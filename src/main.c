@@ -95,7 +95,7 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 			opt->hash_size = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-k")) {
-			opt->hash_size = atoi(argv[pos + 1]);
+			opt->kmer_size = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-o")) {
 			opt->out_dir = argv[pos + 1];
