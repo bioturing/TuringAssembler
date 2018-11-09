@@ -17,6 +17,7 @@ struct opt_count_t {
 	int n_threads;
 	int hash_size;
 	int kmer_size;
+	int filter_thres;
 	int n_files;
 	char **files_1, **files_2;
 	char *out_dir;
@@ -64,6 +65,7 @@ struct opt_count_t *init_opt_count()
 	opt->hash_size = (1 << 24);
 	opt->kmer_size = 29;
 	opt->n_files = 0;
+	opt->filter_thres = 1;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = "./";
 	return opt;
@@ -112,6 +114,9 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
 			pos += (n + 1);
+		} else if (!strcmp(argv[pos], "--filter-threshold")) {
+			opt->filter_thres = atoi(argv[pos + 1]);
+			pos += 2;
 		} else if (argv[pos][0] != '-') {
 			if (opt->n_files != 0)
 				__ERROR("Unknown %s", argv[pos]);
@@ -139,10 +144,26 @@ void print_usage(const char *prog)
 
 struct kmhash_t *count_kmer(struct opt_count_t *opt);
 
+void filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
+{
+	kmint_t n_filters, i;
+	kmkey_t tombstone;
+	n_filters = 0;
+	tombstone = (kmkey_t)-1;
+	for (i = 0; i < V->n_items; ++i) {
+		if (V->bucks[i].idx == tombstone)
+			continue;
+		if (V->bucks[i].cnt <= opt->filter_thres)
+			++n_filters;
+	}
+	__VERBOSE_LOG("Result", "Number of filtered vertices        : %20d\n", (int)n_filters);
+}
+
 void main_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *V;
 	V = count_kmer(opt);
+	filter_kmer(V, opt);
 	kmhash_destroy(V);
 }
 
