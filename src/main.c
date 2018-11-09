@@ -325,11 +325,11 @@ void count_kmer_read(struct read_t *r, struct worker_bundle_t *bundle)
 			last = 0;
 		}
 		if (last >= k) {
-			// if (knum < krev)
-			// 	kmhash_inc_val_wrap(h, knum, lock_hash);
-			// else
-			// 	kmhash_inc_val_wrap(h, krev, lock_hash);
+			if (knum < krev)
 				kmhash_inc_val_wrap(h, knum, lock_hash);
+			else
+				kmhash_inc_val_wrap(h, krev, lock_hash);
+			//	kmhash_inc_val_wrap(h, knum, lock_hash);
 		}
 	}
 	// if (bundle->count_reverse) {
