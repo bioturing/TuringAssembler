@@ -8,6 +8,7 @@
 #include <sys/time.h>
 
 #include "get_buffer.h"
+#include "io_utils.h"
 #include "kmer_count.h"
 #include "kmhash.h"
 #include "utils.h"
@@ -21,7 +22,7 @@ struct opt_count_t *init_opt_count()
 	opt->hash_size = (1 << 24);
 	opt->kmer_size = 29;
 	opt->n_files = 0;
-	opt->filter_thres = 1;
+	opt->filter_thres = 0;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
 	return opt;
@@ -101,6 +102,10 @@ void print_usage(const char *prog)
 
 void filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 {
+	char dump_path[1024];
+	strcpy(dump_path, opt->out_dir);
+	strcat(dump_path, "/dump.tsv");
+	FILE *fp = xfopen(dump_path, "wb");
 	kmint_t n_filters, i;
 	kmkey_t tombstone;
 	n_filters = 0;
@@ -110,8 +115,11 @@ void filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 			continue;
 		if (V->bucks[i].cnt <= opt->filter_thres)
 			++n_filters;
+		else
+			fprintf(fp, "%llu\t%u\n", (unsigned long long)V->bucks[i].idx, (unsigned int)V->bucks[i].cnt);
 	}
 	__VERBOSE_LOG("Result", "Number of filtered vertices        : %20d\n", (int)n_filters);
+	fclose(fp);
 }
 
 void main_process(struct opt_count_t *opt)
@@ -125,7 +133,7 @@ void main_process(struct opt_count_t *opt)
 void opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
-	opt = parse_count_option(argc, argv);
+	opt = parse_count_option(argc - 1, argv + 1);
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
@@ -143,6 +151,7 @@ void opt_process(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", opt->kmer_size);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
+	__VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
 	if (opt->n_files == 0) {
 		__VERBOSE_LOG("INFO", "input: { stdin }\n");
 	} else {
@@ -185,7 +194,7 @@ int main(int argc, char *argv[])
 		print_usage(argv[0]);
 		return -1;
 	}
-	opt_process(argc - 1, argv + 1);
+	opt_process(argc, argv);
 	return 0;
 }
 
