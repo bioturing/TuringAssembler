@@ -135,11 +135,12 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 
 void print_usage(const char *prog)
 {
-	__VERBOSE("Usage: %s [options] input.fq <input2.fq...>\n", prog);
-	__VERBOSE("Options: -t     <num_threads>\n");
-	__VERBOSE("         -s     <pre-alloc size>\n");
-	__VERBOSE("         -k     <kmer size>\n");
-	__VERBOSE("         -o     <output directory>\n");
+	__VERBOSE("Usage: %s [options] -1 read_1.fq -2 read_2.fq\n", prog);
+	__VERBOSE("Options: -t                     <number of threads>\n");
+	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -k                     <kmer size>\n");
+	__VERBOSE("         -o                     <output directory>\n");
+	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
 }
 
 struct kmhash_t *count_kmer(struct opt_count_t *opt);
@@ -150,7 +151,7 @@ void filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 	kmkey_t tombstone;
 	n_filters = 0;
 	tombstone = (kmkey_t)-1;
-	for (i = 0; i < V->n_items; ++i) {
+	for (i = 0; i < V->size; ++i) {
 		if (V->bucks[i].idx == tombstone)
 			continue;
 		if (V->bucks[i].cnt <= opt->filter_thres)
@@ -309,10 +310,10 @@ void count_kmer_read(struct read_t *r, struct worker_bundle_t *bundle)
 	seq = r->seq;
 	k = bundle->ksize;
 	kmkey_t knum, krev, kmask;
-	kmask = ((kmkey_t)1 << (k << 2)) - 1;
+	kmask = ((kmkey_t)1 << (k << 1)) - 1;
 	knum = krev = 0;
 	last = 0;
-	lmc = (k - 1) << 2;
+	lmc = (k - 1) << 1;
 	for (i = 0; i < len; ++i) {
 		c = nt4_table[seq[i]];
 		knum = (knum << 2) & kmask;
