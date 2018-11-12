@@ -1,12 +1,16 @@
 #include <stdlib.h>
 #include <string.h>
+#include <zlib.h>
 
 #include "dqueue.h"
 #include "get_buffer.h"
 #include "kmer_count.h"
 #include "kmhash.h"
+#include "kseq.h"
 #include "utils.h"
 #include "verbose.h"
+
+KSEQ_INIT(gzFile, gzread)
 
 struct pair_buffer_t {
 	char *buf1;
@@ -32,6 +36,8 @@ struct worker_stat_t {
 struct worker_bundle_t {
 	struct dqueue_t *q;
 	struct kmhash_t *h;
+	kseq_t *kseq;
+	pthread_mutex_t *lock_input;
 	pthread_mutex_t *lock_count;
 	// pthread_barrier_t *barrier_hash;
 	struct worker_stat_t *global_stat;
@@ -150,22 +156,6 @@ void count_kmer_read(struct read_t *r, struct worker_bundle_t *bundle)
 			//	kmhash_inc_val_wrap(h, knum, lock_hash);
 		}
 	}
-	// if (bundle->count_reverse) {
-	// 	knum = 0;
-	// 	last = 0;
-	// 	for (i = 0; i < len; ++i) {
-	// 		c = nt4_table[seq[len - i - 1]];
-	// 		knum = (knum << 2) & kmask;
-	// 		if (c < 4) {
-	// 			knum |= (c ^ 3);
-	// 			++last;
-	// 		} else {
-	// 			last = 0;
-	// 		}
-	// 		if (last >= k)
-	// 			kmhash_inc_val_wrap(h, knum, lock_hash);
-	// 	}
-	// }
 }
 
 void *count_worker(void *data)
@@ -234,7 +224,123 @@ void *count_worker(void *data)
 	pthread_exit(NULL);
 }
 
-struct kmhash_t *count_kmer(struct opt_count_t *opt)
+void *count_worker_fa(void *data)
+{
+	struct worker_bundle_t *bundle = (struct worker_bundle_t *)data;
+	// struct dqueue_t *q = bundle->q;
+	// struct kmhash_t *h = bundle->h;
+	// pthread_mutex_t *lock_hash = bundle->lock_hash;
+
+	// struct kmthread_bundle_t kmhash_bundle;
+	// kmhash_bundle.thread_no = bundle->thread_no;
+	// kmhash_bundle.n_threads = bundle->n_threads;
+	// kmhash_bundle.barrier = bundle->barrier_hash;
+	// kmhash_init(h, bundle->init_hash_size, 0, &kmhash_bundle);
+
+	struct read_t read;
+	// struct read_t read1, read2;
+	// struct pair_buffer_t *own_buf, *ext_buf;
+	// own_buf = init_pair_buffer();
+
+	// char *buf1, *buf2;
+	// int pos1, pos2, rc1, rc2, input_format;
+	
+	kseq_t *seq;
+	seq = bundle->kseq;
+
+	struct worker_stat_t stat;
+	memset(&stat, 0, sizeof(struct worker_stat_t));
+	pthread_mutex_t *lock_input;
+	lock_input = bundle->lock_input;
+
+	while (1) {
+		pthread_mutex_lock(lock_input);
+		if (kseq_read(seq) >= 0) {
+			__VERBOSE("Read sequence: %s\n", seq->name.s);
+			// read.name = strdup(seq->name.s);
+			read.len = seq->seq.l;
+			read.seq = strdup(seq->seq.s);
+		} else {
+			read.seq = NULL;
+			read.len = 0;
+		}
+		pthread_mutex_unlock(lock_input);
+		if (read.seq == NULL)
+			break;
+		count_kmer_read(&read, bundle);
+		free(read.seq);
+	}
+	// pthread_mutex_lock(bundle->lock_count);
+	// bundle->global_stat->r1_sum += stat.r1_sum;
+	// bundle->global_stat->r2_sum += stat.r2_sum;
+	__sync_add_and_fetch(&(bundle->global_stat->nread), stat.nread);
+	// bundle->global_stat->nread += stat.nread;
+	// pthread_mutex_unlock(bundle->lock_count);
+
+	pthread_exit(NULL);
+}
+
+struct kmhash_t *count_kmer_fasta(struct opt_count_t *opt)
+{
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct worker_bundle_t *worker_bundles;
+	pthread_t *worker_threads;
+
+	struct worker_stat_t result;
+	memset(&result, 0, sizeof(struct worker_stat_t));
+
+	worker_bundles = malloc(opt->n_threads * sizeof(struct worker_bundle_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	pthread_mutex_t lock_count, lock_input;
+	pthread_mutex_init(&lock_count, NULL);
+	pthread_mutex_init(&lock_input, NULL);
+
+	struct kmhash_t *h;
+	h = init_kmhash(opt->hash_size, opt->n_threads);
+
+	kseq_t *kseq;
+	gzFile fp = gzopen(opt->files_1[0], "r");
+	kseq = kseq_init(fp);
+
+	int i;
+	for (i = 0; i < opt->n_threads; ++i) {
+		// worker_bundles[i].q = q;
+		worker_bundles[i].h = h;
+		worker_bundles[i].n_threads = opt->n_threads;
+		worker_bundles[i].kseq = kseq;
+		// worker_bundles[i].thread_no = i;
+		// worker_bundles[i].barrier_hash = &barrier_hash;
+		worker_bundles[i].lock_count = &lock_count;
+		worker_bundles[i].lock_input = &lock_input;
+		worker_bundles[i].lock_hash = h->locks + i;
+		worker_bundles[i].global_stat = &result;
+
+		worker_bundles[i].ksize = opt->kmer_size;
+		pthread_create(worker_threads + i, &attr, count_worker_fa, worker_bundles + i);
+	}
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	kseq_destroy(kseq);
+	gzclose(fp);
+
+	__VERBOSE_LOG("Result", "Number of read                 : %20d\n", result.nread);
+	__VERBOSE_LOG("Result", "Number of kmer                 : %20llu\n", (unsigned long long)h->n_items);
+	return h;
+}
+
+struct kmhash_t *count_kmer_SE(struct opt_count_t *opt)
+{
+	return NULL;
+}
+
+struct kmhash_t *count_kmer_PE(struct opt_count_t *opt)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -299,7 +405,6 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 		worker_bundles[i].global_stat = &result;
 
 		worker_bundles[i].ksize = opt->kmer_size;
-		worker_bundles[i].count_reverse = 0;
 		pthread_create(worker_threads + i, &attr, count_worker, worker_bundles + i);
 	}
 
@@ -312,5 +417,20 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 	__VERBOSE_LOG("Result", "Number of read                 : %20d\n", result.nread);
 	__VERBOSE_LOG("Result", "Number of kmer                 : %20llu\n", (unsigned long long)h->n_items);
 	return h;
+}
+
+struct kmhash_t *count_kmer(struct opt_count_t *opt)
+{
+	int input_type;
+	input_type = get_format(opt->files_1[0]);
+	if (input_type == TYPE_FASTA) {
+		return count_kmer_fasta(opt);
+	} else if (input_type == TYPE_FASTQ) {
+		if (opt->files_1 != NULL && opt->files_2 != NULL)
+			return count_kmer_PE(opt);
+		else
+			return count_kmer_SE(opt);
+	}
+	return NULL;
 }
 

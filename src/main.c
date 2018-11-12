@@ -23,7 +23,7 @@ struct opt_count_t *init_opt_count()
 	opt->n_files = 0;
 	opt->filter_thres = 1;
 	opt->files_1 = opt->files_2 = NULL;
-	opt->out_dir = "./";
+	opt->out_dir = ".";
 	return opt;
 }
 
@@ -129,6 +129,16 @@ void opt_process(int argc, char *argv[])
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
+
+	int cmd_len = 0, i;
+	for (i = 0; i < argc; ++i)
+		cmd_len += strlen(argv[i]) + 1;
+	char *cmd = malloc(cmd_len);
+	cmd_len = 0;
+	for (i = 0; i < argc; ++i)
+		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
+	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
+	free(cmd);
 
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", opt->kmer_size);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
