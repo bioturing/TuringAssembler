@@ -11,6 +11,7 @@ EXEC = kmer_count
 SRC = src/dqueue.c 				\
       src/get_buffer.c 				\
       src/io_utils.c 				\
+      src/kmer_count.c 				\
       src/kmhash.c 				\
       src/verbose.c 				\
       src/utils.c 				\

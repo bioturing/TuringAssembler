@@ -13,6 +13,8 @@
 
 #define BUF_SIZE		SIZE_1MB
 
+int get_format(const char *file_path);
+
 struct gb_file_inf {
 	gzFile fi;
 	int size;

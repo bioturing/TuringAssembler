@@ -16,4 +16,14 @@ struct read_t {
 	int len;
 };
 
+struct opt_count_t {
+	int n_threads;
+	int hash_size;
+	int kmer_size;
+	int filter_thres;
+	int n_files;
+	char **files_1, **files_2;
+	char *out_dir;
+};
+
 #endif

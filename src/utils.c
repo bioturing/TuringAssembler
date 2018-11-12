@@ -74,8 +74,8 @@ char *get_rev_complement(const char *seq, int len)
 
 	char *ret = malloc(len + 1);
 	int i, k;
-	for (i = 0, k = len - 1; i < len; ++i, --k) 
-		ret[i] = rev_nt4_char[nt4_table[seq[k]]];
+	for (i = 0, k = len - 1; i < len; ++i, --k)
+		ret[i] = rev_nt4_char[nt4_table[(int)seq[k]]];
 	ret[len] = '\0';
 	return ret;
 }
@@ -96,7 +96,7 @@ int64_t seq2num(const char *seq, int len)
 	int64_t ret = 0;
 	int i;
 	for (i = 0; i < len; ++i)
-		ret = ret * 5 + nt4_table[seq[i]];
+		ret = ret * 5 + nt4_table[(int)seq[i]];
 	return ret;
 }
 

@@ -4,7 +4,7 @@
 #include "utils.h"
 #include "verbose.h"
 
-static int get_format(char *file_path)
+int get_format(const char *file_path)
 {
 	char buf[1024];
 	gzFile file;
