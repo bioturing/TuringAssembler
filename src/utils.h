@@ -33,6 +33,10 @@
 // #include <sys/time.h>
 // #endif
 
+// #include "attribute.h"
+// #include "khash.h"
+
+
 /* color terminal */
 
 #define MAX_INT32		2147483647

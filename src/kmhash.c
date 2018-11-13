@@ -11,16 +11,16 @@
 				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
 				 ++(x))
 
-#define HM_MAGIC_1                      UINT64_C(0xbf58476d1ce4e5b9)
-#define HM_MAGIC_2                      UINT64_C(0x94d049bb133111eb)
+#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
+#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
 
 static kmkey_t __hash_int2(kmkey_t k)
 {
-        kmkey_t x = k;
-        x = (x ^ (x >> 30)) * HM_MAGIC_1;
-        x = (x ^ (x >> 27)) * HM_MAGIC_2;
-        x ^= (x > 31);
-        return x;
+	kmkey_t x = k;
+	x = (x ^ (x >> 30)) * HM_MAGIC_1;
+	x = (x ^ (x >> 27)) * HM_MAGIC_2;
+	x ^= (x > 31);
+	return x;
 }
 
 static kmint_t estimate_probe(kmint_t size)
