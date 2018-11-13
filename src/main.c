@@ -222,11 +222,18 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 void main_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *V;
+	__VERBOSE("Counting kmer...\n");
 	V = count_kmer(opt);
 	khash_t(kvert) *hvert;
+	__VERBOSE("Filtering vertices...\n");
 	hvert = filter_kmer(V, opt);
 	kmhash_destroy(V);
-	int16_t *edge_count = get_edges(opt, hvert);
+
+	int16_t *edge_count;
+	__VERBOSE("Counting edges...\n");
+	edge_count = get_edges(opt, hvert);
+
+	__VERBOSE("Dumping graph...\n");
 	dump_graph(opt, hvert, edge_count);
 }
 

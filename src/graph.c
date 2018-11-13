@@ -195,6 +195,7 @@ void *edge_worker(void *data)
 int16_t *get_edges(struct opt_count_t *opt, khash_t(kvert) *h)
 {
 	int nvert = kh_size(h);
+	__VERBOSE("Number of vertices: %d\n", nvert);
 	int16_t *edges = calloc(nvert * 8, sizeof(int16_t));
 
 	pthread_attr_t attr;
