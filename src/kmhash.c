@@ -185,7 +185,8 @@ void kmhash_inc_val_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
 
 	pthread_mutex_lock(lock);
 	k = kmhash_put(h, key);
-	__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
+	if (k < h->size)
+		__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
 	pthread_mutex_unlock(lock);
 
 	if (k == h->size) {
@@ -194,7 +195,8 @@ void kmhash_inc_val_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
 
 		pthread_mutex_lock(lock);
 		k = kmhash_put(h, key);
-		__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
+		if (k < h->size)
+			__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
 		pthread_mutex_unlock(lock);
 	}
 }

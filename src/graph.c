@@ -117,7 +117,7 @@ void add_edge(struct read_t *r, struct e_bundle_t *bundle)
 			last = 0;
 		}
 		if (last >= k + 1) { // k + 1 for an edge
-			ck = nt4_table[(int)seq[i - k]];
+			ck = nt4_table[(int)seq[i - k]] ^ 3;
 			// insert forward edge
 			if (pknum < pkrev) {
 				ki = kh_get(kvert, h, pknum);
@@ -127,15 +127,17 @@ void add_edge(struct read_t *r, struct e_bundle_t *bundle)
 			}
 			if (knum < krev) {
 				kk = kh_get(kvert, h, knum);
+				ck += 4;
 			} else {
 				kk = kh_get(kvert, h, krev);
-				ck += 4;
 			}
 			if (ki != kh_end(h) && kk != kh_end(h)) {
-				__sync_fetch_and_add(e + (ki * 8 + ci), 1);
-				__sync_fetch_and_add(e + (kk * 8 + ck), 1);
+				__sync_fetch_and_add(e + (kh_value(h, ki).idx * 8 + ci), 1);
+				__sync_fetch_and_add(e + (kh_value(h, kk).idx * 8 + ck), 1);
 			}
 		}
+		pknum = knum;
+		pkrev = krev;
 	}
 
 }

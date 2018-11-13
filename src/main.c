@@ -122,7 +122,9 @@ khash_t(kvert) *filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 	for (i = 0; i < V->size; ++i) {
 		if (V->bucks[i].idx == tombstone)
 			continue;
-		if (V->bucks[i].cnt > opt->filter_thres) {
+		if (V->bucks[i].cnt > (uint32_t)opt->filter_thres) {
+			if (V->bucks[i].idx == 0)
+				fprintf(stderr, "Count????? %lu\n", V->bucks[i].cnt);
 			k = kh_put(kvert, h, V->bucks[i].idx, &ret);
 			kh_value(h, k).cnt = V->bucks[i].cnt;
 			kh_value(h, k).idx = n_chosen++;
@@ -156,8 +158,8 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 {
 	char dump_path[1024];
 	strcpy(dump_path, opt->out_dir);
-	strcat(dump_path, "/dump.tsv");
-	FILE *fp = xfopen(dump_path, "wb");
+	strcat(dump_path, "/graph.gfa");
+	FILE *fp = xfopen(dump_path, "w");
 	int ksize, node_id, c;
 	uint64_t kmask, idx, rev_idx, adj_idx, rev_adj_idx;
 	int16_t *adj;
@@ -180,11 +182,11 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 		node_id = kh_value(h, i).idx;
 		__get_revc_num(idx, rev_idx, ksize, kmask);
 
-		adj = edges + (idx * 8);
+		adj = edges + (node_id * 8);
 		for (c = 0; c < 4; ++c) {
 			if (adj[c]) {
 				adj_idx = ((idx << 2) & kmask) | c;
-				rev_adj_idx = (rev_idx >> 2) | ((c ^ 3) << ((ksize << 1) - 2));
+				rev_adj_idx = (rev_idx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
 				if (adj_idx < rev_adj_idx) {
 					ik = kh_get(kvert, h, adj_idx);
 					assert(ik != kh_end(h));
@@ -199,7 +201,7 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 			}
 			if (adj[c + 4]) {
 				adj_idx = ((rev_idx << 2) & kmask) | c;
-				rev_adj_idx = (idx >> 2) | ((c ^ 3) << ((ksize << 1) - 2));
+				rev_adj_idx = (idx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
 				if (adj_idx < rev_adj_idx) {
 					ik = kh_get(kvert, h, adj_idx);
 					assert(ik != kh_end(h));
