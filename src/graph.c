@@ -15,6 +15,90 @@
 #include "verbose.h"
 
 
+struct graph_t {
+	int n_v, n_k, n_e;
+	int16_t *kmer_count;
+
+	// kmer list info
+	int *chain_head;
+	uint64_t *chain_kmer;
+	
+	// adjacency list
+	int *fhead, *rhead;
+	int *fadj, *radj;
+};
+
+#define __off_bit(a, i) ((a)[(i) >> 5] &= (~(1 << ((i) & 31))))
+#define __on_bit(a, i) ((a)[(i) >> 5] |= (1 << ((i) & 31)))
+#define __get_bit(a, i) (1 & ((a)[(i) >> 5] >> ((i) & 31)))
+
+#define __degree(e) ((!!(e)[0]) + (!!(e)[1]) + (!!(e)[2]) + (!!(e)[3]))
+
+/* We assume that there is only one out going edge */
+#define __only_edge(e) ((!!(e)[1]) + (!!(e)[2]) * 2 + (!!(e)[3]) * 3)
+
+void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
+{
+	struct graph_t *g;
+	g = calloc(1, sizeof(struct graph_t));
+
+	int m_v, m_e;
+	g.n_k = kh_size(h);
+	g.chain_kmer = malloc(g.n_k * sizeof(uint64_t));
+	m_v = 0x1000;
+	m_e = 0x1000;
+
+	g.kmer_count = malloc(m_v * sizeof(int16_t));
+	g.chain_head = malloc(m_v * sizeof(int));
+
+	g.fhead = malloc(m_v * sizeof(int));
+	g.rhead = malloc(m_v * sizeof(int));
+
+	g.fadj = malloc(m_e * sizeof(int));
+	g.radj = malloc(m_e * sizeof(int));
+
+	uint32_t *visited;
+	visited = calloc((nkmer + 31) / 32, sizeof(uint32_t));
+
+	khint_t i;
+	for (i = kh_begin(h); i != kh_end(h); ++i) {
+		if (!kh_exist(h, i))
+			continue;
+		idx = kh_key(h, i);
+		node_id = kh_value(h, i).idx;
+		if (__get_bit(visited, node_id))
+			continue;
+		__get_revc_num(idx, rev_idx, ksize, kmask);
+
+		u_node = node_id;
+		u_idx = idx;
+		u_ridx = rev_idx;
+
+		p_node = -1;
+
+		while (1) {
+			// test the forward edge
+			adj = e + (u_node * 8);
+			if (__degree(adj) == 1) {
+				c = __only_edge(adj);
+				v_idx = ((u_idx << 2) & kmask) | c;
+				v_ridx = (u_ridx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
+				if (v_idx != p_idx && v_idx != p_ridx && v_idx != u_idx && v_idx != u_ridx) {
+					if (v_idx < v_ridx) {
+						ik = kh_get(kvert, h, v_idx);
+						assert(ik != kh_end(h));
+						v_node = kh_value(h, ik).idx;
+					} else {
+						ik = kh_get(kvert, h, v_ridx);
+						assert(ik != kh_end(h));
+					}
+				}
+			}
+		}
+	}
+}
+
+
 struct e_bundle_t {
 	struct dqueue_t *q;
 	khash_t(kvert) *h;

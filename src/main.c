@@ -123,8 +123,6 @@ khash_t(kvert) *filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 		if (V->bucks[i].idx == tombstone)
 			continue;
 		if (V->bucks[i].cnt > (uint32_t)opt->filter_thres) {
-			if (V->bucks[i].idx == 0)
-				fprintf(stderr, "Count????? %lu\n", V->bucks[i].cnt);
 			k = kh_put(kvert, h, V->bucks[i].idx, &ret);
 			kh_value(h, k).cnt = V->bucks[i].cnt;
 			kh_value(h, k).idx = n_chosen++;
@@ -221,6 +219,46 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 	fclose(fp);
 }
 
+struct graph_t {
+	int nV;
+	int16_t *kmer_count;
+
+	// kmer list info
+	int *chain_head;
+	uint64_t *chain_kmer;
+	
+	// adjacency list
+	int *fhead, *rhead;
+	int *fadj, *radj;
+};
+
+#define __off_bit(a, i) ((a)[(i) >> 5] &= (~(1 << ((i) & 31))))
+#define __on_bit(a, i) ((a)[(i) >> 5] |= (1 << ((i) & 31)))
+#define __get_bit(a, i) (1 & ((a)[(i) >> 5] >> ((i) & 31)))
+
+void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
+{
+	struct graph_t *g;
+	g = calloc(1, sizeof(struct graph_t));
+
+	int nkmer;
+	nkmer = kh_size(h);
+
+	uint32_t *visited;
+	visited = calloc((nkmer + 31) / 32, sizeof(uint32_t));
+
+	khint_t i;
+	for (i = kh_begin(h); i != kh_end(h); ++i) {
+		if (!kh_exist(h, i))
+			continue;
+		idx = kh_key(h, i);
+		node_id = kh_value(h, i).idx;
+		if (__get_bit(visited, node_id))
+			continue;
+		__get_revc_num(idx, rev_idx, ksize, kmask);
+	}
+}
+
 void main_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *V;
@@ -234,6 +272,8 @@ void main_process(struct opt_count_t *opt)
 	int16_t *edge_count;
 	__VERBOSE("Counting edges...\n");
 	edge_count = get_edges(opt, hvert);
+
+	reduce_graph(opt, hvert, edge_count);
 
 	__VERBOSE("Dumping graph...\n");
 	dump_graph(opt, hvert, edge_count);
