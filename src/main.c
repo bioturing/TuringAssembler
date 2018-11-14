@@ -219,46 +219,6 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 	fclose(fp);
 }
 
-struct graph_t {
-	int nV;
-	int16_t *kmer_count;
-
-	// kmer list info
-	int *chain_head;
-	uint64_t *chain_kmer;
-	
-	// adjacency list
-	int *fhead, *rhead;
-	int *fadj, *radj;
-};
-
-#define __off_bit(a, i) ((a)[(i) >> 5] &= (~(1 << ((i) & 31))))
-#define __on_bit(a, i) ((a)[(i) >> 5] |= (1 << ((i) & 31)))
-#define __get_bit(a, i) (1 & ((a)[(i) >> 5] >> ((i) & 31)))
-
-void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
-{
-	struct graph_t *g;
-	g = calloc(1, sizeof(struct graph_t));
-
-	int nkmer;
-	nkmer = kh_size(h);
-
-	uint32_t *visited;
-	visited = calloc((nkmer + 31) / 32, sizeof(uint32_t));
-
-	khint_t i;
-	for (i = kh_begin(h); i != kh_end(h); ++i) {
-		if (!kh_exist(h, i))
-			continue;
-		idx = kh_key(h, i);
-		node_id = kh_value(h, i).idx;
-		if (__get_bit(visited, node_id))
-			continue;
-		__get_revc_num(idx, rev_idx, ksize, kmask);
-	}
-}
-
 void main_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *V;
