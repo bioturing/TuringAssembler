@@ -56,6 +56,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 	uint64_t *chain;
 	int16_t *adj, *v_radj;
 	g.n_k = kh_size(h);
+	g.n_v = g.n_e = 0;
 	g.kmer_chain_id = malloc(g.n_k * sizeof(int));
 	g.chain_kmer = malloc(g.n_k * sizeof(uint64_t));
 	g.n_k = 0;
