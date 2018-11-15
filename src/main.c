@@ -134,7 +134,7 @@ khash_t(kvert) *filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
 	return h;
 }
 
-void dump_seq(uint64_t num, char *seq, int len)
+static void dump_seq(uint64_t num, char *seq, int len)
 {
 	seq[len] = '\0';
 	while (len) {
@@ -156,7 +156,7 @@ void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
 {
 	char dump_path[1024];
 	strcpy(dump_path, opt->out_dir);
-	strcat(dump_path, "/graph.gfa");
+	strcat(dump_path, "/graph_raw.gfa");
 	FILE *fp = xfopen(dump_path, "w");
 	int ksize, node_id, c;
 	uint64_t kmask, idx, rev_idx, adj_idx, rev_adj_idx;
@@ -235,8 +235,11 @@ void main_process(struct opt_count_t *opt)
 
 	reduce_graph(opt, hvert, edge_count);
 
-	__VERBOSE("Dumping graph...\n");
+	__VERBOSE("Dumping raw graph...\n");
 	dump_graph(opt, hvert, edge_count);
+
+	__VERBOSE("Dumping reduced graph...\n");
+	reduce_graph(opt, hvert, edge_count);
 }
 
 void opt_process(int argc, char *argv[])
