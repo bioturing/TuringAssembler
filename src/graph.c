@@ -424,9 +424,9 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 				}
 				uk = g.kmer_chain_id[v_node];
 				if (v_ridx == g.chain_kmer[g.chain_head[uk + 1] - 1])
-					g.radj[--g.rhead[k]] = uk + 1;
-				else if (v_idx == g.chain_kmer[g.chain_head[uk]])
 					g.radj[--g.rhead[k]] = -(uk + 1);
+				else if (v_idx == g.chain_kmer[g.chain_head[uk]])
+					g.radj[--g.rhead[k]] = uk + 1;
 				else {
 					if (v_ridx == g.chain_kmer[g.chain_head[uk]] || v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
 						fprintf(stderr, "Wrong connect\n");
