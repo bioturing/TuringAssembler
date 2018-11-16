@@ -33,16 +33,16 @@ static void dump_seq(uint64_t num, char *seq, int len)
 	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2), \
 	(x) ^= 0xffffffffffffffffull, (x) &= (mask))
 
-#define __off_bit(a, i) ((a)[(i) >> 5] &= (~(1 << ((i) & 31))))
-#define __on_bit(a, i) ((a)[(i) >> 5] |= (1 << ((i) & 31)))
+#define __off_bit(a, i) ((a)[(i) >> 5] &= (~((uint32_t)1 << ((i) & 31))))
+#define __on_bit(a, i) ((a)[(i) >> 5] |= ((uint32_t)1 << ((i) & 31)))
 #define __get_bit(a, i) (1 & ((a)[(i) >> 5] >> ((i) & 31)))
 
-#define __degree(e) ((!!(e)[0]) + (!!(e)[1]) + (!!(e)[2]) + (!!(e)[3]))
+#define __degree(e) ((int)((e)[0] > 0) + ((e)[1] > 0) + ((e)[2] > 0) + ((e)[3] > 0))
 
 /* We assume that there is only one out going edge */
-#define __only_edge(e) ((!!(e)[1]) + (!!(e)[2]) * 2 + (!!(e)[3]) * 3)
+#define __only_edge(e) ((int)((e)[1] > 0) + 2 * ((e)[2] > 0) + 3 * ((e)[3] > 0))
 
-void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
+void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 {
 	struct graph_t *ret_g, g;
 	ret_g = calloc(1, sizeof(struct graph_t));
@@ -54,7 +54,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 	kmask = (1ull << (ksize << 1)) - 1;
 
 	uint64_t *chain;
-	int16_t *adj, *v_radj;
+	uint32_t *adj, *v_radj;
 	g.n_k = kh_size(h);
 	g.n_v = g.n_e = 0;
 	g.kmer_chain_id = malloc(g.n_k * sizeof(int));
@@ -67,6 +67,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 
 	g.kmer_count = malloc(m_v * sizeof(int));
 	g.chain_head = malloc(m_v * sizeof(int));
+	g.chain_head[0] = 0;
 
 	uint32_t *visited;
 	visited = calloc((g.n_k + 31) / 32, sizeof(uint32_t));
@@ -77,15 +78,19 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 			continue;
 		idx = kh_key(h, i);
 		node_id = kh_value(h, i).idx;
+		if (!(node_id < g.n_k && node_id >= 0)) {
+			fprintf(stderr, "node_id = %d; g.n_k = %d\n", node_id, g.n_k);
+			assert(0);
+		}
 		if (__get_bit(visited, node_id))
 			continue;
 		__get_revc_num(idx, ridx, ksize, kmask);
 		assert(idx <= ridx);
 
-		if (g.n_v + 1 > m_v) {
+		if (g.n_v + 2 > m_v) {
 			m_v <<= 1;
-			g.kmer_count = realloc(g.kmer_count, (m_v + 1) * sizeof(int));
-			g.chain_head = realloc(g.chain_head, (m_v + 1) * sizeof(int));
+			g.kmer_count = realloc(g.kmer_count, m_v * sizeof(int));
+			g.chain_head = realloc(g.chain_head, m_v * sizeof(int));
 		}
 
 		chain = g.chain_kmer + g.chain_head[g.n_v];
@@ -189,10 +194,63 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 				chain[old_lchain - k - 1] = tmp;
 			}
 			if (old_lchain & 1) {
-				__get_revc_num(chain[(old_lchain + 1) >> 1], tmp, ksize, kmask);
-				chain[(old_lchain + 1) >> 1] = tmp;
+				__get_revc_num(chain[old_lchain >> 1], tmp, ksize, kmask);
+				chain[old_lchain >> 1] = tmp;
 			}
 		}
+
+		// check sanity code
+		u_idx = chain[0];
+		__get_revc_num(u_idx, u_ridx, ksize, kmask);
+		for (k = 1; k < lchain; ++k) {
+			if (u_idx < u_ridx) {
+				ik = kh_get(kvert, h, u_idx);
+				u_node = kh_value(h, ik).idx;
+				adj = e + (u_node * 8);
+			} else {
+				ik = kh_get(kvert, h, u_ridx);
+				u_node = kh_value(h, ik).idx;
+				adj = e + (u_node * 8 + 4);
+			}
+			if (__degree(adj) != 1) {
+				fprintf(stderr, "Sanity check errrorrrr!!!!\n");
+				assert(0);
+			}
+			c = __only_edge(adj);
+			v_idx = ((u_idx << 2) & kmask) | c;
+			v_ridx = (u_ridx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
+			if (v_idx != chain[k]) {
+				if (k < old_lchain)
+					fprintf(stderr, "In the reverse\n");
+				fprintf(stderr, "not equal\n");
+				assert(0);
+			}
+			u_idx = v_idx;
+			u_ridx = v_ridx;
+		}
+		u_ridx = chain[lchain - 1];
+		__get_revc_num(u_ridx, u_idx, ksize, kmask);
+		for (k = 1; k < lchain; ++k) {
+			if (u_idx < u_ridx) {
+				ik = kh_get(kvert, h, u_idx);
+				u_node = kh_value(h, ik).idx;
+				adj = e + (u_node * 8);
+			} else {
+				ik = kh_get(kvert, h, u_ridx);
+				u_node = kh_value(h, ik).idx;
+				adj = e + (u_node * 8 + 4);
+			}
+			if (__degree(adj) != 1) {
+				fprintf(stderr, "Sanity check errrorrrr!!!!\n");
+				assert(0);
+			}
+			c = __only_edge(adj);
+			v_idx = ((u_idx << 2) & kmask) | c;
+			v_ridx = (u_ridx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
+			u_idx = v_idx;
+			u_ridx = v_ridx;
+		}
+
 
 		g.chain_head[g.n_v + 1] = g.chain_head[g.n_v] + lchain;
 		++g.n_v;
@@ -204,7 +262,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 	// Count edge
 	for (k = 0; k < g.n_v; ++k) {
 		// forward edge
-		u_idx = g.chain_kmer[g.chain_head[k + 1]];
+		u_idx = g.chain_kmer[g.chain_head[k + 1] - 1];
 		__get_revc_num(u_idx, u_ridx, ksize, kmask);
 		if (u_idx < u_ridx) {
 			ik = kh_get(kvert, h, u_idx);
@@ -235,6 +293,53 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 		}
 		g.rhead[k] = __degree(adj);
 	}
+
+	__VERBOSE("Number of vertices in reduced graph: %d\n", g.n_v);
+
+	// int seq_len, m_len;
+	// char *seq;
+	// m_len = 128;
+	// seq = malloc(m_len);
+
+	// dumping graph
+	// char dump_path[1024];
+	// strcpy(dump_path, opt->out_dir);
+	// strcat(dump_path, "/graph_reduced.gfa");
+	// FILE *fp = xfopen(dump_path, "w");
+
+	// for (k = 0; k < g.n_v; ++k) {
+	// 	seq_len = (g.chain_head[k + 1] - g.chain_head[k] - 1) + ksize;
+	// 	if (seq_len + 1 > m_len) {
+	// 		m_len = seq_len + 1;
+	// 		seq = realloc(seq, m_len + 1);
+	// 	}
+	// 	dump_seq(g.chain_kmer[g.chain_head[k]], seq, ksize);
+	// 	seq_len = ksize;
+	// 	for (c = g.chain_head[k] + 1; c < g.chain_head[k + 1]; ++c)
+	// 		seq[seq_len++] = nt4_char[g.chain_kmer[c] & 3];
+	// 	seq[seq_len] = '\0';
+	// 	fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
+	// 	for (c = g.chain_head[k]; c < g.chain_head[k + 1]; ++c) {
+	// 		__get_revc_num(g.chain_kmer[c], tmp, ksize, kmask);
+	// 		fprintf(fp, c + 1 == g.chain_head[k + 1] ? "%llu\t%c\n" : "%llu\t%c\t",
+	// 			(unsigned long long)g.chain_kmer[c],
+	// 			g.chain_kmer[c] < tmp ? '+' : '-');
+	// 	}
+	// }
+
+	// for (k = 0; k < g.n_v; ++k) {
+	// 	for (c = g.fhead[k]; c < g.fhead[k + 1]; ++c) {
+	// 		fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
+	// 			k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
+	// 			g.fadj[c] > 0 ? '+' : '-', ksize - 1);
+	// 	}
+	// 	for (c = g.rhead[k]; c < g.rhead[k + 1]; ++c) {
+	// 		fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
+	// 			k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
+	// 			g.radj[c] > 0 ? '+' : '-', ksize - 1);
+	// 	}
+	// }
+	// fclose(fp);
 
 	for (k = 1; k <= g.n_v; ++k) {
 		g.fhead[k] += g.fhead[k - 1];
@@ -274,11 +379,64 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 				}
 				uk = g.kmer_chain_id[v_node];
 				if (v_idx == g.chain_kmer[g.chain_head[uk]])
-					g.fadj[g.fhead[k]--] = uk + 1;
+					g.fadj[--g.fhead[k]] = uk + 1;
 				else if (v_ridx == g.chain_kmer[g.chain_head[uk + 1] - 1])
-					g.fadj[g.fhead[k]--] = -(uk + 1);
-				else
+					g.fadj[--g.fhead[k]] = -(uk + 1);
+				else {
+					if (v_ridx == g.chain_kmer[g.chain_head[uk]] || v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
+						fprintf(stderr, "Wrong connect\n");
+					fprintf(stderr, "k = %d; uk = %d\n", k, uk);
+					char *tmp_seq = malloc(ksize + 1);
+					dump_seq(u_idx, tmp_seq, ksize);
+					fprintf(stderr, "u_idx = %s\n", tmp_seq);
+					dump_seq(u_ridx, tmp_seq, ksize);
+					fprintf(stderr, "u_ridx = %s\n", tmp_seq);
+
+					dump_seq(v_idx, tmp_seq, ksize);
+					fprintf(stderr, "v_idx = %s\n", tmp_seq);
+					dump_seq(v_ridx, tmp_seq, ksize);
+					fprintf(stderr, "v_ridx = %s\n", tmp_seq);
+					dump_seq(g.chain_kmer[g.chain_head[uk]], tmp_seq, ksize);
+
+					fprintf(stderr, "v_begin = %s\n", tmp_seq);
+					dump_seq(g.chain_kmer[g.chain_head[uk + 1] - 1], tmp_seq, ksize);
+					fprintf(stderr, "v_end = %s\n", tmp_seq);
+					fprintf(stderr, "u info:\n");
+					if (u_idx < u_ridx) {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[u_node], e[u_node + 1],
+								e[u_node + 2], e[u_node + 3],
+								e[u_node + 4], e[u_node + 5],
+								e[u_node + 6], e[u_node + 7]);
+					} else {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[u_node + 4], e[u_node + 5],
+								e[u_node + 6], e[u_node + 7],
+								e[u_node], e[u_node + 1],
+								e[u_node + 2], e[u_node + 3]);
+					}
+					fprintf(stderr, "v info:\n");
+					if (v_idx < v_ridx) {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[v_node], e[v_node + 1],
+								e[v_node + 2], e[v_node + 3],
+								e[v_node + 4], e[v_node + 5],
+								e[v_node + 6], e[v_node + 7]);
+					} else {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[v_node + 4], e[v_node + 5],
+								e[v_node + 6], e[v_node + 7],
+								e[v_node], e[v_node + 1],
+								e[v_node + 2], e[v_node + 3]);
+					}
+
+					fprintf(stderr, "adj info:\n");
+					fprintf(stderr, "adj = (%d, %d, %d, %d)\n",
+						adj[0], adj[1], adj[2], adj[3]);
+
+					fprintf(stderr, "%d\t%d\t%llu\t%llu\n", k, c, (unsigned long long)u_idx, (unsigned long long)v_idx);
 					assert(0);
+				}
 			}
 		}
 
@@ -310,12 +468,58 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 					v_node = kh_value(h, ik).idx;
 				}
 				uk = g.kmer_chain_id[v_node];
-				if (v_idx == g.chain_kmer[g.chain_head[uk]])
-					g.radj[g.rhead[k]--] = uk + 1;
-				else if (v_ridx == g.chain_kmer[g.chain_head[uk + 1] - 1])
-					g.radj[g.rhead[k]--] = -(uk + 1);
-				else
+				if (v_ridx == g.chain_kmer[g.chain_head[uk + 1] - 1])
+					g.radj[--g.rhead[k]] = uk + 1;
+				else if (v_idx == g.chain_kmer[g.chain_head[uk]])
+					g.radj[--g.rhead[k]] = -(uk + 1);
+				// if (v_ridx == g.chain_kmer[g.chain_head[uk]])
+				// 	g.radj[g.rhead[k]--] = uk + 1;
+				// else if (v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
+				// 	g.radj[g.rhead[k]--] = -(uk + 1);
+				else {
+					if (v_ridx == g.chain_kmer[g.chain_head[uk]] || v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
+						fprintf(stderr, "Wrong connect\n");
+					fprintf(stderr, "uk = %d\n", uk);
+					char *tmp_seq = malloc(ksize + 1);
+					dump_seq(v_idx, tmp_seq, ksize);
+					fprintf(stderr, "idx = %s\n", tmp_seq);
+					dump_seq(v_ridx, tmp_seq, ksize);
+					fprintf(stderr, "ridx = %s\n", tmp_seq);
+					dump_seq(g.chain_kmer[g.chain_head[uk]], tmp_seq, ksize);
+					fprintf(stderr, "v_begin = %s\n", tmp_seq);
+					dump_seq(g.chain_kmer[g.chain_head[uk + 1] - 1], tmp_seq, ksize);
+					fprintf(stderr, "v_end = %s\n", tmp_seq);
+					fprintf(stderr, "u info:\n");
+					if (u_idx < u_ridx) {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[u_node], e[u_node + 1],
+								e[u_node + 2], e[u_node + 3],
+								e[u_node + 4], e[u_node + 5],
+								e[u_node + 6], e[u_node + 7]);
+					} else {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[u_node + 4], e[u_node + 5],
+								e[u_node + 6], e[u_node + 7],
+								e[u_node], e[u_node + 1],
+								e[u_node + 2], e[u_node + 3]);
+					}
+					fprintf(stderr, "v info:\n");
+					if (v_idx < v_ridx) {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[v_node], e[v_node + 1],
+								e[v_node + 2], e[v_node + 3],
+								e[v_node + 4], e[v_node + 5],
+								e[v_node + 6], e[v_node + 7]);
+					} else {
+						fprintf(stderr, "fw = (%d, %d, %d, %d), rv = (%d, %d, %d, %d)\n",
+								e[v_node + 4], e[v_node + 5],
+								e[v_node + 6], e[v_node + 7],
+								e[v_node], e[v_node + 1],
+								e[v_node + 2], e[v_node + 3]);
+					}
+					// fprintf(stderr, "%d\t%d\t%llu\t%llu\n", k, c, (unsigned long long)u_idx, (unsigned long long)v_idx);
 					assert(0);
+				}
 			}
 		}
 	}
@@ -325,7 +529,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 	m_len = 128;
 	seq = malloc(m_len);
 
-	// dumping graph
+	// // dumping graph
 	char dump_path[1024];
 	strcpy(dump_path, opt->out_dir);
 	strcat(dump_path, "/graph_reduced.gfa");
@@ -364,7 +568,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e)
 struct e_bundle_t {
 	struct dqueue_t *q;
 	khash_t(kvert) *h;
-	int16_t *e;
+	uint32_t *e;
 	int ksize;
 };
 
@@ -436,7 +640,7 @@ static void *producer_worker(void *data)
 void add_edge(struct read_t *r, struct e_bundle_t *bundle)
 {
 	khash_t(kvert) *h = bundle->h;
-	int16_t *e = bundle->e;
+	uint32_t *e = bundle->e;
 
 	int i, k, last, ci, ck, len, lmc;
 	char *seq;
@@ -540,11 +744,11 @@ void *edge_worker(void *data)
 
 }
 
-int16_t *get_edges(struct opt_count_t *opt, khash_t(kvert) *h)
+uint32_t *get_edges(struct opt_count_t *opt, khash_t(kvert) *h)
 {
 	int nvert = kh_size(h);
 	__VERBOSE("Number of vertices: %d\n", nvert);
-	int16_t *edges = calloc(nvert * 8, sizeof(int16_t));
+	uint32_t *edges = calloc(nvert * 8, sizeof(uint32_t));
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);

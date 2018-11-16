@@ -20,8 +20,8 @@ struct graph_t {
 };
 
 
-int16_t *get_edges(struct opt_count_t *opt, khash_t(kvert) *h);
+uint32_t *get_edges(struct opt_count_t *opt, khash_t(kvert) *h);
 
-void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *e);
+void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e);
 
 #endif

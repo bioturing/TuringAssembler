@@ -229,14 +229,12 @@ void main_process(struct opt_count_t *opt)
 	hvert = filter_kmer(V, opt);
 	kmhash_destroy(V);
 
-	int16_t *edge_count;
+	uint32_t *edge_count;
 	__VERBOSE("Counting edges...\n");
 	edge_count = get_edges(opt, hvert);
 
-	reduce_graph(opt, hvert, edge_count);
-
-	__VERBOSE("Dumping raw graph...\n");
-	dump_graph(opt, hvert, edge_count);
+	// __VERBOSE("Dumping raw graph...\n");
+	// dump_graph(opt, hvert, edge_count);
 
 	__VERBOSE("Dumping reduced graph...\n");
 	reduce_graph(opt, hvert, edge_count);
