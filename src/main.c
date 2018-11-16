@@ -24,7 +24,8 @@ struct opt_count_t *init_opt_count()
 	opt = calloc(1, sizeof(struct opt_count_t));
 	opt->n_threads = 1;
 	opt->hash_size = (1 << 24);
-	opt->kmer_size = 29;
+	opt->kmer_size = 31;
+	opt->kmer_pre = 15;
 	opt->n_files = 0;
 	opt->filter_thres = 0;
 	opt->files_1 = opt->files_2 = NULL;
@@ -54,6 +55,9 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
+			pos += 2;
+		} else if (!strcmp(argv[pos], "--kmer-pre")) {
+			opt->kmer_pre = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-k")) {
 			opt->kmer_size = atoi(argv[pos + 1]);
