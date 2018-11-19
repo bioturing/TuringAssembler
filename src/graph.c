@@ -474,6 +474,54 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 		}
 	}
 
+	uint32_t *removed;
+	removed = calloc((g.n_v + 31) / 32, sizeof(uint32_t));
+
+	for (k = 0; k < g.n_v; ++k) {
+		int deg = (g.rhead[k + 1] - g.rhead[k]) + (g.fhead[k + 1] - g.fhead[k]);
+		if (deg <= 1) {
+			if (deg == 0) {
+				__on_bit(removed, k);
+				continue;
+			}
+			// Otherwise, deg = 1
+			int v;
+			if (g.rhead[k + 1] - g.rhead[k] == 1) {
+				v = g.radj[g.rhead[k]];
+			} else {
+				v = g.fadj[g.fhead[k]];
+			}
+			int *radj, rdeg;
+			if (v > 0) {
+				radj = g.radj + g.rhead[v - 1];
+				rdeg = g.rhead[v] - g.rhead[v - 1];
+				--v;
+			} else {
+				radj = g.fadj + g.fhead[-v - 1];
+				rdeg = g.fhead[-v] - g.fhead[-v - 1];
+				v = -v - 1;
+			}
+			if (rdeg > 2) {
+				float max_cov;
+				max_cov = 0.0;
+				for (c = 0; c < rdeg; ++c) {
+					int t = radj[c];
+					if (t < 0)
+						t = -t - 1;
+					else
+						--t;
+					float cov = 1.0 * g.kmer_count[t] / (g.chain_head[t + 1] - g.chain_head[t] + ksize - 1);
+					if (cov > max_cov)
+						max_cov = cov;
+				}
+				float cov = 1.0 * g.kmer_count[k] / (g.chain_head[k + 1] - g.chain_head[k] + ksize - 1);
+				if (cov / max_cov < 0.5) {
+					__on_bit(removed, k);
+				}
+			}
+		}
+	}
+
 	int seq_len, m_len;
 	char *seq;
 	m_len = 128;
@@ -484,6 +532,9 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 	strcpy(dump_path, opt->out_dir);
 	strcat(dump_path, "/graph_reduced.gfa");
 	FILE *fp = xfopen(dump_path, "w");
+	strcpy(dump_path, opt->out_dir);
+	strcat(dump_path, "/tips.tsv");
+	FILE *fr = xfopen(dump_path, "w");
 
 	for (k = 0; k < g.n_v; ++k) {
 		seq_len = (g.chain_head[k + 1] - g.chain_head[k] - 1) + ksize;
@@ -496,19 +547,36 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 		for (c = g.chain_head[k] + 1; c < g.chain_head[k + 1]; ++c)
 			seq[seq_len++] = nt4_char[g.chain_kmer[c] & 3];
 		seq[seq_len] = '\0';
-		fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
+		if (__get_bit(removed, k))
+			fprintf(fr, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
+		else
+			fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
 	}
 
 	for (k = 0; k < g.n_v; ++k) {
+		if (__get_bit(removed, k))
+			continue;
 		for (c = g.fhead[k]; c < g.fhead[k + 1]; ++c) {
-			fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
-				k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
-				g.fadj[c] > 0 ? '+' : '-', ksize - 1);
+			int v = g.fadj[c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			if (!__get_bit(removed, v))
+				fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
+					k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
+					g.fadj[c] > 0 ? '+' : '-', ksize - 1);
 		}
 		for (c = g.rhead[k]; c < g.rhead[k + 1]; ++c) {
-			fprintf(fp, "L\t%d\t-\t%d\t%c\t%dM\n",
-				k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
-				g.radj[c] > 0 ? '+' : '-', ksize - 1);
+			int v = g.radj[c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			if (!__get_bit(removed, v))
+				fprintf(fp, "L\t%d\t-\t%d\t%c\t%dM\n",
+					k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
+					g.radj[c] > 0 ? '+' : '-', ksize - 1);
 		}
 	}
 	fclose(fp);
