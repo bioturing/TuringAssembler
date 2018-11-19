@@ -501,7 +501,7 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 				rdeg = g.fhead[-v] - g.fhead[-v - 1];
 				v = -v - 1;
 			}
-			if (rdeg > 2) {
+			if (rdeg > 1) {
 				float max_cov;
 				max_cov = 0.0;
 				for (c = 0; c < rdeg; ++c) {
