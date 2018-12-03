@@ -24,8 +24,8 @@ struct opt_count_t *init_opt_count()
 	opt = calloc(1, sizeof(struct opt_count_t));
 	opt->n_threads = 1;
 	opt->hash_size = (1 << 24);
-	opt->kmer_size = 31;
-	opt->kmer_pre = 15;
+	opt->kmer_master = 31;
+	opt->kmer_slave = 15;
 	opt->n_files = 0;
 	opt->filter_thres = 0;
 	opt->files_1 = opt->files_2 = NULL;
@@ -56,11 +56,11 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "--kmer-pre")) {
-			opt->kmer_pre = atoi(argv[pos + 1]);
+		} else if (!strcmp(argv[pos], "--kmer-small")) {
+			opt->kmer_slave = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "-k")) {
-			opt->kmer_size = atoi(argv[pos + 1]);
+		} else if (!strcmp(argv[pos], "--kmer-large")) {
+			opt->kmer_master = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-o")) {
 			opt->out_dir = argv[pos + 1];
@@ -98,150 +98,32 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 	return opt;
 }
 
-void print_usage(const char *prog)
+void print_usage_assembly(const char *prog)
 {
-	__VERBOSE("Usage: %s [options] -1 read_1.fq -2 read_2.fq\n", prog);
+	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
-	__VERBOSE("         -k                     <kmer size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
+	__VERBOSE("         --kmer-small           <small kmer size>\n");
+	__VERBOSE("         --kmer-large           <large kmer size>\n");
 	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
 }
 
-khash_t(kvert) *filter_kmer(struct kmhash_t *V, struct opt_count_t *opt)
+void print_usage_count(const char *prog)
 {
-	// can be done in parallel
-	// char dump_path[1024];
-	// strcpy(dump_path, opt->out_dir);
-	// strcat(dump_path, "/dump.tsv");
-	// FILE *fp = xfopen(dump_path, "wb");
-	kmint_t i;
-	kmkey_t tombstone;
-	tombstone = (kmkey_t)-1;
-	khash_t(kvert) *h = kh_init(kvert);
-	int n_chosen;
-	n_chosen = 0;
-	khiter_t k;
-	int ret;
-	for (i = 0; i < V->size; ++i) {
-		if (V->bucks[i].idx == tombstone)
-			continue;
-		if (V->bucks[i].cnt > (uint32_t)opt->filter_thres) {
-			k = kh_put(kvert, h, V->bucks[i].idx, &ret);
-			kh_value(h, k).cnt = V->bucks[i].cnt;
-			kh_value(h, k).idx = n_chosen++;
-			// fprintf(fp, "%llu\t%u\n", (unsigned long long)V->bucks[i].idx, (unsigned int)V->bucks[i].cnt);
-		}
-	}
-	__VERBOSE_LOG("Result", "Number of filtered vertices        : %20d\n", (int)V->n_items - n_chosen);
-	// fclose(fp);
-	return h;
+	__VERBOSE("Usage: %s count [options] read.[fq|fq]\n", prog);
+	__VERBOSE("Options: -t                     <number of threads>\n");
+	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -o                     <output directory>\n");
+	__VERBOSE("         --kmer                 <small kmer size>\n");
+	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
 }
 
-static void dump_seq(uint64_t num, char *seq, int len)
+void print_usage(const char *prog)
 {
-	seq[len] = '\0';
-	while (len) {
-		seq[--len] = nt4_char[num & 3];
-		num >>= 2;
-	}
-}
-
-#define __get_revc_num(y, x, l, mask)					       \
-(	(x) = (y) << (64 - ((l) << 1)),					       \
-	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
-	(x) = (((x) & 0xffff0000ffff0000ull) >> 16) | (((x) & 0x0000ffff0000ffffull) << 16), \
-	(x) = (((x) & 0xff00ff00ff00ff00ull) >>  8) | (((x) & 0x00ff00ff00ff00ffull) <<  8), \
-	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
-	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2), \
-	(x) ^= 0xffffffffffffffffull, (x) &= (mask))
-
-void dump_graph(struct opt_count_t *opt, khash_t(kvert) *h, int16_t *edges)
-{
-	char dump_path[1024];
-	strcpy(dump_path, opt->out_dir);
-	strcat(dump_path, "/graph_raw.gfa");
-	FILE *fp = xfopen(dump_path, "w");
-	int ksize, node_id, c;
-	uint64_t kmask, idx, rev_idx, adj_idx, rev_adj_idx;
-	int16_t *adj;
-	ksize = opt->kmer_size;
-	kmask = (1ull << (ksize << 1)) - 1;
-	char *seq = malloc(ksize + 1);
-
-	khint_t i, ik;
-	for (i = kh_begin(h); i != kh_end(h); ++i) {
-		if (!kh_exist(h, i))
-			continue;
-		dump_seq(kh_key(h, i), seq, ksize);
-		fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", kh_value(h, i).idx, seq, kh_value(h, i).cnt);
-	}
-
-	for (i = kh_begin(h); i != kh_end(h); ++i) {
-		if (!kh_exist(h, i))
-			continue;
-		idx = kh_key(h, i);
-		node_id = kh_value(h, i).idx;
-		__get_revc_num(idx, rev_idx, ksize, kmask);
-
-		adj = edges + (node_id * 8);
-		for (c = 0; c < 4; ++c) {
-			if (adj[c]) {
-				adj_idx = ((idx << 2) & kmask) | c;
-				rev_adj_idx = (rev_idx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
-				if (adj_idx < rev_adj_idx) {
-					ik = kh_get(kvert, h, adj_idx);
-					assert(ik != kh_end(h));
-					fprintf(fp, "L\t%d\t+\t%d\t+\t%dM\n",
-						node_id, kh_value(h, ik).idx, ksize - 1);
-				} else {
-					ik = kh_get(kvert, h, rev_adj_idx);
-					assert(ik != kh_end(h));
-					fprintf(fp, "L\t%d\t+\t%d\t-\t%dM\n",
-						node_id, kh_value(h, ik).idx, ksize - 1);
-				}
-			}
-			if (adj[c + 4]) {
-				adj_idx = ((rev_idx << 2) & kmask) | c;
-				rev_adj_idx = (idx >> 2) | ((uint64_t)(c ^ 3) << ((ksize << 1) - 2));
-				if (adj_idx < rev_adj_idx) {
-					ik = kh_get(kvert, h, adj_idx);
-					assert(ik != kh_end(h));
-					fprintf(fp, "L\t%d\t-\t%d\t+\t%dM\n",
-						node_id, kh_value(h, ik).idx, ksize - 1);
-				} else {
-					ik = kh_get(kvert, h, rev_adj_idx);
-					assert(ik != kh_end(h));
-					fprintf(fp, "L\t%d\t-\t%d\t-\t%dM\n",
-						node_id, kh_value(h, ik).idx, ksize - 1);
-				}
-			}
-		}
-	}
-
-	free(seq);
-	fclose(fp);
-}
-
-void main_process(struct opt_count_t *opt)
-{
-	struct kmhash_t *V;
-	__VERBOSE("Counting kmer...\n");
-	V = count_kmer(opt);
-	khash_t(kvert) *hvert;
-	__VERBOSE("Filtering vertices...\n");
-	hvert = filter_kmer(V, opt);
-	kmhash_destroy(V);
-
-	uint32_t *edge_count;
-	__VERBOSE("Counting edges...\n");
-	edge_count = get_edges(opt, hvert);
-
-	// __VERBOSE("Dumping raw graph...\n");
-	// dump_graph(opt, hvert, edge_count);
-
-	__VERBOSE("Dumping reduced graph...\n");
-	reduce_graph(opt, hvert, edge_count);
+	__VERBOSE("Usage: %s\n", prog);
+	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
+	__VERBOSE("          count [options] read.[fq|fa]");
 }
 
 void opt_process(int argc, char *argv[])
@@ -262,7 +144,8 @@ void opt_process(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
 	free(cmd);
 
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", opt->kmer_size);
+	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
+	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
 	__VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
@@ -299,15 +182,16 @@ void opt_process(int argc, char *argv[])
 			free(list_files);
 		}
 	}
-	main_process(opt);
+	kmer_test_process(opt);
 }
 
 int main(int argc, char *argv[])
 {
-	if (argc < 4) {
+	if (argc < 2) {
 		print_usage(argv[0]);
 		return -1;
 	}
+
 	opt_process(argc, argv);
 	return 0;
 }

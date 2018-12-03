@@ -15,6 +15,7 @@ SRC = src/dqueue.c 				\
       src/io_utils.c 				\
       src/kmer_count.c 				\
       src/kmhash.c 				\
+      src/semaphore_wrapper.c 			\
       src/verbose.c 				\
       src/utils.c 				\
       src/main.c

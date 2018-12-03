@@ -4,6 +4,10 @@
 #include "attribute.h"
 #include "kmhash.h"
 
+void kmer_test_process(struct opt_count_t *opt);
+
+void kmer_fastq_count(struct opt_count_t *opt);
+
 struct kmhash_t *count_kmer(struct opt_count_t *opt);
 
 #endif
