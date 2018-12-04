@@ -131,16 +131,16 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 	return opt;
 }
 
-void opt_process(int argc, char *argv[])
+void assembly_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 1, argv + 1);
+	opt = parse_count_option(argc - 2, argv + 2);
 	if (opt == NULL) {
 		print_usage_assembly(argv[0]);
 		__ERROR("Error parsing arguments");
 	}
 	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/assembly.log");
 	init_log(tmp_dir);
 
 	int cmd_len = 0, i;
@@ -194,6 +194,10 @@ void opt_process(int argc, char *argv[])
 	kmer_test_process(opt);
 }
 
+void test_opt_process(int argc, char *argv[])
+{
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -206,7 +210,7 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "test"))
 		test_opt_process(argc, argv);
 	else
-		print_usage();
+		print_usage(argv[0]);
 
 	return 0;
 }
