@@ -267,6 +267,7 @@ kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key)
 	n_probe = h->n_probe;
 	if (h->keys[i] == key)
 		return i;
+	step = 0;
 	do {
 		i = (i + (step * (step + 1)) / 2) & mask;
 		if (h->keys[i] == key)
