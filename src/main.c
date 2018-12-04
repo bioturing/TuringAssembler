@@ -18,6 +18,35 @@
 
 __KHASH_IMPL(kvert, kh_inline, kmkey_t, struct kvert_info_t, 1, kh_int64_hash_func, kh_int64_hash_equal)
 
+void print_usage_assembly(const char *prog)
+{
+	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
+	__VERBOSE("Options: -t                     <number of threads>\n");
+	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -o                     <output directory>\n");
+	__VERBOSE("         --kmer-small           <small kmer size>\n");
+	__VERBOSE("         --kmer-large           <large kmer size>\n");
+	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
+	__VERBOSE("         --help                 show help\n");
+}
+
+void print_usage_count(const char *prog)
+{
+	__VERBOSE("Usage: %s count [options] read.[fq|fq]\n", prog);
+	__VERBOSE("Options: -t                     <number of threads>\n");
+	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -o                     <output directory>\n");
+	__VERBOSE("         --kmer                 <small kmer size>\n");
+	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
+}
+
+void print_usage(const char *prog)
+{
+	__VERBOSE("Usage: %s\n", prog);
+	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
+	__VERBOSE("          count [options] read.[fq|fa]\n");
+}
+
 struct opt_count_t *init_opt_count()
 {
 	struct opt_count_t *opt;
@@ -94,42 +123,22 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 			__ERROR("Unknown option %s", argv[pos]);
 		}
 	}
+	if (opt->n_files == 0) {
+		free(opt);
+		return NULL;
+	}
 	mkdir(opt->out_dir, 0755);
 	return opt;
-}
-
-void print_usage_assembly(const char *prog)
-{
-	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
-	__VERBOSE("Options: -t                     <number of threads>\n");
-	__VERBOSE("         -s                     <pre-alloc size>\n");
-	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         --kmer-small           <small kmer size>\n");
-	__VERBOSE("         --kmer-large           <large kmer size>\n");
-	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
-}
-
-void print_usage_count(const char *prog)
-{
-	__VERBOSE("Usage: %s count [options] read.[fq|fq]\n", prog);
-	__VERBOSE("Options: -t                     <number of threads>\n");
-	__VERBOSE("         -s                     <pre-alloc size>\n");
-	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         --kmer                 <small kmer size>\n");
-	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
-}
-
-void print_usage(const char *prog)
-{
-	__VERBOSE("Usage: %s\n", prog);
-	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
-	__VERBOSE("          count [options] read.[fq|fa]");
 }
 
 void opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
 	opt = parse_count_option(argc - 1, argv + 1);
+	if (opt == NULL) {
+		print_usage_assembly(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
