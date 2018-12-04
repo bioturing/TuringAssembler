@@ -71,7 +71,7 @@ static kmint_t kmhash_put(struct kmhash_t *h, kmkey_t key)
 			__sync_fetch_and_add(&(h->n_items), 1);
 		return i;
 	}
-	return h->size;
+	return KMHASH_MAX_SIZE;
 }
 
 void *kmresize_worker(void *data)
@@ -274,7 +274,7 @@ kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key)
 			return i;
 		++step;
 	} while (step < n_probe);
-	return h->size;
+	return KMHASH_MAX_SIZE;
 }
 
 struct kmhash_t *init_kmhash(kmint_t size, int n_threads)

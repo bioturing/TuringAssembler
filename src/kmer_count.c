@@ -23,7 +23,9 @@ struct maincount_bundle_t {
 	struct dqueue_t *q;
 	struct kmhash_t *h;
 	struct kmhash_t *dict; // read-only small kmer dictionary
-	int ksize;
+	int ksmall;
+	int klarge;
+	int64_t *n_reads;
 };
 
 void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
@@ -41,7 +43,7 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
 	for (i = 0; i < len; ++i) {
 		c = nt4_table[(int)seq[i]];
 		knum = (knum << 2) & kmask;
-		krev = (krev >> 2) & kmask;
+		krev = krev >> 2;
 		if (c < 4) {
 			knum |= c;
 			krev |= (kmkey_t)(c ^ 3) << lmc;
@@ -58,7 +60,56 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
 	}
 }
 
-void *PE_minor_worker(void *data)
+void count_kmer_filter(struct read_t *r, struct kmhash_t *h, int ksmall, int klarge, struct kmhash_t *dict)
+{
+	int i, last, cnt_small, n_small, c, len, lmc_small, lmc_large;
+	char *seq;
+	kmint_t k;
+	len = r->len;
+	seq = r->seq;
+
+	kmkey_t knum_small, knum_large, krev_small, krev_large, kmask_small, kmask_large;
+	kmask_small = ((kmkey_t)1 << (ksmall << 1)) - 1;
+	kmask_large = ((kmkey_t)1 << (klarge << 1)) - 1;
+	knum_small = knum_large = krev_small = krev_large = 0;
+	last = cnt_small = 0;
+	n_small = klarge - ksmall + 1;
+	lmc_small = (ksmall - 1) << 1;
+	lmc_large = (klarge - 1) << 1;
+	for (i = 0; i < len; ++i) {
+		c = nt4_table[(int)seq[i]];
+		knum_small = (knum_small << 2) & kmask_small;
+		krev_small = krev_small >> 2;
+		knum_large = (knum_large << 2) & kmask_large;
+		krev_large = krev_large >> 2;
+		if (c < 4) {
+			knum_small |= c;
+			knum_large |= c;
+			krev_small |= (kmkey_t)(c ^ 3) << lmc_small;
+			krev_large |= (kmkey_t)(c ^ 3) << lmc_large;
+			++last;
+			if (knum_small < krev_small)
+				k = kmhash_get(dict, knum_small);
+			else
+				k = kmhash_get(dict, krev_small);
+			if (k != KMHASH_MAX_SIZE && dict->vals[k] != 0)
+				++cnt_small;
+			else
+				cnt_small = 0;
+		} else {
+			last = 0;
+			cnt_small = 0;
+		}
+		if (last >= klarge && cnt_small >= n_small) {
+			if (knum_large < krev_large)
+				kmhash_inc_val(h, knum_large);
+			else
+				kmhash_inc_val(h, krev_large);
+		}
+	}
+}
+
+void *PE_slave_worker(void *data)
 {
 	struct precount_bundle_t *bundle = (struct precount_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
@@ -118,6 +169,68 @@ void *PE_minor_worker(void *data)
 	pthread_exit(NULL);
 }
 
+void *PE_master_worker(void *data)
+{
+	struct maincount_bundle_t *bundle = (struct maincount_bundle_t *)data;
+	struct dqueue_t *q = bundle->q;
+	struct kmhash_t *h = bundle->h;
+	struct kmhash_t *dict = bundle->dict;
+
+	struct read_t read1, read2;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_pair_buffer();
+
+	char *buf1, *buf2;
+	int pos1, pos2, rc1, rc2, input_format;
+
+	int64_t n_reads;
+	int64_t *gcnt_reads;
+	gcnt_reads = bundle->n_reads;
+
+	int ksmall, klarge;
+	ksmall = bundle->ksmall;
+	klarge = bundle->klarge;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf)
+			break;
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		buf1 = ext_buf->buf1;
+		buf2 = ext_buf->buf2;
+		input_format = ext_buf->input_format;
+
+		n_reads = 0;
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read1, buf1, &pos1) :
+				get_read_from_fa(&read1, buf1, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read2, buf2, &pos2) :
+				get_read_from_fa(&read2, buf2, &pos2);
+
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				__ERROR("\nWrong format file\n");
+
+			++n_reads;
+			count_kmer_filter(&read1, h, ksmall, klarge, dict);
+			count_kmer_filter(&read2, h, ksmall, klarge, dict);
+
+			if (rc1 == READ_END)
+				break;
+		}
+		n_reads = __sync_add_and_fetch(gcnt_reads, n_reads);
+		__VERBOSE("\rNumber of process read:    %lld", (long long)n_reads);
+	}
+
+	free_pair_buffer(own_buf);
+	pthread_exit(NULL);
+}
+
 struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 {
 	pthread_attr_t attr;
@@ -155,7 +268,7 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 				producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, PE_minor_worker,
+		pthread_create(worker_threads + i, &attr, PE_slave_worker,
 				worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
@@ -173,8 +286,55 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 
 struct kmhash_t *count_kmer_master(struct opt_count_t *opt, struct kmhash_t *dict)
 {
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	int i;
+
 	struct kmhash_t *kmer_hash;
 	kmer_hash = init_kmhash((kmint_t)opt->hash_size, opt->n_threads);
+
+	struct producer_bundle_t *producer_bundles;
+	producer_bundles = init_fastq_PE(opt);
+
+	struct maincount_bundle_t *worker_bundles;
+	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));
+
+	int64_t n_reads;
+	n_reads = 0;
+
+	for (i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].h = kmer_hash;
+		worker_bundles[i].dict = dict;
+		worker_bundles[i].klarge = opt->kmer_master;
+		worker_bundles[i].ksmall = opt->kmer_slave;
+		worker_bundles[i].n_reads = &n_reads;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
+				producer_bundles + i);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, PE_master_worker,
+				worker_bundles + i);
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_PE(producer_bundles, opt->n_files);
+	free(worker_bundles);
+
 	return kmer_hash;
 }
 
@@ -190,12 +350,41 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 void kmer_test_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *hs, *hl, *hm;
+	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
 	hs = count_kmer_minor(opt, opt->kmer_slave);
+	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
 	hl = count_kmer_minor(opt, opt->kmer_master);
+	uint64_t cnt_slave, cnt_master;
+	kmint_t k;
+	cnt_slave = cnt_master = 0;
+	for (k = 0; k < hs->size; ++k)
+		if (hs->keys[k] != TOMB_STONE && hs->vals[k] > opt->filter_thres)
+			++cnt_slave;
+		else
+			hs->vals[k] = 0;
+	for (k = 0; k < hl->size; ++k)
+		if (hl->keys[k] != TOMB_STONE && hl->vals[k] > opt->filter_thres)
+			++cnt_master;
+	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)hs->n_items);
+	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)cnt_slave);
+
 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hl->n_items);
+	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)cnt_master);
+
 	kmhash_destroy(hl);
 	hm = count_kmer_master(opt, hs);
+	uint64_t cnt_master_2;
+	cnt_master_2 = 0;
+	for (k = 0; k < hm->size; ++k)
+		if (hm->keys[k] != TOMB_STONE && hm->vals[k] > opt->filter_thres)
+			++cnt_master_2;
+		else
+			hm->vals[k] = 0;
+	__VERBOSE("\n");
+	__VERBOSE("Number of %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)hm->n_items);
+	__VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)cnt_master_2);
+
 	kmhash_destroy(hs);
 }
 

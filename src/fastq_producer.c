@@ -82,6 +82,9 @@ struct producer_bundle_t *init_fastq_PE(struct opt_count_t *opt)
 	lock = malloc(sizeof(pthread_mutex_t));
 	barrier = malloc(sizeof(pthread_barrier_t));
 
+	pthread_mutex_init(lock, NULL);
+	pthread_barrier_init(barrier, NULL, opt->n_files);
+
 	for (i = 0; i < opt->n_files; ++i) {
 		struct gb_pair_data *data = calloc(1, sizeof(struct gb_pair_data));
 		gb_pair_init(data, opt->files_1[i], opt->files_2[i]);
