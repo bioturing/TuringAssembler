@@ -12,6 +12,10 @@ struct pair_buffer_t {
 	int input_format;
 };
 
+struct pair_buffer_t *init_pair_buffer();
+
+void free_pair_buffer(struct pair_buffer_t *p);
+
 struct producer_bundle_t *init_fastq_PE(struct opt_count_t *opt);
 
 void *fastq_PE_producer(void *data);

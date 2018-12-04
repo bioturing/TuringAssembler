@@ -1,6 +1,7 @@
 #include "fastq_producer.h"
+#include "utils.h"
 
-static struct pair_buffer_t *init_pair_buffer()
+struct pair_buffer_t *init_pair_buffer()
 {
 	struct pair_buffer_t *ret = malloc(sizeof(struct pair_buffer_t));
 	ret->buf1 = malloc(BUF_SIZE + 1);
@@ -8,7 +9,7 @@ static struct pair_buffer_t *init_pair_buffer()
 	return ret;
 }
 
-static void free_pair_buffer(struct pair_buffer_t *p)
+void free_pair_buffer(struct pair_buffer_t *p)
 {
 	if (!p) return;
 	free(p->buf1);

@@ -2,7 +2,9 @@
 #include <string.h>
 #include <zlib.h>
 
+#include "attribute.h"
 #include "dqueue.h"
+#include "fastq_producer.h"
 #include "get_buffer.h"
 #include "kmer_count.h"
 #include "kmhash.h"
@@ -32,10 +34,10 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
 	seq = r->seq;
 
 	kmkey_t knum, krev, kmask;
-	kmask = ((kmkey_t)1 << (k << 1)) - 1;
+	kmask = ((kmkey_t)1 << (ksize << 1)) - 1;
 	knum = krev = 0;
 	last = 0;
-	lmc = (k - 1) << 1;
+	lmc = (ksize - 1) << 1;
 	for (i = 0; i < len; ++i) {
 		c = nt4_table[(int)seq[i]];
 		knum = (knum << 2) & kmask;
@@ -58,7 +60,7 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
 
 void *PE_minor_worker(void *data)
 {
-	struct precount_bundle_t *bundle = (struct precount_bundlet *)data;
+	struct precount_bundle_t *bundle = (struct precount_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
 	struct kmhash_t *h = bundle->h;
 
@@ -128,7 +130,7 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 	struct kmhash_t *kmer_hash;
 	kmer_hash = init_kmhash((kmint_t)opt->hash_size, opt->n_threads);
 
-	struct fastq_bundle_t *producer_bundles;
+	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
 
 	struct precount_bundle_t *worker_bundles;
@@ -157,10 +159,10 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 				worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i]);
+		pthread_join(producer_threads[i], NULL);
 
 	for (i = 0; i < opt->n_threads; ++i)
-		pthread_join(worker_threads[i])
+		pthread_join(worker_threads[i], NULL);
 
 	free_fastq_PE(producer_bundles, opt->n_files);
 	free(worker_bundles);
@@ -172,7 +174,7 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 struct kmhash_t *count_kmer_master(struct opt_count_t *opt, struct kmhash_t *dict)
 {
 	struct kmhash_t *kmer_hash;
-	kmer_hash = int_kmhash((kmint_t)opt->hash_size, opt->n_threads);
+	kmer_hash = init_kmhash((kmint_t)opt->hash_size, opt->n_threads);
 	return kmer_hash;
 }
 
@@ -190,6 +192,8 @@ void kmer_test_process(struct opt_count_t *opt)
 	struct kmhash_t *hs, *hl, *hm;
 	hs = count_kmer_minor(opt, opt->kmer_slave);
 	hl = count_kmer_minor(opt, opt->kmer_master);
+	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)hs->n_items);
+	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hl->n_items);
 	kmhash_destroy(hl);
 	hm = count_kmer_master(opt, hs);
 	kmhash_destroy(hs);

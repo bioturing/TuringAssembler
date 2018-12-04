@@ -46,7 +46,7 @@ static kmint_t estimate_probe(kmint_t size)
 static kmint_t kmhash_put(struct kmhash_t *h, kmkey_t key)
 {
 	kmint_t mask, step, i, n_probe;
-	kmkey_t cur_key, k, tombstone;
+	kmkey_t cur_key, k;
 
 	mask = h->size - 1;
 	k = __hash_int2(key);
@@ -78,7 +78,6 @@ void *kmresize_worker(void *data)
 {
 	struct kmresize_bundle_t *bundle = (struct kmresize_bundle_t *)data;
 	struct kmhash_t *h;
-	int j;
 	kmint_t i, k, l, r, cap;
 
 	h = bundle->h;
