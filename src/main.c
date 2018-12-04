@@ -201,7 +201,13 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	opt_process(argc, argv);
+	if (!strcmp(argv[1], "assembly"))
+		assembly_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "test"))
+		test_opt_process(argc, argv);
+	else
+		print_usage();
+
 	return 0;
 }
 
