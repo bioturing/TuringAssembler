@@ -17,6 +17,7 @@ struct precount_bundle_t {
 	struct kmhash_t *h;
 	int ksize;
 	int64_t *n_reads;
+	pthread_mutex_t *lock_hash;
 };
 
 struct maincount_bundle_t {
@@ -26,9 +27,10 @@ struct maincount_bundle_t {
 	int ksmall;
 	int klarge;
 	int64_t *n_reads;
+	pthread_mutex_t *lock_hash;
 };
 
-void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
+void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize, pthread_mutex_t *lock_hash)
 {
 	int i, last, c, len, lmc;
 	char *seq;
@@ -53,14 +55,16 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize)
 		}
 		if (last >= ksize) {
 			if (knum < krev)
-				kmhash_inc_val(h, knum);
+				kmhash_inc_val(h, knum, lock_hash);
 			else
-				kmhash_inc_val(h, krev);
+				kmhash_inc_val(h, krev, lock_hash);
 		}
 	}
 }
 
-void count_kmer_filter(struct read_t *r, struct kmhash_t *h, int ksmall, int klarge, struct kmhash_t *dict)
+void count_kmer_filter(struct read_t *r, struct kmhash_t *h,
+			int ksmall, int klarge, struct kmhash_t *dict,
+			pthread_mutex_t *lock_hash)
 {
 	int i, last, cnt_small, n_small, c, len, lmc_small, lmc_large;
 	char *seq;
@@ -102,9 +106,9 @@ void count_kmer_filter(struct read_t *r, struct kmhash_t *h, int ksmall, int kla
 		}
 		if (last >= klarge && cnt_small >= n_small) {
 			if (knum_large < krev_large)
-				kmhash_inc_val(h, knum_large);
+				kmhash_inc_val(h, knum_large, lock_hash);
 			else
-				kmhash_inc_val(h, krev_large);
+				kmhash_inc_val(h, krev_large, lock_hash);
 		}
 	}
 }
@@ -128,6 +132,9 @@ void *PE_slave_worker(void *data)
 
 	int ksize;
 	ksize = bundle->ksize;
+
+	pthread_mutex_t *lock_hash;
+	lock_hash = bundle->lock_hash;
 
 	while (1) {
 		ext_buf = d_dequeue_in(q);
@@ -155,8 +162,8 @@ void *PE_slave_worker(void *data)
 				__ERROR("\nWrong format file\n");
 
 			++n_reads;
-			count_kmer_read(&read1, h, ksize);
-			count_kmer_read(&read2, h, ksize);
+			count_kmer_read(&read1, h, ksize, lock_hash);
+			count_kmer_read(&read2, h, ksize, lock_hash);
 
 			if (rc1 == READ_END)
 				break;
@@ -191,6 +198,9 @@ void *PE_master_worker(void *data)
 	ksmall = bundle->ksmall;
 	klarge = bundle->klarge;
 
+	pthread_mutex_t *lock_hash;
+	lock_hash = bundle->lock_hash;
+
 	while (1) {
 		ext_buf = d_dequeue_in(q);
 		if (!ext_buf)
@@ -217,8 +227,8 @@ void *PE_master_worker(void *data)
 				__ERROR("\nWrong format file\n");
 
 			++n_reads;
-			count_kmer_filter(&read1, h, ksmall, klarge, dict);
-			count_kmer_filter(&read2, h, ksmall, klarge, dict);
+			count_kmer_filter(&read1, h, ksmall, klarge, dict, lock_hash);
+			count_kmer_filter(&read2, h, ksmall, klarge, dict, lock_hash);
 
 			if (rc1 == READ_END)
 				break;
@@ -257,6 +267,7 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 		worker_bundles[i].h = kmer_hash;
 		worker_bundles[i].ksize = kmer_size;
 		worker_bundles[i].n_reads = &n_reads;
+		worker_bundles[i].lock_hash = kmer_hash->locks + i;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -312,6 +323,7 @@ struct kmhash_t *count_kmer_master(struct opt_count_t *opt, struct kmhash_t *dic
 		worker_bundles[i].klarge = opt->kmer_master;
 		worker_bundles[i].ksmall = opt->kmer_slave;
 		worker_bundles[i].n_reads = &n_reads;
+		worker_bundles[i].lock_hash = kmer_hash->locks + i;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
