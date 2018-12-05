@@ -9,6 +9,11 @@
 
 #define TOMB_STONE			((kmkey_t)-1)
 
+#define __round_up_kmint(x) 	(--(x), (x) |= (x) >> 1,		       \
+				 (x) |= (x) >> 2, (x) |= (x) >> 4,	       \
+				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
+				 ++(x))
+
 typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
 typedef uint32_t kmval_t;

@@ -23,6 +23,7 @@ EXEC = kmer_count
 SRC = src/dqueue.c 				\
       src/fastq_producer.c 			\
       src/get_buffer.c 				\
+      src/graph_assembly.c 			\
       src/io_utils.c 				\
       src/kmer_count.c 				\
       src/kmhash.c 				\

@@ -291,6 +291,9 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 	free_fastq_PE(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
+	free(producer_threads);
+	free(worker_threads);
+
 	// get some stat
 	return kmer_hash;
 }
@@ -347,13 +350,32 @@ struct kmhash_t *count_kmer_master(struct opt_count_t *opt, struct kmhash_t *dic
 	free_fastq_PE(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
+	free(worker_threads);
+	free(producer_threads);
+
 	return kmer_hash;
 }
 
 struct kmhash_t *count_kmer(struct opt_count_t *opt)
 {
 	struct kmhash_t *hs, *hm;
+	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
 	hs = count_kmer_minor(opt, opt->kmer_slave);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", opt->kmer_slave,
+		(long long unsigned)hs->n_items);
+	uint64_t cnt_good;
+	kmint_t i;
+	cnt_good = 0;
+	for (i = 0; i < hs->size; ++i) {
+		if (hs->keys[i] != TOMB_STONE && hs->vals[i] > opt->filter_thres)
+			++cnt_good;
+		else
+			hs->vals[i] = 0;
+	}
+	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer with count greater than (%d): %llu\n",
+		opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
+	__VERBOSE("\nCounting %d-mer (early filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
 	hm = count_kmer_master(opt, hs);
 	kmhash_destroy(hs);
 	return hm;

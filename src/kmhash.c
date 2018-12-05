@@ -5,11 +5,6 @@
 #include "utils.h"
 #include "verbose.h"
 
-#define __round_up_kmint(x) 	(--(x), (x) |= (x) >> 1,		       \
-				 (x) |= (x) >> 2, (x) |= (x) >> 4,	       \
-				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
-				 ++(x))
-
 #define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
 #define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
 

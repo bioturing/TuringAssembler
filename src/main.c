@@ -9,6 +9,7 @@
 
 #include "get_buffer.h"
 #include "graph.h"
+#include "graph_assembly.h"
 #include "io_utils.h"
 #include "khash.h"
 #include "kmer_count.h"
@@ -191,7 +192,7 @@ void assembly_opt_process(int argc, char *argv[])
 			free(list_files);
 		}
 	}
-	kmer_test_process(opt);
+	assembly_process(opt);
 }
 
 void test_opt_process(int argc, char *argv[])
