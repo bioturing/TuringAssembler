@@ -27,7 +27,7 @@
 /* e must have degree 1 */
 #define __only_edge(e) ((((e) >> 1) & 1) * 1 + (((e) >> 2) & 1) * 2 + (((e) >> 3) & 1) * 3)
 
-#define __set_degree(bin, k, deg) ((bin)[(k) >> 4] ^= (((bin)[(k) >> 4] & (3 << (((k) & 15) << 1))) ^ ((deg) << (((k) & 15) << 1))))
+#define __set_degree(bin, k, deg) ((bin)[(k) >> 4] ^= (((bin)[(k) >> 4] & (3u << (((k) & 15) << 1))) ^ ((deg) << (((k) & 15) << 1))))
 
 #define __get_degree(bin, k) (((bin)[(k) >> 4] >> (((k) & 15) << 1)) & 3)
 
@@ -67,6 +67,8 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_graph, int ksize);
 
 void dump_scrap_graph(struct scrap_graph_t *g, struct raw_graph_t *pre_g, struct opt_count_t *opt);
 
+struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *pre_g);
+
 void assembly_process(struct opt_count_t *opt)
 {
 	__VERBOSE("2-step kmer counting\n");
@@ -77,7 +79,7 @@ void assembly_process(struct opt_count_t *opt)
 	pre_graph = extract_kmer(opt, kmer_hash);
 	kmhash_destroy(kmer_hash);
 
-	__VERBOSE("kmer graph building\n");
+	__VERBOSE("\nkmer graph building\n");
 	sort_kmer(pre_graph);
 	// test_sort_kmer(pre_graph);
 
@@ -85,11 +87,136 @@ void assembly_process(struct opt_count_t *opt)
 	__VERBOSE("\n");
 	// get_edge_stat(pre_graph);
 
-	__VERBOSE("condense graph building\n");
+	__VERBOSE("\nscratch graph building\n");
 	struct scrap_graph_t *scratch_graph;
 	scratch_graph = sketch_graph(pre_graph, opt->kmer_master);
+
+	__VERBOSE("\nremoving tips #1\n");
+	struct scrap_graph_t *bad_graph;
+	bad_graph = remove_tips_round_1(scratch_graph);
+
 	__VERBOSE("printing graph\n");
 	dump_scrap_graph(scratch_graph, pre_graph, opt);
+}
+
+struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *pre_g)
+{
+	struct scrap_graph_t *g;
+	g = calloc(1, sizeof(struct scrap_graph_t));
+
+	gint_t k, uk, v;
+	gint_t *uk_adj;
+	int deg, fdeg, rdeg, uk_deg, c;
+	float cov, max_cov;
+
+	uint32_t *removed;
+	removed = calloc((g->n_v + 31) / 32, sizeof(uint32_t));
+
+	// mark remove nodes
+	for (k = 0; k < g->n_v; ++k) {
+		fdeg = __get_degree(g->bin_fdeg, k) + (int)(g->fadj[k] != NULL);
+		rdeg = __get_degree(g->bin_rdeg, k) + (int)(g->radj[k] != NULL);
+		deg = fdeg + rdeg;
+		if (deg <= 1) {
+			if (deg == 0) {
+				__on_bit(removed, k);
+				continue;
+			}
+			if (fdeg == 1)
+				uk = g->fadj[k][0];
+			else
+				uk = g->radj[k][0];
+			if (uk > 0) {
+				uk_adj = g->radj[uk - 1];
+				uk_deg = __get_degree(g->bin_rdeg, uk - 1) + (int)(g->radj[uk - 1] != NULL);
+			} else {
+				uk_adj = g->fadj[-uk - 1];
+				uk_deg = __get_degree(g->bin_fdeg, -uk - 1) + (int)(g->fadj[-uk - 1] != NULL);
+			}
+			if (uk_deg > 1) {
+				max_cov = 0.0;
+				for (c = 0; c < uk_deg; ++c) {
+					v = uk_adj[c];
+					if (v > 0)
+						cov = 1.0 * g->kmer_count[v - 1] / g->seq_len[v - 1];
+					else
+						cov = 1.0 * g->kmer_count[-v - 1] / g->seq_len[-v - 1];
+					if (cov > max_cov)
+						max_cov = cov;
+				}
+				cov = 1.0 * g->kmer_count[k] / g->seq_len[k];
+				if (cov / max_cov < 0.1)
+					__on_bit(removed, k);
+			}
+		}
+	}
+
+	// remove edge
+	for (k = 0; k < g->n_v; ++k) {
+		if (__get_bit(removed, k))
+			continue;
+		// forward edge
+		old_deg = __get_degree(g->bin_fdeg, k) + (int)(g->fadj[k] != NULL);
+		new_deg = 0;
+		if (old_deg) {
+			for (c = 0; c < old_deg; ++c) {
+				uk = g->fadj[k][c];
+				if (uk > 0)
+					--uk;
+				else
+					uk = -uk - 1;
+				if (__get_bit(removed, uk) == 0)
+					g->fadj[k][new_deg++] = g->fadj[k][c];
+			}
+			if (new_deg != old_deg) {
+				if (new_deg == 0) {
+					__set_degree(g->bin_fdeg, k, 0);
+					free(g->fadj[k]);
+					g->fadj[k] = NULL;
+				} else {
+					__set_degree(g->bin_fdeg, k, new_deg - 1);
+					g->fadj[k] = realloc(g->fadj[k], new_deg * sizeof(gint_t));
+				}
+			}
+		}
+		// reverse edge
+		old_deg = __get_degree(g->bin_rdeg, k) + (int)(g->radj[k] != NULL);
+		new_deg = 0;
+		if (old_deg) {
+			for (c = 0; c < old_deg; ++c) {
+				uk = g->radj[k][c];
+				if (uk > 0)
+					--uk;
+				else
+					uk = -uk - 1;
+				if (__get_bit(removed, uk) == 0)
+					g->radj[k][new_deg++] = g->radj[k][c];
+			}
+			if (new_deg != old_deg) {
+				if (new_deg == 0) {
+					__set_degree(g->bin_rdeg, k, 0);
+					free(g->radj[k]);
+					g->radj[k] = NULL;
+				} else {
+					__set_degree(g->bin_rdeg, k, new_deg - 1);
+					g->radj[k] = realloc(g->radj[k], new_deg * sizeof(gint_t));
+				}
+			}
+		}
+	}
+
+	// condense path
+	n_v = 0;
+	for (k = 0; k < g->n_v; ++k) {
+		if (__get_bit(removed, k))
+			continue;
+
+		if (n_v + 1 > m_v) {
+			g->
+		}
+	}
+
+	return g;
 }
 
 struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
@@ -117,6 +244,7 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 	g->kmer_count = malloc(m_v * sizeof(gint_t));
 	g->kmer_beg = malloc(m_v * sizeof(kmkey_t));
 	g->kmer_end = malloc(m_v * sizeof(kmkey_t));
+	g->seq_len = malloc(m_v * sizeof(int));
 
 	for (i = 0; i < n_k; ++i) {
 		node_id = (gint_t)i;
@@ -131,14 +259,17 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 			g->kmer_count = realloc(g->kmer_count, m_v * sizeof(gint_t));
 			g->kmer_beg = realloc(g->kmer_beg, m_v * sizeof(kmkey_t));
 			g->kmer_end = realloc(g->kmer_end, m_v * sizeof(kmkey_t));
+			g->seq_len = realloc(g->seq_len, m_v * sizeof(int));
 		}
 
 		// chain = malloc(sizeof(kmkey_t));
 		// chain[0] = node_kmer;
 		// lchain = 1;
 		g->kmer_count[n_v] = nodes[node_id].cnt;
+		g->seq_len[n_v] = ksize;
 		__on_bit(visited, node_id);
 		g->kmer_beg[n_v] = g->kmer_end[n_v] = node_kmer;
+		g->kmer_chain_id[node_id] = n_v;
 
 		// forward
 		u_node = node_id;
@@ -169,6 +300,8 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 			// chain[lchain++] = v_kmer;
 			g->kmer_end[n_v] = v_kmer;
 			g->kmer_count[n_v] += nodes[v_node].cnt;
+			g->kmer_chain_id[v_node] = n_v;
+			++g->seq_len[n_v];
 			__on_bit(visited, v_node);
 			u_node = v_node;
 			u_kmer = v_kmer;
@@ -206,6 +339,8 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 			// chain[lchain++] = v_kmer;
 			g->kmer_beg[n_v] = v_kmer;
 			g->kmer_count[n_v] += nodes[v_node].cnt;
+			g->kmer_chain_id[v_node] = n_v;
+			++g->seq_len[n_v];
 			__on_bit(visited, v_node);
 			u_node = v_node;
 			u_kmer = v_kmer;
@@ -319,6 +454,7 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 	}
 
 	g->n_v = n_v;
+	__VERBOSE("[INFO] Number of node on kmer glued graph: %llu\n", (long long unsigned)n_v);
 
 	free(visited);
 
@@ -340,6 +476,10 @@ void dump_scrap_graph(struct scrap_graph_t *g, struct raw_graph_t *pre_g, struct
 	uint8_t c, adj, deg;
 	m_seq = 0x100;
 	seq = malloc(m_seq);
+
+	ksize = opt->kmer_master;
+	kmask = ((kmkey_t)1 << (ksize << 1)) - 1;
+	lmc = (ksize << 1) - 2;
 
 	for (k = 0; k < g->n_v; ++k) {
 		len = ksize;

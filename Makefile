@@ -2,9 +2,10 @@ GCC = gcc
 
 AR = ar
 
-LIBS = -pthread -flto -lm -lz -fsanitize=undefined,address
+LIBS = -pthread -flto -lm -lz
+#-fsanitize=undefined,address
 
-CFLAGS = -Wfatal-errors -Wall -fPIC -std=gnu99 -O2 -g
+CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
 
 EXEC = kmer_count
 
