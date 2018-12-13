@@ -7,16 +7,16 @@
 typedef int64_t gint_t;
 
 struct scrap_graph_t {
-	gint_t *kmer_chain_id;
-	int *seq_len;
-	uint32_t **node_seq;
-
+	// gint_t *kmer_chain_id;
 	// 1-based node id, 0-based stored
 	gint_t n_v;
 
 	gint_t *kmer_count;
-	kmkey_t *kmer_beg;
-	kmkey_t *kmer_end;
+	int *seq_len;
+	uint32_t **node_seq;
+
+	// kmkey_t *kmer_beg;
+	// kmkey_t *kmer_end;
 
 	gint_t **fadj, **radj;
 	uint32_t *bin_fdeg, *bin_rdeg;
