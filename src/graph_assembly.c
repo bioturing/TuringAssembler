@@ -108,6 +108,29 @@ void assembly_process(struct opt_count_t *opt)
 	dump_scrap_graph(bad_graph, opt);
 }
 
+void test_graph(struct scrap_graph_t *g)
+{
+	gint_t k, u, v;
+	int deg, c;
+	for (k = 0; k < g->n_v; ++k) {
+		deg = __get_degree(g->bin_fdeg, k);
+		if (deg == 0)
+			deg += (int)(g->fadj[k] != NULL);
+		else
+			assert(g->fadj[k] != NULL);
+		assert(c >= 0 && c <= 4);
+		for (c = 0; c < deg; ++c) {
+			v = g->fadj[k][c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			assert(v >= 0 && v < g->n_v);
+		}
+	}
+	fprintf(stderr, "test graph ok\n");
+}
+
 uint32_t *remove_tips(struct scrap_graph_t *g)
 {
 	gint_t k, uk, v;
@@ -235,6 +258,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 	node_end = malloc(m_v * sizeof(gint_t));
 	ret_g->node_seq = malloc(m_v * sizeof(uint32_t *));
 	ret_g->seq_len = malloc(m_v * sizeof(int));
+	ret_g->kmer_count = malloc(m_v * sizeof(gint_t));
 
 	// condense path
 	n_v = 0;
@@ -248,6 +272,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 			node_end = realloc(node_end, m_v * sizeof(gint_t));
 			ret_g->node_seq = realloc(ret_g->node_seq, m_v * sizeof(uint32_t *));
 			ret_g->seq_len = realloc(ret_g->seq_len, m_v * sizeof(int));
+			ret_g->kmer_count = realloc(ret_g->kmer_count, m_v * sizeof(gint_t));
 		}
 
 		node_beg[n_v] = node_end[n_v] = k + 1;
@@ -255,9 +280,10 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 		adj = g->fadj[k];
 		deg = __get_degree(g->bin_fdeg, k) + (int)(adj != NULL);
 		__on_bit(removed, k);
-		new_id[k] = n_v + 1;
+		new_id[k] = n_v;
 		seq_len = ksize;
 		node_seq = append_bin_seq_fw(NULL, 0, g->node_seq[u], 0, ksize);
+		ret_g->kmer_count[n_v] = g->kmer_count[k];
 
 		while (deg == 1) {
 			v = adj[0];
@@ -282,6 +308,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				node_seq = append_bin_seq_fw(node_seq, seq_len, g->node_seq[u], ksize - 1, g->seq_len[u] - ksize + 1);
 				seq_len += g->seq_len[u] - ksize + 1;
 				new_id[u] = n_v;
+				ret_g->kmer_count[n_v] += g->kmer_count[u];
 			} else {
 				u = -v - 1;
 				adj = g->radj[u];
@@ -290,6 +317,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				node_seq = append_bin_seq_rv(node_seq, seq_len, g->node_seq[u], ksize - 1, g->seq_len[u] - ksize + 1);
 				seq_len += g->seq_len[u] - ksize + 1;
 				new_id[u] = n_v;
+				ret_g->kmer_count[n_v] += g->kmer_count[u];
 			}
 			node_end[n_v] = v;
 		}
@@ -322,6 +350,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				node_seq = append_bin_seq_fw(node_seq, seq_len, g->node_seq[u], ksize - 1, g->seq_len[u] - ksize + 1);
 				seq_len += g->seq_len[u] - ksize + 1;
 				new_id[u] = n_v;
+				ret_g->kmer_count[n_v] += g->kmer_count[u];
 			} else {
 				u = -v - 1;
 				adj = g->radj[u];
@@ -330,6 +359,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				node_seq = append_bin_seq_rv(node_seq, seq_len, g->node_seq[u], ksize - 1, g->seq_len[u] - ksize + 1);
 				seq_len += g->seq_len[u] - ksize + 1;
 				new_id[u] = n_v;
+				ret_g->kmer_count[n_v] += g->kmer_count[u];
 			}
 			node_beg[n_v] = v;
 		}
@@ -350,6 +380,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 	node_end = realloc(node_end, n_v * sizeof(gint_t));
 	ret_g->seq_len = realloc(ret_g->seq_len, n_v * sizeof(int));
 	ret_g->node_seq = realloc(ret_g->node_seq, n_v * sizeof(uint32_t *));
+	ret_g->kmer_count = realloc(ret_g->kmer_count, n_v * sizeof(gint_t));
 	ret_g->fadj = malloc(n_v * sizeof(gint_t *));
 	ret_g->radj = malloc(n_v * sizeof(gint_t *));
 	ret_g->bin_fdeg = calloc((n_v + 15) >> 4, sizeof(uint32_t));
@@ -372,6 +403,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 			new_deg = 0;
 			for (j = 0; j < deg; ++j) {
 				v = adj[j];
+				assert(v >= -g->n_v && v <= g->n_v);
 				if (v > 0) {
 					id_v = v - 1;
 					v_node = new_id[id_v];
@@ -384,9 +416,15 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				} else if (v == -node_end[v_node]) {
 					new_adj[new_deg++] = -v_node - 1;
 				} else {
+					fprintf(stderr, "n_v = %llu\n", (long long)g->n_v);
+					fprintf(stderr, "k = %lld\nu = %lld\nv = %lld\nv_node = %lld\nbeg[v_node]=%lld\nend[v_node]=%lld\n",
+						(long long)k, (long long)u, (long long)v,
+						(long long)v_node, (long long)node_beg[v_node],
+						(long long)node_end[v_node]);
 					assert(0);
 				}
 			}
+			assert(deg == new_deg);
 			__set_degree(ret_g->bin_fdeg, k, new_deg - 1);
 		} else {
 			ret_g->fadj[k] = NULL;
@@ -405,7 +443,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 			deg = __get_degree(g->bin_fdeg, id_u) + (int)(adj != NULL);
 		}
 		if (deg) {
-			new_adj = ret_g->fadj[k] = malloc(deg * sizeof(gint_t));
+			new_adj = ret_g->radj[k] = malloc(deg * sizeof(gint_t));
 			new_deg = 0;
 			for (j = 0; j < deg; ++j) {
 				v = adj[j];
@@ -424,12 +462,19 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 					assert(0);
 				}
 			}
+			assert(deg == new_deg);
 			__set_degree(ret_g->bin_rdeg, k, new_deg - 1);
 		} else {
 			ret_g->radj[k] = NULL;
 			__set_degree(ret_g->bin_rdeg, k, 0);
 		}
 	}
+
+	free(new_id);
+	free(node_beg);
+	free(node_end);
+
+	ret_g->n_v = n_v;
 
 	return ret_g;
 }
@@ -438,12 +483,17 @@ struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *g)
 {
 	struct scrap_graph_t *ret_g;
 	uint32_t *removed;
+	
+	test_graph(g);
 
 	__VERBOSE("||-- removing tips\n");
 	removed = remove_tips(g);
 
+	test_graph(g);
+
 	__VERBOSE("||-- condesing graph\n");
 	ret_g = condense_graph(g, removed);
+	test_graph(ret_g);
 
 	free(removed);
 
@@ -537,8 +587,8 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 			// g->kmer_end = realloc(g->kmer_end, m_v * sizeof(kmkey_t));
 			g->seq_len = realloc(g->seq_len, m_v * sizeof(int));
 			g->node_seq = realloc(g->node_seq, m_v * sizeof(uint32_t *));
-			kmer_beg = realloc(g->seq_len, m_v * sizeof(kmkey_t));
-			kmer_end = realloc(g->seq_len, m_v * sizeof(kmkey_t));
+			kmer_beg = realloc(kmer_beg, m_v * sizeof(kmkey_t));
+			kmer_end = realloc(kmer_end, m_v * sizeof(kmkey_t));
 		}
 
 		// chain = malloc(sizeof(kmkey_t));
@@ -771,6 +821,7 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 
 void dump_scrap_graph(struct scrap_graph_t *g, struct opt_count_t *opt)
 {
+	__VERBOSE_LOG("RESULT", "Number of current graph node: %lld\n", (long long)g->n_v);
 	char path[1024];
 	strcpy(path, opt->out_dir);
 	strcat(path, "/graph.gfa");
