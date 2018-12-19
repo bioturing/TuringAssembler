@@ -118,7 +118,7 @@ void test_graph(struct scrap_graph_t *g)
 			deg += (int)(g->fadj[k] != NULL);
 		else
 			assert(g->fadj[k] != NULL);
-		assert(c >= 0 && c <= 4);
+		assert(deg >= 0 && deg <= 4);
 		for (c = 0; c < deg; ++c) {
 			v = g->fadj[k][c];
 			if (v > 0)
