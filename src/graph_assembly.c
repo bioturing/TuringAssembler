@@ -125,9 +125,10 @@ void assembly_process(struct opt_count_t *opt)
 
 void test_graph(struct scrap_graph_t *g)
 {
-	gint_t k, u, v;
+	gint_t k, v;
 	int deg, c;
 	for (k = 0; k < g->n_v; ++k) {
+		// forward edges
 		deg = __get_degree(g->bin_fdeg, k);
 		if (deg == 0)
 			deg += (int)(g->fadj[k] != NULL);
@@ -142,8 +143,57 @@ void test_graph(struct scrap_graph_t *g)
 				v = -v - 1;
 			assert(v >= 0 && v < g->n_v);
 		}
+
+		// reverse edges
+		deg = __get_degree(g->bin_rdeg, k);
+		if (deg == 0)
+			deg += (int)(g->radj[k] != NULL);
+		else
+			assert(g->radj[k] != NULL);
+		assert(deg >= 0 && deg <= 4);
+		for (c = 0; c < deg; ++c) {
+			v = g->radj[k][c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			assert(v >= 0 && v < g->n_v);
+		}
 	}
 	fprintf(stderr, "test graph ok\n");
+}
+
+void test_graph_2(struct scrap_graph_t *g)
+{
+	// Expecting graph does not have 1-1 edge
+	gint_t k, v;
+	int deg, rdeg;
+	for (k = 0; k < g->n_v; ++k) {
+		deg = __get_degree(g->bin_fdeg, k) + (int)(g->fadj[k] != NULL);
+		if (deg == 1) {
+			v = g->fadj[k][0];
+			if (v > 0)
+				rdeg = __get_degree(g->bin_rdeg, v - 1) + (int)(g->radj[v - 1] != NULL);
+			else
+				rdeg = __get_degree(g->bin_fdeg, -v - 1) + (int)(g->fadj[-v - 1] != NULL);
+			if (rdeg == 1 && v != k + 1 && v != -k - 1) {
+				__ERROR("1-1 edge exist (%lld) -> (%lld)\n", (long long)k + 1, (long long)v);
+			}
+		}
+
+		deg = __get_degree(g->bin_rdeg, k) + (int)(g->radj[k] != NULL);
+		if (deg == 1) {
+			v = g->radj[k][0];
+			if (v > 0)
+				rdeg = __get_degree(g->bin_rdeg, v - 1) + (int)(g->radj[v - 1] != NULL);
+			else
+				rdeg = __get_degree(g->bin_fdeg, -v - 1) + (int)(g->fadj[-v - 1] != NULL);
+			if (rdeg == 1 && v != k + 1 && v != -k - 1) {
+				__ERROR("1-1 edge exist (%lld) -> (%lld)\n", (long long)(-k - 1), (long long)v);
+			}
+		}
+	}
+	__VERBOSE("test graph 2 ok\n");
 }
 
 uint32_t *remove_tips(struct scrap_graph_t *g)
@@ -509,6 +559,7 @@ struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *g)
 	__VERBOSE("||-- condesing graph\n");
 	ret_g = condense_graph(g, removed);
 	test_graph(ret_g);
+	test_graph_2(ret_g);
 
 	free(removed);
 
