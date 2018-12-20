@@ -28,8 +28,9 @@ SRC = src/dqueue.c 				\
       src/kmer_count.c 				\
       src/kmhash.c 				\
       src/semaphore_wrapper.c 			\
-      src/verbose.c 				\
+      src/time_utils.c 				\
       src/utils.c 				\
+      src/verbose.c 				\
       src/main.c
 
 all:

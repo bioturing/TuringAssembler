@@ -4,6 +4,7 @@
 #include "graph_assembly.h"
 #include "io_utils.h"
 #include "kmer_count.h"
+#include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -79,7 +80,8 @@ struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *pre_g);
 
 void assembly_process(struct opt_count_t *opt)
 {
-	__VERBOSE("2-step kmer counting\n");
+	init_clock();
+	__VERBOSE("Counting kmer\n");
 	struct kmhash_t *kmer_hash;
 	kmer_hash = count_kmer(opt);
 
@@ -87,25 +89,38 @@ void assembly_process(struct opt_count_t *opt)
 	pre_graph = extract_kmer(opt, kmer_hash);
 	kmhash_destroy(kmer_hash);
 
-	__VERBOSE("\nkmer graph building\n");
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Counting kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("\nBuilding kmer graph\n");
 	sort_kmer(pre_graph);
 	// test_sort_kmer(pre_graph);
 
 	get_edges(opt, pre_graph);
-	__VERBOSE("\n");
 	// get_edge_stat(pre_graph);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Building kmer graph time: %.3f\n", sec_from_prev_time());
+	set_time_now();
 
-	__VERBOSE("\nscratch graph building\n");
+	__VERBOSE("\nGluing non-branching path #1\n");
 	struct scrap_graph_t *scratch_graph;
 	scratch_graph = sketch_graph(pre_graph, opt->kmer_master);
 	// dump_scrap_graph(scratch_graph, opt);
+	
+	__VERBOSE_LOG("TIMER", "Gluing non-branching path #1 time: %.3f\n", sec_from_prev_time());
+	set_time_now();
 
-	__VERBOSE("\nremoving tips #1\n");
+	__VERBOSE("\nRemoving tips #1 and gluing non-branching path #2\n");
 	struct scrap_graph_t *bad_graph;
 	bad_graph = remove_tips_round_1(scratch_graph);
 
-	__VERBOSE("printing graph\n");
+	__VERBOSE_LOG("TIMER", "Removing tips #1 and gluing non-branching path #2 time: %.3f\n", sec_from_prev_time());
+
+	__VERBOSE("Printing graph in gfa format\n");
 	dump_scrap_graph(bad_graph, opt);
+
+	__VERBOSE_LOG("TIMER", "Total time: %.3f\n", sec_from_initial_time());
 }
 
 void test_graph(struct scrap_graph_t *g)
