@@ -98,13 +98,13 @@ void assembly_process(struct opt_count_t *opt)
 	__VERBOSE("\nscratch graph building\n");
 	struct scrap_graph_t *scratch_graph;
 	scratch_graph = sketch_graph(pre_graph, opt->kmer_master);
+	// dump_scrap_graph(scratch_graph, opt);
 
 	__VERBOSE("\nremoving tips #1\n");
 	struct scrap_graph_t *bad_graph;
 	bad_graph = remove_tips_round_1(scratch_graph);
 
 	__VERBOSE("printing graph\n");
-	// dump_scrap_graph(scratch_graph, opt);
 	dump_scrap_graph(bad_graph, opt);
 }
 
@@ -281,8 +281,8 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 		deg = __get_degree(g->bin_fdeg, k) + (int)(adj != NULL);
 		__on_bit(removed, k);
 		new_id[k] = n_v;
-		seq_len = ksize;
-		node_seq = append_bin_seq_fw(NULL, 0, g->node_seq[u], 0, ksize);
+		seq_len = g->seq_len[u];
+		node_seq = append_bin_seq_fw(NULL, 0, g->node_seq[u], 0, g->seq_len[u]);
 		ret_g->kmer_count[n_v] = g->kmer_count[k];
 
 		while (deg == 1) {
@@ -314,7 +314,7 @@ struct scrap_graph_t *condense_graph(struct scrap_graph_t *g, uint32_t *removed)
 				adj = g->radj[u];
 				deg = __get_degree(g->bin_rdeg, u) + (int)(adj != NULL);
 				__on_bit(removed, u);
-				node_seq = append_bin_seq_rv(node_seq, seq_len, g->node_seq[u], ksize - 1, g->seq_len[u] - ksize + 1);
+				node_seq = append_bin_seq_rv(node_seq, seq_len, g->node_seq[u], 0, g->seq_len[u] - ksize + 1);
 				seq_len += g->seq_len[u] - ksize + 1;
 				new_id[u] = n_v;
 				ret_g->kmer_count[n_v] += g->kmer_count[u];
@@ -502,36 +502,38 @@ struct scrap_graph_t *remove_tips_round_1(struct scrap_graph_t *g)
 
 static uint32_t *append_bin_seq_fw(uint32_t *dest, int cur_len, uint32_t *src, int beg, int len)
 {
-	int m, i, k;
+	int m, i, k, cur_m;
 	uint32_t *new_ptr;
+	cur_m = (cur_len + 15) >> 4;
 	m = (cur_len + len + 15) >> 4;
-	if (m > (cur_len + 15) >> 4) {
+	if (m > cur_m) {
 		new_ptr = realloc(dest, m * sizeof(uint32_t));
-		memset(new_ptr + ((cur_len + 15) >> 4), 0, ((m - ((cur_len + 15) >> 4))) * sizeof(uint32_t));
+		memset(new_ptr + cur_m, 0, (m - cur_m) * sizeof(uint32_t));
 	} else {
 		new_ptr = dest;
 	}
 	for (i = beg; i < beg + len; ++i) {
 		k = cur_len + (i - beg);
-		new_ptr[k >> 4] |= ((src[i >> 4] >> (i & 15)) & (uint32_t)3) << (k & 15);
+		new_ptr[k >> 4] |= ((src[i >> 4] >> ((i & 15) << 1)) & (uint32_t)3) << ((k & 15) << 1);
 	}
 	return new_ptr;
 }
 
 static uint32_t *append_bin_seq_rv(uint32_t *dest, int cur_len, uint32_t *src, int beg, int len)
 {
-	int m, i, k;
+	int m, i, k, cur_m;
 	uint32_t *new_ptr;
+	cur_m = (cur_len + 15) >> 4;
 	m = (cur_len + len + 15) >> 4;
-	if (m > (cur_len + 15) >> 4) {
+	if (m > cur_m) {
 		new_ptr = realloc(dest, m * sizeof(uint32_t));
-		memset(new_ptr + ((cur_len + 15) >> 4), 0, ((m - ((cur_len + 15) >> 4))) * sizeof(uint32_t));
+		memset(new_ptr + cur_m, 0, (m - cur_m) * sizeof(uint32_t));
 	} else {
 		new_ptr = dest;
 	}
 	for (i = beg; i < beg + len; ++i) {
 		k = cur_len + (len - (i - beg) - 1);
-		new_ptr[k >> 4] |= ((src[i >> 4] >> (i & 15)) & (uint32_t)3) << (k & 15);
+		new_ptr[k >> 4] |= (((src[i >> 4] >> ((i & 15) << 1)) & (uint32_t)3) ^ (uint32_t)3) << ((k & 15) << 1);
 	}
 	return new_ptr;
 }
@@ -637,7 +639,7 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 				node_seq = realloc(node_seq, ((seq_len >> 4) + 1) * sizeof(uint32_t));
 				node_seq[seq_len >> 4] = 0;
 			}
-			node_seq[seq_len >> 4] |= ((uint32_t)(c) << (seq_len & 15));
+			node_seq[seq_len >> 4] |= ((uint32_t)(c) << ((seq_len & 15) << 1));
 			++seq_len;
 			// ++g->seq_len[n_v];
 			__on_bit(visited, v_node);
@@ -684,7 +686,7 @@ struct scrap_graph_t *sketch_graph(struct raw_graph_t *pre_g, int ksize)
 				node_seq = realloc(node_seq, ((seq_len >> 4) + 1) * sizeof(uint32_t));
 				node_seq[seq_len >> 4] = 0;
 			}
-			node_seq[seq_len >> 4] |= ((uint32_t)(c) << (seq_len & 15));
+			node_seq[seq_len >> 4] |= ((uint32_t)(c) << ((seq_len & 15) << 1));
 			++seq_len;
 			// ++g->seq_len[n_v];
 			__on_bit(visited, v_node);
@@ -1196,7 +1198,7 @@ static void dump_bin_seq(uint32_t *bin, char *seq, int len)
 {
 	int i;
 	for (i = 0; i < len; ++i)
-		seq[i] = nt4_char[(bin[i >> 4] >> (i & 15)) & 3];
+		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & 3];
 	seq[len] = '\0';
 }
 
@@ -1220,14 +1222,18 @@ static void rev_bin_seq(uint32_t *seq, int beg, int len)
 {
 	int i, k, v;
 	uint32_t ck, cv;
-	for (i = 0; i < (len + 1) >> 1; ++i) {
+	for (i = 0; i < len >> 1; ++i) {
 		k = beg + i;
 		v = beg + len - i - 1;
-		ck = ((seq[k >> 4] >> (k & 15)) & 3) ^ 3;
-		cv = ((seq[v >> 4] >> (v & 15)) & 3) ^ 3;
-		seq[k >> 4] &= (~((uint32_t)3 << (k & 15)));
-		seq[v >> 4] &= (~((uint32_t)3 << (v & 15)));
-		seq[k >> 4] |= (cv << (v & 15));
-		seq[v >> 4] |= (ck << (k & 15));
+		ck = (seq[k >> 4] >> ((k & 15) << 1)) & 3;
+		cv = (seq[v >> 4] >> ((v & 15) << 1)) & 3;
+		// seq[k >> 4] &= (~((uint32_t)3 << ((k & 15) << 1)));
+		// seq[v >> 4] &= (~((uint32_t)3 << ((v & 15) << 1)));
+		seq[k >> 4] ^= ((cv ^ ck ^ 3) << ((k & 15) << 1));
+		seq[v >> 4] ^= ((ck ^ cv ^ 3) << ((v & 15) << 1));
+	}
+	if (len & 1) {
+		k = beg + ((len + 1) >> 1);
+		seq[k >> 4] ^= (uint32_t)3 << ((k & 15) << 1);
 	}
 }
