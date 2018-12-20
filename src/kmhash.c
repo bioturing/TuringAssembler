@@ -1,18 +1,22 @@
 #include <stdlib.h>
 
 #include "kmhash.h"
+#include "semaphore_wrapper.h"
 #include "utils.h"
 #include "verbose.h"
 
-#define __hash_int(x) (int32_t)((x) >> 33 ^ (x) ^ (x) << 11)
-
-#define __round_up_kmint(x) 	(--(x), (x) |= (x) >> 1,		       \
-				 (x) |= (x) >> 2, (x) |= (x) >> 4,	       \
-				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
-				 ++(x))
-
 #define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
 #define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
+
+#define KMHASH_IDLE			0
+#define KMHASH_BUSY			1
+
+struct kmresize_bundle_t {
+	struct kmhash_t *h;
+	int n_threads;
+	int thread_no;
+	pthread_barrier_t *barrier;
+};
 
 static kmkey_t __hash_int2(kmkey_t k)
 {
@@ -29,7 +33,7 @@ static kmint_t estimate_probe(kmint_t size)
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * 128;
+		s += i * i * 2048;
 	}
 	return i;
 }
@@ -37,34 +41,32 @@ static kmint_t estimate_probe(kmint_t size)
 static kmint_t kmhash_put(struct kmhash_t *h, kmkey_t key)
 {
 	kmint_t mask, step, i, n_probe;
-	kmkey_t cur_key, k, tombstone;
+	kmkey_t cur_key, k;
 
 	mask = h->size - 1;
 	k = __hash_int2(key);
 	n_probe = h->n_probe;
-	tombstone = (kmkey_t)-1;
 	i = k & mask;
 	{
-		cur_key = __sync_val_compare_and_swap(&(h->bucks[i].idx), tombstone, key);
-		if (cur_key == tombstone || cur_key == key) {
-			if (cur_key == tombstone)
+		cur_key = __sync_val_compare_and_swap(&(h->keys[i]), TOMB_STONE, key);
+		if (cur_key == TOMB_STONE || cur_key == key) {
+			if (cur_key == TOMB_STONE)
 				__sync_fetch_and_add(&(h->n_items), 1);
 			return i;
 		}
 	}
 	step = 0;
 	do {
-		i = (i + (step * (step + 1)) / 2) & mask;
 		++step;
-		cur_key = __sync_val_compare_and_swap(&(h->bucks[i].idx), tombstone, key);
-	} while (step < n_probe && cur_key != key && cur_key != tombstone);
-	if (cur_key == tombstone || cur_key == key) {
-		if (cur_key == tombstone)
+		i = (i + (step * (step + 1)) / 2) & mask;
+		cur_key = __sync_val_compare_and_swap(&(h->keys[i]), TOMB_STONE, key);
+	} while (step < n_probe && cur_key != key && cur_key != TOMB_STONE);
+	if (cur_key == TOMB_STONE || cur_key == key) {
+		if (cur_key == TOMB_STONE)
 			__sync_fetch_and_add(&(h->n_items), 1);
 		return i;
-	} else {
-		return h->size;
 	}
+	return KMHASH_MAX_SIZE;
 }
 
 void *kmresize_worker(void *data)
@@ -78,126 +80,185 @@ void *kmresize_worker(void *data)
 	cap = h->size / bundle->n_threads + 1;
 	l = cap * bundle->thread_no;
 	r = __min(cap * (bundle->thread_no + 1), h->size);
-	kmkey_t tombstone;
-	tombstone = (kmkey_t)-1;
 	for (i = l; i < r; ++i) {
-		h->bucks[i].idx = tombstone;
-		h->bucks[i].cnt = 0;
+		h->keys[i] = TOMB_STONE;
+		h->vals[i] = 0;
 	}
 
 	pthread_barrier_wait(bundle->barrier);
 
+	// Fill buckets
 	cap = h->old_size / bundle->n_threads + 1;
 	l = cap * bundle->thread_no;
 	r = __min(cap * (bundle->thread_no + 1), h->old_size);
 	for (i = l; i < r; ++i) {
-		if (h->old_bucks[i].idx == tombstone)
+		if (h->old_keys[i] == TOMB_STONE)
 			continue;
-		k = kmhash_put(h, h->old_bucks[i].idx);
-		if (k == h->size)
-			__ERROR("Resizing kmer hash table fail");
-		__sync_add_and_fetch(&(h->bucks[k].cnt), h->old_bucks[i].cnt);
+		k = kmhash_put(h, h->old_keys[i]);
+		if (k == KMHASH_MAX_SIZE)
+			__ERROR("Resizing hash table fail");
+		__sync_fetch_and_add(&(h->vals[k]), h->old_vals[i]);
 	}
 
 	pthread_exit(NULL);
 }
 
-void kmhash_enlarge(struct kmhash_t *h)
+void kmhash_resize_multi(struct kmhash_t *h)
 {
-        __VERBOSE("I need to double hash table size\n");
-	int i;
-	for (i = 0; i < h->n_workers; ++i)
-		pthread_mutex_lock(h->locks + i);
-
-	if (h->size == KMHASH_MAX_SIZE)
-		__ERROR("The kmer hash table is too big (exceeded %llu)", (unsigned long long)KMHASH_MAX_SIZE);
+	int n_threads, i;
+	n_threads = h->n_workers;
 
 	h->old_size = h->size;
-	h->old_bucks = h->bucks;
+	h->old_keys = h->keys;
+	h->old_vals = h->vals;
 
 	h->size <<= 1;
-	h->bucks = malloc(h->size * sizeof(struct kmbucket_t));
-	// FIXME: calculate new prob value
 	h->n_probe = estimate_probe(h->size);
-        __VERBOSE("New probe: %d; New size: %llu\n", (int)h->n_probe, (unsigned long long)h->size);
-        __VERBOSE("Current number of items: %llu\n", (unsigned long long)h->n_items);
-        h->n_items = 0;
+	h->keys = malloc(h->size * sizeof(kmkey_t));
+	h->vals = malloc(h->size * sizeof(kmval_t));
+
+	h->n_items = 0;
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	pthread_t *th;
-	th = calloc(h->n_workers, sizeof(pthread_t));
-
-	struct kmresize_bundle_t *bundles;
-	bundles = calloc(h->n_workers, sizeof(struct kmresize_bundle_t));
+	pthread_t *t;
+	t = calloc(h->n_workers, sizeof(pthread_t));
 
 	pthread_barrier_t barrier;
-	pthread_barrier_init(&barrier, NULL, h->n_workers);
+	pthread_barrier_init(&barrier, NULL, n_threads);
 
-	for (i = 0; i < h->n_workers; ++i) {
-		bundles[i].n_threads = h->n_workers;
+	struct kmresize_bundle_t *bundles;
+	bundles = calloc(n_threads, sizeof(struct kmresize_bundle_t));
+
+	for (i = 0; i < n_threads; ++i) {
+		bundles[i].n_threads = n_threads;
 		bundles[i].thread_no = i;
-		bundles[i].barrier = &barrier;
 		bundles[i].h = h;
-		pthread_create(th + i, &attr, kmresize_worker, bundles + i);
+		bundles[i].barrier = &barrier;
+		pthread_create(t + i, &attr, kmresize_worker, bundles + i);
 	}
 
-	for (i = 0; i < h->n_workers; ++i)
-		pthread_join(th[i], NULL);
+	for (i = 0; i < n_threads; ++i)
+		pthread_join(t[i], NULL);
 
-        for (i = 0; i < h->n_workers; ++i)
-                pthread_mutex_unlock(h->locks + i);
-
-	pthread_barrier_destroy(&barrier);
 	pthread_attr_destroy(&attr);
+	pthread_barrier_destroy(&barrier);
 
-	free(th);
+	free(t);
 	free(bundles);
-	free(h->old_bucks);
-        __sync_bool_compare_and_swap(&(h->status), KMHASH_RESIZE, KMHASH_IDLE);
-        __VERBOSE("Done resize\n");
+	free(h->old_keys);
+	free(h->old_vals);
 }
+
+void kmhash_resize_single(struct kmhash_t *h)
+{
+	kmint_t i, k;
+
+	h->old_size = h->size;
+	h->old_keys = h->keys;
+	h->old_vals = h->vals;
+
+	h->size <<= 1;
+	h->n_probe = estimate_probe(h->size);
+	h->keys = malloc(h->size * sizeof(kmkey_t));
+	h->vals = malloc(h->size * sizeof(kmval_t));
+
+	h->n_items = 0;
+	for (i = 0; i < h->size; ++i) {
+		h->keys[i] = TOMB_STONE;
+		h->vals[i] = 0;
+	}
+
+	for (i = 0; i < h->old_size; ++i) {
+		if (h->old_keys[i] == TOMB_STONE)
+			continue;
+		k = kmhash_put(h, h->old_keys[i]);
+		if (k == KMHASH_MAX_SIZE)
+			__ERROR("Resizing hash table fail");
+		__sync_add_and_fetch(&(h->vals[k]), h->old_vals[i]);
+	}
+	free(h->old_keys);
+	free(h->old_vals);
+}
+
+void kmhash_resize(struct kmhash_t *h)
+{
+	int i;
+	for (i = 0; i < h->n_workers; ++i)
+		// sem_wrap_wait(&(h->gsem));
+		pthread_mutex_lock(h->locks + i);
+
+	if (h->size == KMHASH_MAX_SIZE)
+		__ERROR("Unable to expand the hash table (max size = %llu)",
+			(unsigned long long)KMHASH_MAX_SIZE);
+
+	if (h->size <= KMHASH_SINGLE_RESIZE)
+		kmhash_resize_single(h);
+	else
+		kmhash_resize_multi(h);
+
+	for (i = 0; i < h->n_workers; ++i)
+		// sem_wrap_post(&(h->gsem));
+		pthread_mutex_unlock(h->locks + i);
+}
+
 
 void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
 {
 	kmint_t k;
 
+	// sem_wrap_wait(&(h->gsem));
 	pthread_mutex_lock(lock);
 	k = kmhash_put(h, key);
+	// sem_wrap_post(&(h->gsem));
 	pthread_mutex_unlock(lock);
 
-	if (k == h->size) {
-		if (__sync_bool_compare_and_swap(&(h->status), KMHASH_IDLE, KMHASH_RESIZE))
-			kmhash_enlarge(h);
+	if (k == KMHASH_MAX_SIZE) {
+		do {
+			if (__sync_bool_compare_and_swap(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+				kmhash_resize(h);
+				__sync_val_compare_and_swap(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+			}
 
-		pthread_mutex_lock(lock);
-		k = kmhash_put(h, key);
-		pthread_mutex_unlock(lock);
+			// sem_wrap_wait(&(h->gsem));
+			pthread_mutex_lock(lock);
+			k = kmhash_put(h, key);
+			// sem_wrap_post(&(h->gsem));
+			pthread_mutex_unlock(lock);
+		} while (k == KMHASH_MAX_SIZE);
 	}
 }
 
-void kmhash_inc_val_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
+void kmhash_inc_val(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
 {
 	kmint_t k;
 
+	// sem_wrap_wait(&(h->gsem));
 	pthread_mutex_lock(lock);
 	k = kmhash_put(h, key);
-	if (k < h->size)
-		__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
+	if (k < KMHASH_MAX_SIZE)
+		__sync_add_and_fetch(&(h->vals[k]), 1);
+	// sem_wrap_post(&(h->gsem));
 	pthread_mutex_unlock(lock);
 
-	if (k == h->size) {
-		if (__sync_bool_compare_and_swap(&(h->status), KMHASH_IDLE, KMHASH_RESIZE))
-			kmhash_enlarge(h);
+	if (k == KMHASH_MAX_SIZE) {
+		do {
+			if (__sync_bool_compare_and_swap(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+				kmhash_resize(h);
+				__sync_val_compare_and_swap(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+			}
 
-		pthread_mutex_lock(lock);
-		k = kmhash_put(h, key);
-		if (k < h->size)
-			__sync_add_and_fetch(&(h->bucks[k].cnt), 1);
-		pthread_mutex_unlock(lock);
+			// sem_wrap_wait(&(h->gsem));
+			pthread_mutex_lock(lock);
+			k = kmhash_put(h, key);
+			if (k < KMHASH_MAX_SIZE)
+				__sync_add_and_fetch(&(h->vals[k]), 1);
+			// sem_wrap_post(&(h->gsem));
+			pthread_mutex_unlock(lock);
+		} while (k == KMHASH_MAX_SIZE);
 	}
 }
 
@@ -209,41 +270,40 @@ kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key)
 	k = __hash_int2(key);
 	i = k & mask;
 	n_probe = h->n_probe;
-	if (h->bucks[i].idx == key)
+	if (h->keys[i] == key)
 		return i;
-	step = 1;
+	step = 0;
 	do {
-		i = (i + (step * (step + 1)) / 2) & mask;
-		if (h->bucks[i].idx == key)
-			return i;
 		++step;
+		i = (i + (step * (step + 1)) / 2) & mask;
+		if (h->keys[i] == key)
+			return i;
 	} while (step < n_probe);
-	return h->size;
+	return KMHASH_MAX_SIZE;
 }
 
 struct kmhash_t *init_kmhash(kmint_t size, int n_threads)
 {
-        __VERBOSE("Initilizing hash table\n");
 	struct kmhash_t *h;
 	kmint_t i;
-	kmkey_t tombstone;
+	int k;
+
 	h = calloc(1, sizeof(struct kmhash_t));
 	h->size = size;
 	__round_up_kmint(h->size);
-	h->bucks = malloc(h->size * sizeof(struct kmbucket_t));
-	h->n_probe = estimate_probe(h->size);
-        __VERBOSE("Probe number: %d\n", (int)h->n_probe);
-
-	tombstone = (kmkey_t)-1;
-	for (i = 0; i < h->size; ++i)
-		h->bucks[i].idx = tombstone;
+	h->keys = malloc(h->size * sizeof(kmkey_t));
+	h->vals = malloc(h->size * sizeof(kmval_t));
+	for (i = 0; i < h->size; ++i) {
+		h->keys[i] = TOMB_STONE;
+		h->vals[i] = 0;
+	}
 
 	h->n_workers = n_threads;
-	h->locks = calloc(n_threads, sizeof(pthread_mutex_t));
-	int k;
+	// sem_wrap_init(&(h->gsem), n_threads);
+	h->status = KMHASH_IDLE;
+	h->locks = malloc(n_threads * sizeof(pthread_mutex_t));
 	for (k = 0; k < n_threads; ++k)
 		pthread_mutex_init(h->locks + k, NULL);
-	h->status = KMHASH_IDLE;
 
 	return h;
 }
@@ -251,10 +311,12 @@ struct kmhash_t *init_kmhash(kmint_t size, int n_threads)
 void kmhash_destroy(struct kmhash_t *h)
 {
 	if (!h) return;
-	free(h->bucks);
 	int i;
 	for (i = 0; i < h->n_workers; ++i)
 		pthread_mutex_destroy(h->locks + i);
 	free(h->locks);
+	free(h->keys);
+	free(h->vals);
+	// sem_wrap_destroy(&(h->gsem));
 	free(h);
 }

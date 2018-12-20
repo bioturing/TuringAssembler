@@ -296,51 +296,6 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 
 	__VERBOSE("Number of vertices in reduced graph: %d\n", g.n_v);
 
-	// int seq_len, m_len;
-	// char *seq;
-	// m_len = 128;
-	// seq = malloc(m_len);
-
-	// dumping graph
-	// char dump_path[1024];
-	// strcpy(dump_path, opt->out_dir);
-	// strcat(dump_path, "/graph_reduced.gfa");
-	// FILE *fp = xfopen(dump_path, "w");
-
-	// for (k = 0; k < g.n_v; ++k) {
-	// 	seq_len = (g.chain_head[k + 1] - g.chain_head[k] - 1) + ksize;
-	// 	if (seq_len + 1 > m_len) {
-	// 		m_len = seq_len + 1;
-	// 		seq = realloc(seq, m_len + 1);
-	// 	}
-	// 	dump_seq(g.chain_kmer[g.chain_head[k]], seq, ksize);
-	// 	seq_len = ksize;
-	// 	for (c = g.chain_head[k] + 1; c < g.chain_head[k + 1]; ++c)
-	// 		seq[seq_len++] = nt4_char[g.chain_kmer[c] & 3];
-	// 	seq[seq_len] = '\0';
-	// 	fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
-	// 	for (c = g.chain_head[k]; c < g.chain_head[k + 1]; ++c) {
-	// 		__get_revc_num(g.chain_kmer[c], tmp, ksize, kmask);
-	// 		fprintf(fp, c + 1 == g.chain_head[k + 1] ? "%llu\t%c\n" : "%llu\t%c\t",
-	// 			(unsigned long long)g.chain_kmer[c],
-	// 			g.chain_kmer[c] < tmp ? '+' : '-');
-	// 	}
-	// }
-
-	// for (k = 0; k < g.n_v; ++k) {
-	// 	for (c = g.fhead[k]; c < g.fhead[k + 1]; ++c) {
-	// 		fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
-	// 			k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
-	// 			g.fadj[c] > 0 ? '+' : '-', ksize - 1);
-	// 	}
-	// 	for (c = g.rhead[k]; c < g.rhead[k + 1]; ++c) {
-	// 		fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
-	// 			k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
-	// 			g.radj[c] > 0 ? '+' : '-', ksize - 1);
-	// 	}
-	// }
-	// fclose(fp);
-
 	for (k = 1; k <= g.n_v; ++k) {
 		g.fhead[k] += g.fhead[k - 1];
 		g.rhead[k] += g.rhead[k - 1];
@@ -469,13 +424,9 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 				}
 				uk = g.kmer_chain_id[v_node];
 				if (v_ridx == g.chain_kmer[g.chain_head[uk + 1] - 1])
-					g.radj[--g.rhead[k]] = uk + 1;
-				else if (v_idx == g.chain_kmer[g.chain_head[uk]])
 					g.radj[--g.rhead[k]] = -(uk + 1);
-				// if (v_ridx == g.chain_kmer[g.chain_head[uk]])
-				// 	g.radj[g.rhead[k]--] = uk + 1;
-				// else if (v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
-				// 	g.radj[g.rhead[k]--] = -(uk + 1);
+				else if (v_idx == g.chain_kmer[g.chain_head[uk]])
+					g.radj[--g.rhead[k]] = uk + 1;
 				else {
 					if (v_ridx == g.chain_kmer[g.chain_head[uk]] || v_idx == g.chain_kmer[g.chain_head[uk + 1] - 1])
 						fprintf(stderr, "Wrong connect\n");
@@ -517,8 +468,55 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 								e[v_node], e[v_node + 1],
 								e[v_node + 2], e[v_node + 3]);
 					}
-					// fprintf(stderr, "%d\t%d\t%llu\t%llu\n", k, c, (unsigned long long)u_idx, (unsigned long long)v_idx);
 					assert(0);
+				}
+			}
+		}
+	}
+
+	uint32_t *removed;
+	removed = calloc((g.n_v + 31) / 32, sizeof(uint32_t));
+
+	for (k = 0; k < g.n_v; ++k) {
+		int deg = (g.rhead[k + 1] - g.rhead[k]) + (g.fhead[k + 1] - g.fhead[k]);
+		if (deg <= 1) {
+			if (deg == 0) {
+				__on_bit(removed, k);
+				continue;
+			}
+			// Otherwise, deg = 1
+			int v;
+			if (g.rhead[k + 1] - g.rhead[k] == 1) {
+				v = g.radj[g.rhead[k]];
+			} else {
+				v = g.fadj[g.fhead[k]];
+			}
+			int *radj, rdeg;
+			if (v > 0) {
+				radj = g.radj + g.rhead[v - 1];
+				rdeg = g.rhead[v] - g.rhead[v - 1];
+				--v;
+			} else {
+				radj = g.fadj + g.fhead[-v - 1];
+				rdeg = g.fhead[-v] - g.fhead[-v - 1];
+				v = -v - 1;
+			}
+			if (rdeg > 1) {
+				float max_cov;
+				max_cov = 0.0;
+				for (c = 0; c < rdeg; ++c) {
+					int t = radj[c];
+					if (t < 0)
+						t = -t - 1;
+					else
+						--t;
+					float cov = 1.0 * g.kmer_count[t] / (g.chain_head[t + 1] - g.chain_head[t] + ksize - 1);
+					if (cov > max_cov)
+						max_cov = cov;
+				}
+				float cov = 1.0 * g.kmer_count[k] / (g.chain_head[k + 1] - g.chain_head[k] + ksize - 1);
+				if (cov / max_cov < 0.5) {
+					__on_bit(removed, k);
 				}
 			}
 		}
@@ -534,6 +532,9 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 	strcpy(dump_path, opt->out_dir);
 	strcat(dump_path, "/graph_reduced.gfa");
 	FILE *fp = xfopen(dump_path, "w");
+	strcpy(dump_path, opt->out_dir);
+	strcat(dump_path, "/tips.tsv");
+	FILE *fr = xfopen(dump_path, "w");
 
 	for (k = 0; k < g.n_v; ++k) {
 		seq_len = (g.chain_head[k + 1] - g.chain_head[k] - 1) + ksize;
@@ -546,19 +547,36 @@ void reduce_graph(struct opt_count_t *opt, khash_t(kvert) *h, uint32_t *e)
 		for (c = g.chain_head[k] + 1; c < g.chain_head[k + 1]; ++c)
 			seq[seq_len++] = nt4_char[g.chain_kmer[c] & 3];
 		seq[seq_len] = '\0';
-		fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
+		if (__get_bit(removed, k))
+			fprintf(fr, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
+		else
+			fprintf(fp, "S\t%d\t%s\tKC:i:%d\n", k + 1, seq, g.kmer_count[k]);
 	}
 
 	for (k = 0; k < g.n_v; ++k) {
+		if (__get_bit(removed, k))
+			continue;
 		for (c = g.fhead[k]; c < g.fhead[k + 1]; ++c) {
-			fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
-				k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
-				g.fadj[c] > 0 ? '+' : '-', ksize - 1);
+			int v = g.fadj[c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			if (!__get_bit(removed, v))
+				fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
+					k + 1, g.fadj[c] > 0 ? g.fadj[c] : -g.fadj[c],
+					g.fadj[c] > 0 ? '+' : '-', ksize - 1);
 		}
 		for (c = g.rhead[k]; c < g.rhead[k + 1]; ++c) {
-			fprintf(fp, "L\t%d\t+\t%d\t%c\t%dM\n",
-				k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
-				g.radj[c] > 0 ? '+' : '-', ksize - 1);
+			int v = g.radj[c];
+			if (v > 0)
+				--v;
+			else
+				v = -v - 1;
+			if (!__get_bit(removed, v))
+				fprintf(fp, "L\t%d\t-\t%d\t%c\t%dM\n",
+					k + 1, g.radj[c] > 0 ? g.radj[c] : -g.radj[c],
+					g.radj[c] > 0 ? '+' : '-', ksize - 1);
 		}
 	}
 	fclose(fp);
@@ -689,7 +707,6 @@ void add_edge(struct read_t *r, struct e_bundle_t *bundle)
 		pknum = knum;
 		pkrev = krev;
 	}
-
 }
 
 void *edge_worker(void *data)

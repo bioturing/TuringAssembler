@@ -15,7 +15,7 @@ KHASH_DECLARE(kvert, uint64_t, struct kvert_info_t)
 
 struct kvert_info_t {
 	int idx;
-	int cnt;
+	uint32_t cnt;
 };
 
 struct read_t {
@@ -30,25 +30,20 @@ struct read_t {
 struct opt_count_t {
 	int n_threads;
 	int hash_size;
-	int kmer_size;
+	int kmer_master;
+	int kmer_slave;
 	int filter_thres;
 	int n_files;
 	char **files_1, **files_2;
 	char *out_dir;
 };
 
-struct pair_buffer_t {
-	char *buf1;
-	char *buf2;
-	int input_format;
-};
-
 struct producer_bundle_t {
+	struct dqueue_t *q;
 	int *n_consumer;
 	void *stream;
 	pthread_barrier_t *barrier;
 	pthread_mutex_t *lock;
-	struct dqueue_t *q;
 };
 
 #endif
