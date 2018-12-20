@@ -308,6 +308,35 @@ struct kmhash_t *init_kmhash(kmint_t size, int n_threads)
 	return h;
 }
 
+void filter_by_count(struct kmhash_t *h, kmval_t min_count)
+{
+	uint32_t *mask;
+	kmint_t n_items;
+	for (i = 0; i < h->size; ++i) {
+		if (h->keys[i] != TOMB_STONE && h->vals[i] > min_count) {
+			__set_old(mask, i);
+			++n_items;
+		}
+	}
+	new_size = n_items;
+	__round_up_kmint(new_size);
+	if (n_items > (kmint_t)(0.88 * new_size))
+		new_size <<= 1;
+	if (new_size > h->size)
+		new_size = h->size;
+	mask_size = (new_size + 15) >> 4;
+	mask = realloc(mask, mask_size * sizeof(uint32_t));
+	memset(mask + old_mask_size, (mask_size - old_mask_size) * sizeof(uint32_t));
+
+	while (fail) {
+		for (i = 0; i < cur_size; ++i) {
+			if (__is_old(mask, i)) {
+				// re-insert
+			}
+		}
+	}
+}
+
 void kmhash_destroy(struct kmhash_t *h)
 {
 	if (!h) return;
