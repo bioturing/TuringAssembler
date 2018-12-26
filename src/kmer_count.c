@@ -55,9 +55,11 @@ void count_kmer_read(struct read_t *r, struct kmhash_t *h, int ksize, pthread_mu
 		}
 		if (last >= ksize) {
 			if (knum < krev)
-				kmhash_inc_val(h, knum, lock_hash);
+				// kmhash_inc_val(h, knum, lock_hash);
+				kmhash_put(h, knum, lock_hash);
 			else
-				kmhash_inc_val(h, krev, lock_hash);
+				// kmhash_inc_val(h, krev, lock_hash);
+				kmhash_put(h, krev, lock_hash);
 		}
 	}
 }
@@ -93,10 +95,10 @@ void count_kmer_filter(struct read_t *r, struct kmhash_t *h,
 			krev_large |= (kmkey_t)(c ^ 3) << lmc_large;
 			++last;
 			if (knum_small < krev_small)
-				k = kmhash_get(dict, knum_small);
+				k = kmphash_get(dict, knum_small);
 			else
-				k = kmhash_get(dict, krev_small);
-			if (k != KMHASH_MAX_SIZE && dict->vals[k] != 0)
+				k = kmphash_get(dict, krev_small);
+			if (k != KMHASH_MAX_SIZE)
 				++cnt_small;
 			else
 				cnt_small = 0;
@@ -106,9 +108,11 @@ void count_kmer_filter(struct read_t *r, struct kmhash_t *h,
 		}
 		if (last >= klarge && cnt_small >= n_small) {
 			if (knum_large < krev_large)
-				kmhash_inc_val(h, knum_large, lock_hash);
+				// kmhash_inc_val(h, knum_large, lock_hash);
+				kmhash_put(h, knum_large, lock_hash);
 			else
-				kmhash_inc_val(h, krev_large, lock_hash);
+				// kmhash_inc_val(h, krev_large, lock_hash);
+				kmhash_put(h, krev_large, lock_hash);
 		}
 	}
 }
@@ -251,7 +255,7 @@ struct kmhash_t *count_kmer_minor(struct opt_count_t *opt, int kmer_size)
 	int i;
 
 	struct kmhash_t *kmer_hash;
-	kmer_hash = init_kmhash((kmint_t)opt->hash_size, opt->n_threads);
+	kmer_hash = init_filter_kmhash((kmint_t)opt->hash_size - 1, opt->n_threads);
 
 	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
@@ -308,7 +312,7 @@ struct kmhash_t *count_kmer_master(struct opt_count_t *opt, struct kmhash_t *dic
 	int i;
 
 	struct kmhash_t *kmer_hash;
-	kmer_hash = init_kmhash((kmint_t)opt->hash_size, opt->n_threads);
+	kmer_hash = init_filter_kmhash((kmint_t)opt->hash_size - 1, opt->n_threads);
 
 	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
@@ -364,17 +368,22 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", opt->kmer_slave,
 		(long long unsigned)hs->n_items);
-	uint64_t cnt_good;
-	kmint_t i;
-	cnt_good = 0;
-	for (i = 0; i < hs->size; ++i) {
-		if (hs->keys[i] != TOMB_STONE && hs->vals[i] > opt->filter_thres)
-			++cnt_good;
-		else
-			hs->vals[i] = 0;
-	}
-	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer with count greater than (%d): %llu\n",
-		opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
+
+	__VERBOSE("Filtering %d-mer\n", opt->kmer_slave);
+	kmhash_filter_singleton(hs, 0);
+	// uint64_t cnt_good;
+	// kmint_t i;
+	// cnt_good = 0;
+	// for (i = 0; i < hs->size; ++i) {
+	// 	if (hs->keys[i] != TOMB_STONE && hs->vals[i] > opt->filter_thres)
+	// 		++cnt_good;
+	// 	else
+	// 		hs->vals[i] = 0;
+	// }
+	// __VERBOSE_LOG("KMER COUNT", "Number of %d-mer with count greater than (%d): %llu\n",
+	// 	opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
+	__VERBOSE_LOG("KMER_COUNT", "Number of non-singleton %d-mer: %llu\n",
+			opt->kmer_slave, (long long unsigned)hs->n_items);
 	__VERBOSE("\nCounting %d-mer (early filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
 	hm = count_kmer_master(opt, hs);
 	kmhash_destroy(hs);
@@ -386,41 +395,156 @@ void kmer_test_process(struct opt_count_t *opt)
 	struct kmhash_t *hs, *hl, *hm;
 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
 	hs = count_kmer_minor(opt, opt->kmer_slave);
-	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
-	hl = count_kmer_minor(opt, opt->kmer_master);
-	uint64_t cnt_slave, cnt_master;
-	kmint_t k;
-	cnt_slave = cnt_master = 0;
-	for (k = 0; k < hs->size; ++k)
-		if (hs->keys[k] != TOMB_STONE && hs->vals[k] > opt->filter_thres)
-			++cnt_slave;
-		else
-			hs->vals[k] = 0;
-	for (k = 0; k < hl->size; ++k)
-		if (hl->keys[k] != TOMB_STONE && hl->vals[k] > opt->filter_thres)
-			++cnt_master;
+
 	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)hs->n_items);
-	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)cnt_slave);
+	// __VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)cnt_slave);
 
+	// kmint_t cnt, k, ret;
+	// cnt = 0;
+	// for (k = 0; k < hs->size; ++k)
+	// 	if ((hs->vals[k >> 5] >> (k & 31)) & 1)
+	// 		++cnt;
+	// kmkey_t *tmp;
+	// tmp = malloc(cnt * sizeof(kmkey_t));
+	// cnt = 0;
+	// for (k = 0; k < hs->size; ++k)
+	// 	if ((hs->vals[k >> 5] >> (k & 31)) & 1)
+	// 		tmp[cnt++] = hs->keys[k];
+
+	kmhash_filter_singleton(hs, 0);
+	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)hs->n_items);
+
+	// test 
+	
+	// fprintf(stderr, "pre-count = %llu\n", cnt);
+
+	// for (k = 0; k < cnt; ++k) {
+	// 	ret = kmphash_get(hs, tmp[k]);
+	// 	if (ret == KMHASH_MAX_SIZE)
+	// 		fprintf(stderr, "Fail test\n");
+	// }
+	// fprintf(stderr, "Pass test\n");
+
+	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
+	hl = count_kmer_minor(opt, opt->kmer_master);
+	// uint64_t cnt_slave, cnt_master;
+	// kmint_t k;
+	// cnt_slave = cnt_master = 0;
+	// for (k = 0; k < hs->size; ++k)
+	// 	if (hs->keys[k] != TOMB_STONE && hs->vals[k] > opt->filter_thres)
+	// 		++cnt_slave;
+	// 	else
+	// 		hs->vals[k] = 0;
+	// for (k = 0; k < hl->size; ++k)
+	// 	if (hl->keys[k] != TOMB_STONE && hl->vals[k] > opt->filter_thres)
+	// 		++cnt_master;
+
+	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hl->n_items);
-	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)cnt_master);
+	// __VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)cnt_master);
 
-	kmhash_destroy(hl);
+	kmhash_filter_singleton(hl, 0);
+	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hl->n_items);
+
+	// kmhash_destroy(hl);
 	hm = count_kmer_master(opt, hs);
-	uint64_t cnt_master_2;
-	cnt_master_2 = 0;
-	for (k = 0; k < hm->size; ++k)
-		if (hm->keys[k] != TOMB_STONE && hm->vals[k] > opt->filter_thres)
-			++cnt_master_2;
-		else
-			hm->vals[k] = 0;
+	// uint64_t cnt_master_2;
+	// cnt_master_2 = 0;
+	// for (k = 0; k < hm->size; ++k)
+	// 	if (hm->keys[k] != TOMB_STONE && hm->vals[k] > opt->filter_thres)
+	// 		++cnt_master_2;
+	// 	else
+	// 		hm->vals[k] = 0;
 	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)hm->n_items);
-	__VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)cnt_master_2);
+	// __VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)cnt_master_2);
+
+	kmhash_filter_singleton(hm, 0);
+	__VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)hm->n_items);
+
+	// for (k = 0; k < hl->size; ++k) {
+	// 	if (hl->keys[k] != TOMB_STONE) {
+	// 		ret = kmphash_get(hm, hl->keys[k]);
+	// 		assert(ret != KMHASH_MAX_SIZE && "Fail test #1");
+	// 	}
+	// }
+
+	// for (k = 0; k < hm->size; ++k) {
+	// 	if (hm->keys[k] != TOMB_STONE) {
+	// 		ret = kmphash_get(hl, hm->keys[k]);
+	// 		assert(ret != KMHASH_MAX_SIZE && "Fail test #2");
+	// 	}
+	// }
 
 	kmhash_destroy(hs);
 }
+
+// struct kmhash_t *count_kmer(struct opt_count_t *opt)
+// {
+// 	struct kmhash_t *hs, *hm;
+// 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
+// 	hs = count_kmer_minor(opt, opt->kmer_slave);
+// 	__VERBOSE("\n");
+// 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", opt->kmer_slave,
+// 		(long long unsigned)hs->n_items);
+// 	uint64_t cnt_good;
+// 	kmint_t i;
+// 	cnt_good = 0;
+// 	for (i = 0; i < hs->size; ++i) {
+// 		if (hs->keys[i] != TOMB_STONE && hs->vals[i] > opt->filter_thres)
+// 			++cnt_good;
+// 		else
+// 			hs->vals[i] = 0;
+// 	}
+// 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer with count greater than (%d): %llu\n",
+// 		opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
+// 	__VERBOSE("\nCounting %d-mer (early filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
+// 	hm = count_kmer_master(opt, hs);
+// 	kmhash_destroy(hs);
+// 	return hm;
+// }
+
+// void kmer_test_process(struct opt_count_t *opt)
+// {
+// 	struct kmhash_t *hs, *hl, *hm;
+// 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
+// 	hs = count_kmer_minor(opt, opt->kmer_slave);
+// 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
+// 	hl = count_kmer_minor(opt, opt->kmer_master);
+// 	uint64_t cnt_slave, cnt_master;
+// 	kmint_t k;
+// 	cnt_slave = cnt_master = 0;
+// 	for (k = 0; k < hs->size; ++k)
+// 		if (hs->keys[k] != TOMB_STONE && hs->vals[k] > opt->filter_thres)
+// 			++cnt_slave;
+// 		else
+// 			hs->vals[k] = 0;
+// 	for (k = 0; k < hl->size; ++k)
+// 		if (hl->keys[k] != TOMB_STONE && hl->vals[k] > opt->filter_thres)
+// 			++cnt_master;
+// 	__VERBOSE("\n");
+// 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)hs->n_items);
+// 	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave, (long long unsigned)cnt_slave);
+
+// 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hl->n_items);
+// 	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)cnt_master);
+
+// 	kmhash_destroy(hl);
+// 	hm = count_kmer_master(opt, hs);
+// 	uint64_t cnt_master_2;
+// 	cnt_master_2 = 0;
+// 	for (k = 0; k < hm->size; ++k)
+// 		if (hm->keys[k] != TOMB_STONE && hm->vals[k] > opt->filter_thres)
+// 			++cnt_master_2;
+// 		else
+// 			hm->vals[k] = 0;
+// 	__VERBOSE("\n");
+// 	__VERBOSE("Number of %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)hm->n_items);
+// 	__VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n", opt->kmer_master, (long long unsigned)cnt_master_2);
+
+// 	kmhash_destroy(hs);
+// }
 
 void kmer_fastq_count(struct opt_count_t *opt)
 {

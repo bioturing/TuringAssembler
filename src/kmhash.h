@@ -18,6 +18,9 @@ typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
 typedef uint32_t kmval_t;
 
+#define KMVAL_LOG			5
+#define KMVAL_MASK			31
+
 // struct kmbucket_t {
 // 	kmkey_t idx;
 // 	kmval_t cnt;
@@ -34,6 +37,9 @@ struct kmhash_t {
 	kmval_t *vals;
 	kmval_t *old_vals;
 
+	// additional storage for resize
+	uint8_t *rs_flag;
+
 	int status;
 	int n_workers;
 	// struct sem_wrap_t gsem;
@@ -44,15 +50,23 @@ struct kmhash_t {
 	pthread_mutex_t *locks;
 };
 
-struct kmhash_t *init_kmhash(kmint_t size, int n_threads);
+// struct kmhash_t *init_kmhash(kmint_t size, int n_threads);
+
+struct kmhash_t *init_filter_kmhash(kmint_t size, int n_threads);
 
 void kmhash_destroy(struct kmhash_t *h);
 
-void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-void kmhash_inc_val(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
 kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
+
+kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key);
+
+// void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+
+// void kmhash_inc_val(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+
+// kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
 
 
 #endif
