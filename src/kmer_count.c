@@ -371,6 +371,8 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 
 	__VERBOSE("Filtering %d-mer\n", opt->kmer_slave);
 	kmhash_filter_singleton(hs, 0);
+	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n",
+			opt->kmer_slave, (long long unsigned)hs->n_items);
 	// uint64_t cnt_good;
 	// kmint_t i;
 	// cnt_good = 0;
@@ -382,11 +384,13 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 	// }
 	// __VERBOSE_LOG("KMER COUNT", "Number of %d-mer with count greater than (%d): %llu\n",
 	// 	opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
-	__VERBOSE_LOG("KMER_COUNT", "Number of non-singleton %d-mer: %llu\n",
-			opt->kmer_slave, (long long unsigned)hs->n_items);
-	__VERBOSE("\nCounting %d-mer (early filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
+	__VERBOSE("\nCounting %d-mer (early singleton-filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
 	hm = count_kmer_master(opt, hs);
+	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer (early singleton-filtered with %d-mer): %llu\n", opt->kmer_master, opt->kmer_slave, (long long unsigned)hm->n_items);
+
 	kmhash_destroy(hs);
+	kmhash_filter_singleton(hm, 0);
+	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n", opt->kmer_master, (long long unsigned)hm->n_items);
 	return hm;
 }
 

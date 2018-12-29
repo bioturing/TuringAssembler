@@ -23,31 +23,45 @@ struct kmresize_bundle_t {
 	pthread_barrier_t *barrier;
 };
 
-static kmkey_t __hash_int2(kmkey_t k)
-{
-	kmkey_t x = k;
-	x = (x ^ (x >> 30)) * HM_MAGIC_1;
-	x = (x ^ (x >> 27)) * HM_MAGIC_2;
-	x ^= (x > 31);
-	return x;
-}
-
-static kmint_t estimate_probe(kmint_t size)
+static kmint_t estimate_probe_3(kmint_t size)
 {
 	kmint_t s, i;
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * 2048;
+		s += i * i * 64;
 	}
 	return i;
 }
 
-static void atomic_set_bit(kmval_t *ptr, kmint_t i, kmval_t b)
+static kmint_t estimate_probe_prime(kmint_t size)
+{
+	kmint_t s, i;
+	i = s = 0;
+	while (s < size) {
+		++i;
+		s += i * i * 1024;
+	}
+	return i;
+}
+
+// static kmint_t estimate_probe(kmint_t size)
+// {
+// 	kmint_t s, i;
+// 	i = s = 0;
+// 	while (s < size) {
+// 		++i;
+// 		s += i * i * 2048;
+// 	}
+// 	return i;
+// }
+
+static void atomic_set_bit_kmval(kmval_t *ptr, kmint_t i, kmval_t b)
 {
 	kmval_t old_bin, new_bin, cur_bin;
+	cur_bin = *(volatile kmval_t *)ptr;
 	do {
-		old_bin = *(volatile kmval_t *)ptr;
+		old_bin = cur_bin;
 		new_bin = old_bin | ((kmval_t)b << i);
 		cur_bin = __sync_val_compare_and_swap(ptr, old_bin, new_bin);
 	} while (cur_bin != old_bin);
@@ -68,7 +82,7 @@ static kmint_t kmhash_set(struct kmhash_t *h, kmkey_t key)
 			if (cur_key == TOMB_STONE)
 				__sync_fetch_and_add(&(h->n_items), 1);
 			else
-				atomic_set_bit(h->vals + (i >> KMVAL_LOG), i & KMVAL_MASK, 1);
+				atomic_set_bit_kmval(h->vals + (i >> KMVAL_LOG), i & KMVAL_MASK, 1);
 			return i;
 		}
 	}
@@ -82,7 +96,7 @@ static kmint_t kmhash_set(struct kmhash_t *h, kmkey_t key)
 		if (cur_key == TOMB_STONE)
 			__sync_fetch_and_add(&(h->n_items), 1);
 		else
-			atomic_set_bit(h->vals + (i >> KMVAL_LOG), i & KMVAL_MASK, 1);
+			atomic_set_bit_kmval(h->vals + (i >> KMVAL_LOG), i & KMVAL_MASK, 1);
 		return i;
 	}
 	return KMHASH_MAX_SIZE;
@@ -181,7 +195,7 @@ void *kmresize_worker(void *data)
 					// if (cur_flag == KMMASK_EMPTY) {
 						// rs_flag[j] = KMMASK_NEW;
 						keys[j] = x;
-						atomic_set_bit(vals + (j >> KMVAL_LOG), j & KMVAL_MASK, b);
+						atomic_set_bit_kmval(vals + (j >> KMVAL_LOG), j & KMVAL_MASK, b);
 						// vals[j >> 5] |= (b << (j & 31));
 						break;
 					// } else if (cur_flag == KMMASK_OLD) {
@@ -189,7 +203,7 @@ void *kmresize_worker(void *data)
 						y = keys[j];
 						// rs_flag[j] = KMMASK_NEW;
 						keys[j] = x;
-						atomic_set_bit(vals + (j >> KMVAL_LOG), j & KMVAL_MASK, b);
+						atomic_set_bit_kmval(vals + (j >> KMVAL_LOG), j & KMVAL_MASK, b);
 						b = (old_vals[j >> 5] >> (j & 31)) & 1;
 						// vals[j >> 5] |= (b << (j & 31));
 						x = y;
@@ -218,7 +232,7 @@ void kmhash_resize_multi(struct kmhash_t *h)
 	h->old_vals = h->vals;
 
 	h->size <<= 1;
-	h->n_probe = estimate_probe(h->size);
+	h->n_probe = estimate_probe_3(h->size);
 	// h->keys = malloc(h->size * sizeof(kmkey_t));
 	// h->vals = malloc(h->size * sizeof(kmval_t));
 	h->keys = realloc(h->keys, h->size * sizeof(kmkey_t));
@@ -287,7 +301,7 @@ void kmhash_resize_single(struct kmhash_t *h)
 	old_vals = h->vals;
 
 	h->size <<= 1;
-	h->n_probe = estimate_probe(h->size);
+	h->n_probe = estimate_probe_3(h->size);
 	h->keys = realloc(h->keys, h->size * sizeof(kmkey_t));
 	h->vals = calloc(h->size >> 5, sizeof(kmval_t));
 	rs_flag = calloc(h->size, sizeof(uint8_t));
@@ -421,9 +435,9 @@ kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
 	step = 0;
 	do {
 		++step;
-		i += step * (step + 1) / 2;
-		if (i >= size)
-			i %= size;
+		i = (i + step * (step + 1) / 2) % size;
+		// if (i >= size)
+			// i %= size;
 		if (h->keys[i] == key)
 			return i;
 	} while (step < n_probe);
@@ -558,7 +572,7 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 	// fprintf(stderr, "cnt = %llu\n", (long long unsigned)cnt);
 	// new_size = find_next_prime(cnt * 1.136363);
 	new_size = find_next_prime(cnt * 1.432);
-	// n_probe = estimate_probe(new_size);
+	n_probe = estimate_probe_prime(new_size);
 	// fprintf(stderr, "probe = %llu\n", n_probe);
 	// fprintf(stderr, "new_size = %llu\n", (long long unsigned)new_size);
 
@@ -585,9 +599,9 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 
 				cur_flag = KMMASK_NEW;
 				while (step <= n_probe) {
-					j += step * (step + 1) / 2;
-					if (j >= new_size)
-						j %= new_size;
+					j = (j + step * (step + 1) / 2) % size;
+					// if (j >= new_size)
+					// 	j %= new_size;
 					cur_flag = rs_get_flag(rs_flag, j);
 					if (cur_flag == KMMASK_EMPTY) {
 						rs_set_new(rs_flag, j);

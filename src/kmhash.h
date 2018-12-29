@@ -50,6 +50,15 @@ struct kmhash_t {
 	pthread_mutex_t *locks;
 };
 
+static inline kmkey_t __hash_int2(kmkey_t k)
+{
+	kmkey_t x = k;
+	x = (x ^ (x >> 30)) * HM_MAGIC_1;
+	x = (x ^ (x >> 27)) * HM_MAGIC_2;
+	x ^= (x > 31);
+	return x;
+}
+
 // struct kmhash_t *init_kmhash(kmint_t size, int n_threads);
 
 struct kmhash_t *init_filter_kmhash(kmint_t size, int n_threads);
