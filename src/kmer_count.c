@@ -386,6 +386,7 @@ struct kmhash_t *count_kmer(struct opt_count_t *opt)
 	// 	opt->kmer_slave, opt->filter_thres, (long long unsigned)cnt_good);
 	__VERBOSE("\nCounting %d-mer (early singleton-filtered with %d-mer)\n", opt->kmer_master, opt->kmer_slave);
 	hm = count_kmer_master(opt, hs);
+	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer (early singleton-filtered with %d-mer): %llu\n", opt->kmer_master, opt->kmer_slave, (long long unsigned)hm->n_items);
 
 	kmhash_destroy(hs);

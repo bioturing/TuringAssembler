@@ -4,6 +4,9 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
+#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
+
 #define KMHASH_MAX_SIZE			UINT64_C(0x80000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 

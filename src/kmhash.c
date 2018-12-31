@@ -5,9 +5,6 @@
 #include "utils.h"
 #include "verbose.h"
 
-#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
-#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
-
 #define KMHASH_IDLE			0
 #define KMHASH_BUSY			1
 
@@ -29,7 +26,7 @@ static kmint_t estimate_probe_3(kmint_t size)
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * 64;
+		s += i * i * i * 64;
 	}
 	return i;
 }
@@ -40,7 +37,7 @@ static kmint_t estimate_probe_prime(kmint_t size)
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * 1024;
+		s += i * i * 256;
 	}
 	return i;
 }
@@ -558,7 +555,8 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 	vals = h->vals;
 
 	cur_size = h->size;
-	n_probe = h->n_probe;
+	// fprintf(stderr, "old_size = %llu\n", h->size);
+	// n_probe = h->n_probe;
 	// fprintf(stderr, "old_probe = %llu\n", h->n_probe);
 
 	cnt = 0;
@@ -599,7 +597,7 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 
 				cur_flag = KMMASK_NEW;
 				while (step <= n_probe) {
-					j = (j + step * (step + 1) / 2) % size;
+					j = (j + step * (step + 1) / 2) % new_size;
 					// if (j >= new_size)
 					// 	j %= new_size;
 					cur_flag = rs_get_flag(rs_flag, j);

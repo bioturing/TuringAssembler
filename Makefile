@@ -7,7 +7,7 @@ LIBS = -pthread -flto -lm -lz
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
 
-EXEC = kmer_count
+EXEC = skipping
 
 # SRC = src/dqueue.c 				\
 #       src/get_buffer.c 				\
