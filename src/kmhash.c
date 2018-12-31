@@ -418,28 +418,7 @@ void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock)
 	}
 }
 
-kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
-{
-	kmint_t size, step, i, n_probe;
-	kmkey_t k;
-	size = h->size;
-	k = __hash_int2(key);
-	i = k % size;
-	// i = key % size;
-	n_probe = h->n_probe;
-	if (h->keys[i] == key)
-		return i;
-	step = 0;
-	do {
-		++step;
-		i = (i + step * (step + 1) / 2) % size;
-		// if (i >= size)
-			// i %= size;
-		if (h->keys[i] == key)
-			return i;
-	} while (step < n_probe);
-	return KMHASH_MAX_SIZE;
-}
+
 
 // kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key)
 // {
@@ -541,6 +520,30 @@ kmint_t find_next_prime(kmint_t x)
 
 #define rs_is_old(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3) == (uint32_t)KMMASK_OLD)
 
+#ifdef USE_PRIME_HASH
+kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
+{
+	kmint_t size, step, i, n_probe;
+	kmkey_t k;
+	size = h->size;
+	k = __hash_int2(key);
+	i = k % size;
+	// i = key % size;
+	n_probe = h->n_probe;
+	if (h->keys[i] == key)
+		return i;
+	step = 0;
+	do {
+		++step;
+		i = (i + step * (step + 1) / 2) % size;
+		// if (i >= size)
+			// i %= size;
+		if (h->keys[i] == key)
+			return i;
+	} while (step < n_probe);
+	return KMHASH_MAX_SIZE;
+}
+
 void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 {
 	kmkey_t *keys;
@@ -640,6 +643,128 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 	if (reinit_val)
 		h->vals = calloc(h->size, sizeof(kmval_t));
 }
+#else
+kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
+{
+	kmint_t step, i, n_probe, mask;
+	kmkey_t k;
+	mask = h->size - 1;
+	k = __hash_int2(key);
+	i = k & mask;
+	// i = key % size;
+	n_probe = h->n_probe;
+	if (h->keys[i] == key)
+		return i;
+	step = 0;
+	do {
+		++step;
+		i = (i + step * (step + 1) / 2) & mask;
+		if (h->keys[i] == key)
+			return i;
+	} while (step < n_probe);
+	return KMHASH_MAX_SIZE;
+}
+
+void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
+{
+	kmkey_t *keys;
+	kmval_t *vals;
+
+	kmint_t cnt, i, j, new_size, cur_size, step, n_probe, mask;
+	kmkey_t x, y, k;
+	uint32_t *rs_flag;
+	uint32_t cur_flag;
+
+	keys = h->keys;
+	vals = h->vals;
+
+	cur_size = h->size;
+
+	cnt = 0;
+	for (i = 0; i < cur_size; ++i) {
+		if ((vals[i >> KMVAL_LOG] >> (i & KMVAL_MASK)) & 1) {
+			++cnt;
+			assert(keys[i] != TOMB_STONE);
+		} else
+			keys[i] = TOMB_STONE;
+	}
+
+	new_size = cnt * 1.25;
+	__round_up_kmint(new_size);
+	n_probe = estimate_probe_3(new_size);
+	mask = new_size - 1;
+	// new_size = find_next_prime(cnt * 1.432);
+	// n_probe = estimate_probe_prime(new_size);
+	// fprintf(stderr, "probe = %llu\n", n_probe);
+	// fprintf(stderr, "new_size = %llu\n", (long long unsigned)new_size);
+
+	rs_flag = calloc((__max(cur_size, new_size) + 15) >> 4, sizeof(uint32_t));
+	if (new_size > cur_size) {
+		h->keys = keys = realloc(keys, new_size * sizeof(kmkey_t));
+		for (i = cur_size; i < new_size; ++i)
+			keys[i] = TOMB_STONE;
+	}
+	for (i = 0; i < cur_size; ++i) {
+		if ((vals[i >> KMVAL_LOG] >> (i & KMVAL_MASK)) & 1)
+			rs_set_old(rs_flag, i);
+	}
+	for (i = 0; i < cur_size; ++i) {
+		if (rs_is_old(rs_flag, i)) {
+			x = keys[i];
+			rs_set_empty(rs_flag, i);
+			keys[i] = TOMB_STONE;
+			while (1) {
+				k = __hash_int2(x);
+				j = k & mask;
+				// j = k % new_size;
+				step = 0;
+
+				cur_flag = KMMASK_NEW;
+				while (step <= n_probe) {
+					j = (j + step * (step + 1) / 2) & mask;
+					// if (j >= new_size)
+					// 	j %= new_size;
+					cur_flag = rs_get_flag(rs_flag, j);
+					if (cur_flag == KMMASK_EMPTY) {
+						rs_set_new(rs_flag, j);
+						// rs_flag[j] = KMMASK_NEW;
+						keys[j] = x;
+						break;
+					} else if (cur_flag == KMMASK_OLD) {
+						y = keys[j];
+						// rs_flag[j] = KMMASK_NEW;
+						rs_set_new(rs_flag, j);
+						keys[j] = x;
+						x = y;
+						break;
+					}
+					++step;
+				}
+				if (cur_flag == KMMASK_EMPTY)
+					break;
+				else if (cur_flag == KMMASK_NEW)
+					__ERROR("Shrink kmhash size error");
+			}
+		}
+	}
+	if (new_size < cur_size)
+		h->keys = realloc(h->keys, new_size * sizeof(kmkey_t));
+	free(h->vals);
+	free(rs_flag);
+	h->vals = 0;
+	h->size = new_size;
+	h->n_items = cnt;
+	// cnt = 0;
+	// for (i = 0; i < h->size; ++i)
+	// 	cnt += (h->keys[i] != TOMB_STONE);
+	// if (cnt != h->n_items) {
+	// 	fprintf(stderr, "cnt = %llu\nn_items = %llu\n", (long long unsigned)cnt, (long long unsigned)h->n_items);
+	// 	assert(cnt == h->n_items);
+	// }
+	if (reinit_val)
+		h->vals = calloc(h->size, sizeof(kmval_t));
+}
+#endif
 
 // void filter_by_count(struct kmhash_t *h, kmval_t min_count)
 // {

@@ -122,6 +122,7 @@ void assembly_process(struct opt_count_t *opt)
 	pre_graph = init_edge_count(kmer_hash);
 	kmhash_destroy(kmer_hash);
 	get_edges(opt, pre_graph);
+	__VERBOSE("\n");
 
 	// storing binary raw graph
 	__VERBOSE("Storing kmer graph\n");
@@ -1077,6 +1078,7 @@ static inline void atomic_set_bit_uint8(uint8_t *ptr, int pos)
 	} while (cur_bin != old_bin);
 }
 
+#ifdef USE_PRIME_HASH
 static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
 {
 	kmint_t size, step, i, n_probe;
@@ -1098,8 +1100,29 @@ static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
 			return i;
 	} while (step < n_probe);
 	return g->size;
-
 }
+#else
+static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
+{
+	kmint_t step, i, n_probe, mask;
+	kmkey_t k;
+	mask = g->size - 1;
+	k = __hash_int2(key);
+	i = k & mask;
+	// i = key % size;
+	if (g->kmer[i] == key)
+		return i;
+	n_probe = g->n_probe;
+	step = 0;
+	do {
+		++step;
+		i = (i + step * (step + 1) / 2) & mask;
+		if (g->kmer[i] == key)
+			return i;
+	} while (step < n_probe);
+	return g->size;
+}
+#endif
 
 // static kmint_t bin_search_id(struct raw_graph_t *g, kmkey_t x)
 // {
@@ -1286,6 +1309,8 @@ void get_edges(struct opt_count_t *opt, struct raw_graph_t *g)
 
 	free(producer_threads);
 	free(worker_threads);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("INSIGHT", "Number of read-pair: %lld\n", (long long)n_reads);
 }
 
 // struct raw_graph_t *extract_kmer(struct opt_count_t *opt, struct kmhash_t *h)

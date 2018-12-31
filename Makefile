@@ -33,8 +33,13 @@ SRC = src/dqueue.c 				\
       src/verbose.c 				\
       src/main.c
 
-all:
+$(EXEC):
 	$(CC) -o $(EXEC) $(CFLAGS) $(SRC) $(LIBS)
+
+all: $(EXEC)
+
+lazy: CFLAGS += -DUSE_PRIME_HASH
+lazy: $(EXEC)
 
 clean:
 	rm -f $(EXEC)

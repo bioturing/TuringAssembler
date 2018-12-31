@@ -7,7 +7,7 @@
 #define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
 #define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
 
-#define KMHASH_MAX_SIZE			UINT64_C(0x80000000)
+#define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 
 #define TOMB_STONE			((kmkey_t)-1)
@@ -15,7 +15,7 @@
 #define __round_up_kmint(x) 	(--(x), (x) |= (x) >> 1,		       \
 				 (x) |= (x) >> 2, (x) |= (x) >> 4,	       \
 				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
-				 ++(x))
+				 (x) |= (x) >> 32, ++(x))
 
 typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
@@ -73,6 +73,8 @@ void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
 
 kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key);
+
+void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val);
 
 // void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
