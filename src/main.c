@@ -55,7 +55,7 @@ struct opt_count_t *init_opt_count()
 	opt->n_threads = 1;
 	opt->hash_size = (1 << 24);
 	opt->kmer_master = 31;
-	opt->kmer_slave = 15;
+	opt->kmer_slave = 17;
 	opt->n_files = 0;
 	opt->filter_thres = 0;
 	opt->files_1 = opt->files_2 = NULL;
