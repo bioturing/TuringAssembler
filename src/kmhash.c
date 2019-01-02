@@ -520,7 +520,7 @@ kmint_t find_next_prime(kmint_t x)
 
 #define rs_is_old(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3) == (uint32_t)KMMASK_OLD)
 
-#ifdef USE_PRIME_HASH
+#if defined(USE_PRIME_HASH)
 kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
 {
 	kmint_t size, step, i, n_probe;
@@ -640,6 +640,137 @@ void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
 	// 	fprintf(stderr, "cnt = %llu\nn_items = %llu\n", (long long unsigned)cnt, (long long unsigned)h->n_items);
 	// 	assert(cnt == h->n_items);
 	// }
+	if (reinit_val)
+		h->vals = calloc(h->size, sizeof(kmval_t));
+}
+#elif defined(USE_BINARY_SEARCH)
+kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key)
+{
+	kmkey_t *keys;
+	kmint_t l, r, mid;
+	l = 0;
+	r = h->size;
+	keys = h->keys;
+	while (l < r) {
+		mid = l + ((r - l) >> 1);
+		if (keys[mid] == key)
+			return mid;
+		else if (keys[mid] < key)
+			l = mid + 1;
+		else
+			r = mid;
+	}
+	return KMHASH_MAX_SIZE;
+}
+
+static inline void kmkey_insertion_sort(kmkey_t *b, kmkey_t *e)
+{
+	kmkey_t *i, *j, tmp;
+	for (i = b + 1; i <  e; ++i) {
+		if (*i < *(i - 1)) {
+			tmp = *i;
+			for (j = i; j > b && tmp < *(j - 1); j--)
+				*j = *(j - 1);
+			*j = tmp;
+		}
+	}
+}
+
+#define RS_MIN_SIZE 64
+
+struct kmkey_bucket_t {
+	kmkey_t *b, *e;
+};
+
+void kmkey_recursive_rs(kmkey_t *beg, kmkey_t *end, int block_size, int offset)
+{
+	kmkey_t *i;
+	int size = 1 << block_size, m = size - 1;
+	struct kmkey_bucket_t *k, *b, *be;
+	b = alloca(size * sizeof(struct kmkey_bucket_t));
+	be = b + size;
+	for (k = b; k != be; ++k)
+		k->b = k->e = beg;
+	for (i = beg; i != end; ++i)
+		++b[((*i) >> offset) & m].e;
+	for (k = b + 1; k != be; ++k)
+		k->e += (k - 1)->e - beg, k->b = (k - 1)->e;
+	for (k = b; k != be;) {
+		if (k->b != k->e) {
+			struct kmkey_bucket_t *l;
+			if ((l = b + (((*k->b) >> offset) & m)) != k) {
+				kmkey_t tmp = *k->b, swap;
+				do {
+					swap = tmp;
+					tmp = *l->b;
+					*l->b++ = swap;
+					l = b + ((tmp >> offset) & m);
+				} while (l != k);
+				*k->b++ = tmp;
+			} else
+				++k->b;
+		} else
+			++k;
+	}
+	for (b->b = beg, k = b + 1; k != be; ++k) k->b = (k - 1)->e;
+	if (offset) {
+		offset -= block_size;
+		for (k = b; k != be; ++k) {
+			if (k->e - k->b > RS_MIN_SIZE)
+				kmkey_recursive_rs(k->b, k->e, block_size, offset);
+			else if (k->e - k->b > 1)
+				kmkey_insertion_sort(k->b, k->e);
+		}
+	}
+}
+
+void kmkey_radix_sort(kmkey_t *b, kmkey_t *e)
+{
+	if (e - b < RS_MIN_SIZE)
+		kmkey_insertion_sort(b, e);
+	else
+		kmkey_recursive_rs(b, e, 8, 56);
+}
+
+void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val)
+{
+	kmkey_t *keys;
+	kmval_t *vals;
+
+	kmint_t cnt, i, cur_size;
+
+	keys = h->keys;
+	vals = h->vals;
+	cur_size = h->size;
+
+	cnt = 0;
+	for (i = 0; i < cur_size; ++i) {
+		if ((vals[i >> KMVAL_LOG] >> (i & KMVAL_MASK)) & 1) {
+			++cnt;
+			assert(keys[i] != TOMB_STONE);
+		} else
+			keys[i] = TOMB_STONE;
+	}
+
+	cnt = 0;
+	for (i = 0; i < cur_size; ++i) {
+		if ((vals[i >> KMVAL_LOG] >> (i & KMVAL_MASK)) & 1)
+			keys[cnt++] = keys[i];
+	}
+
+	keys = realloc(keys, cnt * sizeof(kmkey_t));
+
+	fprintf(stderr, "Sorting\n");
+
+	kmkey_radix_sort(keys, keys + cnt);
+
+	fprintf(stderr, "Sort done\n");
+
+	h->keys = keys;
+	free(h->vals);
+	h->vals = NULL;
+	h->size = h->n_items = cnt;
+
 	if (reinit_val)
 		h->vals = calloc(h->size, sizeof(kmval_t));
 }

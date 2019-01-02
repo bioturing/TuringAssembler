@@ -38,8 +38,13 @@ $(EXEC):
 
 all: $(EXEC)
 
-lazy: CFLAGS += -DUSE_PRIME_HASH
-lazy: $(EXEC)
+unstable: CFLAGS += -DUSE_PRIME_HASH
+unstable: $(EXEC)
+
+time: $(EXEC)
+
+mem: CFLAGS += -DUSE_BINARY_SEARCH
+mem: $(EXEC)
 
 clean:
 	rm -f $(EXEC)

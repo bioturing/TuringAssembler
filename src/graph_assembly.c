@@ -1078,7 +1078,7 @@ static inline void atomic_set_bit_uint8(uint8_t *ptr, int pos)
 	} while (cur_bin != old_bin);
 }
 
-#ifdef USE_PRIME_HASH
+#if defined(USE_PRIME_HASH)
 static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
 {
 	kmint_t size, step, i, n_probe;
@@ -1100,6 +1100,26 @@ static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
 			return i;
 	} while (step < n_probe);
 	return g->size;
+}
+#elif defined(USE_BINARY_SEARCH)
+static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
+{
+	kmkey_t *keys;
+	kmint_t l, r, mid;
+	l = 0;
+	r = g->size;
+	keys = g->kmer;
+	while (l < r) {
+		mid = l + ((r - l) >> 1);
+		if (keys[mid] == key)
+			return mid;
+		else if (keys[mid] < key)
+			l = mid + 1;
+		else
+			r = mid;
+	}
+	return g->size;
+
 }
 #else
 static inline kmint_t kmer_search_id(struct raw_graph_t *g, kmkey_t key)
