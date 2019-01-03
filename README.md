@@ -5,14 +5,15 @@ Genome assembly problem is like skipping. Many many rounds, again and again.
 * Filter singleton kmer (&#8730;)
 * Glue non-branching kmer path (&#8730;)
 * Build (small k)-mer graph to early filter (big k)-mer (on fruit fly and even human) (&#8730;)
-* Simplify the non-branching path graph <--------------------- current
+* Simplify the non-branching path graph (&#8730;)
 
----------> Resolve slow couting edges
+---------> Resolve slow couting edges (&#8730;)
 
----------> Resolve memory redundant
+---------> Resolve memory redundant (&#8730;)
 
----------> Fix weird non-branching path not glued together
+---------> Fix weird non-branching path not glued together (&#8730;)
 
+* What is the correct "weight" of each vertice on graph? <------------------- current
 * Extend non-branching path through simple erroneous branching
 * Resolve simple bubble (bubble, yes bubble)
 
