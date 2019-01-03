@@ -7,7 +7,7 @@ LIBS = -pthread -flto -lm -lz
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
 
-EXEC = kmer_count
+EXEC = skipping
 
 # SRC = src/dqueue.c 				\
 #       src/get_buffer.c 				\
@@ -33,8 +33,18 @@ SRC = src/dqueue.c 				\
       src/verbose.c 				\
       src/main.c
 
-all:
+$(EXEC):
 	$(CC) -o $(EXEC) $(CFLAGS) $(SRC) $(LIBS)
+
+all: $(EXEC)
+
+unstable: CFLAGS += -DUSE_PRIME_HASH
+unstable: $(EXEC)
+
+time: $(EXEC)
+
+mem: CFLAGS += -DUSE_BINARY_SEARCH
+mem: $(EXEC)
 
 clean:
 	rm -f $(EXEC)
