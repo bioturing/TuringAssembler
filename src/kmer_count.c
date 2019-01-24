@@ -61,22 +61,22 @@ void count_lazy_from_read(struct read_t *r, struct kmhash_t *h, int ksize,
 		}
 		if (last >= ksize) {
 			if (knum < krev)
-				sgt_adj_put(h, knum, lock_hash);
+				kmhash_put_adj(h, knum, lock_hash);
 			else
-				sgt_adj_put(h, krev, lock_hash);
+				kmhash_put_adj(h, krev, lock_hash);
 		}
 		if (last >= kedge) {
 			ck = nt4_table[(int)seq[i - ksize]] ^ 3;
 
 			if (pknum < pkrev)
-				sgt_add_edge(h, pknum, ci, lock_hash);
+				kmhash_add_edge(h, pknum, ci, lock_hash);
 			else
-				sgt_add_edge(h, pkrev, ci + 4, lock_hash);
+				kmhash_add_edge(h, pkrev, ci + 4, lock_hash);
 
 			if (knum < krev)
-				sgt_add_edge(h, knum, ck + 4, lock_hash);
+				kmhash_add_edge(h, knum, ck + 4, lock_hash);
 			else
-				sgt_add_edge(h, krev, ck, lock_hash);
+				kmhash_add_edge(h, krev, ck, lock_hash);
 		}
 		pknum = knum;
 		pkrev = krev;
@@ -109,9 +109,9 @@ void count_small_from_read(struct read_t *r, struct kmhash_t *h, int ksize,
 		}
 		if (last >= ksize) {
 			if (knum < krev)
-				sgt_put(h, knum, lock_hash);
+				kmhash_put(h, knum, lock_hash);
 			else
-				sgt_put(h, krev, lock_hash);
+				kmhash_put(h, krev, lock_hash);
 		}
 	}
 }
@@ -147,38 +147,42 @@ void count_large_from_read(struct read_t *r, struct kmhash_t *h,
 		if (ci < 4) {
 			knum_small |= ci;
 			knum_large |= ci;
-			krev_small |= (kmkey_t)(ci ^ 3) << lmc_small;
-			krev_large |= (kmkey_t)(ci ^ 3) << lmc_large;
+			krev_small |= ((kmkey_t)(ci ^ 3) << lmc_small);
+			krev_large |= ((kmkey_t)(ci ^ 3) << lmc_large);
 			++last;
-			if (knum_small < krev_small)
-				k = hash_get(dict, knum_small);
-			else
-				k = hash_get(dict, krev_small);
-			if (k != KMHASH_MAX_SIZE)
-				++cnt_small;
-			else
+			if (last >= ksmall) {
+				if (knum_small < krev_small)
+					k = kmhash_get(dict, knum_small);
+				else
+					k = kmhash_get(dict, krev_small);
+				if (k != KMHASH_MAX_SIZE)
+					++cnt_small;
+				else
+					cnt_small = 0;
+			} else {
 				cnt_small = 0;
+			}
 		} else {
 			last = 0;
 			cnt_small = 0;
 		}
 		if (cnt_small >= nk_large) {
 			if (knum_large < krev_large)
-				sgt_adj_put(h, knum_large, lock_hash);
+				kmhash_put_adj(h, knum_large, lock_hash);
 			else
-				sgt_adj_put(h, krev_large, lock_hash);
+				kmhash_put_adj(h, krev_large, lock_hash);
 		}
 		if (last >= kedge && cnt_small >= nk_edge) {
 			ck = nt4_table[(int)seq[i - klarge]] ^ 3;
 			if (pknum < pkrev)
-				sgt_add_edge(h, pknum, ci, lock_hash);
+				kmhash_add_edge(h, pknum, ci, lock_hash);
 			else
-				sgt_add_edge(h, pkrev, ci + 4, lock_hash);
+				kmhash_add_edge(h, pkrev, ci + 4, lock_hash);
 
 			if (knum_large < krev_large)
-				sgt_add_edge(h, knum_large, ck + 4, lock_hash);
+				kmhash_add_edge(h, knum_large, ck + 4, lock_hash);
 			else
-				sgt_add_edge(h, krev_large, ck, lock_hash);
+				kmhash_add_edge(h, krev_large, ck, lock_hash);
 		}
 		pknum = knum_large;
 		pkrev = krev_large;
@@ -384,17 +388,15 @@ void *PE_large_count_worker(void *data)
 /*
  * Start thread for counting processes
  */
-struct kmhash_t *count_kmer_lazy(struct opt_count_t *opt, int ksize)
+void count_kmer_lazy(struct opt_count_t *opt, struct kmhash_t *h, int ksize)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+	int64_t n_reads;
 	int i;
-
-	struct kmhash_t *kmer_hash;
-	kmer_hash = init_sgt_adj_kmhash((kmint_t)opt->hash_size - 1, opt->n_threads);
 
 	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
@@ -402,15 +404,15 @@ struct kmhash_t *count_kmer_lazy(struct opt_count_t *opt, int ksize)
 	struct maincount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));
 
-	int64_t n_reads;
 	n_reads = 0;
+	kmhash_init(h, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
 
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].h = kmer_hash;
+		worker_bundles[i].h = h;
 		worker_bundles[i].klarge = ksize;
 		worker_bundles[i].n_reads = &n_reads;
-		worker_bundles[i].lock_hash = kmer_hash->locks + i;
+		worker_bundles[i].lock_hash = h->locks + i;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -436,21 +438,18 @@ struct kmhash_t *count_kmer_lazy(struct opt_count_t *opt, int ksize)
 
 	free(worker_threads);
 	free(producer_threads);
-
-	return kmer_hash;
 }
 
-struct kmhash_t *precount_small_kmer(struct opt_count_t *opt, int kmer_size)
+void precount_small_kmer(struct opt_count_t *opt, struct kmhash_t *h,
+							int kmer_size)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+	int64_t n_reads;
 	int i;
-
-	struct kmhash_t *kmer_hash;
-	kmer_hash = init_sgt_kmhash((kmint_t)opt->hash_size - 1, opt->n_threads);
 
 	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
@@ -458,15 +457,15 @@ struct kmhash_t *precount_small_kmer(struct opt_count_t *opt, int kmer_size)
 	struct precount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct precount_bundle_t));
 
-	int64_t n_reads;
 	n_reads = 0;
+	kmhash_init(h, (kmint_t)opt->hash_size - 1, opt->n_threads, 0);
 
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].h = kmer_hash;
+		worker_bundles[i].h = h;
 		worker_bundles[i].ksize = kmer_size;
 		worker_bundles[i].n_reads = &n_reads;
-		worker_bundles[i].lock_hash = kmer_hash->locks + i;
+		worker_bundles[i].lock_hash = h->locks + i;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -492,12 +491,9 @@ struct kmhash_t *precount_small_kmer(struct opt_count_t *opt, int kmer_size)
 
 	free(producer_threads);
 	free(worker_threads);
-
-	// get some stat
-	return kmer_hash;
 }
 
-struct kmhash_t *count_kmer_and_adj(struct opt_count_t *opt,
+void count_kmer_and_adj(struct opt_count_t *opt, struct kmhash_t *h,
 				struct kmhash_t *dict, int ksmall, int klarge)
 {
 	pthread_attr_t attr;
@@ -505,10 +501,8 @@ struct kmhash_t *count_kmer_and_adj(struct opt_count_t *opt,
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+	int64_t n_reads;
 	int i;
-
-	struct kmhash_t *kmer_hash;
-	kmer_hash = init_sgt_adj_kmhash((kmint_t)opt->hash_size - 1, opt->n_threads);
 
 	struct producer_bundle_t *producer_bundles;
 	producer_bundles = init_fastq_PE(opt);
@@ -516,17 +510,17 @@ struct kmhash_t *count_kmer_and_adj(struct opt_count_t *opt,
 	struct maincount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));
 
-	int64_t n_reads;
 	n_reads = 0;
+	kmhash_init(h, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
 
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].h = kmer_hash;
+		worker_bundles[i].h = h;
 		worker_bundles[i].dict = dict;
 		worker_bundles[i].klarge = klarge;
 		worker_bundles[i].ksmall = ksmall;
 		worker_bundles[i].n_reads = &n_reads;
-		worker_bundles[i].lock_hash = kmer_hash->locks + i;
+		worker_bundles[i].lock_hash = h->locks + i;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -552,8 +546,6 @@ struct kmhash_t *count_kmer_and_adj(struct opt_count_t *opt,
 
 	free(worker_threads);
 	free(producer_threads);
-
-	return kmer_hash;
 }
 
 #define __get_revc_num(y, x, l, mask)					       \
@@ -587,9 +579,9 @@ void correct_edge(struct kmhash_t *h, int ksize)
 				nkmer = ((kmer << 2) & mask) | c;
 				rnkmer = (rkmer >> 2) | ((kmkey_t)(c ^ 3) << lmc);
 				if (nkmer < rnkmer)
-					k = hash_get(h, nkmer);
+					k = kmhash_get(h, nkmer);
 				else
-					k = hash_get(h, rnkmer);
+					k = kmhash_get(h, rnkmer);
 				if (k == KMHASH_MAX_SIZE)
 					adjs[i] &= ~((uint8_t)1 << c);
 			}
@@ -598,9 +590,9 @@ void correct_edge(struct kmhash_t *h, int ksize)
 				nkmer = ((rkmer << 2) & mask) | c;
 				rnkmer = (kmer >> 2) | ((kmkey_t)(c ^ 3) << lmc);
 				if (nkmer < rnkmer)
-					k = hash_get(h, nkmer);
+					k = kmhash_get(h, nkmer);
 				else
-					k = hash_get(h, rnkmer);
+					k = kmhash_get(h, rnkmer);
 				if (k == KMHASH_MAX_SIZE)
 					adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
@@ -643,9 +635,9 @@ void check_edge(struct kmhash_t *h, int ksize)
 				nkmer = ((kmer << 2) & mask) | c;
 				rnkmer = (rkmer >> 2) | ((kmkey_t)(c ^ 3) << lmc);
 				if (nkmer < rnkmer)
-					k = hash_get(h, nkmer);
+					k = kmhash_get(h, nkmer);
 				else
-					k = hash_get(h, rnkmer);
+					k = kmhash_get(h, rnkmer);
 				assert(k != KMHASH_MAX_SIZE);
 				rc = kmer >> lmc;
 				assert(rc >= 0 && rc < 4);
@@ -659,9 +651,9 @@ void check_edge(struct kmhash_t *h, int ksize)
 				nkmer = ((rkmer << 2) & mask) | c;
 				rnkmer = (kmer >> 2) | ((kmkey_t)(c ^ 3) << lmc);
 				if (nkmer < rnkmer)
-					k = hash_get(h, nkmer);
+					k = kmhash_get(h, nkmer);
 				else
-					k = hash_get(h, rnkmer);
+					k = kmhash_get(h, rnkmer);
 				assert(k != KMHASH_MAX_SIZE);
 				rc = rkmer >> lmc;
 				assert(rc >= 0 && rc < 4);
@@ -673,7 +665,7 @@ void check_edge(struct kmhash_t *h, int ksize)
 		}
 	}
 
-	__VERBOSE("Test raw kmhash done\n");
+	__VERBOSE("Check edge kmhash done\n");
 }
 
 void recount_edge(struct kmhash_t *h)
@@ -698,55 +690,56 @@ void recount_edge(struct kmhash_t *h)
 	__VERBOSE("hash sum: %llu\n", (long long unsigned)sum);
 }
 
-struct kmhash_t *build_kmer_table_lazy(struct opt_count_t *opt)
+void build_kmer_table_lazy(struct opt_count_t *opt, struct kmhash_t *h)
 {
-	struct kmhash_t *h;
 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
-	h = count_kmer_lazy(opt, opt->kmer_master);
+	count_kmer_lazy(opt, h, opt->kmer_master);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n",
 			opt->kmer_master, (long long unsigned)h->n_item);
-
-	recount_edge(h);
 	check_edge(h, opt->kmer_master);
+	recount_edge(h);
 
 	/* Filter singleton kmer */
-	sgt_adj_hash_filter(h);
+	kmhash_filter(h, 1);
 	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n",
 			opt->kmer_master, (long long unsigned)h->n_item);
 
 	/* Correct edges */
 	correct_edge(h, opt->kmer_master);
-	return h;
+	recount_edge(h);
+	check_edge(h, opt->kmer_master);
 }
 
-struct kmhash_t *build_kmer_table(struct opt_count_t *opt)
+void build_kmer_table(struct opt_count_t *opt, struct kmhash_t *h)
 {
-	struct kmhash_t *hs, *hm;
+	struct kmhash_t *hs;
+	hs = calloc(1, sizeof(struct kmhash_t));
 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
-	hs = precount_small_kmer(opt, opt->kmer_slave);
+	precount_small_kmer(opt, h, opt->kmer_slave);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", opt->kmer_slave,
 					(long long unsigned)hs->n_item);
 
 	__VERBOSE("Filtering %d-mer\n", opt->kmer_slave);
-	sgt_hash_filter(hs);
+	kmhash_filter(hs, 0);
 	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n",
 			opt->kmer_slave, (long long unsigned)hs->n_item);
 
 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_master);
-	hm = count_kmer_and_adj(opt, hs, opt->kmer_slave, opt->kmer_master);
+	count_kmer_and_adj(opt, h, hs, opt->kmer_slave, opt->kmer_master);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer : %llu\n",
-			opt->kmer_master, (long long unsigned)hm->n_item);
+			opt->kmer_master, (long long unsigned)h->n_item);
 
 	kmhash_destroy(hs);
-	sgt_adj_hash_filter(hm);
+	free(hs);
+	__VERBOSE("Filtering %d-mer\n", opt->kmer_master);
+	kmhash_filter(h, 1);
 	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n",
-			opt->kmer_master, (long long unsigned)hm->n_item);
+			opt->kmer_master, (long long unsigned)h->n_item);
 
-	correct_edge(hm, opt->kmer_master);
-	return hm;
+	correct_edge(h, opt->kmer_master);
 }
 
 void test_relocate(struct kmhash_t *h)
@@ -757,7 +750,7 @@ void test_relocate(struct kmhash_t *h)
 	hash = 0;
 	for (i = 0; i < h->size; ++i) {
 		if (h->keys[i] != TOMB_STONE) {
-			k = hash_get(h, h->keys[i]);
+			k = kmhash_get(h, h->keys[i]);
 			if (k == KMHASH_MAX_SIZE)
 				__ERROR("test relocate failed");
 			++cnt;
@@ -772,13 +765,14 @@ void kmer_test_process(struct opt_count_t *opt)
 {
 	struct kmhash_t *hs, *hl, *hm;
 	__VERBOSE("\nCounting %d-mer\n", opt->kmer_slave);
-	hs = precount_small_kmer(opt, opt->kmer_slave);
+	hs = calloc(1, sizeof(struct kmhash_t));
+	precount_small_kmer(opt, hs, opt->kmer_slave);
 
 	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer: %llu\n", opt->kmer_slave,
 					(long long unsigned)hs->n_item);
 
-	sgt_hash_filter(hs);
+	kmhash_filter(hs, 0);
 	__VERBOSE("Number of non-singleton %d-mer: %llu\n", opt->kmer_slave,
 					(long long unsigned)hs->n_item);
 
@@ -793,16 +787,21 @@ void kmer_test_process(struct opt_count_t *opt)
 	// fprintf(stderr, "Pass test\n");
 
 	/* Lazy counting kmer */
-	hl = build_kmer_table_lazy(opt);
+	__VERBOSE("\nLazy count %d-mer\n", opt->kmer_master);
+	hl = calloc(1, sizeof(struct kmhash_t));
+	build_kmer_table_lazy(opt, hl);
 
 	recount_edge(hl);
 
-	hm = count_kmer_and_adj(opt, hs, opt->kmer_slave, opt->kmer_master);
+	__VERBOSE("\nCount %d-mer from %d-mer\n", opt->kmer_master,
+							opt->kmer_slave);
+	hm = calloc(1, sizeof(struct kmhash_t));
+	count_kmer_and_adj(opt, hm, hs, opt->kmer_slave, opt->kmer_master);
 	__VERBOSE("\n");
 	__VERBOSE("Number of %d-mer (2-step counting): %llu\n",
 			opt->kmer_master, (long long unsigned)hm->n_item);
 
-	sgt_adj_hash_filter(hm);
+	kmhash_filter(hm, 1);
 	__VERBOSE("Number of non-singleton %d-mer (2-step counting): %llu\n",
 			opt->kmer_master, (long long unsigned)hm->n_item);
 
@@ -811,22 +810,6 @@ void kmer_test_process(struct opt_count_t *opt)
 	correct_edge(hm, opt->kmer_master);
 
 	recount_edge(hm);
-
-	// for (k = 0; k < hl->size; ++k) {
-	// 	if (hl->keys[k] != TOMB_STONE) {
-	// 		ret = kmphash_get(hm, hl->keys[k]);
-	// 		assert(ret != KMHASH_MAX_SIZE && "Fail test #1");
-	// 	}
-	// }
-
-	// for (k = 0; k < hm->size; ++k) {
-	// 	if (hm->keys[k] != TOMB_STONE) {
-	// 		ret = kmphash_get(hl, hm->keys[k]);
-	// 		assert(ret != KMHASH_MAX_SIZE && "Fail test #2");
-	// 	}
-	// }
-
-	kmhash_destroy(hs);
 }
 
 // struct kmhash_t *count_kmer(struct opt_count_t *opt)

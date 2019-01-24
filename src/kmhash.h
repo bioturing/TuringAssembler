@@ -4,9 +4,6 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
-#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
-
 #define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 
@@ -21,10 +18,8 @@ typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
 typedef uint32_t kmval_t;
 
-#define KMVAL_LOG			5
-#define KMVAL_MASK			31
-
 struct kmhash_t {
+	/* multi-threaded singleton kmer filtered hash table */
 	kmint_t size;			/* current size */
 	kmint_t old_size;		/* previous size */
 	kmint_t n_item;			/* number of items */
@@ -47,43 +42,37 @@ struct kmhash_t {
 	pthread_mutex_t *locks;
 };
 
-static inline kmkey_t __hash_int2(kmkey_t k)
-{
-	kmkey_t x = k;
-	x = (x ^ (x >> 30)) * HM_MAGIC_1;
-	x = (x ^ (x >> 27)) * HM_MAGIC_2;
-	x ^= (x > 31);
-	return x;
-}
+/* Turn on adj bit of a kmer */
+void kmhash_add_edge(struct kmhash_t *h, kmkey_t key, int c, pthread_mutex_t *lock);
 
-static inline kmint_t estimate_probe_3(kmint_t size)
-{
-	kmint_t s, i;
-	i = s = 0;
-	while (s < size) {
-		++i;
-		s += i * i * i * 64;
-	}
-	return i;
-}
+/*
+ * Put a kmer to hash table
+ * auto-resize with doubling the adjs array
+ */
+void kmhash_put_adj(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
-kmint_t hash_get(struct kmhash_t *h, kmkey_t key);
+/*
+ * Put a kmer to hash table
+ * auto-resize without doubling the adjs array
+ */
+void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
-struct kmhash_t *init_sgt_adj_kmhash(kmint_t size, int n_threads);
+/*
+ * Get the position of a kmer on the table
+ * return KMHASH_MAX_SIZE of not found
+ */
+kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
 
-struct kmhash_t *init_sgt_kmhash(kmint_t size, int n_threads);
+/*
+ * Init the hash table with at pre-allocated size items
+ * Should know the number of working threads
+ */
+void kmhash_init(struct kmhash_t *h, kmint_t size, int n_threads, int adj_included);
 
-void sgt_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+/* Remove all singleton kmer and shrink the table size */
+void kmhash_filter(struct kmhash_t *h, int adj_included);
 
-void sgt_adj_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-void sgt_add_edge(struct kmhash_t *h, kmkey_t key, int c,
-						pthread_mutex_t *lock);
-
+/* Free all allocated memory on h but not h itself */
 void kmhash_destroy(struct kmhash_t *h);
-
-void sgt_adj_hash_filter(struct kmhash_t *h);
-
-void sgt_hash_filter(struct kmhash_t *h);
 
 #endif

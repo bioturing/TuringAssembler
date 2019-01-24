@@ -31,6 +31,50 @@
 	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
 	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2))
 
+#define KMMASK_EMPTY			0
+#define KMMASK_OLD			1
+#define KMMASK_NEW			2
+#define KMMASK_LOADING			3
+
+#define rs_set_old(x, i) ((x)[(i) >> 4] = ((x)[(i) >> 4] &		       \
+				(~((uint32_t)3 << (((i) & 15) << 1)))) |       \
+				((uint32_t)KMMASK_OLD << (((i) & 15) << 1)))
+
+#define rs_set_new(x, i) ((x)[(i) >> 4] = ((x)[(i) >> 4] &		       \
+				(~((uint32_t)3 << (((i) & 15) << 1)))) |       \
+				((uint32_t)KMMASK_NEW << (((i) & 15) << 1)))
+
+#define rs_set_empty(x, i) ((x)[(i) >> 4] = (x)[(i) >> 4] &		       \
+				(~((uint32_t)3 << (((i) & 15) << 1))))
+
+#define rs_get_flag(x, i) (((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)
+
+#define rs_is_old(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
+							== (uint32_t)KMMASK_OLD)
+
+#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
+#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
+
+static inline kmkey_t __hash_int2(kmkey_t k)
+{
+	kmkey_t x = k;
+	x = (x ^ (x >> 30)) * HM_MAGIC_1;
+	x = (x ^ (x >> 27)) * HM_MAGIC_2;
+	x ^= (x > 31);
+	return x;
+}
+
+static inline kmint_t estimate_probe_3(kmint_t size)
+{
+	kmint_t s, i;
+	i = s = 0;
+	while (s < size) {
+		++i;
+		s += i * i * i * 64;
+	}
+	return i;
+}
+
 static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t len)
 {
 	char *seq;
@@ -82,8 +126,6 @@ static void dump_bin_seq(char *seq, uint32_t *bin, int len)
 	seq[len] = '\0';
 }
 
-#define __only_edge4(e) ((((e) >> 1) & 1) * 1 + (((e) >> 2) & 1) * 2 + (((e) >> 3) & 1) * 3)
-
 #define __get_revc_num(y, x, l, mask)					       \
 (	(x) = (y) << (64 - ((l) << 1)),					       \
 	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
@@ -95,156 +137,242 @@ static void dump_bin_seq(char *seq, uint32_t *bin, int len)
 
 #define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
 
-#define __degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
+#define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
+
+#define __bin_only_edge4(e) ((((e) >> 1) & 1) * 1 + (((e) >> 2) & 1) * 2 + (((e) >> 3) & 1) * 3)
 
 #define __get_only_edge4(adj) (((adj)[1] != -1) * 1 + ((adj)[2] != -1) * 2 + ((adj)[3] != -1) * 3)
 
 #define __get_degree4(adj) (((adj)[0] != -1) + ((adj)[1] != -1) + ((adj)[2] != -1) + ((adj)[3] != -1))
 
-#define table_exist(h, k) ((k) != (h)->size)
-
-struct edge_table_t {
-	/* map non-branching kmer to edge */
-	kmint_t size;
-	kmint_t n_probe;
-	kmint_t n_item;
+struct idhash_t {
+	kmint_t size;		/* number of buckets */
+	kmint_t n_probe;	/* number of time probing */
+	kmint_t n_item;		/* number of items */
 
 	kmkey_t *kmer;
-	gint_t  *edge_id;
+	gint_t  *id;
 	uint8_t *adj;
 };
 
-struct node_table_t {
-	/* map branching kmer to node */
-	kmint_t size;
-	kmint_t n_probe;
-	kmint_t n_item;
+#define idhash_end(h) ((h)->size)
+#define idhash_kmer(h, k) ((h)->kmer[k])
+#define idhash_id(h, k) ((h)->id[k])
+#define idhash_adj(h, k) ((h)->adj[k])
 
-	kmkey_t *kmer;
-	gint_t  *node_id;
-};
+void convert_table(struct idhash_t *edict, struct kmhash_t *h)
+{
+	edict->size = h->size;
+	edict->n_probe = h->n_probe;
+	edict->n_item = h->n_item;
+
+	edict->kmer = h->keys;
+	edict->adj = h->adjs;
+	edict->id = calloc(edict->size, sizeof(gint_t));
+
+	h->keys = NULL;
+	h->adjs = NULL;
+}
+
+void idhash_init(struct idhash_t *h, kmint_t size, int adj_included)
+{
+	h->size = size;
+	__round_up_kmint(h->size);
+	h->n_probe = estimate_probe_3(h->size);
+	h->n_item = 0;
+	h->kmer = malloc(h->size * sizeof(kmkey_t));
+	h->id = calloc(h->size, sizeof(gint_t));
+	if (adj_included)
+		h->adj = calloc(h->size, sizeof(uint8_t));
+	kmint_t i;
+	for (i = 0; i < h->size; ++i)
+		h->kmer[i] = TOMB_STONE;
+}
+
+void idhash_clean(struct idhash_t *h, int adj_included)
+{
+	free(h->kmer);
+	free(h->id);
+	h->kmer = NULL;
+	h->id = NULL;
+	if (adj_included) {
+		free(h->adj);
+		h->adj = NULL;
+	}
+	h->n_item = 0;
+}
+
+kmint_t idhash_get(struct idhash_t *h, kmkey_t key)
+{
+	kmint_t step, i, n_probe, mask;
+	kmkey_t k;
+	mask = h->size - 1;
+	k = __hash_int2(key);
+	i = k & mask;
+	n_probe = h->n_probe;
+	if (h->kmer[i] == key)
+		return i;
+	if (h->kmer[i] == TOMB_STONE)
+		return h->size;
+	step = 0;
+	do {
+		++step;
+		i = (i + step * (step + 1) / 2) & mask;
+		if (h->kmer[i] == key)
+			return i;
+	} while (step < n_probe && h->kmer[i] != TOMB_STONE);
+	return h->size;
+}
+
+kmint_t internal_idhash_put(struct idhash_t *h, kmkey_t key)
+{
+	kmint_t mask, step, i, n_probe;
+	kmkey_t cur_key, k;
+
+	mask = h->size - 1;
+	k = __hash_int2(key);
+	n_probe = h->n_probe;
+	i = k & mask;
+
+	if (h->kmer[i] == TOMB_STONE) {
+		h->kmer[i] = key;
+		++h->n_item;
+		return i;
+	}
+
+	step = 0;
+	do {
+		++step;
+		i = (i + (step * (step + 1) / 2)) & mask;
+		if (h->kmer[i] == TOMB_STONE) {
+			h->kmer[i] = key;
+			++h->n_item;
+			return i;
+		}
+	} while (step < n_probe);
+	return h->size;
+}
+
+void idhash_resize(struct idhash_t *h)
+{
+	kmint_t i, old_size, j, step, n_probe, mask;
+	kmkey_t k, x, xt;
+	gint_t y, yt;
+	uint32_t *flag;
+	uint32_t current_flag;
+	old_size = h->size;
+	h->size <<= 1;
+	h->n_probe = estimate_probe_3(h->size);
+	h->kmer = realloc(h->kmer, h->size * sizeof(kmkey_t));
+	h->id = realloc(h->id, h->size * sizeof(gint_t));
+	flag = calloc(h->size >> 4, sizeof(uint32_t));
+
+	mask = h->size - 1;
+	n_probe = h->n_probe;
+
+	for (i = old_size; i < h->size; ++i) {
+		h->kmer[i] = TOMB_STONE;
+		h->id[i] = 0;
+	}
+
+	for (i = 0; i < old_size; ++i) {
+		if (h->kmer[i] != TOMB_STONE)
+			rs_set_old(flag, i);
+	}
+
+	for (i = 0; i < old_size; ++i) {
+		if (rs_is_old(flag, i)) {
+			x = h->kmer[i];
+			y = h->id[i];
+			rs_set_new(flag, i);
+			h->kmer[i] = TOMB_STONE;
+			h->id[i] = 0;
+			while (1) {
+				k = __hash_int2(x);
+				j = k & mask;
+				step = 0;
+				current_flag = KMMASK_NEW;
+
+				while (step <= n_probe) {
+					j = (j + step * (step + 1) / 2) & mask;
+					current_flag = rs_get_flag(flag, j);
+					if (current_flag == KMMASK_EMPTY) {
+						rs_set_new(flag, j);
+						h->kmer[j] = x;
+						h->id[j] = y;
+						break;
+					} else if (current_flag == KMMASK_OLD) {
+						rs_set_new(flag, j);
+						xt = h->kmer[j];
+						yt = h->id[j];
+						h->kmer[j] = x;
+						h->id[j] = y;
+						x = xt;
+						y = yt;
+						break;
+					}
+					++step;
+				}
+				if (current_flag == KMMASK_EMPTY)
+					break;
+				else if (current_flag == KMMASK_NEW)
+					__ERROR("Resizing node table error");
+			}
+		}
+	}
+	free(flag);
+}
+
+void idhash_put(struct idhash_t *h, kmkey_t key, gint_t id)
+{
+	kmint_t k;
+	k = internal_idhash_put(h, key);
+	if (k != h->size)
+		idhash_id(h, k) = id;
+	while (k == idhash_end(h)) {
+		idhash_resize(h);
+		k = internal_idhash_put(h, key);
+		if (k != idhash_end(h))
+			idhash_id(h, k) = id;
+	}
+}
+
+void graph_clean(struct asm_graph_t *graph)
+{
+	gint_t i;
+	free(graph->nodes);
+	graph->nodes = NULL;
+	for (i = 0; i < graph->n_e; ++i)
+		free(graph->edges[i].seq);
+	free(graph->edges);
+	graph->edges = NULL;
+}
 
 struct edgecount_bundle_t {
 	struct dqueue_t *q;
 	struct asm_graph_t *graph;
-	struct edge_table_t *edict;
-	struct node_table_t *ndict;
+	// struct edge_table_t *edict;
+	// struct node_table_t *ndict;
+	struct idhash_t *edict;
+	struct idhash_t *ndict;
 	int ksize;
 	int64_t *n_reads;
 };
 
-void convert_table(struct edge_table_t *edge_dict, struct kmhash_t *kmer_hash);
-
-struct node_table_t *init_node_table(kmint_t size);
-
+// void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
+// 				struct edge_table_t *edge_dict,
+// 				struct node_table_t *node_dict);
 void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
-				struct edge_table_t *edge_dict,
-				struct node_table_t *node_dict);
+				struct idhash_t *edict, struct idhash_t *ndict);
 
+// void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+// 		struct edge_table_t *edict, struct node_table_t *ndict);
 void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
-		struct edge_table_t *edict, struct node_table_t *ndict);
+		struct idhash_t *edict, struct idhash_t *ndict);
 
 void remove_dead_end(struct asm_graph_t *graph);
 
 void write_gfa(struct asm_graph_t *g, const char *path);
-
-kmint_t hash_edge_table_get(struct edge_table_t *h, kmkey_t key)
-{
-	kmint_t step, i, n_probe, mask;
-	kmkey_t k;
-	mask = h->size - 1;
-	k = __hash_int2(key);
-	i = k & mask;
-	n_probe = h->n_probe;
-	if (h->kmer[i] == key)
-		return i;
-	if (h->kmer[i] == TOMB_STONE)
-		return h->size;
-	step = 0;
-	do {
-		++step;
-		i = (i + step * (step + 1) / 2) & mask;
-		if (h->kmer[i] == key)
-			return i;
-	} while (step < n_probe && h->kmer[i] != TOMB_STONE);
-	return h->size;
-}
-
-kmint_t hash_node_table_get(struct node_table_t *h, kmkey_t key)
-{
-	kmint_t step, i, n_probe, mask;
-	kmkey_t k;
-	mask = h->size - 1;
-	k = __hash_int2(key);
-	i = k & mask;
-	n_probe = h->n_probe;
-	if (h->kmer[i] == key)
-		return i;
-	if (h->kmer[i] == TOMB_STONE)
-		return h->size;
-	step = 0;
-	do {
-		++step;
-		i = (i + step * (step + 1) / 2) & mask;
-		if (h->kmer[i] == key)
-			return i;
-	} while (step < n_probe && h->kmer[i] != TOMB_STONE);
-	return h->size;
-}
-
-#define edge_table_get hash_edge_table_get
-#define node_table_get hash_node_table_get
-
-void check_hash_table(struct kmhash_t *h, int ksize)
-{
-	kmint_t i, k;
-	kmkey_t mask, kmer, kmer_rc, nkmer, nkmer_rc;
-	int lmc, c, rc;
-	mask = ((kmkey_t)1 << (ksize << 1)) - 1;
-	lmc = (ksize - 1) << 1;
-
-	for (i = 0; i < h->size; ++i) {
-		if (h->keys[i] == TOMB_STONE)
-			continue;
-		kmer = h->keys[i];
-		__get_revc_num(kmer, kmer_rc, ksize, mask);
-		for (c = 0; c < 4; ++c) {
-			if (!((h->adjs[i] >> c) & 1))
-				continue;
-			nkmer = ((kmer << 2) & mask) | c;
-			__get_revc_num(nkmer, nkmer_rc, ksize, mask);
-			if (nkmer < nkmer_rc)
-				k = hash_get(h, nkmer);
-			else
-				k = hash_get(h, nkmer_rc);
-			assert(k != KMHASH_MAX_SIZE);
-			rc = kmer >> lmc;
-			if (nkmer < nkmer_rc)
-				assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
-			else
-				assert((h->adjs[k] >> (rc ^ 3)) & 1);
-		}
-
-		for (c = 0; c < 4; ++c) {
-			if (!((h->adjs[i] >> (c + 4)) & 1))
-				continue;
-			nkmer = ((kmer_rc << 2) & mask) | c;
-			__get_revc_num(nkmer, nkmer_rc, ksize, mask);
-			if (nkmer < nkmer_rc)
-				k = hash_get(h, nkmer);
-			else
-				k = hash_get(h, nkmer_rc);
-			assert(k != KMHASH_MAX_SIZE);
-			rc = kmer_rc >> lmc;
-			if (nkmer < nkmer_rc) {
-				assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
-			} else {
-				assert((h->adjs[k] >> (rc ^ 3)) & 1);
-			}
-		}
-	}
-	__VERBOSE("\nTest hash table done\n");
-}
 
 void assembly_process(struct opt_count_t *opt)
 {
@@ -252,34 +380,39 @@ void assembly_process(struct opt_count_t *opt)
 	init_clock();
 
 	struct kmhash_t *kmer_hash;
+	kmer_hash = calloc(1, sizeof(struct kmhash_t));
 	__VERBOSE("Estimating kmer\n");
-	kmer_hash = build_kmer_table_lazy(opt);
-	check_hash_table(kmer_hash, opt->kmer_master);
+	build_kmer_table_lazy(opt, kmer_hash);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
 
 	__VERBOSE("\nBuilding assembly graph\n");
 	__VERBOSE("|--- Condensing non-branching path\n");
-	struct edge_table_t *edge_dict;
-	struct node_table_t *node_dict;
+	// struct edge_table_t *edge_dict;
+	// struct node_table_t *node_dict;
+	struct idhash_t *edict, *ndict;
 	struct asm_graph_t *asm_graph;
 
-	edge_dict = calloc(1, sizeof(struct edge_table_t));
-	convert_table(edge_dict, kmer_hash);
+	edict = calloc(1, sizeof(struct idhash_t));
+	convert_table(edict, kmer_hash);
 	kmhash_destroy(kmer_hash);
+	free(kmer_hash);
+	kmer_hash = NULL;
 
-	node_dict = init_node_table(opt->hash_size - 1);
+	ndict = calloc(1, sizeof(struct idhash_t));
+	idhash_init(ndict, opt->hash_size - 1, 0);
+
 	asm_graph = calloc(1, sizeof(struct asm_graph_t));
-	build_graph_from_kmer(asm_graph, opt->kmer_master, edge_dict, node_dict);
+	build_graph_from_kmer(asm_graph, opt->kmer_master, edict, ndict);
 	test_graph_build(asm_graph);
 	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)asm_graph->n_v);
 	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)asm_graph->n_e);
 
 	__VERBOSE("|--- Estimating edge coverage\n");
-	count_edge(opt, asm_graph, edge_dict, node_dict);
-	clear_node_dict(node_dict);
-	clear_edge_dict(edge_dict);
+	count_edge(opt, asm_graph, edict, ndict);
+	idhash_clean(ndict, 0);
+	idhash_clean(edict, 1);
 
 	strcpy(path, opt->out_dir);
 	strcat(path, "/graph_0.gfa");
@@ -288,10 +421,19 @@ void assembly_process(struct opt_count_t *opt)
 	__VERBOSE("\nRemoving dead-end\n");
 	remove_dead_end(asm_graph);
 	test_graph_build(asm_graph);
+	__VERBOSE_LOG("Graph #2", "Number of nodes: %lld\n", (long long)asm_graph->n_v);
+	__VERBOSE_LOG("Graph #2", "Number of edges: %lld\n", (long long)asm_graph->n_e);
 
 	strcpy(path, opt->out_dir);
 	strcat(path, "/graph_1.gfa");
 	write_gfa(asm_graph, path);
+
+	__VERBOSE("\nRebuilding kmer map\n");
+
+	graph_clean(asm_graph);
+	free(edict);
+	free(ndict);
+	free(asm_graph);
 }
 
 char sign_char[2] = {'+', '-'};
@@ -375,17 +517,6 @@ uint32_t *append_bin_seq_forward(uint32_t *dst, gint_t dlen, uint32_t *src,
 		new_ptr[k >> 4] |= ((src[i >> 4] >> ((i & 15) << 1)) & (uint32_t)3) << ((k & 15) << 1);
 	}
 	return new_ptr;
-}
-
-void clean_graph(struct asm_graph_t *graph)
-{
-	gint_t i;
-	free(graph->nodes);
-	graph->nodes = NULL;
-	for (i = 0; i < graph->n_e; ++i)
-		free(graph->edges[i].seq);
-	free(graph->edges);
-	graph->edges = NULL;
 }
 
 void remove_dead_end(struct asm_graph_t *graph)
@@ -626,7 +757,7 @@ void remove_dead_end(struct asm_graph_t *graph)
 		rc_id = edges[u].rc_id;
 		assert(edges[rc_id].rc_id == u);
 	}
-	clean_graph(graph);
+	graph_clean(graph);
 	graph->n_v = n_v;
 	graph->n_e = n_e;
 	graph->nodes = nodes;
@@ -668,238 +799,8 @@ void test_graph_build(struct asm_graph_t *graph)
 	__VERBOSE("Test graph structure ok\n");
 }
 
-void clear_node_dict(struct node_table_t *h)
-{
-	free(h->kmer);
-	free(h->node_id);
-	h->n_item = 0;
-}
-
-void clear_edge_dict(struct edge_table_t *h)
-{
-	free(h->kmer);
-	free(h->edge_id);
-	free(h->adj);
-	h->n_item = 0;
-}
-
-void reninit_node_table(struct node_table_t *h, kmint_t size)
-{
-	h->size = size - 1;
-	__round_up_kmint(h->size);
-	h->n_probe = estimate_probe_3(h->size);
-	h->n_item = 0;
-	h->kmer = malloc(h->size * sizeof(kmkey_t));
-	h->node_id = calloc(h->size, sizeof(gint_t));
-	kmint_t i;
-	for (i = 0; i < h->size; ++i)
-		h->kmer[i] = TOMB_STONE;
-}
-
-void reinit_edge_table(struct edge_table_t *h, kmint_t size)
-{
-	h->size = size - 1;
-	__round_up_kmint(h->size);
-	h->n_probe = estimate_probe_3(h->size);
-	h->n_item = 0;
-	h->kmer = malloc(h->size * sizeof(kmkey_t));
-	h->edge_id = calloc(h->size, sizeof(gint_t));
-	kmint_t i;
-	for (i = 0; i < h->size; ++i)
-		h->kmer[i] = TOMB_STONE;
-}
-
-struct node_table_t *init_node_table(kmint_t size)
-{
-	struct node_table_t *ret;
-	ret = calloc(1, sizeof(struct node_table_t));
-	ret->size = size;
-	__round_up_kmint(ret->size);
-	ret->n_probe = estimate_probe_3(ret->size);
-	ret->n_item = 0;
-	ret->kmer = malloc(ret->size * sizeof(kmkey_t));
-	ret->node_id = calloc(ret->size, sizeof(gint_t));
-	kmint_t i;
-	for (i = 0; i < ret->size; ++i)
-		ret->kmer[i] = TOMB_STONE;
-	return ret;
-}
-
-void convert_table(struct edge_table_t *edge_dict, struct kmhash_t *kmer_hash)
-{
-	edge_dict->size = kmer_hash->size;
-	edge_dict->n_probe = kmer_hash->n_probe;
-	edge_dict->n_item = kmer_hash->n_item;
-
-	edge_dict->kmer = kmer_hash->keys;
-	edge_dict->adj = kmer_hash->adjs;
-	kmer_hash->keys = NULL;
-	kmer_hash->adjs = NULL;
-	edge_dict->edge_id = calloc(edge_dict->size, sizeof(gint_t));
-}
-
-static kmint_t node_table_internal_put(struct node_table_t *h, kmkey_t key)
-{
-	kmint_t mask, step, i, n_probe;
-	kmkey_t cur_key, k;
-
-	mask = h->size - 1;
-	k = __hash_int2(key);
-	n_probe = h->n_probe;
-	i = k & mask;
-
-	if (h->kmer[i] == TOMB_STONE) {
-		h->kmer[i] = key;
-		++h->n_item;
-		return i;
-	}
-
-	step = 0;
-	do {
-		++step;
-		i = (i + (step * (step + 1) / 2)) & mask;
-		if (h->kmer[i] == TOMB_STONE) {
-			h->kmer[i] = key;
-			++h->n_item;
-			return i;
-		}
-	} while (step < n_probe);
-	return h->size;
-}
-
-#define KMMASK_EMPTY			0
-#define KMMASK_OLD			1
-#define KMMASK_NEW			2
-#define KMMASK_LOADING			3
-
-#define rs_set_old(x, i) ((x)[(i) >> 4] = ((x)[(i) >> 4] &		       \
-				(~((uint32_t)3 << (((i) & 15) << 1)))) |       \
-				((uint32_t)KMMASK_OLD << (((i) & 15) << 1)))
-
-#define rs_set_new(x, i) ((x)[(i) >> 4] = ((x)[(i) >> 4] &		       \
-				(~((uint32_t)3 << (((i) & 15) << 1)))) |       \
-				((uint32_t)KMMASK_NEW << (((i) & 15) << 1)))
-
-#define rs_set_empty(x, i) ((x)[(i) >> 4] = (x)[(i) >> 4] &		       \
-				(~((uint32_t)3 << (((i) & 15) << 1))))
-
-#define rs_get_flag(x, i) (((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)
-
-#define rs_is_old(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
-							== (uint32_t)KMMASK_OLD)
-
-static inline kmint_t recount_table(struct node_table_t *h)
-{
-	kmint_t s, i;
-	s = 0;
-	for (i = 0; i < h->size; ++i)
-		if (h->kmer[i] != TOMB_STONE)
-			++s;
-	return s;
-}
-
-static inline kmkey_t calhash_table(struct node_table_t *h)
-{
-	kmkey_t sum;
-	kmint_t i;
-	sum = 0;
-	for (i = 0; i < h->size; ++i)
-		sum += (h->kmer[i] ^ (kmkey_t)h->node_id[i]);
-	return sum;
-}
-
-void node_table_resize(struct node_table_t *h)
-{
-	kmkey_t old_hash = calhash_table(h);
-	kmint_t i, old_size, j, step, n_probe, mask;
-	kmkey_t k, x, xt;
-	gint_t y, yt;
-	uint32_t *flag;
-	uint32_t current_flag;
-	old_size = h->size;
-	h->size <<= 1;
-	h->n_probe = estimate_probe_3(h->size);
-	h->kmer = realloc(h->kmer, h->size * sizeof(kmkey_t));
-	h->node_id = realloc(h->node_id, h->size * sizeof(gint_t));
-	flag = calloc(h->size >> 4, sizeof(uint32_t));
-
-	mask = h->size - 1;
-	n_probe = h->n_probe;
-
-	for (i = old_size; i < h->size; ++i) {
-		h->kmer[i] = TOMB_STONE;
-		h->node_id[i] = 0;
-	}
-
-	for (i = 0; i < old_size; ++i) {
-		if (h->kmer[i] != TOMB_STONE)
-			rs_set_old(flag, i);
-	}
-
-	for (i = 0; i < old_size; ++i) {
-		if (rs_is_old(flag, i)) {
-			x = h->kmer[i];
-			y = h->node_id[i];
-			rs_set_new(flag, i);
-			h->kmer[i] = TOMB_STONE;
-			h->node_id[i] = 0;
-			while (1) {
-				k = __hash_int2(x);
-				j = k & mask;
-				step = 0;
-				current_flag = KMMASK_NEW;
-
-				while (step <= n_probe) {
-					j = (j + step * (step + 1) / 2) & mask;
-					current_flag = rs_get_flag(flag, j);
-					if (current_flag == KMMASK_EMPTY) {
-						rs_set_new(flag, j);
-						h->kmer[j] = x;
-						h->node_id[j] = y;
-						break;
-					} else if (current_flag == KMMASK_OLD) {
-						rs_set_new(flag, j);
-						xt = h->kmer[j];
-						yt = h->node_id[j];
-						h->kmer[j] = x;
-						h->node_id[j] = y;
-						x = xt;
-						y = yt;
-						break;
-					}
-					++step;
-				}
-				if (current_flag == KMMASK_EMPTY)
-					break;
-				else if (current_flag == KMMASK_NEW)
-					__ERROR("Resizing node table error");
-			}
-		}
-	}
-
-	assert(recount_table(h) == h->n_item);
-	assert(calhash_table(h) == old_hash);
-
-	free(flag);
-}
-
-void node_table_put(struct node_table_t *h, kmkey_t key, gint_t node_id)
-{
-	kmint_t k;
-	k = node_table_internal_put(h, key);
-	if (k != h->size)
-		h->node_id[k] = node_id;
-	while (k == h->size) {
-		node_table_resize(h);
-		k = node_table_internal_put(h, key);
-		if (k != h->size)
-			h->node_id[k] = node_id;
-	}
-}
-
 void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
-				struct edge_table_t *edge_dict,
-				struct node_table_t *node_dict)
+				struct idhash_t *edict, struct idhash_t *ndict)
 {
 	struct asm_node_t *nodes;
 	struct asm_edge_t *edges;
@@ -917,69 +818,69 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 	kmask = ((kmkey_t)1 << (ksize << 1)) - 1;
 	lmc = (ksize - 1) << 1;
 
-	__VERBOSE("Counting node and edge\n");
 	/* Count node and edge */
 	n_e = n_v = 0;
-	hash_sum = 0;
-	for (i = 0; i < edge_dict->size; ++i) {
-		if (edge_dict->kmer[i] == TOMB_STONE)
+	// hash_sum = 0;
+	for (i = 0; i < edict->size; ++i) {
+		if (idhash_kmer(edict, i) == TOMB_STONE)
 			continue;
-		adj_forward = edge_dict->adj[i] & 0xf;
-		adj_reverse = edge_dict->adj[i] >> 4;
-		deg_forward = __degree4(adj_forward);
-		deg_reverse = __degree4(adj_reverse);
+		adj_forward = idhash_adj(edict, i) & 0xf;
+		adj_reverse = idhash_adj(edict, i) >> 4;
+		deg_forward = __bin_degree4(adj_forward);
+		deg_reverse = __bin_degree4(adj_reverse);
 		if (deg_forward == 1 && deg_reverse == 1)
 			continue;
-		node_table_put(node_dict, edge_dict->kmer[i], n_v);
+		idhash_put(ndict, idhash_kmer(edict, i), n_v);
 		++n_v;
 		n_e += (deg_forward + deg_reverse);
-		hash_sum += edge_dict->kmer[i];
+		// hash_sum += edge_dict->kmer[i];
 	}
 
-	fprintf(stderr, "node hash sum = %llu\n", hash_sum);
+	// fprintf(stderr, "node hash sum = %llu\n", hash_sum);
 
-	hash_sum = 0;
-	gint_t *check = malloc(n_v * sizeof(gint_t));
-	for (i = 0; i < n_v; ++i)
-		check[i] = -1;
+	// hash_sum = 0;
+	// gint_t *check = malloc(n_v * sizeof(gint_t));
+	// for (i = 0; i < n_v; ++i)
+	// 	check[i] = -1;
 
-	for (i = 0; i < node_dict->size; ++i) {
-		if (node_dict->kmer[i] == TOMB_STONE)
-			continue;
-		hash_sum += node_dict->kmer[i];
-		if (check[node_dict->node_id[i]] != -1) {
-			fprintf(stderr, "i = %llu; collide = %lld\n", i, check[node_dict->node_id[i]]);
-			fprintf(stderr, "node_id_1 = %lld; node_id_2 = %lld\n",
-				node_dict->node_id[i], node_dict->node_id[check[node_dict->node_id[i]]]);
-			assert(0);
-		}
-		check[node_dict->node_id[i]] = i;
-	}
+	// for (i = 0; i < node_dict->size; ++i) {
+	// 	if (node_dict->kmer[i] == TOMB_STONE)
+	// 		continue;
+	// 	hash_sum += node_dict->kmer[i];
+	// 	if (check[node_dict->node_id[i]] != -1) {
+	// 		fprintf(stderr, "i = %llu; collide = %lld\n", i, check[node_dict->node_id[i]]);
+	// 		fprintf(stderr, "node_id_1 = %lld; node_id_2 = %lld\n",
+	// 			node_dict->node_id[i], node_dict->node_id[check[node_dict->node_id[i]]]);
+	// 		assert(0);
+	// 	}
+	// 	check[node_dict->node_id[i]] = i;
+	// }
 
-	fprintf(stderr, "node hash sum recal = %llu\n", hash_sum);
+	// fprintf(stderr, "node hash sum recal = %llu\n", hash_sum);
 
-	fprintf(stderr, "n_v = %llu\n", (long long unsigned)n_v);
-	fprintf(stderr, "n_e = %llu\n", (long long unsigned)n_e);
+	// fprintf(stderr, "n_v = %llu\n", (long long unsigned)n_v);
+	// fprintf(stderr, "n_e = %llu\n", (long long unsigned)n_e);
 
-	assert(recount_table(node_dict) == node_dict->n_item);
-	assert(n_v == node_dict->n_item);
+	// assert(recount_table(node_dict) == node_dict->n_item);
+	assert(n_v == ndict->n_item);
 
 	nodes = calloc(n_v, sizeof(struct asm_node_t));
 	edges = calloc(n_e, sizeof(struct asm_edge_t));
 
-	__VERBOSE("Assembling node and edge\n");
+	// __VERBOSE("Assembling node and edge\n");
 	n_e = n_v = 0;
 	/* Assemble node and edge */
-	for (i = 0; i < node_dict->size; ++i) {
-		if (node_dict->kmer[i] == TOMB_STONE)
+	for (i = 0; i < ndict->size; ++i) {
+		if (idhash_kmer(ndict, i) == TOMB_STONE)
 			continue;
-		node_kmer = node_dict->kmer[i];
+		node_kmer = idhash_kmer(ndict, i);
 		__get_revc_num(node_kmer, node_kmer_rc, ksize, kmask);
-		node_id = node_dict->node_id[i];
+		node_id = idhash_id(ndict, i);
 		nodes[node_id].seq = node_kmer;
-		k = edge_table_get(edge_dict, node_kmer);
-		adj_forward = edge_dict->adj[k] & 0xf;
-		adj_reverse = edge_dict->adj[k] >> 4;
+		k = idhash_get(edict, node_kmer);
+		assert(k != idhash_end(edict));
+		adj_forward = idhash_adj(edict, k) & 0xf;
+		adj_reverse = idhash_adj(edict, k) >> 4;
 
 		/* forward kmer's edges */
 		for (c = 0; c < 4; ++c) {
@@ -1006,38 +907,31 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 				cur_kmer_rc = (cur_kmer_rc >> 2) |
 						((kmkey_t)(cur_c ^ 3) << lmc);
 				if (cur_kmer < cur_kmer_rc) {
-					k = node_table_get(node_dict, cur_kmer);
-					if (!table_exist(node_dict, k)) {
-						j = edge_table_get(edge_dict, cur_kmer);
-						if (!table_exist(edge_dict, j))
-							fprintf(stderr, "%llu %u\n",
-								cur_kmer, edge_seq_len);
-						assert(table_exist(edge_dict, j));
-						edge_dict->edge_id[j] = n_e;
-						assert(__degree4(edge_dict->adj[j] & 0xf) == 1);
-						cur_c = __only_edge4(edge_dict->adj[j] & 0xf);
+					k = idhash_get(ndict, cur_kmer);
+					if (k == idhash_end(ndict)) {
+						j = idhash_get(edict, cur_kmer);
+						assert(j != idhash_end(edict));
+						idhash_id(edict, j) = n_e;
+						assert(__bin_degree4(idhash_adj(edict, j) & 0xf) == 1);
+						cur_c = __bin_only_edge4(idhash_adj(edict, j) & 0xf);
 					}
 				} else {
-					k = node_table_get(node_dict, cur_kmer_rc);
-					if (!table_exist(node_dict, k)) {
-						j = edge_table_get(edge_dict, cur_kmer_rc);
-						if (!table_exist(edge_dict, j))
-							fprintf(stderr, "%llu %u\n",
-								cur_kmer, edge_seq_len);
-						assert(table_exist(edge_dict, j));
-						assert(__degree4(edge_dict->adj[j] >> 4) == 1);
-						cur_c = __only_edge4(edge_dict->adj[j] >> 4);
+					k = idhash_get(ndict, cur_kmer_rc);
+					if (k == idhash_end(ndict)) {
+						j = idhash_get(edict, cur_kmer_rc);
+						assert(j != idhash_end(edict));
+						assert(__bin_degree4(idhash_adj(edict, j) >> 4) == 1);
+						cur_c = __bin_only_edge4(idhash_adj(edict, j) >> 4);
 					}
 				}
-			} while (!table_exist(node_dict, k));
-
+			} while (k == idhash_end(ndict));
 			edges[n_e].seq = edge_seq;
 			edges[n_e].seq_len = edge_seq_len;
 			edges[n_e].source = node_id + 1;
 			if (cur_kmer < cur_kmer_rc)
-				edges[n_e].target = node_dict->node_id[k] + 1;
+				edges[n_e].target = idhash_id(ndict, k) + 1;
 			else
-				edges[n_e].target = -node_dict->node_id[k] - 1;
+				edges[n_e].target = -idhash_id(ndict, k) - 1;
 			nodes[node_id].forward_adj[c] = n_e;
 			++n_e;
 		}
@@ -1066,38 +960,31 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 				cur_kmer_rc = (cur_kmer_rc >> 2) |
 						((kmkey_t)(cur_c ^ 3) << lmc);
 				if (cur_kmer < cur_kmer_rc) {
-					k = node_table_get(node_dict, cur_kmer);
-					if (!table_exist(node_dict, k)) {
-						j = edge_table_get(edge_dict, cur_kmer);
-						if (!table_exist(edge_dict, j))
-							fprintf(stderr, "%llu %u\n",
-								cur_kmer, edge_seq_len);
-						assert(table_exist(edge_dict, j));
-						edge_dict->edge_id[j] = n_e;
-						assert(__degree4(edge_dict->adj[j] & 0xf) == 1);
-						cur_c = __only_edge4(edge_dict->adj[j] & 0xf);
+					k = idhash_get(ndict, cur_kmer);
+					if (k == idhash_end(ndict)) {
+						j = idhash_get(edict, cur_kmer);
+						assert(j != idhash_end(edict));
+						idhash_id(edict, j) = n_e;
+						assert(__bin_degree4(idhash_adj(edict, j) & 0xf) == 1);
+						cur_c = __bin_only_edge4(idhash_adj(edict, j) & 0xf);
 					}
 				} else {
-					k = node_table_get(node_dict, cur_kmer_rc);
-					if (!table_exist(node_dict, k)) {
-						j = edge_table_get(edge_dict, cur_kmer_rc);
-						if (!table_exist(edge_dict, j))
-							fprintf(stderr, "%llu %u\n",
-								cur_kmer, edge_seq_len);
-						assert(table_exist(edge_dict, j));
-						assert(__degree4(edge_dict->adj[j] >> 4) == 1);
-						cur_c = __only_edge4(edge_dict->adj[j] >> 4);
+					k = idhash_get(ndict, cur_kmer_rc);
+					if (k == idhash_end(ndict)) {
+						j = idhash_get(edict, cur_kmer_rc);
+						assert(j != idhash_end(edict));
+						assert(__bin_degree4(idhash_adj(edict, j) >> 4) == 1);
+						cur_c = __bin_only_edge4(idhash_adj(edict, j) >> 4);
 					}
 				}
-			} while (!table_exist(node_dict, k));
+			} while (k == idhash_end(ndict));
 			edges[n_e].seq = edge_seq;
 			edges[n_e].seq_len = edge_seq_len;
-
 			edges[n_e].source = -node_id - 1;
 			if (cur_kmer < cur_kmer_rc)
-				edges[n_e].target = node_dict->node_id[k] + 1;
+				edges[n_e].target = idhash_id(ndict, k) + 1;
 			else
-				edges[n_e].target = -node_dict->node_id[k] - 1;
+				edges[n_e].target = -idhash_id(ndict, k) - 1;
 			nodes[node_id].reverse_adj[c] = n_e;
 			++n_e;
 		}
@@ -1105,15 +992,12 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 	}
 
 	for (u = 0; u < n_v; ++u) {
-		k = node_table_get(node_dict, nodes[u].seq);
-		assert(table_exist(node_dict, k));
-		assert(node_dict->node_id[k] == u);
+		k = idhash_get(ndict, nodes[u].seq);
+		assert(k != idhash_end(ndict));
+		assert(idhash_id(ndict, k) == u);
 	}
 
-	fprintf(stderr, "n_v = %llu\n", (long long unsigned)n_v);
-	fprintf(stderr, "n_e = %llu\n", (long long unsigned)n_e);
-
-	assert(n_v == node_dict->n_item);
+	assert(n_v == ndict->n_item);
 
 	/* link reverse complemented edges */
 	for (u = 0; u < n_e; ++u) {
@@ -1123,32 +1007,7 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 			adj = nodes[v - 1].reverse_adj;
 		else
 			adj = nodes[-v - 1].forward_adj;
-		if (adj[c] == -1) {
-			deb_dump_bin_seq("edge seq   : ", edges[u].seq, edges[u].seq_len);
-			if (edges[u].target > 0) {
-				fprintf(stderr, "target id : %lld; target seq: %llu\n",
-					edges[u].target - 1, nodes[edges[u].target - 1].seq);
-				deb_dump_seq("target seq : ",
-					nodes[edges[u].target - 1].seq, ksize);
-			} else {
-				fprintf(stderr, "target id : %lld; target seq: %llu\n",
-					-edges[u].target - 1, nodes[-edges[u].target - 1].seq);
-				deb_dump_seq("target seq : ",
-					nodes[-edges[u].target - 1].seq, ksize);
-			}
-			if (edges[u].source > 0) {
-				fprintf(stderr, "source id : %lld; source seq: %llu\n",
-					edges[u].source - 1, nodes[edges[u].source - 1].seq);
-				deb_dump_seq("source seq : ",
-					nodes[edges[u].source - 1].seq, ksize);
-			} else {
-				fprintf(stderr, "source id : %lld; source seq: %llu\n",
-					-edges[u].source - 1, nodes[-edges[u].source - 1].seq);
-				deb_dump_seq("source seq : ",
-					nodes[-edges[u].source - 1].seq, ksize);
-			}
-			assert(0);
-		}
+		assert(adj[c] != -1);
 		edges[u].rc_id = adj[c];
 	}
 
@@ -1168,14 +1027,14 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 }
 
 void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
-		struct edge_table_t *edict, struct node_table_t *ndict)
+		struct idhash_t *edict, struct idhash_t *ndict)
 {
 	kmint_t e_pos, n_pos;
 	gint_t e_id, e_id_rc, n_id;
 	if (kmer < kmer_rc) {
-		n_pos = node_table_get(ndict, kmer);
-		if (table_exist(ndict, n_pos)) {
-			n_id = ndict->node_id[n_pos];
+		n_pos = idhash_get(ndict, kmer);
+		if (n_pos != idhash_end(ndict)) {
+			n_id = idhash_id(ndict, n_pos);
 			e_id = g->nodes[n_id].forward_adj[c];
 			if (e_id != -1) {
 				atomic_add_and_fetch64(&(g->edges[e_id].count), 1);
@@ -1183,18 +1042,18 @@ void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
 				atomic_add_and_fetch64(&(g->edges[e_id_rc].count), 1);
 			}
 		} else {
-			e_pos = edge_table_get(edict, kmer);
-			if (!table_exist(edict, e_pos))
+			e_pos = idhash_get(edict, kmer);
+			if (e_pos == idhash_end(edict))
 				return;
-			e_id = edict->edge_id[e_pos];
+			e_id = idhash_id(edict, e_pos);
 			atomic_add_and_fetch64(&(g->edges[e_id].count), 1);
 			e_id_rc = g->edges[e_id].rc_id;
 			atomic_add_and_fetch64(&(g->edges[e_id_rc].count), 1);
 		}
 	} else {
-		n_pos = node_table_get(ndict, kmer_rc);
-		if (table_exist(ndict, n_pos)) {
-			n_id = ndict->node_id[n_pos];
+		n_pos = idhash_get(ndict, kmer_rc);
+		if (n_pos != idhash_end(ndict)) {
+			n_id = idhash_id(ndict, n_pos);
 			e_id = g->nodes[n_id].reverse_adj[c];
 			if (e_id != -1) {
 				atomic_add_and_fetch64(&(g->edges[e_id].count), 1);
@@ -1202,10 +1061,10 @@ void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
 				atomic_add_and_fetch64(&(g->edges[e_id_rc].count), 1);
 			}
 		} else {
-			e_pos = edge_table_get(edict, kmer_rc);
-			if (!table_exist(edict, e_pos))
+			e_pos = idhash_get(edict, kmer_rc);
+			if (e_pos == idhash_end(edict))
 				return;
-			e_id = edict->edge_id[e_pos];
+			e_id = idhash_id(edict, e_pos);
 			atomic_add_and_fetch64(&(g->edges[e_id].count), 1);
 			e_id_rc = g->edges[e_id].rc_id;
 			atomic_add_and_fetch64(&(g->edges[e_id_rc].count), 1);
@@ -1214,7 +1073,7 @@ void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
 }
 
 void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *graph,
-			struct edge_table_t *edict, struct node_table_t *ndict)
+			struct idhash_t *edict, struct idhash_t *ndict)
 {
 	int i, last, last_i, ci, ck, len, lmc, kedge;
 	char *seq;
@@ -1261,8 +1120,9 @@ void *count_edge_worker(void *data)
 
 	struct dqueue_t *q = bundle->q;
 	struct asm_graph_t *graph = bundle->graph;
-	struct edge_table_t *edict = bundle->edict;
-	struct node_table_t *ndict = bundle->ndict;
+	struct idhash_t *edict, *ndict;
+	edict = bundle->edict;
+	ndict = bundle->ndict;
 
 	struct read_t read1, read2;
 	struct pair_buffer_t *own_buf, *ext_buf;
@@ -1318,7 +1178,7 @@ void *count_edge_worker(void *data)
 }
 
 void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
-		struct edge_table_t *edict, struct node_table_t *ndict)
+		struct idhash_t *edict, struct idhash_t *ndict)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
