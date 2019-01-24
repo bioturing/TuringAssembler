@@ -8,6 +8,8 @@ void kmer_test_process(struct opt_count_t *opt);
 
 void kmer_fastq_count(struct opt_count_t *opt);
 
-struct kmhash_t *count_kmer(struct opt_count_t *opt);
+void build_kmer_table(struct opt_count_t *opt, struct kmhash_t *h);
+
+void build_kmer_table_lazy(struct opt_count_t *opt, struct kmhash_t *h);
 
 #endif

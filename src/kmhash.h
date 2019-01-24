@@ -4,9 +4,6 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
-#define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
-
 #define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 
@@ -21,31 +18,23 @@ typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
 typedef uint32_t kmval_t;
 
-#define KMVAL_LOG			5
-#define KMVAL_MASK			31
-
-// struct kmbucket_t {
-// 	kmkey_t idx;
-// 	kmval_t cnt;
-// };
-
 struct kmhash_t {
-	kmint_t size;
-	kmint_t old_size;
-	kmint_t n_items;
-	kmint_t n_probe;
+	/* multi-threaded singleton kmer filtered hash table */
+	kmint_t size;			/* current size */
+	kmint_t old_size;		/* previous size */
+	kmint_t n_item;			/* number of items */
+	kmint_t n_probe;		/* maximum probing times */
 
-	kmkey_t *keys;
-	kmkey_t *old_keys;
-	kmval_t *vals;
-	kmval_t *old_vals;
+	// informative part
+	kmkey_t  *keys;			/* keys */
+	uint32_t *sgts;			/* count > 1? */
+	uint8_t  *adjs;			/* adjacency edges */
 
 	// additional storage for resize
-	uint8_t *rs_flag;
+	uint8_t  *flag;
 
 	int status;
-	int n_workers;
-	// struct sem_wrap_t gsem;
+	int n_worker;
 	/* Each threads need a lock of hashtable access state (busy|idle)
 	 * Using a shared semaphore (like in HeraT) causes a big data race and
 	 * slow down much, much (100 times compare to HeraT)
@@ -53,34 +42,37 @@ struct kmhash_t {
 	pthread_mutex_t *locks;
 };
 
-static inline kmkey_t __hash_int2(kmkey_t k)
-{
-	kmkey_t x = k;
-	x = (x ^ (x >> 30)) * HM_MAGIC_1;
-	x = (x ^ (x >> 27)) * HM_MAGIC_2;
-	x ^= (x > 31);
-	return x;
-}
+/* Turn on adj bit of a kmer */
+void kmhash_add_edge(struct kmhash_t *h, kmkey_t key, int c, pthread_mutex_t *lock);
 
-// struct kmhash_t *init_kmhash(kmint_t size, int n_threads);
+/*
+ * Put a kmer to hash table
+ * auto-resize with doubling the adjs array
+ */
+void kmhash_put_adj(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
-struct kmhash_t *init_filter_kmhash(kmint_t size, int n_threads);
-
-void kmhash_destroy(struct kmhash_t *h);
-
+/*
+ * Put a kmer to hash table
+ * auto-resize without doubling the adjs array
+ */
 void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
 
+/*
+ * Get the position of a kmer on the table
+ * return KMHASH_MAX_SIZE of not found
+ */
 kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
 
-kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key);
+/*
+ * Init the hash table with at pre-allocated size items
+ * Should know the number of working threads
+ */
+void kmhash_init(struct kmhash_t *h, kmint_t size, int n_threads, int adj_included);
 
-void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val);
+/* Remove all singleton kmer and shrink the table size */
+void kmhash_filter(struct kmhash_t *h, int adj_included);
 
-// void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-// void kmhash_inc_val(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-// kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
-
+/* Free all allocated memory on h but not h itself */
+void kmhash_destroy(struct kmhash_t *h);
 
 #endif

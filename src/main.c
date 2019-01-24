@@ -7,9 +7,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include "assembly_graph.h"
 #include "get_buffer.h"
-#include "graph.h"
-#include "graph_assembly.h"
 #include "io_utils.h"
 #include "khash.h"
 #include "kmer_count.h"
@@ -158,7 +157,7 @@ void assembly_opt_process(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	__VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
+	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
 	if (opt->n_files == 0) {
 		__VERBOSE_LOG("INFO", "input: { stdin }\n");
 	} else {
@@ -221,7 +220,7 @@ void test_opt_process(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	__VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
+	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
 	if (opt->n_files == 0) {
 		__VERBOSE_LOG("INFO", "input: { stdin }\n");
 	} else {
