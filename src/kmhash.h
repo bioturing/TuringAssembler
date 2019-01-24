@@ -24,28 +24,22 @@ typedef uint32_t kmval_t;
 #define KMVAL_LOG			5
 #define KMVAL_MASK			31
 
-// struct kmbucket_t {
-// 	kmkey_t idx;
-// 	kmval_t cnt;
-// };
-
 struct kmhash_t {
-	kmint_t size;
-	kmint_t old_size;
-	kmint_t n_items;
-	kmint_t n_probe;
+	kmint_t size;			/* current size */
+	kmint_t old_size;		/* previous size */
+	kmint_t n_item;			/* number of items */
+	kmint_t n_probe;		/* maximum probing times */
 
-	kmkey_t *keys;
-	kmkey_t *old_keys;
-	kmval_t *vals;
-	kmval_t *old_vals;
+	// informative part
+	kmkey_t  *keys;			/* keys */
+	uint32_t *sgts;			/* count > 1? */
+	uint8_t  *adjs;			/* adjacency edges */
 
 	// additional storage for resize
-	uint8_t *rs_flag;
+	uint8_t  *flag;
 
 	int status;
-	int n_workers;
-	// struct sem_wrap_t gsem;
+	int n_worker;
 	/* Each threads need a lock of hashtable access state (busy|idle)
 	 * Using a shared semaphore (like in HeraT) causes a big data race and
 	 * slow down much, much (100 times compare to HeraT)
@@ -62,25 +56,34 @@ static inline kmkey_t __hash_int2(kmkey_t k)
 	return x;
 }
 
-// struct kmhash_t *init_kmhash(kmint_t size, int n_threads);
+static inline kmint_t estimate_probe_3(kmint_t size)
+{
+	kmint_t s, i;
+	i = s = 0;
+	while (s < size) {
+		++i;
+		s += i * i * i * 64;
+	}
+	return i;
+}
 
-struct kmhash_t *init_filter_kmhash(kmint_t size, int n_threads);
+kmint_t hash_get(struct kmhash_t *h, kmkey_t key);
+
+struct kmhash_t *init_sgt_adj_kmhash(kmint_t size, int n_threads);
+
+struct kmhash_t *init_sgt_kmhash(kmint_t size, int n_threads);
+
+void sgt_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+
+void sgt_adj_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+
+void sgt_add_edge(struct kmhash_t *h, kmkey_t key, int c,
+						pthread_mutex_t *lock);
 
 void kmhash_destroy(struct kmhash_t *h);
 
-void kmhash_put(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
+void sgt_adj_hash_filter(struct kmhash_t *h);
 
-kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
-
-kmint_t kmphash_get(struct kmhash_t *h, kmkey_t key);
-
-void kmhash_filter_singleton(struct kmhash_t *h, int reinit_val);
-
-// void kmhash_put_wrap(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-// void kmhash_inc_val(struct kmhash_t *h, kmkey_t key, pthread_mutex_t *lock);
-
-// kmint_t kmhash_get(struct kmhash_t *h, kmkey_t key);
-
+void sgt_hash_filter(struct kmhash_t *h);
 
 #endif
