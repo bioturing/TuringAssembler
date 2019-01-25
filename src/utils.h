@@ -12,6 +12,7 @@
 // #include <string.h>
 // #include <stdbool.h>
 #include <assert.h>
+#include "mac_attr.h"
 // #include <stdint.h>
 // #include <stdarg.h>
 // #include <math.h>

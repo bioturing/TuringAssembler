@@ -31,4 +31,5 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
+void test_graph_build(struct asm_graph_t *graph);
 #endif  /* __ASSEMBLY_GRAPH_H__ */
