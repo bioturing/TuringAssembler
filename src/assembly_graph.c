@@ -441,9 +441,9 @@ char sign_char[2] = {'+', '-'};
 void write_gfa(struct asm_graph_t *g, const char *path)
 {
 	FILE *fp = xfopen(path, "w");
-	gint_t k, rc_id, e_i, e_k, rc_i, rc_k;
+	gint_t k, rc_id, e_i, e_k, rc_i, rc_k, u;
 	gint_t *adj_i, *adj_k;
-	int s_i, s_k, ci, ck;
+	int s_i, s_k, ci, ck, deg;
 	char *seq;
 
 	seq = NULL;
@@ -451,6 +451,19 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 	for (k = 0; k < g->n_e; ++k) {
 		rc_id = g->edges[k].rc_id;
 		if (k > rc_id)
+			continue;
+		deg = 0;
+		if (g->edges[k].source > 0)
+			u = g->edges[k].source - 1;
+		else
+			u = -g->edges[k].source - 1;
+		deg += __get_degree4(g->nodes[u].forward_adj) + __get_degree4(g->nodes[u].reverse_adj);
+		if (g->edges[k].target > 0)
+			u = g->edges[k].target - 1;
+		else
+			u = -g->edges[k].target - 1;
+		deg += __get_degree4(g->nodes[u].forward_adj) + __get_degree4(g->nodes[u].reverse_adj);
+		if (deg == 2)
 			continue;
 		seq = realloc(seq, g->edges[k].seq_len + 1);
 		dump_bin_seq(seq, g->edges[k].seq, g->edges[k].seq_len);
@@ -527,9 +540,9 @@ void remove_dead_end(struct asm_graph_t *graph)
 	struct asm_node_t *nodes;
 	struct asm_edge_t *edges;
 	gint_t u, v, e_id, next_node, n_id, current_eid, current_nid;
-	gint_t n_v, n_e, edge_seq_len, n_edge, rc_id;
+	gint_t n_v, n_e, edge_seq_len, n_edge, rc_id, e_id_rc;
 	float sum_cov, cov;
-	int c, current_c, deg_fw, deg_rv, ksize;
+	int c, rc, current_c, deg_fw, deg_rv, ksize;
 	ksize = graph->ksize;
 	/* disconnect edge */
 	for (u = 0; u < graph->n_v; ++u) {
@@ -564,21 +577,33 @@ void remove_dead_end(struct asm_graph_t *graph)
 					(graph->edges[e_id].seq_len - graph->ksize);
 				if (cov / sum_cov < 0.1 && n_edge > 2) {
 					next_node = graph->edges[e_id].target;
-					if (next_node < 0)
+					e_id_rc = graph->edges[e_id].rc_id;
+					if (next_node < 0) {
 						next_node = -next_node - 1;
-					else
+						for (rc = 0; rc < 4; ++rc)
+							if (graph->nodes[next_node].forward_adj[rc] == e_id_rc)
+								graph->nodes[next_node].forward_adj[rc] = -1;
+					} else {
 						next_node = next_node - 1;
-					if (__get_degree4(graph->nodes[next_node].forward_adj)
-						+ __get_degree4(graph->nodes[next_node].reverse_adj) == 1) {
+						for (rc = 0; rc < 4; ++rc)
+							if (graph->nodes[next_node].reverse_adj[rc] == e_id_rc)
+								graph->nodes[next_node].reverse_adj[rc] = -1;
+					}
+					graph->nodes[u].forward_adj[c] = -1;
+					--n_edge;
+
+					// if (__get_degree4(graph->nodes[next_node].forward_adj)
+					// 	+ __get_degree4(graph->nodes[next_node].reverse_adj) == 1) {
+					// {
 						/* dead end */
 						/* disconnect edge */
-						memset(graph->nodes[next_node].forward_adj,
-							255, 4 * sizeof(gint_t));
-						memset(graph->nodes[next_node].reverse_adj,
-							255, 4 * sizeof(gint_t));
-						graph->nodes[u].forward_adj[c] = -1;
-						--n_edge;
-					}
+						// memset(graph->nodes[next_node].forward_adj,
+						// 	255, 4 * sizeof(gint_t));
+						// memset(graph->nodes[next_node].reverse_adj,
+						// 	255, 4 * sizeof(gint_t));
+						// graph->nodes[u].forward_adj[c] = -1;
+						// --n_edge;
+					// }
 				}
 			}
 
@@ -588,21 +613,37 @@ void remove_dead_end(struct asm_graph_t *graph)
 					(graph->edges[e_id].seq_len - graph->ksize);
 				if (cov / sum_cov < 0.1 && n_edge > 2) {
 					next_node = graph->edges[e_id].target;
-					if (next_node < 0)
+					e_id_rc = graph->edges[e_id].rc_id;
+					if (next_node < 0) {
 						next_node = -next_node - 1;
-					else
+						for (rc = 0; rc < 4; ++rc)
+							if (graph->nodes[next_node].forward_adj[rc] == e_id_rc)
+								graph->nodes[next_node].forward_adj[rc] = -1;
+					} else {
 						next_node = next_node - 1;
-					if (__get_degree4(graph->nodes[next_node].forward_adj)
-						+ __get_degree4(graph->nodes[next_node].reverse_adj) == 1) {
-						/* dead end */
-						/* disconnect edge */
-						memset(graph->nodes[next_node].forward_adj,
-							255, 4 * sizeof(gint_t));
-						memset(graph->nodes[next_node].reverse_adj,
-							255, 4 * sizeof(gint_t));
-						graph->nodes[u].reverse_adj[c] = -1;
-						--n_edge;
+						for (rc = 0; rc < 4; ++rc)
+							if (graph->nodes[next_node].reverse_adj[rc] == e_id_rc)
+								graph->nodes[next_node].reverse_adj[rc] = -1;
 					}
+					graph->nodes[u].reverse_adj[c] = -1;
+					--n_edge;
+
+// 					if (next_node < 0)
+// 						next_node = -next_node - 1;
+// 					else
+// 						next_node = next_node - 1;
+					// if (__get_degree4(graph->nodes[next_node].forward_adj)
+					// 	+ __get_degree4(graph->nodes[next_node].reverse_adj) == 1) {
+					// {
+					// 	/* dead end */
+					// 	/* disconnect edge */
+					// 	memset(graph->nodes[next_node].forward_adj,
+					// 		255, 4 * sizeof(gint_t));
+					// 	memset(graph->nodes[next_node].reverse_adj,
+					// 		255, 4 * sizeof(gint_t));
+					// 	graph->nodes[u].reverse_adj[c] = -1;
+					// 	--n_edge;
+					// }
 				}
 			}
 		}
