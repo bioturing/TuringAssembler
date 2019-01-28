@@ -10,7 +10,7 @@
 #define SIZE_128MB		134217728
 
 #include "khash.h"
-
+#include "mac_attr.h"
 KHASH_DECLARE(kvert, uint64_t, struct kvert_info_t)
 
 struct kvert_info_t {

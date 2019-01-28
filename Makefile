@@ -12,6 +12,7 @@ SRC = src/assembly_graph.c 			\
       src/dqueue.c 				\
       src/fastq_producer.c 			\
       src/get_buffer.c 				\
+      src/mac_attr.c 				\
       src/io_utils.c 				\
       src/kmer_count.c 				\
       src/kmhash.c 				\
