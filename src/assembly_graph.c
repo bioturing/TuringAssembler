@@ -12,6 +12,8 @@
 #include "verbose.h"
 #include "time_utils.h"
 
+#define TIPS_THRESHOLD			0.1
+
 /*
  * strand   :                <------------------
  * seq      :                X X X X X X X X X X
@@ -54,26 +56,6 @@
 
 #define HM_MAGIC_1			UINT64_C(0xbf58476d1ce4e5b9)
 #define HM_MAGIC_2			UINT64_C(0x94d049bb133111eb)
-
-static inline kmkey_t __hash_int2(kmkey_t k)
-{
-	kmkey_t x = k;
-	x = (x ^ (x >> 30)) * HM_MAGIC_1;
-	x = (x ^ (x >> 27)) * HM_MAGIC_2;
-	x ^= (x > 31);
-	return x;
-}
-
-static inline kmint_t estimate_probe_3(kmint_t size)
-{
-	kmint_t s, i;
-	i = s = 0;
-	while (s < size) {
-		++i;
-		s += i * i * i * 64;
-	}
-	return i;
-}
 
 static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t len)
 {
@@ -207,7 +189,7 @@ kmint_t idhash_get(struct idhash_t *h, kmkey_t key)
 	kmint_t step, i, n_probe, mask;
 	kmkey_t k;
 	mask = h->size - 1;
-	k = __hash_int2(key);
+	k = __hash_int(key);
 	i = k & mask;
 	n_probe = h->n_probe;
 	if (h->kmer[i] == key)
@@ -230,7 +212,7 @@ kmint_t internal_idhash_put(struct idhash_t *h, kmkey_t key)
 	kmkey_t cur_key, k;
 
 	mask = h->size - 1;
-	k = __hash_int2(key);
+	k = __hash_int(key);
 	n_probe = h->n_probe;
 	i = k & mask;
 
@@ -288,7 +270,7 @@ void idhash_resize(struct idhash_t *h)
 			h->kmer[i] = TOMB_STONE;
 			h->id[i] = 0;
 			while (1) {
-				k = __hash_int2(x);
+				k = __hash_int(x);
 				j = k & mask;
 				step = 0;
 				current_flag = KMMASK_NEW;
@@ -337,7 +319,7 @@ void idhash_put(struct idhash_t *h, kmkey_t key, gint_t id)
 	}
 }
 
-void graph_clean(struct asm_graph_t *graph)
+void graph0_clean(struct asm_graph0_t *graph)
 {
 	gint_t i;
 	free(graph->nodes);
@@ -348,9 +330,22 @@ void graph_clean(struct asm_graph_t *graph)
 	graph->edges = NULL;
 }
 
+void graph_clean(struct asm_graph_t *graph)
+{
+	gint_t i;
+	for (i = 0; i < graph->n_v; ++i)
+		free(graph->nodes[i].adj);
+	free(graph->nodes);
+	graph->nodes = NULL;
+	for (i = 0; i < graph->n_e; ++i)
+		free(graph->edges[i].seq);
+	free(graph->edges);
+	graph->edges = NULL;
+}
+
 struct edgecount_bundle_t {
 	struct dqueue_t *q;
-	struct asm_graph_t *graph;
+	struct asm_graph0_t *graph;
 	// struct edge_table_t *edict;
 	// struct node_table_t *ndict;
 	struct idhash_t *edict;
@@ -359,20 +354,32 @@ struct edgecount_bundle_t {
 	int64_t *n_reads;
 };
 
-// void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
+// void build_graph_from_kmer(struct asm_graph0_t *graph, int ksize,
 // 				struct edge_table_t *edge_dict,
 // 				struct node_table_t *node_dict);
-void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
+void build_graph_from_kmer(struct asm_graph0_t *graph, int ksize,
 				struct idhash_t *edict, struct idhash_t *ndict);
 
-// void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+// void count_edge(struct opt_count_t *opt, struct asm_graph0_t *graph,
 // 		struct edge_table_t *edict, struct node_table_t *ndict);
-void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+void count_edge(struct opt_count_t *opt, struct asm_graph0_t *graph,
 		struct idhash_t *edict, struct idhash_t *ndict);
 
-void remove_dead_end(struct asm_graph_t *graph);
+void remove_dead_end(struct asm_graph0_t *graph);
+
+void write_gfa0(struct asm_graph0_t *g, const char *path);
 
 void write_gfa(struct asm_graph_t *g, const char *path);
+
+void remove_tips(struct asm_graph0_t *g0, struct asm_graph_t *g);
+
+void test_graph_build0(struct asm_graph0_t *graph);
+
+void test_graph_build(struct asm_graph_t *graph);
+
+void graph0_clean(struct asm_graph0_t *graph);
+
+void graph_clean(struct asm_graph_t *graph);
 
 void assembly_process(struct opt_count_t *opt)
 {
@@ -392,7 +399,7 @@ void assembly_process(struct opt_count_t *opt)
 	// struct edge_table_t *edge_dict;
 	// struct node_table_t *node_dict;
 	struct idhash_t *edict, *ndict;
-	struct asm_graph_t *asm_graph;
+	struct asm_graph0_t *asm_graph0;
 
 	edict = calloc(1, sizeof(struct idhash_t));
 	convert_table(edict, kmer_hash);
@@ -403,24 +410,32 @@ void assembly_process(struct opt_count_t *opt)
 	ndict = calloc(1, sizeof(struct idhash_t));
 	idhash_init(ndict, opt->hash_size - 1, 0);
 
-	asm_graph = calloc(1, sizeof(struct asm_graph_t));
-	build_graph_from_kmer(asm_graph, opt->kmer_master, edict, ndict);
-	test_graph_build(asm_graph);
-	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)asm_graph->n_v);
-	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)asm_graph->n_e);
+	asm_graph0 = calloc(1, sizeof(struct asm_graph0_t));
+	build_graph_from_kmer(asm_graph0, opt->kmer_master, edict, ndict);
+	test_graph_build0(asm_graph0);
+	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)asm_graph0->n_v);
+	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)asm_graph0->n_e);
 
 	__VERBOSE("|--- Estimating edge coverage\n");
-	count_edge(opt, asm_graph, edict, ndict);
+	count_edge(opt, asm_graph0, edict, ndict);
 	idhash_clean(ndict, 0);
 	idhash_clean(edict, 1);
 
 	strcpy(path, opt->out_dir);
 	strcat(path, "/graph_0.gfa");
-	write_gfa(asm_graph, path);
+	write_gfa0(asm_graph0, path);
 
 	__VERBOSE("\nRemoving dead-end\n");
-	remove_dead_end(asm_graph);
+	struct asm_graph_t *asm_graph;
+	asm_graph = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips(asm_graph0, asm_graph);
+	graph0_clean(asm_graph0);
 	test_graph_build(asm_graph);
+	// struct asm_graph02_t *asm_graph02;
+	// asm_graph02 = calloc(1, sizeof(struct asm_graph02_t));
+	// remove_dead_end2(asm_graph0, asm_graph02);
+	// remove_dead_end(asm_graph0);
+	// test_graph_build(asm_graph0);
 	__VERBOSE_LOG("Graph #2", "Number of nodes: %lld\n", (long long)asm_graph->n_v);
 	__VERBOSE_LOG("Graph #2", "Number of edges: %lld\n", (long long)asm_graph->n_e);
 
@@ -433,12 +448,101 @@ void assembly_process(struct opt_count_t *opt)
 	graph_clean(asm_graph);
 	free(edict);
 	free(ndict);
-	free(asm_graph);
+	free(asm_graph0);
 }
 
 char sign_char[2] = {'+', '-'};
 
 void write_gfa(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "w");
+	char *seq;
+	gint_t k, rc_eid, rc_nid, i_id, k_id, rc_i, rc_k, e_i, e_k;
+	int deg, ci, ck, s_i, s_k;
+	seq = NULL;
+
+	uint8_t *deb_flag;
+	deb_flag = calloc(g->n_e, sizeof(uint8_t));
+
+	for (k = 0; k < g->n_e; ++k) {
+		rc_eid = g->edges[k].rc_id;
+		if (k > rc_eid)
+			continue;
+		deg = g->nodes[g->edges[k].target].deg +
+			g->nodes[g->nodes[g->edges[k].source].rc_id].deg;
+		if (deg == 0) {
+			continue;
+		}
+		seq = realloc(seq, g->edges[k].seq_len + 1);
+		dump_bin_seq(seq, g->edges[k].seq, g->edges[k].seq_len);
+		fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)k, seq,
+					(long long unsigned)g->edges[k].count);
+	}
+
+	for (k = 0; k < g->n_v; ++k) {
+		// if (k > g->nodes[k].rc_id)
+		// 	continue;
+		rc_nid = g->nodes[k].rc_id;
+		for (ci = 0; ci < g->nodes[k].deg; ++ci) {
+			i_id = g->nodes[k].adj[ci];
+			rc_i = g->edges[i_id].rc_id;
+			if (i_id < rc_i) {
+				e_i = i_id;
+				s_i = 0;
+			} else {
+				e_i = rc_i;
+				s_i = 1;
+			}
+			for (ck = 0; ck < g->nodes[rc_nid].deg; ++ck) {
+				k_id = g->nodes[rc_nid].adj[ck];
+				rc_k = g->edges[k_id].rc_id;
+				if (k_id < rc_k) {
+					e_k = k_id;
+					s_k = 1;
+				} else {
+					e_k = rc_k;
+					s_k = 0;
+				}
+				deb_flag[e_i] = 1;
+				deb_flag[e_k] = 1;
+				fprintf(fp, "L\t%lld\t%c\t%lld\t%c\t%dM\n",
+					(long long)e_i, sign_char[s_i],
+					(long long)e_k, sign_char[s_k],
+					g->ksize);
+			}
+		}
+	}
+
+	for (k = 0; k < g->n_e; ++k) {
+		rc_eid = g->edges[k].rc_id;
+		if (k > rc_eid)
+			continue;
+		deg = g->nodes[g->edges[k].target].deg +
+			g->nodes[g->nodes[g->edges[k].source].rc_id].deg;
+		if (deg == 0) {
+			continue;
+		}
+		if (deb_flag[k] == 0) {
+			fprintf(stderr, "deg = %d\n", deg);
+			fprintf(stderr, "|-- forward deg = %d\n",
+				g->nodes[g->edges[k].target].deg);
+			fprintf(stderr, "|-- reverse deg = %d\n",
+				g->nodes[g->nodes[g->edges[k].source].rc_id].deg);
+			gint_t u = g->edges[k].target;
+			gint_t rc_u = g->nodes[u].rc_id;
+			fprintf(stderr, "|----- reverse target deg = %d\n",
+				g->nodes[rc_u].deg);
+		}
+		// seq = realloc(seq, g->edges[k].seq_len + 1);
+		// dump_bin_seq(seq, g->edges[k].seq, g->edges[k].seq_len);
+		// fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)k, seq,
+		// 			(long long unsigned)g->edges[k].count);
+	}
+
+	fclose(fp);
+}
+
+void write_gfa0(struct asm_graph0_t *g, const char *path)
 {
 	FILE *fp = xfopen(path, "w");
 	gint_t k, rc_id, e_i, e_k, rc_i, rc_k, u;
@@ -532,13 +636,253 @@ uint32_t *append_bin_seq_forward(uint32_t *dst, gint_t dlen, uint32_t *src,
 	return new_ptr;
 }
 
-void remove_dead_end(struct asm_graph_t *graph)
+static inline gint_t graph0_get_next_edge(struct asm_graph0_t *g,
+				gint_t *new_node_id, gint_t node_id,
+						struct asm_edge_t *e)
+{
+	int c;
+	gint_t eid;
+	if (node_id > 0) {
+		node_id = node_id - 1;
+		if (new_node_id[node_id] == -1) {
+			c = __get_only_edge4(g->nodes[node_id].forward_adj);
+			eid = g->nodes[node_id].forward_adj[c];
+			e->seq = append_bin_seq_forward(e->seq, e->seq_len,
+					g->edges[eid].seq,
+					g->edges[eid].seq_len - g->ksize,
+					g->ksize);
+			e->seq_len += (g->edges[eid].seq_len - g->ksize);
+			e->count += g->edges[eid].count;
+		} else {
+			eid = -1;
+		}
+	} else {
+		node_id = -node_id - 1;
+		if (new_node_id[node_id] == -1) {
+			c = __get_only_edge4(g->nodes[node_id].reverse_adj);
+			eid = g->nodes[node_id].reverse_adj[c];
+			e->seq = append_bin_seq_forward(e->seq, e->seq_len,
+					g->edges[eid].seq,
+					g->edges[eid].seq_len - g->ksize,
+					g->ksize);
+			e->seq_len += (g->edges[eid].seq_len - g->ksize);
+			e->count += g->edges[eid].count;
+		} else {
+			eid = -1;
+		}
+	}
+	return eid;
+}
+
+void condense_convert(struct asm_graph0_t *g0, struct asm_graph_t *g)
+{
+	struct asm_node_t *nodes;
+	struct asm_edge_t *edges;
+	gint_t *new_node_id, *new_edge_id;
+	gint_t n_v, n_e, u, node_id, id_fw, id_rv, cur_eid, cur_nid, rc_eid;
+	int deg_fw, deg_rv, c, cur_deg;
+
+	n_v = n_e = 0;
+	new_node_id = malloc(g0->n_v * sizeof(gint_t));
+	new_edge_id = malloc(g0->n_e * sizeof(gint_t));
+	memset(new_node_id, 255, g0->n_v * sizeof(gint_t));
+	memset(new_edge_id, 255, g0->n_e * sizeof(gint_t));
+	/* Assign new node id */
+	for (u = 0; u < g0->n_v; ++u) {
+		deg_fw = __get_degree4(g0->nodes[u].forward_adj);
+		deg_rv = __get_degree4(g0->nodes[u].reverse_adj);
+		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0)
+			continue;
+		new_node_id[u] = n_v++;
+		n_e += (deg_fw + deg_rv);
+	}
+
+	/* Get list of new node */
+	nodes = calloc(n_v * 2, sizeof(struct asm_node_t));
+	edges = calloc(n_e, sizeof(struct asm_edge_t));
+	n_e = 0;
+	for (u = 0; u < g0->n_v; ++u) {
+		node_id = new_node_id[u];
+		if (node_id == -1)
+			continue;
+		id_fw = node_id * 2;
+		id_rv = node_id * 2 + 1;
+		nodes[id_fw].rc_id = id_rv;
+		nodes[id_rv].rc_id = id_fw;
+		// nodes[n_id].seq = graph->nodes[u].seq;
+		/* count degree */
+		deg_fw = deg_rv = 0;
+		for (c = 0; c < 4; ++c) {
+			if (g0->nodes[u].forward_adj[c] != -1)
+				++deg_fw;
+			if (g0->nodes[u].reverse_adj[c] != -1)
+				++deg_rv;
+		}
+		nodes[id_fw].deg = deg_fw;
+		nodes[id_rv].deg = deg_rv;
+		nodes[id_fw].adj = calloc(deg_fw, sizeof(gint_t));
+		nodes[id_rv].adj = calloc(deg_rv, sizeof(gint_t));
+		/* forward edges */
+		cur_deg = 0;
+		for (c = 0; c < 4; ++c) {
+			cur_eid = g0->nodes[u].forward_adj[c];
+			if (cur_eid == -1)
+				continue;
+			edges[n_e].seq = g0->edges[cur_eid].seq;
+			g0->edges[cur_eid].seq = NULL;
+			edges[n_e].seq_len = g0->edges[cur_eid].seq_len;
+			edges[n_e].count = g0->edges[cur_eid].count;
+			do {
+				new_edge_id[cur_eid] = n_e;
+				cur_nid = g0->edges[cur_eid].target;
+				cur_eid = graph0_get_next_edge(g0, new_node_id,
+							cur_nid, edges + n_e);
+			} while (cur_eid != -1);
+			edges[n_e].source = id_fw;
+			if (cur_nid < 0)
+				edges[n_e].target = new_node_id[-cur_nid - 1] * 2;
+			else
+				edges[n_e].target = new_node_id[cur_nid - 1] * 2 + 1;
+			nodes[id_fw].adj[cur_deg++] = n_e;
+			cur_eid = g0->nodes[u].forward_adj[c];
+			if (new_edge_id[g0->edges[cur_eid].rc_id] != -1) {
+				rc_eid = new_edge_id[g0->edges[cur_eid].rc_id];
+				edges[n_e].rc_id = rc_eid;
+				edges[rc_eid].rc_id = n_e;
+			}
+			++n_e;
+		}
+		/* reverse edges */
+		cur_deg = 0;
+		for (c = 0; c < 4; ++c) {
+			cur_eid = g0->nodes[u].reverse_adj[c];
+			if (cur_eid == -1)
+				continue;
+			edges[n_e].seq = g0->edges[cur_eid].seq;
+			g0->edges[cur_eid].seq = NULL;
+			edges[n_e].seq_len = g0->edges[cur_eid].seq_len;
+			edges[n_e].count = g0->edges[cur_eid].count;
+			do {
+				new_edge_id[cur_eid] = n_e;
+				cur_nid = g0->edges[cur_eid].target;
+				cur_eid = graph0_get_next_edge(g0, new_node_id,
+							cur_nid, edges + n_e);
+			} while (cur_eid != -1);
+			edges[n_e].source = id_rv;
+			if (cur_nid < 0)
+				edges[n_e].target = new_node_id[-cur_nid - 1] * 2;
+			else
+				edges[n_e].target = new_node_id[cur_nid - 1] * 2 + 1;
+			nodes[id_rv].adj[cur_deg++] = n_e;
+			cur_eid = g0->nodes[u].reverse_adj[c];
+			if (new_edge_id[g0->edges[cur_eid].rc_id] != -1) {
+				rc_eid = new_edge_id[g0->edges[cur_eid].rc_id];
+				edges[n_e].rc_id = rc_eid;
+				edges[rc_eid].rc_id = n_e;
+			}
+			++n_e;
+		}
+	}
+	g->n_v = n_v * 2;
+	g->n_e = n_e;
+	g->ksize = g0->ksize;
+	g->nodes = nodes;
+	g->edges = edges;
+}
+
+void remove_tips(struct asm_graph0_t *g0, struct asm_graph_t *g)
+{
+	gint_t *new_id, *adj;
+	gint_t u, e_id, e_id_rc, next_node;
+	float sum_cov, cov;
+	int c, rc, ksize, n_in, n_out, n_edge;
+	ksize = g0->ksize;
+	/* disconnect edge */
+	for (u = 0; u < g0->n_v; ++u) {
+		sum_cov = 0;
+		n_in = n_out = 0;
+		n_edge = 0;
+		for (c = 0; c < 4; ++c) {
+			e_id = g0->nodes[u].forward_adj[c];
+			if (e_id != -1) {
+				cov = g0->edges[e_id].count * 1.0 /
+					(g0->edges[e_id].seq_len - g0->ksize);
+				sum_cov += cov;
+				++n_out;
+				++n_edge;
+			}
+
+			e_id = g0->nodes[u].reverse_adj[c];
+			if (e_id != -1) {
+				cov = g0->edges[e_id].count * 1.0 /
+					(g0->edges[e_id].seq_len - g0->ksize);
+				sum_cov += cov;
+				++n_out;
+				++n_edge;
+			}
+		}
+		for (c = 0; c < 4; ++c) {
+			e_id = g0->nodes[u].forward_adj[c];
+			/* kedge = graph->ksize + 1 */
+			if (e_id != -1) {
+				cov = g0->edges[e_id].count * 1.0 /
+					(g0->edges[e_id].seq_len - g0->ksize);
+				if (cov / sum_cov < TIPS_THRESHOLD && n_edge > 2) {
+					next_node = g0->edges[e_id].target;
+					e_id_rc = g0->edges[e_id].rc_id;
+					if (next_node < 0) {
+						next_node = -next_node - 1;
+						for (rc = 0; rc < 4; ++rc)
+							if (g0->nodes[next_node].forward_adj[rc] == e_id_rc)
+								g0->nodes[next_node].forward_adj[rc] = -1;
+					} else {
+						next_node = next_node - 1;
+						for (rc = 0; rc < 4; ++rc)
+							if (g0->nodes[next_node].reverse_adj[rc] == e_id_rc)
+								g0->nodes[next_node].reverse_adj[rc] = -1;
+					}
+					g0->nodes[u].forward_adj[c] = -1;
+					// --n_out;
+					--n_edge;
+				}
+			}
+
+			e_id = g0->nodes[u].reverse_adj[c];
+			if (e_id != -1) {
+				cov = g0->edges[e_id].count * 1.0 /
+					(g0->edges[e_id].seq_len - g0->ksize);
+				if (cov / sum_cov < TIPS_THRESHOLD && n_edge > 2) {
+					next_node = g0->edges[e_id].target;
+					e_id_rc = g0->edges[e_id].rc_id;
+					if (next_node < 0) {
+						next_node = -next_node - 1;
+						for (rc = 0; rc < 4; ++rc)
+							if (g0->nodes[next_node].forward_adj[rc] == e_id_rc)
+								g0->nodes[next_node].forward_adj[rc] = -1;
+					} else {
+						next_node = next_node - 1;
+						for (rc = 0; rc < 4; ++rc)
+							if (g0->nodes[next_node].reverse_adj[rc] == e_id_rc)
+								g0->nodes[next_node].reverse_adj[rc] = -1;
+					}
+					g0->nodes[u].reverse_adj[c] = -1;
+					// --n_in;
+					--n_edge;
+				}
+			}
+		}
+	}
+
+	condense_convert(g0, g);
+}
+
+void remove_dead_end(struct asm_graph0_t *graph)
 {
 	gint_t *new_id, *adj;
 	uint32_t *edge_seq;
 	uint64_t count;
-	struct asm_node_t *nodes;
-	struct asm_edge_t *edges;
+	struct asm_node0_t *nodes;
+	struct asm_edge0_t *edges;
 	gint_t u, v, e_id, next_node, n_id, current_eid, current_nid;
 	gint_t n_v, n_e, edge_seq_len, n_edge, rc_id, e_id_rc;
 	float sum_cov, cov;
@@ -663,8 +1007,8 @@ void remove_dead_end(struct asm_graph_t *graph)
 	}
 
 	/* Get list of new node */
-	nodes = calloc(n_v, sizeof(struct asm_node_t));
-	edges = calloc(n_e, sizeof(struct asm_edge_t));
+	nodes = calloc(n_v, sizeof(struct asm_node0_t));
+	edges = calloc(n_e, sizeof(struct asm_edge0_t));
 	n_e = 0;
 	for (u = 0; u < graph->n_v; ++u) {
 		if (new_id[u] == -1)
@@ -798,7 +1142,7 @@ void remove_dead_end(struct asm_graph_t *graph)
 		rc_id = edges[u].rc_id;
 		assert(edges[rc_id].rc_id == u);
 	}
-	graph_clean(graph);
+	graph0_clean(graph);
 	graph->n_v = n_v;
 	graph->n_e = n_e;
 	graph->nodes = nodes;
@@ -821,6 +1165,25 @@ int is_reverse_complement(uint32_t *a, uint32_t *b, gint_t l)
 	return 1;
 }
 
+void test_graph_build0(struct asm_graph0_t *graph)
+{
+	gint_t u, rc_id;
+	for (u = 0; u < graph->n_e; ++u) {
+		rc_id = graph->edges[u].rc_id;
+		assert(graph->edges[rc_id].rc_id == u);
+		assert(graph->edges[u].seq_len == graph->edges[rc_id].seq_len);
+		if (!(is_reverse_complement(graph->edges[u].seq, graph->edges[rc_id].seq,
+							graph->edges[u].seq_len))) {
+			deb_dump_bin_seq("forward edge: ", graph->edges[u].seq, graph->edges[u].seq_len);
+			deb_dump_bin_seq("reverse edge: ", graph->edges[rc_id].seq, graph->edges[rc_id].seq_len);
+			assert(0);
+		}
+		assert(is_reverse_complement(graph->edges[u].seq, graph->edges[rc_id].seq,
+							graph->edges[u].seq_len));
+	}
+	__VERBOSE("Test graph structure ok\n");
+}
+
 void test_graph_build(struct asm_graph_t *graph)
 {
 	gint_t u, rc_id;
@@ -840,11 +1203,11 @@ void test_graph_build(struct asm_graph_t *graph)
 	__VERBOSE("Test graph structure ok\n");
 }
 
-void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
+void build_graph_from_kmer(struct asm_graph0_t *graph, int ksize,
 				struct idhash_t *edict, struct idhash_t *ndict)
 {
-	struct asm_node_t *nodes;
-	struct asm_edge_t *edges;
+	struct asm_node0_t *nodes;
+	struct asm_edge0_t *edges;
 
 	uint32_t *edge_seq;
 	gint_t *adj;
@@ -905,8 +1268,8 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 	// assert(recount_table(node_dict) == node_dict->n_item);
 	assert(n_v == ndict->n_item);
 
-	nodes = calloc(n_v, sizeof(struct asm_node_t));
-	edges = calloc(n_e, sizeof(struct asm_edge_t));
+	nodes = calloc(n_v, sizeof(struct asm_node0_t));
+	edges = calloc(n_e, sizeof(struct asm_edge0_t));
 
 	// __VERBOSE("Assembling node and edge\n");
 	n_e = n_v = 0;
@@ -1067,7 +1430,7 @@ void build_graph_from_kmer(struct asm_graph_t *graph, int ksize,
 	graph->ksize = ksize;
 }
 
-void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
+void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph0_t *g,
 		struct idhash_t *edict, struct idhash_t *ndict)
 {
 	kmint_t e_pos, n_pos;
@@ -1113,7 +1476,7 @@ void inc_count_edge(kmkey_t kmer, kmkey_t kmer_rc, int c, struct asm_graph_t *g,
 	}
 }
 
-void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *graph,
+void count_edge_read(struct read_t *r, int ksize, struct asm_graph0_t *graph,
 			struct idhash_t *edict, struct idhash_t *ndict)
 {
 	int i, last, last_i, ci, ck, len, lmc, kedge;
@@ -1160,7 +1523,7 @@ void *count_edge_worker(void *data)
 	struct edgecount_bundle_t *bundle = (struct edgecount_bundle_t *)data;
 
 	struct dqueue_t *q = bundle->q;
-	struct asm_graph_t *graph = bundle->graph;
+	struct asm_graph0_t *graph = bundle->graph;
 	struct idhash_t *edict, *ndict;
 	edict = bundle->edict;
 	ndict = bundle->ndict;
@@ -1218,7 +1581,7 @@ void *count_edge_worker(void *data)
 	pthread_exit(NULL);
 }
 
-void count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+void count_edge(struct opt_count_t *opt, struct asm_graph0_t *graph,
 		struct idhash_t *edict, struct idhash_t *ndict)
 {
 	pthread_attr_t attr;

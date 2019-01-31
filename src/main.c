@@ -16,8 +16,6 @@
 #include "utils.h"
 #include "verbose.h"
 
-__KHASH_IMPL(kvert, kh_inline, kmkey_t, struct kvert_info_t, 1, kh_int64_hash_func, kh_int64_hash_equal)
-
 void print_usage_assembly(const char *prog)
 {
 	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
@@ -257,6 +255,70 @@ void test_opt_process(int argc, char *argv[])
 	kmer_test_process(opt);
 }
 
+void test63_opt_process(int argc, char *argv[])
+{
+	struct opt_count_t *opt;
+	opt = parse_count_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_assembly(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
+	init_log(tmp_dir);
+
+	int cmd_len = 0, i;
+	for (i = 0; i < argc; ++i)
+		cmd_len += strlen(argv[i]) + 1;
+	char *cmd = malloc(cmd_len);
+	cmd_len = 0;
+	for (i = 0; i < argc; ++i)
+		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
+	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
+	free(cmd);
+
+	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
+	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
+	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
+	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
+	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
+	if (opt->n_files == 0) {
+		__VERBOSE_LOG("INFO", "input: { stdin }\n");
+	} else {
+		if (opt->files_2 == NULL) {
+			int len = 10, i;
+			for (i = 0; i < opt->n_files; ++i)
+				len += strlen(opt->files_1[i]) + 2;
+			char *list_files = malloc(len);
+			len = 0;
+			len += sprintf(list_files, "{ ");
+			for (i = 0; i < opt->n_files; ++i)
+				len += sprintf(list_files + len,
+						i + 1 == opt->n_files ? "%s" : "%s, ",
+						opt->files_1[i]);
+			sprintf(list_files + len, " }");
+			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
+			free(list_files);
+		} else {
+			int len = 10, i;
+			for (i = 0; i < opt->n_files; ++i)
+				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
+			char *list_files = malloc(len);
+			len = 0;
+			len += sprintf(list_files, "{ ");
+			for (i = 0; i < opt->n_files; ++i)
+				len += sprintf(list_files + len,
+						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
+						opt->files_1[i], opt->files_2[i]);
+			sprintf(list_files + len, " }");
+			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
+			free(list_files);
+		}
+	}
+	k63_test_process(opt);
+	// kmer_test_process(opt);
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -268,6 +330,8 @@ int main(int argc, char *argv[])
 		assembly_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "test"))
 		test_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "test63"))
+		test63_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 

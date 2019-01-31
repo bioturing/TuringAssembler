@@ -13,6 +13,8 @@ SRC = src/assembly_graph.c 			\
       src/fastq_producer.c 			\
       src/get_buffer.c 				\
       src/io_utils.c 				\
+      src/k63_count.c 				\
+      src/k63hash.c 				\
       src/kmer_count.c 				\
       src/kmhash.c 				\
       src/semaphore_wrapper.c 			\

@@ -27,9 +27,8 @@
 /* any i-th bit */
 #define set_bit_var32(x, i, b) (((x) & (~((uint32_t)1 << (i)))) | ((uint32_t)(b) << (i)))
 
-#define atomic_get_bit(ptr, i) (((*(volatile kmval_t *)(ptr)) >> (i)) & 1)
-#define atomic_get_bit32		atomic_get_bit
-#define atomic_get_bit8			atomic_get_bit
+#define atomic_get_bit32(ptr, i) (((*(volatile uint32_t *)(ptr)) >> (i)) & 1)
+#define atomic_get_bit8(ptr, i) (((*(volatile uint8_t *)(ptr)) >> (i)) & 1)
 
 static inline uint32_t atomic_set_bit32(uint32_t *ptr, int i)
 {

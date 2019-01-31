@@ -4,17 +4,10 @@
 #include <pthread.h>
 #include <stdint.h>
 
-#define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
-#define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
+#include "attribute.h"
 
 #define TOMB_STONE			((kmkey_t)-1)
 
-#define __round_up_kmint(x) 	(--(x), (x) |= (x) >> 1,		       \
-				 (x) |= (x) >> 2, (x) |= (x) >> 4,	       \
-				 (x) |= (x) >> 8, (x) |= (x) >> 16,	       \
-				 (x) |= (x) >> 32, ++(x))
-
-typedef uint64_t kmint_t;
 typedef uint64_t kmkey_t;
 typedef uint32_t kmval_t;
 
