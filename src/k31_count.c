@@ -6,15 +6,15 @@
 #include "dqueue.h"
 #include "fastq_producer.h"
 #include "get_buffer.h"
-#include "k63hash.h"
-#include "k63_count.h"
+#include "k31hash.h"
+#include "k31_count.h"
 #include "kseq.h"
 #include "utils.h"
 #include "verbose.h"
 
 struct precount_bundle_t {
 	struct dqueue_t *q;
-	struct k63hash_t *h;
+	struct k31hash_t *h;
 	int ksize;
 	int64_t *n_reads;
 	pthread_mutex_t *lock_hash;
@@ -22,27 +22,13 @@ struct precount_bundle_t {
 
 struct maincount_bundle_t {
 	struct dqueue_t *q;
-	struct k63hash_t *h;
-	struct k63hash_t *dict; // read-only small kmer dictionary
+	struct k31hash_t *h;
+	struct k31hash_t *dict; // read-only small kmer dictionary
 	int ksmall;
 	int klarge;
 	int64_t *n_reads;
 	pthread_mutex_t *lock_hash;
 };
-
-#define __k63_lt(x, y) ((x).bin[1] < (y).bin[1] || ((x).bin[1] == (y).bin[1] && (x).bin[0] < (y).bin[0]))
-
-#define __k63_lshift2(k) (((k).bin[1] = ((k).bin[1] << 2) | ((k).bin[0] >> 62)), \
-				((k).bin[0] <<= 2))
-#define __k63_rshift2(k) (((k).bin[0] = ((k).bin[0] >> 2) | (((k).bin[1] & 0x3ull) << 62)), \
-				((k).bin[1] >>= 2))
-
-#define __k63_lshift(k, l) (((k).bin[1] = ((k).bin[1] << (l)) | ((k).bin[0] >> (64 - (l)))), \
-				((k).bin[0] <<= (l)))
-#define __k63_rshift(k, l) (((k).bin[0] = ((k).bin[0] >> (l)) | (((k).bin[1] & ((1ull << (l)) - 1)) << (64 - (l))), \
-				((k).bin[1] >>= (l))))
-
-#define __k63_and(k, v) ((k).bin[0] &= (v).bin[0], (k).bin[1] &= (v).bin[1])
 
 #define __reverse_bit_order64(x)					       \
 (									       \
@@ -53,65 +39,58 @@ struct maincount_bundle_t {
 	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2)  \
 )
 
-#define __k63_revc_num(y, x, l, mask)					       \
+#define __k31_revc_num(y, x, l, mask)					       \
 (									       \
-	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	(x).bin[1] ^= (x).bin[0],					       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1]),  \
-	(x).bin[0] ^= 0xffffffffffffffffull, (x).bin[0] &= (mask).bin[0],      \
-	(x).bin[1] ^= 0xffffffffffffffffull, (x).bin[1] &= (mask).bin[1]       \
+	(x) = (y) << (64 - ((l) << 1)),					       \
+	__reverse_bit_order64(x), (x) ^= 0xffffffffffffffffull, (x) &= (mask)  \
 )
 
 /*
  * Move the kmer window along reads and add kmer to hash table
  */
-static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
+static void count_lazy_from_read(struct read_t *r, struct k31hash_t *h,
 					int ksize, pthread_mutex_t *lock_hash)
 {
-	int i, last, ci, ck, len, lmc, kedge;
+	int i, last, last_i, ci, ck, len, lmc, kedge;
 	char *seq;
 	len = r->len;
 	seq = r->seq;
 
-	k63key_t knum, krev, pknum, pkrev, kmask;
-	kmask.bin[0] = (1ull << (ksize << 1)) - 1;
-	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
+	k31key_t knum, krev, pknum, pkrev, kmask;
+	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
+	knum = krev = 0;
 	last = 0;
 	lmc = (ksize - 1) << 1;
 	kedge = ksize + 1;
 	for (i = 0; i < len; ++i) {
 		ci = nt4_table[(int)seq[i]];
-		__k63_lshift2(knum); __k63_and(knum, kmask);
-		__k63_rshift2(krev);
+		knum = (knum << 2) & kmask;
+		krev >>= 2;
 		if (ci < 4) {
-			knum.bin[0] |= ci;
-			/* please make sure 128 < lmc <= 64 */
-			krev.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
+			knum |= ci;
+			krev |= (k31key_t)(ci ^ 3) << lmc;
 			++last;
 		} else {
 			last = 0;
 		}
 		if (last >= ksize) {
-			if (__k63_lt(knum, krev))
-				k63hash_put_adj(h, knum, lock_hash);
+			if (knum < krev)
+				k31hash_put_adj(h, knum, lock_hash);
 			else
-				k63hash_put_adj(h, krev, lock_hash);
+				k31hash_put_adj(h, krev, lock_hash);
 		}
 		if (last >= kedge) {
 			ck = nt4_table[(int)seq[i - ksize]] ^ 3;
 
-			if (__k63_lt(pknum, pkrev))
-				k63hash_add_edge(h, pknum, ci, lock_hash);
+			if (pknum < pkrev)
+				k31hash_add_edge(h, pknum, ci, lock_hash);
 			else
-				k63hash_add_edge(h, pkrev, ci + 4, lock_hash);
+				k31hash_add_edge(h, pkrev, ci + 4, lock_hash);
 
-			if (__k63_lt(knum, krev))
-				k63hash_add_edge(h, knum, ck + 4, lock_hash);
+			if (knum < krev)
+				k31hash_add_edge(h, knum, ck + 4, lock_hash);
 			else
-				k63hash_add_edge(h, krev, ck, lock_hash);
+				k31hash_add_edge(h, krev, ck, lock_hash);
 		}
 		pknum = knum;
 		pkrev = krev;
@@ -126,7 +105,7 @@ static void *PE_count_lazy_worker(void *data)
 {
 	struct maincount_bundle_t *bundle = (struct maincount_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
-	struct k63hash_t *h = bundle->h;
+	struct k31hash_t *h = bundle->h;
 
 	struct read_t read1, read2;
 	struct pair_buffer_t *own_buf, *ext_buf;
@@ -188,7 +167,7 @@ static void *PE_count_lazy_worker(void *data)
 /*
  * Start thread for counting processes
  */
-static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksize)
+static void count_kmer_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksize)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -205,7 +184,7 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));
 
 	n_reads = 0;
-	k63hash_init(h, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
+	k31hash_init(h, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
 
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
@@ -240,43 +219,37 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 	free(producer_threads);
 }
 
-void k63_correct_edge(struct k63hash_t *h, int ksize)
+void k31_correct_edge(struct k31hash_t *h, int ksize)
 {
-	k63key_t knum, krev, nknum, nkrev, kmask;
+	k31key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
-	kmask.bin[0] = (1ull << (ksize << 1)) - 1;
-	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
+	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
 	lmc = (ksize - 1) << 1;
 
 	for (i = 0; i < h->size; ++i) {
-		if (h->flag[i] == KMFLAG_EMPTY)
+		if (h->keys[i] == K31_NULL)
 			continue;
 		knum = h->keys[i];
-		__k63_revc_num(knum, krev, ksize, kmask);
+		__k31_revc_num(knum, krev, ksize, kmask);
 		for (c = 0; c < 4; ++c) {
 			if ((h->adjs[i] >> c) & 1) {
-				nknum = knum; __k63_lshift2(nknum);
-				__k63_and(nknum, kmask); nknum.bin[0] |= c;
-				nkrev = krev; __k63_rshift2(nkrev);
-				nkrev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
-				if (__k63_lt(nknum, nkrev))
-					k = k63hash_get(h, nknum);
+				nknum = ((knum << 2) & kmask) | c;
+				nkrev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
+				if (nknum < nkrev)
+					k = k31hash_get(h, nknum);
 				else
-					k = k63hash_get(h, nkrev);
+					k = k31hash_get(h, nkrev);
 				if (k == KMHASH_MAX_SIZE)
 					h->adjs[i] &= ~((uint8_t)1 << c);
 			}
 			if ((h->adjs[i] >> (c + 4)) & 1) {
-				nknum = krev; __k63_lshift2(nknum);
-				__k63_and(nknum, kmask); nknum.bin[0] |= c;
-				nkrev = knum; __k63_rshift2(nkrev);
-				nkrev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
-				if (__k63_lt(nknum, nkrev))
-					k = k63hash_get(h, nknum);
+				nknum = ((krev << 2) & kmask) | c;
+				nkrev = (knum >> 2) | ((k31key_t)(c ^ 3) << lmc);
+				if (nknum < nkrev)
+					k = k31hash_get(h, nknum);
 				else
-					k = k63hash_get(h, nkrev);
+					k = k31hash_get(h, nkrev);
 				if (k == KMHASH_MAX_SIZE)
 					h->adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
@@ -284,7 +257,100 @@ void k63_correct_edge(struct k63hash_t *h, int ksize)
 	}
 }
 
-void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksize)
+static void k31_test_hash(struct k31hash_t *h)
+{
+	kmint_t cnt, i, k;
+	cnt = 0;
+	for (i = 0; i < h->size; ++i) {
+		if (h->keys[i] != K31_NULL) {
+			++cnt;
+			k = k31hash_get(h, h->keys[i]);
+			if (k == KMHASH_END(h)) {
+				fprintf(stderr, "i = %llu; key = %llu\n", i, h->keys[i]);
+			}
+			assert(k != KMHASH_END(h));
+		}
+	}
+	assert(cnt == h->n_item);
+}
+
+static void check_sum(struct k31hash_t *h)
+{
+	kmint_t i;
+	uint64_t sum = 0;
+	for (i = 0; i < h->size; ++i) {
+		if (h->keys[i] != K31_NULL) {
+			sum ^= (h->keys[i] + ((h->sgts[i >> 5] >> (i & 31)) & 1));
+		}
+	}
+	fprintf(stderr, "check sum = %llu\n", sum);
+}
+
+static void k31_check_edge(struct k31hash_t *h, int ksize)
+{
+	kmint_t i, k;
+	k31key_t knum, krev, nknum, nkrev, kmask;
+	int c, lmc, rc;
+
+	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
+	lmc = (ksize - 1) << 1;
+	kmint_t sum_deg = 0;
+	for (i = 0; i < h->size; ++i) {
+		if (h->keys[i] == K31_NULL)
+			continue;
+		knum = h->keys[i];
+		__k31_revc_num(knum, krev, ksize, kmask);
+		for (c = 0; c < 4; ++c) {
+			if ((h->adjs[i] >> c) & 1) {
+				nknum = ((knum << 2) & kmask) | c;
+				nkrev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
+				if (nknum < nkrev)
+					k = k31hash_get(h, nknum);
+				else
+					k = k31hash_get(h, nkrev);
+				assert(k != KMHASH_MAX_SIZE);
+				if (nknum == krev) {
+					assert(nkrev == knum);
+					fprintf(stderr, "naughty edge: (%llu) -> (%llu)\n",
+						knum, nknum);
+				}
+				rc = knum >> lmc;
+				assert(rc >= 0 && rc < 4);
+				if (nknum < nkrev)
+					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+				else
+					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+				++sum_deg;
+			}
+
+			if ((h->adjs[i] >> (c + 4)) & 1) {
+				nknum = ((krev << 2) & kmask) | c;
+				nkrev = (knum >> 2) | ((k31key_t)(c ^ 3) << lmc);
+				if (nknum < nkrev)
+					k = k31hash_get(h, nknum);
+				else
+					k = k31hash_get(h, nkrev);
+				assert(k != KMHASH_MAX_SIZE);
+				if (nknum == knum) {
+					assert(nkrev == krev);
+					fprintf(stderr, "naughty edge2: (%llu) -> (%llu)\n",
+						krev, nknum);
+				}
+				rc = krev >> lmc;
+				assert(rc >= 0 && rc < 4);
+				if (nknum < nkrev)
+					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+				else
+					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+				++sum_deg;
+			}
+		}
+	}
+
+	__VERBOSE("Check edge kmhash done. Sum degree = %llu\n", sum_deg);
+}
+
+void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksize)
 {
 	__VERBOSE("\nCounting %d-mer\n", ksize);
 	count_kmer_lazy(opt, h, ksize);
@@ -295,23 +361,26 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 	// recount_edge(h);
 
 	/* Filter singleton kmer */
-	k63hash_filter(h, 1);
+	__VERBOSE("Filtering singleton %d-mer\n", ksize);
+	k31hash_filter(h, 1);
 	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %llu\n",
 					ksize, (long long unsigned)h->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(h, ksize);
+	k31_correct_edge(h, ksize);
 	// recount_edge(h);
 	// check_edge(h, opt->kmer_master);
+	k31_test_hash(h);
+
+//	k31_check_edge(h, ksize);
 }
 
-void k63_test_process(struct opt_count_t *opt)
+void k31_test_process(struct opt_count_t *opt)
 {
-	struct k63hash_t *hm;
-	hm = calloc(1, sizeof(struct k63hash_t));
+	struct k31hash_t *hm;
+	hm = calloc(1, sizeof(struct k31hash_t));
 	__VERBOSE("Lazy count %d-mer with max word size %lu\n",
-		opt->kmer_master, (long unsigned)sizeof(k63key_t));
-	build_k63_table_lazy(opt, hm, opt->kmer_master);
-	test_kmer_count(opt, opt->kmer_master);
+		opt->kmer_master, (long unsigned)sizeof(k31key_t));
+	build_k31_table_lazy(opt, hm, opt->kmer_master);
 }
 

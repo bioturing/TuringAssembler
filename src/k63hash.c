@@ -11,8 +11,6 @@
 #define KMHASH_IDLE			0
 #define KMHASH_BUSY			1
 
-#define atomic_add_and_fetch_kmint	atomic_add_and_fetch64
-
 struct k63resize_bundle_t {
 	struct k63hash_t *h;
 	int n_threads;
@@ -49,7 +47,7 @@ static kmint_t internal_k63hash_put(struct k63hash_t *h, k63key_t key)
 			++step;
 		}
 	} while (step <= n_probe);
-	return KMHASH_MAX_SIZE;
+	return KMHASH_END(h);
 }
 
 static kmint_t internal_k63hash_singleton_put(struct k63hash_t *h, k63key_t key)
@@ -82,7 +80,7 @@ static kmint_t internal_k63hash_singleton_put(struct k63hash_t *h, k63key_t key)
 			++step;
 		}
 	} while (step <= n_probe);
-	return KMHASH_MAX_SIZE;
+	return KMHASH_END(h);
 }
 
 kmint_t k63hash_get(struct k63hash_t *h, k63key_t key)
@@ -97,17 +95,17 @@ kmint_t k63hash_get(struct k63hash_t *h, k63key_t key)
 	do {
 		i = (i + step * (step + 1) / 2) & mask;
 		if (h->flag[i] == KMFLAG_EMPTY)
-			return KMHASH_MAX_SIZE;
+			return KMHASH_END(h);
 		if (k63_equal(h->keys[i], key))
 			return i;
 		++step;
 	} while (step <= n_probe);
-	return KMHASH_MAX_SIZE;
+	return KMHASH_END(h);
 }
 
 void *k63hash_resize_worker(void *data)
 {
-	struct k63resize_bundle_t *bundle = (struct k63resize_bunlde_t *)data;
+	struct k63resize_bundle_t *bundle = (struct k63resize_bundle_t *)data;
 	struct k63hash_t *h;
 
 	k63key_t *keys;
@@ -290,7 +288,7 @@ void k63hash_resize_single(struct k63hash_t *h, int adj_included)
 
 	h->keys = realloc(h->keys, h->size * sizeof(k63key_t));
 	h->sgts = realloc(h->sgts, (h->size >> 5) * sizeof(uint32_t));
-	memset(sgts + (old_size >> 5), 0,
+	memset(h->sgts + (old_size >> 5), 0,
 			((size >> 5) - (old_size >> 5)) * sizeof(uint32_t));
 	if (adj_included) {
 		adjs = h->adjs;
@@ -388,7 +386,7 @@ void k63hash_add_edge(struct k63hash_t *h, k63key_t key, int c, pthread_mutex_t 
 	kmint_t k;
 	pthread_mutex_lock(lock);
 	k = k63hash_get(h, key);
-	assert(k != KMHASH_MAX_SIZE);
+	assert(k != KMHASH_END(h));
 	atomic_set_bit8(h->adjs + k, c);
 	pthread_mutex_unlock(lock);
 }
@@ -401,7 +399,7 @@ void k63hash_put_adj(struct k63hash_t *h, k63key_t key, pthread_mutex_t *lock)
 	k = internal_k63hash_singleton_put(h, key);
 	pthread_mutex_unlock(lock);
 
-	while (k == KMHASH_MAX_SIZE) {
+	while (k == KMHASH_END(h)) {
 		/* ensure only one thread resize the hash table */
 		if (atomic_bool_CAS32(&(h->status),
 				KMHASH_IDLE, KMHASH_BUSY)) {
@@ -424,7 +422,7 @@ void k63hash_put(struct k63hash_t *h, k63key_t key, pthread_mutex_t *lock)
 	k = internal_k63hash_singleton_put(h, key);
 	pthread_mutex_unlock(lock);
 
-	while (k == KMHASH_MAX_SIZE) {
+	while (k == KMHASH_END(h)) {
 		if (atomic_bool_CAS32(&(h->status),
 				KMHASH_IDLE, KMHASH_BUSY)) {
 			k63hash_resize(h, 0);
@@ -444,7 +442,7 @@ void k63hash_filter(struct k63hash_t *h, int adj_included)
 	uint32_t *sgts;
 	uint8_t *adjs, *flag;
 
-	kmint_t n_item, i, j, new_size, cur_size, cnt, n_probe, mask, step;
+	kmint_t n_item, i, j, new_size, cur_size, n_probe, mask, step;
 	k63key_t x, xt;
 	uint64_t k;
 	uint8_t a, at, current_flag;
@@ -543,11 +541,11 @@ void k63hash_filter(struct k63hash_t *h, int adj_included)
 
 void k63hash_init(struct k63hash_t *h, kmint_t size, int n_threads, int adj_included)
 {
-	kmint_t i;
 	int k;
 
 	h->size = size;
 	__round_up_kmint(h->size);
+	h->n_probe = estimate_probe_3(h->size);
 	h->keys = malloc(h->size * sizeof(k63key_t));
 	h->sgts = calloc(h->size >> 5, sizeof(uint32_t));
 	h->flag = calloc(h->size, sizeof(uint8_t));
@@ -573,8 +571,177 @@ void k63hash_destroy(struct k63hash_t *h)
 	free(h->keys);
 	free(h->sgts);
 	free(h->adjs);
+	free(h->flag);
 	h->locks = NULL;
 	h->keys = NULL;
 	h->sgts = NULL;
 	h->adjs = NULL;
+	h->flag = NULL;
 }
+
+/****************** Single threaded k63 hash table ****************************/
+
+void k63_convert_table(struct k63hash_t *h, struct k63_idhash_t *dict)
+{
+	dict->size = h->size;
+	dict->n_probe = h->n_probe;
+	dict->n_item = h->n_item;
+
+	dict->keys = h->keys;
+	dict->adjs = h->adjs;
+	dict->flag = h->flag;
+	dict->id   = calloc(dict->size, sizeof(gint_t));
+
+	h->keys = NULL;
+	h->adjs = NULL;
+	h->flag = NULL;
+}
+
+void k63_idhash_init(struct k63_idhash_t *h, kmint_t size, int adj_included)
+{
+	h->size = size;
+	__round_up_kmint(h->size);
+	h->n_probe = estimate_probe_3(h->size);
+	h->n_item = 0;
+	h->keys = malloc(h->size * sizeof(k63key_t));
+	h->id = calloc(h->size, sizeof(gint_t));
+	h->flag = calloc(h->size, sizeof(uint8_t));
+	if (adj_included)
+		h->adjs = calloc(h->size, sizeof(uint8_t));
+	else
+		h->adjs = NULL;
+}
+
+void k63_idhash_clean(struct k63_idhash_t *h)
+{
+	free(h->keys);
+	free(h->adjs);
+	free(h->id);
+	free(h->flag);
+	h->keys = NULL;
+	h->id = NULL;
+	h->adjs = NULL;
+	h->flag = NULL;
+	h->n_item = h->size = h->n_probe = 0;
+}
+
+kmint_t k63_idhash_get(struct k63_idhash_t *h, k63key_t key)
+{
+	kmint_t step, i, n_probe, mask;
+	uint64_t k;
+	mask = h->size - 1;
+	k = __hash_k63(key);
+	i = k & mask;
+	n_probe = h->n_probe;
+	step = 0;
+	do {
+		i = (i + step * (step + 1) / 2) & mask;
+		if (h->flag[i] == KMFLAG_EMPTY)
+			return IDHASH_END(h);
+		if (k63_equal(h->keys[i], key))
+			return i;
+		++step;
+	} while (step <= n_probe);
+	return IDHASH_END(h);
+}
+
+static inline kmint_t internal_k63_idhash_put(struct k63_idhash_t *h, k63key_t key)
+{
+	kmint_t mask, step, i, n_probe;
+	uint64_t k;
+
+	mask = h->size - 1;
+	k = __hash_k63(key);
+	n_probe = h->n_probe;
+	i = k & mask;
+	step = 0;
+	do {
+		i = (i + step * (step + 1) / 2) & mask;
+		if (h->flag[i] == KMFLAG_EMPTY || (h->flag[i] == KMFLAG_NEW &&
+						   k63_equal(h->keys[i], key))) {
+			if (h->flag[i] == KMFLAG_EMPTY) {
+				h->keys[i] = key;
+				h->flag[i] = KMFLAG_NEW;
+				++h->n_item;
+			}
+			return i;
+		}
+		++step;
+	} while (step <= n_probe);
+	return IDHASH_END(h);
+}
+
+static void k63_idhash_resize(struct k63_idhash_t *h)
+{
+	kmint_t i, old_size, j, step, n_probe, mask;
+	old_size = h->size;
+	h->size <<= 1;
+	h->n_probe = estimate_probe_3(h->size);
+	h->keys = realloc(h->keys, h->size * sizeof(k63key_t));
+	h->id = realloc(h->id, h->size * sizeof(gint_t));
+	h->flag = realloc(h->flag, h->size * sizeof(uint8_t));
+
+	mask = h->size - 1;
+	n_probe = h->n_probe;
+
+	for (i = old_size; i < h->size; ++i) {
+		h->flag[i] = KMFLAG_EMPTY;
+		h->id[i] = -1;
+	}
+
+	for (i = 0; i < old_size; ++i) {
+		if (h->flag[i] == KMFLAG_NEW)
+			h->flag[i] = KMFLAG_OLD;
+	}
+
+	for (i = 0; i < old_size; ++i) {
+		if (h->flag[i] == KMFLAG_OLD) {
+			k63key_t x = h->keys[i], xt;
+			gint_t   y = h->id[i],   yt;
+			h->flag[i] = KMFLAG_EMPTY;
+			h->id[i] = -1;
+			while (1) {
+				uint64_t k = __hash_k63(x);
+				kmint_t j = k & mask;
+				kmint_t step = 0;
+				uint8_t current_flag = KMFLAG_NEW;
+				while (step <= n_probe) {
+					j = (j + step * (step + 1) / 2) & mask;
+					current_flag = h->flag[j];
+					if (current_flag == KMFLAG_EMPTY) {
+						h->flag[j] = KMFLAG_NEW;
+						h->keys[j] = x;
+						h->id[j] = y;
+						break;
+					} else if (current_flag == KMFLAG_OLD) {
+						h->flag[j] = KMFLAG_NEW;
+						xt = h->keys[j];
+						yt = h->id[j];
+						h->keys[j] = x;
+						h->id[j] = y;
+						x = xt;
+						y = yt;
+						break;
+					}
+					++step;
+				}
+				if (current_flag == KMFLAG_EMPTY)
+					break;
+				else if (current_flag == KMFLAG_NEW)
+					__ERROR("Resizing node table error");
+			}
+		}
+	}
+}
+
+kmint_t k63_idhash_put(struct k63_idhash_t *h, k63key_t key)
+{
+	kmint_t k;
+	k = internal_k63_idhash_put(h, key);
+	while (k == IDHASH_END(h)) {
+		k63_idhash_resize(h);
+		k = internal_k63_idhash_put(h, key);
+	}
+	return k;
+}
+

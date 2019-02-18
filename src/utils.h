@@ -81,6 +81,8 @@
 
 #define __is_sep(c)		((c) == ' ' || (c) == '\t')
 
+#define __rotl64(x, r) (((x) << (r)) | ((x) >> (64 - (r))))
+
 #define normalize_mapq(s)	do {					       \
 	if ((s) < 0) (s) = 0;						       \
 	if ((s) > 60) (s) = 60;						       \

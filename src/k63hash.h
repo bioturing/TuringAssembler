@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
+#include "asm_hash.h"
 #include "attribute.h"
+#include "utils.h"
 
 typedef struct {
 	uint64_t bin[2];
@@ -78,5 +80,28 @@ void k63hash_filter(struct k63hash_t *h, int adj_included);
 
 /* Free all allocated memory on h but not h itself */
 void k63hash_destroy(struct k63hash_t *h);
+
+/****************************** Single thread k63 hash ************************/
+
+struct k63_idhash_t {
+	kmint_t size;		/* maximum current size */
+	kmint_t n_probe;	/* probe time */
+	kmint_t n_item;		/* number of current items */
+
+	k63key_t *keys;		/* keys */
+	gint_t   *id;		/* unique id */
+	uint8_t  *adjs;		/* adjacency character(s) */
+	uint8_t  *flag;		/* mark available key */
+};
+
+void k63_convert_table(struct k63hash_t *h, struct k63_idhash_t *dict);
+
+void k63_idhash_init(struct k63_idhash_t *dict, kmint_t size, int adj_included);
+
+void k63_idhash_clean(struct k63_idhash_t *h);
+
+kmint_t k63_idhash_get(struct k63_idhash_t *h, k63key_t key);
+
+kmint_t k63_idhash_put(struct k63_idhash_t *h, k63key_t key);
 
 #endif
