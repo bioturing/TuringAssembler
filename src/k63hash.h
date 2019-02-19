@@ -11,7 +11,9 @@ typedef struct {
 	uint64_t bin[2];
 } k63key_t;
 
-#define k63_equal(x, y) ((x).bin[0] == (y).bin[0] && (x).bin[1] == (y).bin[1])
+#define __k63_equal(x, y) ((x).bin[0] == (y).bin[0] && (x).bin[1] == (y).bin[1])
+
+#define __k63_lt(x, y) ((x).bin[1] < (y).bin[1] || ((x).bin[1] == (y).bin[1] && (x).bin[0] < (y).bin[0]))
 
 static inline uint64_t __hash_k63(k63key_t x)
 {

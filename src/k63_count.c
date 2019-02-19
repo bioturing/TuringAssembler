@@ -30,8 +30,6 @@ struct maincount_bundle_t {
 	pthread_mutex_t *lock_hash;
 };
 
-#define __k63_lt(x, y) ((x).bin[1] < (y).bin[1] || ((x).bin[1] == (y).bin[1] && (x).bin[0] < (y).bin[0]))
-
 #define __k63_lshift2(k) (((k).bin[1] = ((k).bin[1] << 2) | ((k).bin[0] >> 62)), \
 				((k).bin[0] <<= 2))
 #define __k63_rshift2(k) (((k).bin[0] = ((k).bin[0] >> 2) | (((k).bin[1] & 0x3ull) << 62)), \
@@ -85,7 +83,7 @@ static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
 	seq = r->seq;
 
 	k63key_t knum, krev, pknum, pkrev, kmask;
-	kmask.bin[0] = (1ull << __min(ksize << 1, 64)) - 1;
+	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	last = 0;
@@ -249,12 +247,96 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 	free(producer_threads);
 }
 
+static inline void k63_test_revc(k63key_t knum, k63key_t krev, int l)
+{
+	char *snum, *srev;
+	snum = alloca(l + 1);
+	srev = alloca(l + 1);
+	int i;
+	for (i = 0; i < l; ++i) {
+		snum[i] = nt4_char[knum.bin[0] & 3];
+		__k63_rshift2(knum);
+		srev[i] = nt4_char[krev.bin[0] & 3];
+		__k63_rshift2(krev);
+	}
+	snum[l] = srev[l] = '\0';
+	for (i = 0; i < l; ++i) {
+		if (nt4_table[(int)snum[i]] != (nt4_table[(int)srev[l - i -1]] ^ 3)) {
+			fprintf(stderr, "snum = %s\nsrev = %s\n", snum, srev);
+			assert(0);
+		}
+	}
+}
+
+static void k63_check_edge(struct k63hash_t *h, int ksize)
+{
+	kmint_t i, k;
+	k63key_t knum, krev, nknum, nkrev, kmask;
+	int c, lmc, rc;
+
+	kmask.bin[0] =(uint64_t)-1;
+	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
+	lmc = (ksize - 1) << 1;
+	kmint_t sum_deg = 0;
+	for (i = 0; i < h->size; ++i) {
+		if (h->flag[i] == KMFLAG_EMPTY)
+			continue;
+		knum = h->keys[i];
+		__k63_revc_num(knum, krev, ksize, kmask);
+		for (c = 0; c < 4; ++c) {
+			if ((h->adjs[i] >> c) & 1) {
+				nknum = knum; __k63_lshift2(nknum);
+				__k63_and(nknum, kmask); nknum.bin[0] |= c;
+				nkrev = krev; __k63_rshift2(nkrev);
+				nkrev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
+				if (__k63_lt(nknum, nkrev))
+					k = k63hash_get(h, nknum);
+				else
+					k = k63hash_get(h, nkrev);
+				assert(k != KMHASH_END(h));
+				if (__k63_equal(nknum, krev))
+					assert(__k63_equal(nkrev, knum));
+				rc = knum.bin[1] >> (lmc - 64);
+				assert(rc >= 0 && rc < 4);
+				if (__k63_lt(nknum, nkrev))
+					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+				else
+					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+				++sum_deg;
+			}
+
+			if ((h->adjs[i] >> (c + 4)) & 1) {
+				nknum = krev; __k63_lshift2(nknum);
+				__k63_and(nknum, kmask); nknum.bin[0] |= c;
+				nkrev = knum; __k63_rshift2(nkrev);
+				nkrev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
+				if (__k63_lt(nknum, nkrev))
+					k = k63hash_get(h, nknum);
+				else
+					k = k63hash_get(h, nkrev);
+				assert(k != KMHASH_END(h));
+				if (__k63_equal(nknum, knum))
+					assert(__k63_equal(nkrev, krev));
+				rc = krev.bin[1] >> (lmc - 64);
+				assert(rc >= 0 && rc < 4);
+				if (__k63_lt(nknum, nkrev))
+					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+				else
+					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+				++sum_deg;
+			}
+		}
+	}
+
+	__VERBOSE("Check edge kmhash done. Sum degree = %llu\n", sum_deg);
+}
+
 void k63_correct_edge(struct k63hash_t *h, int ksize)
 {
 	k63key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
-	kmask.bin[0] = (1ull << (ksize << 1)) - 1;
+	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	lmc = (ksize - 1) << 1;
@@ -300,8 +382,7 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", ksize,
 					(long long unsigned)h->n_item);
-	// check_edge(h, opt->kmer_master);
-	// recount_edge(h);
+	k63_check_edge(h, ksize);
 
 	/* Filter singleton kmer */
 	k63hash_filter(h, 1);
@@ -310,6 +391,7 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 
 	/* Correct edges */
 	k63_correct_edge(h, ksize);
+	k63_check_edge(h, ksize);
 	// recount_edge(h);
 	// check_edge(h, opt->kmer_master);
 }

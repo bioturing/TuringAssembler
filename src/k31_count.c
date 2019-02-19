@@ -267,20 +267,21 @@ static void k31_test_hash(struct k31hash_t *h)
 			k = k31hash_get(h, h->keys[i]);
 			if (k == KMHASH_END(h)) {
 				fprintf(stderr, "i = %llu; key = %llu\n", i, h->keys[i]);
+				assert(0);
 			}
-			assert(k != KMHASH_END(h));
 		}
 	}
 	assert(cnt == h->n_item);
+	fprintf(stderr, "test hash relocate done\n");
 }
 
-static void check_sum(struct k31hash_t *h)
+static void k31_check_sum(struct k31hash_t *h)
 {
 	kmint_t i;
 	uint64_t sum = 0;
 	for (i = 0; i < h->size; ++i) {
 		if (h->keys[i] != K31_NULL) {
-			sum ^= (h->keys[i] + ((h->sgts[i >> 5] >> (i & 31)) & 1));
+			sum += h->keys[i];
 		}
 	}
 	fprintf(stderr, "check sum = %llu\n", sum);
@@ -308,11 +309,9 @@ static void k31_check_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				assert(k != KMHASH_MAX_SIZE);
+				assert(k != KMHASH_END(h));
 				if (nknum == krev) {
 					assert(nkrev == knum);
-					fprintf(stderr, "naughty edge: (%llu) -> (%llu)\n",
-						knum, nknum);
 				}
 				rc = knum >> lmc;
 				assert(rc >= 0 && rc < 4);
@@ -330,11 +329,9 @@ static void k31_check_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				assert(k != KMHASH_MAX_SIZE);
+				assert(k != KMHASH_END(h));
 				if (nknum == knum) {
 					assert(nkrev == krev);
-					fprintf(stderr, "naughty edge2: (%llu) -> (%llu)\n",
-						krev, nknum);
 				}
 				rc = krev >> lmc;
 				assert(rc >= 0 && rc < 4);
@@ -357,8 +354,8 @@ void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksiz
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", ksize,
 					(long long unsigned)h->n_item);
-	// check_edge(h, opt->kmer_master);
-	// recount_edge(h);
+	k31_check_edge(h, ksize);
+	k31_test_hash(h);
 
 	/* Filter singleton kmer */
 	__VERBOSE("Filtering singleton %d-mer\n", ksize);
@@ -368,11 +365,10 @@ void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksiz
 
 	/* Correct edges */
 	k31_correct_edge(h, ksize);
-	// recount_edge(h);
-	// check_edge(h, opt->kmer_master);
-	k31_test_hash(h);
 
-//	k31_check_edge(h, ksize);
+	k31_test_hash(h);
+	k31_check_sum(h);
+	k31_check_edge(h, ksize);
 }
 
 void k31_test_process(struct opt_count_t *opt)

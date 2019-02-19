@@ -24,6 +24,12 @@
 #define rs_is_old(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
 							== (uint32_t)KMFLAG_OLD)
 
+#define rs_is_empty(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
+							== (uint32_t)KMFLAG_EMPTY)
+
+#define rs_is_new(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
+							== (uint32_t)KMFLAG_NEW)
+
 struct k31resize_bundle_t {
 	struct k31hash_t *h;
 	int n_threads;
@@ -492,21 +498,23 @@ void k31hash_filter(struct k31hash_t *h, int adj_included)
 	int retry = 0;
 loop_refill:
 	if (retry) {
+		fprintf(stderr, "Retry shrink #%d\n", retry);
 		for (i = 0; i < cur_size; ++i) {
-			if (flag[i] == KMFLAG_NEW)
-				flag[i] = KMFLAG_OLD;
+			if (rs_is_new(flag, i))
+				rs_set_old(flag, i);
 		}
 		for (i = 0; i < cur_size; ++i) {
-			if (flag[i] == KMFLAG_EMPTY) {
+			if (rs_is_empty(flag, i)) {
 				keys[i] = x;
-				flag[i] = KMFLAG_OLD;
+				if (adj_included)
+					adjs[i] = a;
+				rs_set_old(flag, i);
 				break;
 			}
 		}
 		new_size <<= 1;
 		n_probe = estimate_probe_3(new_size);
 		mask = new_size - 1;
-		retry = 0;
 	}
 	for (i = 0; i < cur_size; ++i) {
 		if (rs_is_old(flag, i)) {
@@ -551,7 +559,7 @@ loop_refill:
 				else if (current_flag == KMFLAG_NEW) {
 					if (cur_size == new_size)
 						__ERROR("Shrink kmhash error");
-					retry = 1;
+					++retry;
 					goto loop_refill;
 				}
 			}

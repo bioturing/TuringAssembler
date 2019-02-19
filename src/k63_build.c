@@ -130,7 +130,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 	int deg_fw, deg_rv;
 	int lmc = (ksize << 1) - 2;
 	k63key_t kmask;
-	kmask.bin[0] = (1ull << __min(ksize << 1, 64)) - 1;
+	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
 	gint_t n_v, n_e;
 
@@ -417,7 +417,7 @@ static void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *gra
 	seq = r->seq;
 
 	k63key_t knum, krev, pknum, pkrev, kmask;
-	kmask.bin[0] = (1ull << __min(ksize << 1, 64)) - 1;
+	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	last = 0;

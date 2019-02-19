@@ -42,7 +42,7 @@ static kmint_t internal_k63hash_put(struct k63hash_t *h, k63key_t key)
 		} else if (cur_flag == KMFLAG_LOADING) {
 			continue;
 		} else { /* KMFLAG_NEW */
-			if (k63_equal(h->keys[i], key))
+			if (__k63_equal(h->keys[i], key))
 				return i;
 			++step;
 		}
@@ -73,7 +73,7 @@ static kmint_t internal_k63hash_singleton_put(struct k63hash_t *h, k63key_t key)
 		} else if (cur_flag == KMFLAG_LOADING) {
 			continue;
 		} else { /* KMFLAG_NEW */
-			if (k63_equal(h->keys[i], key)) {
+			if (__k63_equal(h->keys[i], key)) {
 				atomic_set_bit32(h->sgts + (i >> 5), i & 31);
 				return i;
 			}
@@ -96,7 +96,7 @@ kmint_t k63hash_get(struct k63hash_t *h, k63key_t key)
 		i = (i + step * (step + 1) / 2) & mask;
 		if (h->flag[i] == KMFLAG_EMPTY)
 			return KMHASH_END(h);
-		if (k63_equal(h->keys[i], key))
+		if (__k63_equal(h->keys[i], key))
 			return i;
 		++step;
 	} while (step <= n_probe);
@@ -473,6 +473,8 @@ loop_refill:
 		for (i = 0; i < cur_size; ++i) {
 			if (flag[i] == KMFLAG_EMPTY) {
 				keys[i] = x;
+				if (adj_included)
+					adjs[i] = a;
 				flag[i] = KMFLAG_OLD;
 				break;
 			}
@@ -642,7 +644,7 @@ kmint_t k63_idhash_get(struct k63_idhash_t *h, k63key_t key)
 		i = (i + step * (step + 1) / 2) & mask;
 		if (h->flag[i] == KMFLAG_EMPTY)
 			return IDHASH_END(h);
-		if (k63_equal(h->keys[i], key))
+		if (__k63_equal(h->keys[i], key))
 			return i;
 		++step;
 	} while (step <= n_probe);
@@ -662,7 +664,7 @@ static inline kmint_t internal_k63_idhash_put(struct k63_idhash_t *h, k63key_t k
 	do {
 		i = (i + step * (step + 1) / 2) & mask;
 		if (h->flag[i] == KMFLAG_EMPTY || (h->flag[i] == KMFLAG_NEW &&
-						   k63_equal(h->keys[i], key))) {
+						   __k63_equal(h->keys[i], key))) {
 			if (h->flag[i] == KMFLAG_EMPTY) {
 				h->keys[i] = key;
 				h->flag[i] = KMFLAG_NEW;
