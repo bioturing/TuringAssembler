@@ -64,6 +64,15 @@ struct maincount_bundle_t {
 	(x).bin[1] ^= 0xffffffffffffffffull, (x).bin[1] &= (mask).bin[1]       \
 )
 
+static void k63_dump_kmer(k63key_t key, char *seq, int l)
+{
+	seq[l] = '\0';
+	while (l) {
+		seq[--l] = nt4_char[key.bin[0] & 3];
+		__k63_rshift2(key);
+	}
+}
+
 /*
  * Move the kmer window along reads and add kmer to hash table
  */
@@ -76,7 +85,7 @@ static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
 	seq = r->seq;
 
 	k63key_t knum, krev, pknum, pkrev, kmask;
-	kmask.bin[0] = (1ull << (ksize << 1)) - 1;
+	kmask.bin[0] = (1ull << __min(ksize << 1, 64)) - 1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	last = 0;

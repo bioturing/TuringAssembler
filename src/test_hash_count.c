@@ -46,12 +46,25 @@ static void count_from_read(struct read_t *r, khash_t(kmap_t) *h,
 			snum[ksize] = srev[ksize] = '\0';
 			pthread_mutex_lock(lock_hash);
 			if (strcmp(snum, srev) < 0) {
-				k = kh_put(kmap_t, h, snum, &ret);
+				khiter_t k_it = kh_put(kmap_t, h, snum, &ret);
 				assert(ret != -1 && ret != 2);
 				if (ret == 1)
-					kh_val(h, k) = 0;
-				else if (ret == 0)
-					kh_val(h, k) = 1;
+					kh_val(h, k_it) = 0;
+				else if (ret == 0) {
+					kh_val(h, k_it) = 1;
+					free(snum);
+				}
+				free(srev);
+			} else {
+				khiter_t k_it = kh_put(kmap_t, h, srev, &ret);
+				assert(ret != -1 && ret != 2);
+				if (ret == 1)
+					kh_val(h, k_it) = 0;
+				else if (ret == 0) {
+					kh_val(h, k_it) = 1;
+					free(srev);
+				}
+				free(snum);
 			}
 			pthread_mutex_unlock(lock_hash);
 		}
@@ -174,6 +187,7 @@ void test_kmer_count(struct opt_count_t *opt, int ksize)
 	khash_t(kmap_t) *h = kh_init(kmap_t);
 	__VERBOSE("Naiive counting %d-mer\n", ksize);
 	count_kmer(opt, h, ksize);
+	__VERBOSE("\n");
 	__VERBOSE_LOG("TEST", "Number of %d-mer: %u\n", ksize,
 						(unsigned)kh_size(h));
 	uint32_t cnt = 0;

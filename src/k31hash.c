@@ -191,30 +191,15 @@ void *k31hash_resize_worker(void *data)
 					j = (j + step * (step + 1) / 2) & mask;
 					if ((current_flag =
 						atomic_val_CAS8(flag + j,
-								KMFLAG_EMPTY,
-								KMFLAG_NEW))
-							== KMFLAG_EMPTY) {
-						keys[j] = x;
-						atomic_set_bit_val32(sgts +
-								(j >> 5),
-								j & 31, b);
-						if (adj_included)
-							adjs[j] = a;
-						break;
-					} else if ((current_flag =
-						atomic_val_CAS8(flag + j,
-								KMFLAG_OLD,
-								KMFLAG_NEW))
-							== KMFLAG_OLD) {
+							KMFLAG_OLD, KMFLAG_NEW))
+								== KMFLAG_OLD) {
 						xt = keys[j];
 						keys[j] = x;
 						x = xt;
 						bt = atomic_get_bit32(sgts +
-								(j >> 5),
-								j & 31);
+							(j >> 5), j & 31);
 						atomic_set_bit_var32(sgts +
-								(j >> 5),
-								j & 31, b);
+							(j >> 5), j & 31, b);
 						b = bt;
 						if (adj_included) {
 							at = adjs[j];
@@ -222,6 +207,19 @@ void *k31hash_resize_worker(void *data)
 							a = at;
 						}
 						break;
+					} else if ((current_flag =
+						atomic_val_CAS8(flag + j,
+							KMFLAG_EMPTY, KMFLAG_NEW))
+							== KMFLAG_EMPTY) {
+						keys[j] = x;
+						atomic_set_bit_val32(sgts +
+							(j >> 5), j & 31, b);
+						if (adj_included)
+							adjs[j] = a;
+						break;
+					} else if (current_flag == KMFLAG_LOADING) {
+						/* not sure */
+						continue;
 					}
 					++step;
 				}
@@ -476,7 +474,7 @@ void k31hash_filter(struct k31hash_t *h, int adj_included)
 			keys[i] = K31_NULL;
 	}
 
-	new_size = n_item * 1.25;
+	new_size = n_item;
 	__round_up_kmint(new_size);
 	/* if cur_size can hold, why not? */
 	if (new_size > cur_size)
@@ -491,6 +489,25 @@ void k31hash_filter(struct k31hash_t *h, int adj_included)
 		if ((sgts[i >> 5] >> (i & 31)) & 1)
 			rs_set_old(flag, i);
 
+	int retry = 0;
+loop_refill:
+	if (retry) {
+		for (i = 0; i < cur_size; ++i) {
+			if (flag[i] == KMFLAG_NEW)
+				flag[i] = KMFLAG_OLD;
+		}
+		for (i = 0; i < cur_size; ++i) {
+			if (flag[i] == KMFLAG_EMPTY) {
+				keys[i] = x;
+				flag[i] = KMFLAG_OLD;
+				break;
+			}
+		}
+		new_size <<= 1;
+		n_probe = estimate_probe_3(new_size);
+		mask = new_size - 1;
+		retry = 0;
+	}
 	for (i = 0; i < cur_size; ++i) {
 		if (rs_is_old(flag, i)) {
 			assert(keys[i] != K31_NULL);
@@ -531,8 +548,12 @@ void k31hash_filter(struct k31hash_t *h, int adj_included)
 				}
 				if (current_flag == KMFLAG_EMPTY)
 					break;
-				else if (current_flag == KMFLAG_NEW)
-					__ERROR("Shrink kmhash error");
+				else if (current_flag == KMFLAG_NEW) {
+					if (cur_size == new_size)
+						__ERROR("Shrink kmhash error");
+					retry = 1;
+					goto loop_refill;
+				}
 			}
 		}
 	}

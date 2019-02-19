@@ -382,5 +382,6 @@ void k31_test_process(struct opt_count_t *opt)
 	__VERBOSE("Lazy count %d-mer with max word size %lu\n",
 		opt->kmer_master, (long unsigned)sizeof(k31key_t));
 	build_k31_table_lazy(opt, hm, opt->kmer_master);
+	test_kmer_count(opt, opt->kmer_master);
 }
 
