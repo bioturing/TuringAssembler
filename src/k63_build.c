@@ -75,7 +75,7 @@ static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 	int i = 0, k = 0;
 	while (i < m) {
 		ret[i++] = tmp.bin[k] & mask;
-		if (i < l)
+		if (i < m)
 			ret[i++] = (tmp.bin[k++] >> 32) & mask;
 	}
 	return ret;

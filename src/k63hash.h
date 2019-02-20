@@ -50,6 +50,12 @@ struct k63hash_t {
 	pthread_mutex_t *locks;
 };
 
+/* Save binary hash table to file */
+void save_k63hash(struct k63hash_t *h, const char *path);
+
+/* Load saved binary hash table from file */
+void load_k63hash(struct k63hash_t *h, const char *path);
+
 /* Turn on adj bit of a kmer */
 void k63hash_add_edge(struct k63hash_t *h, k63key_t key, int c, pthread_mutex_t *lock);
 

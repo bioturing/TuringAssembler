@@ -30,6 +30,29 @@
 #define rs_is_new(x, i) ((((x)[(i) >> 4] >> (((i) & 15) << 1)) & (uint32_t)3)  \
 							== (uint32_t)KMFLAG_NEW)
 
+void save_k31hash(struct k31hash_t *h, const char *path)
+{
+	FILE *fp = xfopen(path, "wb");
+	fwrite(&h->size, sizeof(kmint_t), 1, fp);
+	fwrite(&h->n_item, sizeof(kmint_t), 1, fp);
+	fwrite(h->keys, sizeof(k31key_t), h->size, fp);
+	fwrite(h->adjs, sizeof(uint8_t), h->size, fp);
+	fclose(fp);
+}
+
+void load_k31hash(struct k31hash_t *h, const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	fread(&h->size, sizeof(kmint_t), 1, fp);
+	fread(&h->n_item, sizeof(kmint_t), 1, fp);
+	h->n_probe = estimate_probe_3(h->size);
+	h->keys = malloc(h->size * sizeof(k31key_t));
+	h->adjs = malloc(h->size * sizeof(uint8_t));
+	fread(h->keys, sizeof(k31key_t), h->size, fp);
+	fread(h->adjs, sizeof(uint8_t), h->size, fp);
+	fclose(fp);
+}
+
 struct k31resize_bundle_t {
 	struct k31hash_t *h;
 	int n_threads;

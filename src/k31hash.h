@@ -38,6 +38,12 @@ struct k31hash_t {
 	pthread_mutex_t *locks;
 };
 
+/* Save binary hash table to file */
+void save_k31hash(struct k31hash_t *h, const char *path);
+
+/* Load saved binary hash table from file */
+void load_k31hash(struct k31hash_t *h, const char *path);
+
 /* Turn on adj bit of a kmer */
 void k31hash_add_edge(struct k31hash_t *h, k31key_t key, int c, pthread_mutex_t *lock);
 
