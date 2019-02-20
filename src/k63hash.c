@@ -14,25 +14,25 @@
 void save_k63hash(struct k63hash_t *h, const char *path)
 {
 	FILE *fp = xfopen(path, "wb");
-	fwrite(&h->size, sizeof(kmint_t), 1, fp);
-	fwrite(&h->n_item, sizeof(kmint_t), 1, fp);
-	fwrite(h->keys, sizeof(k63key_t), h->size, fp);
-	fwrite(h->adjs, sizeof(uint8_t), h->size, fp);
-	fwrite(h->flag, sizeof(uint8_t), h->size, fp);
+	xfwrite(&h->size, sizeof(kmint_t), 1, fp);
+	xfwrite(&h->n_item, sizeof(kmint_t), 1, fp);
+	xfwrite(h->keys, sizeof(k63key_t), h->size, fp);
+	xfwrite(h->adjs, sizeof(uint8_t), h->size, fp);
+	xfwrite(h->flag, sizeof(uint8_t), h->size, fp);
 	fclose(fp);
 }
 
 void load_k63hash(struct k63hash_t *h, const char *path)
 {
 	FILE *fp = xfopen(path, "rb");
-	fread(&h->size, sizeof(kmint_t), 1, fp);
-	fread(&h->n_item, sizeof(kmint_t), 1, fp);
+	xfread(&h->size, sizeof(kmint_t), 1, fp);
+	xfread(&h->n_item, sizeof(kmint_t), 1, fp);
 	h->n_probe = estimate_probe_3(h->size);
 	h->keys = malloc(h->size * sizeof(k63key_t));
 	h->adjs = malloc(h->size * sizeof(uint8_t));
-	fread(h->keys, sizeof(k63key_t), h->size, fp);
-	fread(h->adjs, sizeof(uint8_t), h->size, fp);
-	fread(h->flag, sizeof(uint8_t), h->size, fp);
+	xfread(h->keys, sizeof(k63key_t), h->size, fp);
+	xfread(h->adjs, sizeof(uint8_t), h->size, fp);
+	xfread(h->flag, sizeof(uint8_t), h->size, fp);
 	fclose(fp);
 }
 

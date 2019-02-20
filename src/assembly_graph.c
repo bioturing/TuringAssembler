@@ -229,8 +229,6 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 			fprintf(fp, "%s\n", buf);
 			k += l;
 		}
-		// fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
-		// 			(long long unsigned)g->edges[e].count);
 	}
 	fclose(fp);
 }
@@ -614,4 +612,54 @@ void test_asm_graph(struct asm_graph_t *g)
 		assert(src == g->nodes[tgt_rc].rc_id && g->nodes[src].rc_id == tgt_rc);
 		assert(tgt == g->nodes[src_rc].rc_id && g->nodes[tgt].rc_id == src_rc);
 	}
+}
+
+void save_asm_graph(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "wb");
+	xfwrite(&g->ksize, sizeof(int), 1, fp);
+	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
+	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
+	gint_t u, e;
+	for (u = 0; u < g->n_v; ++u) {
+		xfwrite(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
+		xfwrite(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
+		xfwrite(g->nodes[u].adj, sizeof(gint_t), g->nodes[u].deg, fp);
+	}
+	for (e = 0; e < g->n_e; ++e) {
+		xfwrite(&g->edges[e].source, sizeof(gint_t), 1, fp);
+		xfwrite(&g->edges[e].target, sizeof(gint_t), 1, fp);
+		xfwrite(&g->edges[e].rc_id, sizeof(gint_t), 1, fp);
+		xfwrite(&g->edges[e].count, sizeof(uint64_t), 1, fp);
+		xfwrite(&g->edges[e].seq_len, sizeof(gint_t), 1, fp);
+		xfwrite(g->edges[e].seq, sizeof(uint32_t), (g->edges[e].seq_len + 15) >> 4, fp);
+	}
+	fclose(fp);
+}
+
+void load_asm_graph(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	xfread(&g->ksize, sizeof(int), 1, fp);
+	xfread(&g->n_v, sizeof(gint_t), 1, fp);
+	xfread(&g->n_e, sizeof(gint_t), 1, fp);
+	g->nodes = malloc(g->n_v * sizeof(struct asm_node_t));
+	g->edges = malloc(g->n_e * sizeof(struct asm_edge_t));
+	gint_t u, e;
+	for (u = 0; u < g->n_v; ++u) {
+		xfread(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
+		xfread(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
+		g->nodes[u].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
+		xfread(g->nodes[u].adj, sizeof(gint_t), g->nodes[u].deg, fp);
+	}
+	for (e = 0; e < g->n_e; ++e) {
+		xfread(&g->edges[e].source, sizeof(gint_t), 1, fp);
+		xfread(&g->edges[e].target, sizeof(gint_t), 1, fp);
+		xfread(&g->edges[e].rc_id, sizeof(gint_t), 1, fp);
+		xfread(&g->edges[e].count, sizeof(uint64_t), 1, fp);
+		xfread(&g->edges[e].seq_len, sizeof(gint_t), 1, fp);
+		g->edges[e].seq = calloc((g->edges[e].seq_len + 15) >> 4, sizeof(uint32_t));
+		xfread(g->edges[e].seq, sizeof(uint32_t), (g->edges[e].seq_len + 15) >> 4, fp);
+	}
+	fclose(fp);
 }
