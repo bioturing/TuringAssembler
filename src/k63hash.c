@@ -301,13 +301,13 @@ void k63hash_resize_single(struct k63hash_t *h, int adj_included)
 	memset(h->sgts + (old_size >> 5), 0,
 			((size >> 5) - (old_size >> 5)) * sizeof(uint32_t));
 	if (adj_included) {
-		adjs = h->adjs;
 		h->adjs = realloc(h->adjs, h->size * sizeof(uint8_t));
+		adjs = h->adjs;
 		memset(adjs + old_size, 0, (size - old_size) * sizeof(uint8_t));
 	}
 	h->flag = realloc(h->flag, h->size * sizeof(uint8_t));
 	memset(h->flag + old_size, KMFLAG_EMPTY,
-		(h->size - h->old_size) * sizeof(uint8_t));
+		(size - old_size) * sizeof(uint8_t));
 
 	keys = h->keys;
 	sgts = h->sgts;
@@ -382,10 +382,11 @@ void k63hash_resize(struct k63hash_t *h, int adj_included)
 			(unsigned long long)h->n_item,
 			(unsigned long long)KMHASH_MAX_SIZE);
 
-	if (h->size <= KMHASH_SINGLE_RESIZE)
-		k63hash_resize_single(h, adj_included);
-	else
-		k63hash_resize_multi(h, adj_included);
+	k63hash_resize_single(h, adj_included);
+	// if (h->size <= KMHASH_SINGLE_RESIZE)
+	// 	k63hash_resize_single(h, adj_included);
+	// else
+	// 	k63hash_resize_multi(h, adj_included);
 
 	for (i = 0; i < h->n_worker; ++i)
 		pthread_mutex_unlock(h->locks + i);
