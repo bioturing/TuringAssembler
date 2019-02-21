@@ -17,8 +17,11 @@
 #define NON_TIPS_LEN			250
 
 void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g);
+void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g);
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
 void write_gfa(struct asm_graph_t *g, const char *path);
+void dump_fasta(struct asm_graph_t *g, const char *path);
+void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g);
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 			gint_t len, gint_t max_len, int ksize);
 
@@ -442,7 +445,7 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 	gint_t u;
 	for (u = 0; u < g0->n_v; ++u) {
 		if (u % 1000 == 0)
-			fprintf(stderr, "\rRemoving bubble node %llu", u);
+			fprintf(stderr, "\rRemoving bubble node %ld", u);
 		gint_t u_rc = g0->nodes[u].rc_id;
 		if (g0->nodes[u_rc].deg != 1 || g0->nodes[u].deg != 2)
 			continue;
@@ -478,7 +481,7 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		g0->edges[g0->edges[e].rc_id].count = g0->edges[e_rc0].count + g0->edges[e_rc1].count;
 		++cnt_rm;
 	}
-	__VERBOSE("\nNumber of removed edges: %lld\n", cnt_rm);
+	__VERBOSE("\nNumber of removed edges: %ld\n", cnt_rm);
 	asm_condense(g0, g);
 }
 
@@ -509,7 +512,7 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 	gint_t count_rm = 0;
 	for (u = 0; u < g0->n_v; ++u) {
 		if (u % 1000 == 0)
-			fprintf(stderr, "\rRemoving dead-end node %llu", u);
+			fprintf(stderr, "\rRemoving dead-end node %ld", u);
 		gint_t c, deg, cnt;
 		deg = g0->nodes[u].deg;
 		if (deg > tmp_len) {
@@ -518,7 +521,7 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 		}
 		cnt = 0;
 		for (c = 0; c < g0->nodes[u].deg; ++c) {
-			gint_t e_id, e_rc;
+			gint_t e_id;
 			e_id = g0->nodes[u].adj[c];
 			int ret = dfs_dead_end(g0, g0->edges[e_id].target,
 					g0->ksize, NON_TIPS_LEN, g0->ksize);
@@ -542,7 +545,7 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 			++count_rm;
 		}
 	}
-	fprintf(stderr, "\nNumber of removed edges: %llu\n", count_rm);
+	fprintf(stderr, "\nNumber of removed edges: %ld\n", count_rm);
 	free(tmp);
 	for (e = 0; e < g0->n_e; ++e) {
 		if (!((flag[e >> 5] >> (e & 31)) & 1))
@@ -706,8 +709,8 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			gint_t new_e = edge_id[e];
 			if (edges[new_e].rc_id == -1) {
 				gint_t new_e_rc = edge_id[e_rc];
-				fprintf(stderr, "%llu <-> %llu\n", e, e_rc);
-				fprintf(stderr, "%llu <-> %llu\n", new_e, new_e_rc);
+				fprintf(stderr, "%ld <-> %ld\n", e, e_rc);
+				fprintf(stderr, "%ld <-> %ld\n", new_e, new_e_rc);
 				assert(0 && "Edge not link reverse complement");
 			}
 		}
@@ -746,7 +749,7 @@ void test_asm_graph(struct asm_graph_t *g)
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			gint_t e_id = g->nodes[u].adj[j];
 			if (g->edges[e_id].source != u) {
-				fprintf(stderr, "node = %llu; edges = (%llu -> %llu)\n",
+				fprintf(stderr, "node = %ld; edges = (%ld -> %ld)\n",
 					u, g->edges[e_id].source, g->edges[e_id].target);
 				assert(0 && "Fail node reverse complement id");
 			}
@@ -755,9 +758,9 @@ void test_asm_graph(struct asm_graph_t *g)
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t e_rc = g->edges[e].rc_id;
 		if (e != g->edges[e_rc].rc_id) {
-			fprintf(stderr, "edge = (%llu -> %llu)\n",
+			fprintf(stderr, "edge = (%ld -> %ld)\n",
 				g->edges[e].source, g->edges[e].target);
-			fprintf(stderr, "edge_rc = (%llu -> %llu)\n",
+			fprintf(stderr, "edge_rc = (%ld -> %ld)\n",
 				g->edges[e_rc].source, g->edges[e_rc].target);
 			assert(0 && "Fail edge reverse complement id");
 		}
@@ -777,13 +780,13 @@ void test_asm_graph(struct asm_graph_t *g)
 				}
 			}
 			if (!found) {
-				fprintf(stderr, "Corrupt node: %llu; u_rc = %llu\n", u, g->nodes[u].rc_id);
-				fprintf(stderr, "Corrupt at edge number: %llu; Info (%llu -> %llu) %llu\n",
+				fprintf(stderr, "Corrupt node: %ld; u_rc = %ld\n", u, g->nodes[u].rc_id);
+				fprintf(stderr, "Corrupt at edge number: %ld; Info (%ld -> %ld) %ld\n",
 					e_id, g->edges[e_id].source, g->edges[e_id].target, g->edges[e_id].rc_id);
-				fprintf(stderr, "v_rc = %llu\n", v_rc);
+				fprintf(stderr, "v_rc = %ld\n", v_rc);
 				for (k = 0; k < g->nodes[v_rc].deg; ++k) {
 					gint_t ek = g->nodes[v_rc].adj[k];
-					fprintf(stderr, "\tedges: %llu; Info (%llu -> %llu) %llu\n",
+					fprintf(stderr, "\tedges: %ld; Info (%ld -> %ld) %ld\n",
 						ek, g->edges[ek].source, g->edges[ek].target, g->edges[ek].rc_id);
 				}
 				assert(0);
@@ -800,9 +803,9 @@ void test_asm_graph(struct asm_graph_t *g)
 		tgt_rc = g->edges[e_rc].target;
 		if (!(src == g->nodes[tgt_rc].rc_id && g->nodes[src].rc_id == tgt_rc
 				&& tgt == g->nodes[src_rc].rc_id && g->nodes[tgt].rc_id == src_rc)) {
-			fprintf(stderr, "source = %llu; target = %llu; rc[source] = %llu; rc[target] = %llu\n",
+			fprintf(stderr, "source = %ld; target = %ld; rc[source] = %ld; rc[target] = %ld\n",
 				src, tgt, g->nodes[src].rc_id, g->nodes[tgt].rc_id);
-			fprintf(stderr, "source_rc = %llu; target_rc = %llu; rc[source_rc] = %llu; rc[target_rc] = %llu\n",
+			fprintf(stderr, "source_rc = %ld; target_rc = %ld; rc[source_rc] = %ld; rc[target_rc] = %ld\n",
 				src_rc, tgt_rc, g->nodes[src_rc].rc_id, g->nodes[tgt_rc].rc_id);
 			assert(0);
 		}

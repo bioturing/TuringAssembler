@@ -4,6 +4,7 @@
 
 #include "atomic.h"
 #include "attribute.h"
+#include "io_utils.h"
 #include "k63hash.h"
 #include "utils.h"
 #include "verbose.h"
@@ -705,7 +706,7 @@ static inline kmint_t internal_k63_idhash_put(struct k63_idhash_t *h, k63key_t k
 
 static void k63_idhash_resize(struct k63_idhash_t *h)
 {
-	kmint_t i, old_size, j, step, n_probe, mask;
+	kmint_t i, old_size, n_probe, mask;
 	old_size = h->size;
 	h->size <<= 1;
 	h->n_probe = estimate_probe_3(h->size);

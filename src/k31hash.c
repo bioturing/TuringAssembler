@@ -4,6 +4,7 @@
 
 #include "atomic.h"
 #include "attribute.h"
+#include "io_utils.h"
 #include "k31hash.h"
 #include "utils.h"
 #include "verbose.h"
@@ -66,7 +67,6 @@ static kmint_t internal_k31hash_put(struct k31hash_t *h, k31key_t key)
 	kmint_t mask, step, i, n_probe;
 	k31key_t cur_key;
 	uint64_t k;
-	uint8_t cur_flag;
 
 	mask = h->size - 1;
 	k = __hash_k31(key);
@@ -91,7 +91,6 @@ static kmint_t internal_k31hash_singleton_put(struct k31hash_t *h, k31key_t key)
 	kmint_t mask, step, i, n_probe;
 	k31key_t cur_key;
 	uint64_t k;
-	uint8_t cur_flag;
 
 	mask = h->size - 1;
 	k = __hash_k31(key);
@@ -142,7 +141,7 @@ kmint_t k31hash_get_deb(struct k31hash_t *h, k31key_t key)
 	step = 0;
 	do {
 		i = (i + step * (step + 1) / 2) & mask;
-		fprintf(stderr, "i = %llu; keys[i] = %llu; key = %llu\n", i, h->keys[i], key);
+		fprintf(stderr, "i = %lu; keys[i] = %lu; key = %lu\n", i, h->keys[i], key);
 		if (h->keys[i] == key)
 			return i;
 		++step;
@@ -489,7 +488,7 @@ void k31hash_filter(struct k31hash_t *h, int adj_included)
 	uint32_t *sgts = h->sgts;
 	uint8_t *adjs = h->adjs;
 
-	kmint_t n_item, i, j, new_size, cur_size, cnt, n_probe, mask, step;
+	kmint_t n_item, i, j, new_size, cur_size, n_probe, mask, step;
 	k31key_t x, xt;
 	uint64_t k;
 	uint8_t a, at;
@@ -728,7 +727,7 @@ static inline kmint_t internal_k31_idhash_put(struct k31_idhash_t *h, k31key_t k
 
 static void k31_idhash_resize(struct k31_idhash_t *h)
 {
-	kmint_t i, old_size, j, step, n_probe, mask;
+	kmint_t i, old_size, n_probe, mask;
 	old_size = h->size;
 	h->size <<= 1;
 	h->n_probe = estimate_probe_3(h->size);

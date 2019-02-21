@@ -150,7 +150,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		n_e += (deg_fw + deg_rv);
 	}
 
-	assert(n_v == ndict->n_item);
+	assert(n_v == (gint_t)ndict->n_item);
 	struct asm_node_t *nodes = calloc(n_v * 2, sizeof(struct asm_node_t));
 	struct asm_edge_t *edges = calloc(n_e, sizeof(struct asm_edge_t));
 
@@ -162,7 +162,6 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		gint_t id_fw, id_rv;
 		int c, cur_c;
 		uint32_t *e_seq;
-		gint_t *adj;
 		gint_t e_len;
 
 		node_knum = IDHASH_KEY(ndict, i);
@@ -320,14 +319,14 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		}
 		if (edges[e].rc_id == -1) {
 			deb_dump_bin_seq("edge seq: ", edges[e].seq, edges[e].seq_len);
-			fprintf(stderr, "source = %lld; source reverse complement = %lld\n",
+			fprintf(stderr, "source = %ld; source reverse complement = %ld\n",
 				edges[e].source, nodes[edges[e].source].rc_id);
-			fprintf(stderr, "target = %lld; target reverse complement = %lld\n",
+			fprintf(stderr, "target = %ld; target reverse complement = %ld\n",
 				v, v_rc);
-			fprintf(stderr, "target rc deg = %lld\n", nodes[v_rc].deg);
+			fprintf(stderr, "target rc deg = %ld\n", nodes[v_rc].deg);
 			for (k = 0; k < nodes[v_rc].deg; ++k) {
 				e_rc = nodes[v_rc].adj[k];
-				fprintf(stderr, "edges: (id = %lld) (%lld) -> (%lld)\n",
+				fprintf(stderr, "edges: (id = %ld) (%ld) -> (%ld)\n",
 					e_rc, edges[e_rc].source, edges[e_rc].target);
 				deb_dump_bin_seq("edge seq: ", edges[e_rc].seq, edges[e_rc].seq_len);
 			}
@@ -411,7 +410,7 @@ static void inc_count_edge(k63key_t knum, k63key_t krev, int c, struct asm_graph
 static void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *graph,
 			struct k63_idhash_t *edict, struct k63_idhash_t *ndict)
 {
-	int i, last, ci, ck, len, lmc, kedge;
+	int i, last, ci, len, lmc, kedge;
 	char *seq;
 	len = r->len;
 	seq = r->seq;
@@ -439,7 +438,6 @@ static void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *gra
 			last = 0;
 		}
 		if (last >= kedge) {
-			ck = nt4_table[(int)seq[i - ksize]] ^ 3;
 			/*
 			 * firstly, we find the edge
 			 * increase count of edge

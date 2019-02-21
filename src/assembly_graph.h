@@ -44,4 +44,8 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
 
+void save_asm_graph(struct asm_graph_t *g, const char *path);
+
+void load_asm_graph(struct asm_graph_t *g, const char *path);
+
 #endif  /* __ASSEMBLY_GRAPH_H__ */

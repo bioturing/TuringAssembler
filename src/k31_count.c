@@ -9,6 +9,7 @@
 #include "k31hash.h"
 #include "k31_count.h"
 #include "kseq.h"
+#include "test.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -51,7 +52,7 @@ struct maincount_bundle_t {
 static void count_lazy_from_read(struct read_t *r, struct k31hash_t *h,
 					int ksize, pthread_mutex_t *lock_hash)
 {
-	int i, last, last_i, ci, ck, len, lmc, kedge;
+	int i, last, ci, ck, len, lmc, kedge;
 	char *seq;
 	len = r->len;
 	seq = r->seq;
@@ -266,7 +267,7 @@ static void k31_test_hash(struct k31hash_t *h)
 			++cnt;
 			k = k31hash_get(h, h->keys[i]);
 			if (k == KMHASH_END(h)) {
-				fprintf(stderr, "i = %llu; key = %llu\n", i, h->keys[i]);
+				fprintf(stderr, "i = %lu; key = %lu\n", i, h->keys[i]);
 				assert(0);
 			}
 		}
@@ -284,7 +285,7 @@ static void k31_check_sum(struct k31hash_t *h)
 			sum += h->keys[i];
 		}
 	}
-	fprintf(stderr, "check sum = %llu\n", sum);
+	fprintf(stderr, "check sum = %lu\n", sum);
 }
 
 static void k31_check_edge(struct k31hash_t *h, int ksize)
@@ -344,7 +345,7 @@ static void k31_check_edge(struct k31hash_t *h, int ksize)
 		}
 	}
 
-	__VERBOSE("Check edge kmhash done. Sum degree = %llu\n", sum_deg);
+	__VERBOSE("Check edge kmhash done. Sum degree = %lu\n", sum_deg);
 }
 
 void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksize)

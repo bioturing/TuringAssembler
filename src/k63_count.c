@@ -9,6 +9,7 @@
 #include "k63hash.h"
 #include "k63_count.h"
 #include "kseq.h"
+#include "test.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -328,7 +329,7 @@ static void k63_check_edge(struct k63hash_t *h, int ksize)
 		}
 	}
 
-	__VERBOSE("Check edge kmhash done. Sum degree = %llu\n", sum_deg);
+	__VERBOSE("Check edge kmhash done. Sum degree = %ld\n", sum_deg);
 }
 
 void k63_correct_edge(struct k63hash_t *h, int ksize)
