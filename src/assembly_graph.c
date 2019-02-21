@@ -290,6 +290,12 @@ void asm_get_cc(struct asm_graph_t *g, gint_t *id_node, gint_t *id_edge,
 
 void dump_fasta(struct asm_graph_t *g, const char *path)
 {
+	gint_t *id_node, *id_edge, *cc_size;
+	id_node = malloc(g->n_v * sizeof(gint_t));
+	id_edge = malloc(g->n_e * sizeof(gint_t));
+	cc_size = NULL;
+	asm_get_cc(g, id_node, id_edge, &cc_size);
+
 	FILE *fp = xfopen(path, "w");
 	char *seq = NULL;
 	int seq_len = 0;
@@ -299,7 +305,8 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
-		if (g->edges[e].seq_len < 100)
+		gint_t cc_id = id_edge[e];
+		if (cc_size[cc_id] < 250 || g->edges[e].seq_len < 100)
 			continue;
 		if (seq_len < g->edges[e].seq_len + 1) {
 			seq_len = g->edges[e].seq_len + 1;
@@ -318,6 +325,11 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 		}
 	}
 	fclose(fp);
+
+	free(id_edge);
+	free(id_node);
+	free(cc_size);
+
 }
 
 void write_gfa(struct asm_graph_t *g, const char *path)
