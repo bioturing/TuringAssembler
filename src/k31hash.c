@@ -338,8 +338,8 @@ void k31hash_resize_single(struct k31hash_t *h, int adj_included)
 	memset(h->sgts + (old_size >> 5), 0,
 			((size >> 5) - (old_size >> 5)) * sizeof(uint32_t));
 	if (adj_included) {
-		adjs = h->adjs;
 		h->adjs = realloc(h->adjs, h->size * sizeof(uint8_t));
+		adjs = h->adjs;
 		memset(adjs + old_size, 0, (size - old_size) * sizeof(uint8_t));
 	}
 	flag = calloc(h->size, sizeof(uint8_t));

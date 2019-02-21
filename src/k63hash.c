@@ -67,7 +67,7 @@ static kmint_t internal_k63hash_put(struct k63hash_t *h, k63key_t key)
 		} else if (cur_flag == KMFLAG_LOADING) {
 			continue;
 		} else { /* KMFLAG_NEW */
-			if (__k63_equal(h->keys[i], key))
+			if (__k63_equal(*((volatile k63key_t *)(h->keys + i)), key))
 				return i;
 			++step;
 		}
@@ -92,13 +92,13 @@ static kmint_t internal_k63hash_singleton_put(struct k63hash_t *h, k63key_t key)
 								KMFLAG_LOADING);
 		if (cur_flag == KMFLAG_EMPTY) {
 			h->keys[i] = key;
-			h->flag[i] = KMFLAG_NEW;
 			atomic_add_and_fetch_kmint(&(h->n_item), 1);
+			h->flag[i] = KMFLAG_NEW;
 			return i;
 		} else if (cur_flag == KMFLAG_LOADING) {
 			continue;
 		} else { /* KMFLAG_NEW */
-			if (__k63_equal(h->keys[i], key)) {
+			if (__k63_equal(*((volatile k63key_t *)(h->keys + i)), key)) {
 				atomic_set_bit32(h->sgts + (i >> 5), i & 31);
 				return i;
 			}
@@ -121,7 +121,7 @@ kmint_t k63hash_get(struct k63hash_t *h, k63key_t key)
 		i = (i + step * (step + 1) / 2) & mask;
 		if (h->flag[i] == KMFLAG_EMPTY)
 			return KMHASH_END(h);
-		if (__k63_equal(h->keys[i], key))
+		if (__k63_equal(*((volatile k63key_t *)(h->keys + i)), key))
 			return i;
 		++step;
 	} while (step <= n_probe);
@@ -382,11 +382,11 @@ void k63hash_resize(struct k63hash_t *h, int adj_included)
 			(unsigned long long)h->n_item,
 			(unsigned long long)KMHASH_MAX_SIZE);
 
-	k63hash_resize_single(h, adj_included);
-	// if (h->size <= KMHASH_SINGLE_RESIZE)
-	// 	k63hash_resize_single(h, adj_included);
-	// else
-	// 	k63hash_resize_multi(h, adj_included);
+	// k63hash_resize_single(h, adj_included);
+	if (h->size <= KMHASH_SINGLE_RESIZE)
+		k63hash_resize_single(h, adj_included);
+	else
+		k63hash_resize_multi(h, adj_included);
 
 	for (i = 0; i < h->n_worker; ++i)
 		pthread_mutex_unlock(h->locks + i);
