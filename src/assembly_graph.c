@@ -77,6 +77,20 @@ void k63_process(struct opt_count_t *opt)
 	dump_fasta(g2, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.bin");
 	save_asm_graph(g2, path);
+
+	__VERBOSE("\nRemoving bubble\n");
+	struct asm_graph_t *g3;
+	g3 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g2, g3);
+	__VERBOSE_LOG("Graph #4", "Number of nodes: %lld\n", (long long)g3->n_v);
+	__VERBOSE_LOG("Graph #4", "Number of edges: %lld\n", (long long)g3->n_e);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.gfa");
+	write_gfa(g3, path);
+	test_asm_graph(g3);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.fasta");
+	dump_fasta(g3, path);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.bin");
+	save_asm_graph(g3, path);
 }
 
 void k31_process(struct opt_count_t *opt)
@@ -133,6 +147,20 @@ void k31_process(struct opt_count_t *opt)
 	dump_fasta(g2, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.bin");
 	save_asm_graph(g2, path);
+
+	__VERBOSE("\nRemoving bubble\n");
+	struct asm_graph_t *g3;
+	g3 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g2, g3);
+	__VERBOSE_LOG("Graph #4", "Number of nodes: %lld\n", (long long)g3->n_v);
+	__VERBOSE_LOG("Graph #4", "Number of edges: %lld\n", (long long)g3->n_e);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.gfa");
+	write_gfa(g3, path);
+	test_asm_graph(g3);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.fasta");
+	dump_fasta(g3, path);
+	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.bin");
+	save_asm_graph(g3, path);
 }
 
 static uint32_t *append_bin_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
@@ -356,8 +384,12 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			seq = realloc(seq, seq_len);
 		}
 		dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+		double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
+		uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
+		// fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
+		// 			(long long unsigned)g->edges[e].count);
 		fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
-					(long long unsigned)g->edges[e].count);
+					(long long unsigned)fake_count);
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t cc_id = id_edge[e];
@@ -395,6 +427,59 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 	free(id_edge);
 	free(id_node);
 	free(cc_size);
+}
+
+void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	/* "Don't you want a balloon?"
+	 *        u            v
+	 * o----->o----------->o------>o
+	 *         \           ^
+	 *          \          |
+	 *           +---------+
+	 */
+	gint_t cnt_rm = 0;
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		if (u % 1000 == 0)
+			fprintf(stderr, "\rRemoving bubble node %llu", u);
+		gint_t u_rc = g0->nodes[u].rc_id;
+		if (g0->nodes[u_rc].deg != 1 || g0->nodes[u].deg != 2)
+			continue;
+		gint_t e0, e1;
+		e0 = g0->nodes[u].adj[0];
+		e1 = g0->nodes[u].adj[1];
+		if (g0->edges[e0].target != g0->edges[e1].target)
+			continue;
+		gint_t v, v_rc;
+		v = g0->edges[e0].target;
+		v_rc = g0->nodes[v].rc_id;
+		if (g0->nodes[v_rc].deg != 2 || g0->nodes[v].deg != 1)
+			continue;
+		gint_t e_rc0, e_rc1;
+		e_rc0 = g0->nodes[v_rc].adj[0];
+		e_rc1 = g0->nodes[v_rc].adj[1];
+		assert(g0->edges[e_rc0].target == g0->edges[e_rc1].target);
+		/* keep the longer edge */
+		gint_t e;
+		if (g0->edges[e0].seq_len > g0->edges[e1].seq_len)
+			e = e0;
+		else
+			e = e1;
+		g0->nodes[u].adj[0] = e;
+		g0->nodes[u].deg = 1;
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj, sizeof(gint_t));
+		g0->edges[e].count = g0->edges[e0].count + g0->edges[e1].count;
+
+		assert(g0->edges[e].rc_id == e_rc0 || g0->edges[e].rc_id == e_rc1);
+		g0->nodes[v_rc].adj[0] = g0->edges[e].rc_id;
+		g0->nodes[v_rc].deg = 1;
+		g0->nodes[v_rc].adj = realloc(g0->nodes[v_rc].adj, sizeof(gint_t));
+		g0->edges[g0->edges[e].rc_id].count = g0->edges[e_rc0].count + g0->edges[e_rc1].count;
+		++cnt_rm;
+	}
+	__VERBOSE("\nNumber of removed edges: %lld\n", cnt_rm);
+	asm_condense(g0, g);
 }
 
 struct edge_cov_t {
