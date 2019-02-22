@@ -10,6 +10,8 @@
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
 
+#include "pthread_barrier.h"
+
 typedef int64_t gint_t;
 
 struct read_t {

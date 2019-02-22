@@ -20,6 +20,7 @@ SRC = 						\
       src/k31_build.c 				\
       src/k31_count.c 				\
       src/k31hash.c 				\
+      src/pthread_barrier.c 			\
       src/semaphore_wrapper.c 			\
       src/time_utils.c 				\
       src/utils.c 				\

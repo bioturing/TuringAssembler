@@ -12,6 +12,7 @@
 // #include <string.h>
 // #include <stdbool.h>
 #include <assert.h>
+#include "pthread_barrier.h"
 // #include <stdint.h>
 // #include <stdarg.h>
 // #include <math.h>
