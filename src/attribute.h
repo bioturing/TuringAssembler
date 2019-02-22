@@ -1,6 +1,7 @@
 #ifndef _ATTRIBUTE_H_
 #define _ATTRIBUTE_H_
 
+#include <pthread.h>
 #include <stdint.h>
 
 #define SIZE_1MB		1048576
@@ -9,14 +10,9 @@
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
 
-#include "khash.h"
-#include "mac_attr.h"
-KHASH_DECLARE(kvert, uint64_t, struct kvert_info_t)
+#include "pthread_barrier.h"
 
-struct kvert_info_t {
-	int idx;
-	uint32_t cnt;
-};
+typedef int64_t gint_t;
 
 struct read_t {
 	char *seq;

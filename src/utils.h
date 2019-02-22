@@ -12,7 +12,7 @@
 // #include <string.h>
 // #include <stdbool.h>
 #include <assert.h>
-#include "mac_attr.h"
+#include "pthread_barrier.h"
 // #include <stdint.h>
 // #include <stdarg.h>
 // #include <math.h>
@@ -81,6 +81,8 @@
 				 (x) |= (x) >> 32, ++(x))
 
 #define __is_sep(c)		((c) == ' ' || (c) == '\t')
+
+#define __rotl64(x, r) (((x) << (r)) | ((x) >> (64 - (r))))
 
 #define normalize_mapq(s)	do {					       \
 	if ((s) < 0) (s) = 0;						       \

@@ -3,15 +3,14 @@
 
 #include <stdint.h>
 
-#include "kmhash.h"
-
-typedef int64_t gint_t;
+#include "attribute.h"
+#include "k31hash.h"
+#include "k63hash.h"
 
 struct asm_node_t {
-	/* node represents a 31-mer */
-	kmkey_t seq;
-	gint_t forward_adj[4];
-	gint_t reverse_adj[4];
+	gint_t rc_id;
+	gint_t deg;
+	gint_t *adj;
 };
 
 struct asm_edge_t {
@@ -31,5 +30,22 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
-void test_graph_build(struct asm_graph_t *graph);
+void k31_process(struct opt_count_t *opt);
+
+void k63_process(struct opt_count_t *opt);
+
+void test_asm_graph(struct asm_graph_t *g);
+
+void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
+			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
+
+void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
+			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
+
+int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
+
+void save_asm_graph(struct asm_graph_t *g, const char *path);
+
+void load_asm_graph(struct asm_graph_t *g, const char *path);
+
 #endif  /* __ASSEMBLY_GRAPH_H__ */

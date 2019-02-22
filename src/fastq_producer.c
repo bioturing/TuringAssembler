@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "fastq_producer.h"
 #include "utils.h"
 
