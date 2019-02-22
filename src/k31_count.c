@@ -59,7 +59,7 @@ static void count_lazy_from_read(struct read_t *r, struct k31hash_t *h,
 
 	k31key_t knum, krev, pknum, pkrev, kmask;
 	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
-	knum = krev = 0;
+	knum = krev = pknum = pkrev = 0;
 	last = 0;
 	lmc = (ksize - 1) << 1;
 	kedge = ksize + 1;

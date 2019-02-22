@@ -86,7 +86,7 @@ static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
 	k63key_t knum, krev, pknum, pkrev, kmask;
 	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
+	knum = krev = pknum = pkrev = (k63key_t){{0ull, 0ull}};
 	last = 0;
 	lmc = (ksize - 1) << 1;
 	kedge = ksize + 1;
@@ -108,6 +108,7 @@ static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
 			else
 				k63hash_put_adj(h, krev, lock_hash);
 		}
+
 		if (last >= kedge) {
 			ck = nt4_table[(int)seq[i - ksize]] ^ 3;
 

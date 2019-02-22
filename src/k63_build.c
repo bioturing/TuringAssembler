@@ -418,7 +418,7 @@ static void count_edge_read(struct read_t *r, int ksize, struct asm_graph_t *gra
 	k63key_t knum, krev, pknum, pkrev, kmask;
 	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
+	knum = krev = pknum = pkrev = (k63key_t){{0ull, 0ull}};
 	last = 0;
 	lmc = (ksize - 1) << 1;
 	kedge = ksize + 1;
