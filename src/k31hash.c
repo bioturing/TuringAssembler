@@ -34,6 +34,8 @@
 void save_k31hash(struct k31hash_t *h, const char *path)
 {
 	FILE *fp = xfopen(path, "wb");
+	char *sig = "kh31";
+	xfwrite(sig, 4, 1, fp);
 	xfwrite(&h->size, sizeof(kmint_t), 1, fp);
 	xfwrite(&h->n_item, sizeof(kmint_t), 1, fp);
 	xfwrite(h->keys, sizeof(k31key_t), h->size, fp);
@@ -44,6 +46,10 @@ void save_k31hash(struct k31hash_t *h, const char *path)
 void load_k31hash(struct k31hash_t *h, const char *path)
 {
 	FILE *fp = xfopen(path, "rb");
+	char sig[5];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "kh31", 4))
+		__ERROR("Not k31 hash table file format");
 	xfread(&h->size, sizeof(kmint_t), 1, fp);
 	xfread(&h->n_item, sizeof(kmint_t), 1, fp);
 	h->n_probe = estimate_probe_3(h->size);

@@ -26,11 +26,19 @@ struct read_t {
 struct opt_count_t {
 	int n_threads;
 	int hash_size;
-	int kmer_master;
-	int kmer_slave;
+	int k0;
+	int k1;
+	int k2;
 	int filter_thres;
 	int n_files;
 	char **files_1, **files_2;
+	char *out_dir;
+};
+
+struct opt_build_t {
+	int n_threads;
+	int hash_size;
+	char *in_path;
 	char *out_dir;
 };
 

@@ -25,6 +25,115 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g);
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 			gint_t len, gint_t max_len, int ksize);
 
+void k63_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	struct k63hash_t *kmer_hash;
+	kmer_hash = calloc(1, sizeof(struct k63hash_t));
+	__VERBOSE("Estimating kmer\n");
+	build_k63_table_lazy(opt, kmer_hash, ksize);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("\nBuilding assembly graph\n");
+	build_asm_graph_from_k63(opt, ksize, kmer_hash, g0);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of nodes: %lld\n", ksize,
+							(long long)g0->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of edges: %lld\n", ksize,
+							(long long)g0->n_e);
+}
+
+void k31_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	struct k31hash_t *kmer_hash;
+	kmer_hash = calloc(1, sizeof(struct k31hash_t));
+	__VERBOSE("Estimating kmer\n");
+	build_k31_table_lazy(opt, kmer_hash, ksize);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("\nBuilding assembly graph\n");
+	build_asm_graph_from_k31(opt, ksize, kmer_hash, g0);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of nodes: %lld\n", ksize,
+							(long long)g0->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of edges: %lld\n", ksize,
+							(long long)g0->n_e);
+}
+
+void assembly_process(struct opt_count_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building assembly graph using kmer size %d\n", opt->k0);
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	if (opt->k0 < 32)
+		k31_build0(opt, opt->k0, g0);
+	else if (opt->k0 > 32 && opt->k0 < 64)
+		k63_build0(opt, opt->k0, g0);
+	test_asm_graph(g0);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.gfa", opt->out_dir, opt->k0);
+	write_gfa(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.bin", opt->out_dir, opt->k0);
+	save_asm_graph(g0, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", opt->k0,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", opt->k0,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.gfa", opt->out_dir, opt->k0);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
+	save_asm_graph(g1, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips #2\n");
+	struct asm_graph_t *g2;
+	g2 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips_topology(g1, g2);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of nodes: %lld\n", opt->k0,
+							(long long)g2->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of edges: %lld\n", opt->k0,
+							(long long)g2->n_e);
+	test_asm_graph(g2);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.gfa", opt->out_dir, opt->k0);
+	write_gfa(g2, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g2, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
+	save_asm_graph(g2, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing bubbles\n");
+	struct asm_graph_t *g3;
+	g3 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g2, g3);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", opt->k0,
+							(long long)g3->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", opt->k0,
+							(long long)g3->n_e);
+	test_asm_graph(g3);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, opt->k0);
+	write_gfa(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
+	save_asm_graph(g3, path);
+}
+
 void k63_process(struct opt_count_t *opt)
 {
 	char path[1024];
@@ -33,7 +142,7 @@ void k63_process(struct opt_count_t *opt)
 	struct k63hash_t *kmer_hash;
 	kmer_hash = calloc(1, sizeof(struct k63hash_t));
 	__VERBOSE("Estimating kmer\n");
-	build_k63_table_lazy(opt, kmer_hash, opt->kmer_slave);
+	build_k63_table_lazy(opt, kmer_hash, opt->k0);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
@@ -41,7 +150,7 @@ void k63_process(struct opt_count_t *opt)
 	__VERBOSE("\nBuilding assembly graph\n");
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k63(opt, opt->kmer_slave, kmer_hash, g0);
+	build_asm_graph_from_k63(opt, opt->k0, kmer_hash, g0);
 	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
 	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.gfa");
@@ -104,7 +213,7 @@ void k31_process(struct opt_count_t *opt)
 	struct k31hash_t *kmer_hash;
 	kmer_hash = calloc(1, sizeof(struct k31hash_t));
 	__VERBOSE("Estimating kmer\n");
-	build_k31_table_lazy(opt, kmer_hash, opt->kmer_slave);
+	build_k31_table_lazy(opt, kmer_hash, opt->k0);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
@@ -112,7 +221,7 @@ void k31_process(struct opt_count_t *opt)
 	__VERBOSE("\nBuilding assembly graph\n");
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k31(opt, opt->kmer_slave, kmer_hash, g0);
+	build_asm_graph_from_k31(opt, opt->k0, kmer_hash, g0);
 	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
 	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.gfa");
@@ -817,6 +926,8 @@ void test_asm_graph(struct asm_graph_t *g)
 void save_asm_graph(struct asm_graph_t *g, const char *path)
 {
 	FILE *fp = xfopen(path, "wb");
+	char *sig = "asmg";
+	xfwrite(sig, 4, 1, fp);
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
@@ -841,6 +952,10 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 void load_asm_graph(struct asm_graph_t *g, const char *path)
 {
 	FILE *fp = xfopen(path, "rb");
+	char sig[4];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "asmg", 4))
+		__ERROR("Not assembly graph format file");
 	xfread(&g->ksize, sizeof(int), 1, fp);
 	xfread(&g->n_v, sizeof(gint_t), 1, fp);
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);

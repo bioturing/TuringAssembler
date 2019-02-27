@@ -377,8 +377,8 @@ void k31_test_process(struct opt_count_t *opt)
 	struct k31hash_t *hm;
 	hm = calloc(1, sizeof(struct k31hash_t));
 	__VERBOSE("Lazy count %d-mer with max word size %lu\n",
-		opt->kmer_master, (long unsigned)sizeof(k31key_t));
-	build_k31_table_lazy(opt, hm, opt->kmer_master);
-	test_kmer_count(opt, opt->kmer_master);
+		opt->k1, (long unsigned)sizeof(k31key_t));
+	build_k31_table_lazy(opt, hm, opt->k1);
+	test_kmer_count(opt, opt->k1);
 }
 

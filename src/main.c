@@ -23,8 +23,9 @@ void print_usage_assembly(const char *prog)
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         --kmer-small           <small kmer size>\n");
-	__VERBOSE("         --kmer-large           <large kmer size>\n");
+	__VERBOSE("         -k1                    <1st kmer size>\n");
+	__VERBOSE("         -k2                    <2nd kmer size>\n");
+	__VERBOSE("         -k3                    <3rd kmer size>\n");
 	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
 	__VERBOSE("         --help                 show help\n");
 }
@@ -51,13 +52,25 @@ struct opt_count_t *init_opt_count()
 	struct opt_count_t *opt;
 	opt = calloc(1, sizeof(struct opt_count_t));
 	opt->n_threads = 1;
-	opt->hash_size = (1 << 24);
-	opt->kmer_master = 31;
-	opt->kmer_slave = 17;
+	opt->hash_size = 1 << 24;
+	opt->k0 = 17;
+	opt->k1 = 31;
+	opt->k2 = 55;
 	opt->n_files = 0;
 	opt->filter_thres = 0;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
+	return opt;
+}
+
+struct opt_build_t *init_opt_build()
+{
+	struct opt_build_t *opt;
+	opt = calloc(1, sizeof(struct opt_build_t));
+	opt->n_threads = 1;
+	opt->hash_size = 1 << 24;
+	opt->out_dir = ".";
+	opt->in_path = NULL;
 	return opt;
 }
 
@@ -73,6 +86,35 @@ int opt_count_list(int argc, char *argv[])
 	return n;
 }
 
+struct opt_build_t *parse_build_option(int argc, char *argv[])
+{
+	int pos = 0, n;
+	struct opt_build_t *opt = init_opt_build();
+	while (pos < argc) {
+		if (!strcmp(argv[pos], "-t")) {
+			opt->n_threads = atoi(argv[pos + 1]);
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-o")) {
+			opt->out_dir = argv[pos + 1];
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-i")) {
+			opt->in_path = argv[pos + 1];
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-s")) {
+			opt->hash_size = atoi(argv[pos + 1]);
+			pos += 2;
+		} else {
+			__ERROR("Unknown option %s", argv[pos]);
+		}
+	}
+	if (opt->in_path == NULL) {
+		free(opt);
+		return NULL;
+	}
+	mkdir(opt->out_dir, 0755);
+	return opt;
+}
+
 struct opt_count_t *parse_count_option(int argc, char *argv[])
 {
 	int pos = 0, n;
@@ -84,11 +126,14 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "--kmer-small")) {
-			opt->kmer_slave = atoi(argv[pos + 1]);
+		} else if (!strcmp(argv[pos], "-k1")) {
+			opt->k0 = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "--kmer-large")) {
-			opt->kmer_master = atoi(argv[pos + 1]);
+		} else if (!strcmp(argv[pos], "-k2")) {
+			opt->k1 = atoi(argv[pos + 1]);
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-k3")) {
+			opt->k2 = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-o")) {
 			opt->out_dir = argv[pos + 1];
@@ -130,18 +175,8 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 	return opt;
 }
 
-void assembly_opt_process63(int argc, char *argv[])
+void print_opt_count_info(struct opt_count_t *opt, int argc, char *argv[])
 {
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/assembly.log");
-	init_log(tmp_dir);
-
 	int cmd_len = 0, i;
 	for (i = 0; i < argc; ++i)
 		cmd_len += strlen(argv[i]) + 1;
@@ -152,11 +187,11 @@ void assembly_opt_process63(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
 	free(cmd);
 
-	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
-	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
+	__VERBOSE_LOG("INFO", "k0: %d\n", opt->k0);
+	__VERBOSE_LOG("INFO", "k1: %d\n", opt->k1);
+	__VERBOSE_LOG("INFO", "k2: %d\n", opt->k2);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
 	if (opt->n_files == 0) {
 		__VERBOSE_LOG("INFO", "input: { stdin }\n");
 	} else {
@@ -190,8 +225,21 @@ void assembly_opt_process63(int argc, char *argv[])
 			free(list_files);
 		}
 	}
+}
+
+void assembly_opt_process63(int argc, char *argv[])
+{
+	struct opt_count_t *opt;
+	opt = parse_count_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_assembly(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char log_dir[1024];
+	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
+	init_log(log_dir);
+	print_opt_count_info(opt, argc, argv);
 	k63_process(opt);
-	// assembly_process(opt);
 }
 
 void assembly_opt_process31(int argc, char *argv[])
@@ -202,60 +250,26 @@ void assembly_opt_process31(int argc, char *argv[])
 		print_usage_assembly(argv[0]);
 		__ERROR("Error parsing arguments");
 	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/assembly.log");
-	init_log(tmp_dir);
-
-	int cmd_len = 0, i;
-	for (i = 0; i < argc; ++i)
-		cmd_len += strlen(argv[i]) + 1;
-	char *cmd = malloc(cmd_len);
-	cmd_len = 0;
-	for (i = 0; i < argc; ++i)
-		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
-	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
-	free(cmd);
-
-	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
-	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
-	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
-	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
-	if (opt->n_files == 0) {
-		__VERBOSE_LOG("INFO", "input: { stdin }\n");
-	} else {
-		if (opt->files_2 == NULL) {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + 2;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "%s" : "%s, ",
-						opt->files_1[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		} else {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
-						opt->files_1[i], opt->files_2[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		}
-	}
+	char log_dir[1024];
+	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
+	init_log(log_dir);
+	print_opt_count_info(opt, argc, argv);
 	k31_process(opt);
-	// assembly_process(opt);
+}
+
+void assembly_opt_process(int argc, char *argv[])
+{
+	struct opt_count_t *opt;
+	opt = parse_count_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_assembly(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char log_dir[1024];
+	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
+	init_log(log_dir);
+	print_opt_count_info(opt, argc, argv);
+	assembly_process(opt);
 }
 
 void test_opt_process(int argc, char *argv[])
@@ -269,55 +283,6 @@ void test_opt_process(int argc, char *argv[])
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
-
-	int cmd_len = 0, i;
-	for (i = 0; i < argc; ++i)
-		cmd_len += strlen(argv[i]) + 1;
-	char *cmd = malloc(cmd_len);
-	cmd_len = 0;
-	for (i = 0; i < argc; ++i)
-		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
-	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
-	free(cmd);
-
-	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
-	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
-	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
-	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
-	if (opt->n_files == 0) {
-		__VERBOSE_LOG("INFO", "input: { stdin }\n");
-	} else {
-		if (opt->files_2 == NULL) {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + 2;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "%s" : "%s, ",
-						opt->files_1[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		} else {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
-						opt->files_1[i], opt->files_2[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		}
-	}
 	// kmer_test_process(opt);
 }
 
@@ -332,55 +297,6 @@ void test63_opt_process(int argc, char *argv[])
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
-
-	int cmd_len = 0, i;
-	for (i = 0; i < argc; ++i)
-		cmd_len += strlen(argv[i]) + 1;
-	char *cmd = malloc(cmd_len);
-	cmd_len = 0;
-	for (i = 0; i < argc; ++i)
-		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
-	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
-	free(cmd);
-
-	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
-	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
-	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
-	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
-	if (opt->n_files == 0) {
-		__VERBOSE_LOG("INFO", "input: { stdin }\n");
-	} else {
-		if (opt->files_2 == NULL) {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + 2;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "%s" : "%s, ",
-						opt->files_1[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		} else {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
-						opt->files_1[i], opt->files_2[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		}
-	}
 	k63_test_process(opt);
 }
 
@@ -395,57 +311,24 @@ void test31_opt_process(int argc, char *argv[])
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
 	init_log(tmp_dir);
-
-	int cmd_len = 0, i;
-	for (i = 0; i < argc; ++i)
-		cmd_len += strlen(argv[i]) + 1;
-	char *cmd = malloc(cmd_len);
-	cmd_len = 0;
-	for (i = 0; i < argc; ++i)
-		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
-	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
-	free(cmd);
-
-	__VERBOSE_LOG("INFO", "large kmer size: %d\n", opt->kmer_master);
-	__VERBOSE_LOG("INFO", "small kmer size: %d\n", opt->kmer_slave);
-	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
-	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	// __VERBOSE_LOG("INFO", "cut off with kmer count less or equal: %d\n", opt->filter_thres);
-	if (opt->n_files == 0) {
-		__VERBOSE_LOG("INFO", "input: { stdin }\n");
-	} else {
-		if (opt->files_2 == NULL) {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + 2;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "%s" : "%s, ",
-						opt->files_1[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		} else {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
-						opt->files_1[i], opt->files_2[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		}
-	}
 	k31_test_process(opt);
 }
+
+void build_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	init_log(tmp_dir);
+	build_process(opt);
+}
+
+// ./skipping asm_graph0 -g <graph.bin> -o <output_folder>
 
 int main(int argc, char *argv[])
 {
@@ -458,12 +341,18 @@ int main(int argc, char *argv[])
 		assembly_opt_process31(argc, argv);
 	else if (!strcmp(argv[1], "assembly63"))
 		assembly_opt_process63(argc, argv);
-	else if (!strcmp(argv[1], "test"))
-		test_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "assembly"))
+		assembly_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "test63"))
 		test63_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "test31"))
 		test31_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "count31"))
+		count31_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "count63"))
+		count63_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build"))
+		build_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 

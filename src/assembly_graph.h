@@ -30,6 +30,8 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
+void assembly_process(struct opt_count_t *opt);
+
 void k31_process(struct opt_count_t *opt);
 
 void k63_process(struct opt_count_t *opt);
