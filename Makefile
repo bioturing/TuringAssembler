@@ -1,8 +1,8 @@
-GCC = gcc
+GCC = clang
 
 AR = ar
 
-LIBS = -pthread -flto -lm -lz -fsanitize=undefined,address
+LIBS = -L./ -pthread -flto -lm -lz -fsanitize=undefined,address
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
 
@@ -28,8 +28,24 @@ SRC = 						\
       src/test_hash_count.c 			\
       src/main.c
 
+OBJS= src/dqueue.o src/assembly_graph.o src/fastq_producer.o src/get_buffer.o \
+	  src/io_utils.o src/k63_build.o src/k63_count.o src/k63hash.o src/k31_build.o \
+	  src/k31_count.o src/k31hash.o src/pthread_barrier.o src/semaphore_wrapper.o \
+	  src/time_utils.o src/utils.o src/verbose.o  src/test_hash_count.o
+
 $(EXEC):
 	$(CC) -o $(EXEC) $(CFLAGS) $(SRC) $(LIBS)
+
+.SUFFIXES:.c .o
+
+.c.o:
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@
+
+libskip.a: $(OBJS)
+	$(AR) -csru $@ $(OBJS)
+
+simple: $(OBJS) libskip.a src/simple.o
+	$(CC) -o simple src/simple.o $(CFLAGS) $(LIBS) -lskip
 
 all: $(EXEC)
 
@@ -40,3 +56,4 @@ mem: $(EXEC)
 
 clean:
 	rm -f $(EXEC)
+	rm -rf libskip.a
