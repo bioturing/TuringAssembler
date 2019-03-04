@@ -501,7 +501,7 @@ void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
 	gint_t k, l, r;
 	gint_t *q = malloc(g->n_e * sizeof(gint_t));
 
-	for (k = 0; k < g->n_v; ++k) {
+	for (k = 0; k < g->n_e; ++k) {
 		if (id_edge[k] != -1)
 			continue;
 		id_edge[k] = id_edge[g->edges[k].rc_id] = n_cc;
