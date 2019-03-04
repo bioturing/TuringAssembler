@@ -37,27 +37,42 @@ uint32_t get_genome_cov(struct asm_graph_t *g0)
   return cov / cnt;
 }
 
-int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i)
+int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i, int cnt)
 {
   assert(v[i].deg == 2);
-  return (e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG && e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG);
+  return (((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + 
+          (e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt);
 }
-/* \      /
- *  \----/
- *  /    \
- * /      \
- */        
+
+int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
+{
+  gint_t u;
+  u = e[i].target;
+  gint_t j = e[v[u].adj[0]].seq_len > MIN_BRIDGE_LEG ? v[u].adj[1] : v[u].adj[0];
+  if (e[j].target == e[i].source && e[i].source == e[j].target)
+    return 1;
+  return 0;
+}
+
+/* \                         /
+ *  \                       /  
+ *   \                     / 
+ *    \_______bridge______/
+ *    /                   \
+ *   /                     \
+ *  /                       \
+ * /                         \
+ */                           
 void find_bridge(struct asm_graph_t *g0)
 {
   int i;
-  int ret;
+  int ret, flag, loop;
   gint_t r_src;
   gint_t src, dest;
   struct asm_edge_t *e = g0->edges;
   struct asm_node_t *v = g0->nodes;
 
   khash_t(khInt) *set_v; // for keeping visited nodes
-  khint_t k;
   set_v = kh_init(khInt);
 
   gint_t *id_node, *id_edge, *cc_size; // for the connected component
@@ -68,20 +83,32 @@ void find_bridge(struct asm_graph_t *g0)
   asm_get_cc(g0, id_node, id_edge, &cc_size);
 
   for (i = 0 ; i < g0->n_e; i++){
+    cc_id = id_edge[i];
+    if (cc_size[cc_id] < MIN_COMPONENT || kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
+      continue;
     src = e[i].source;
     dest = e[i].target;
     r_src = v[src].rc_id;
+    flag = 0;
     if (v[r_src].deg == 2 && v[dest].deg == 2){
-      cc_id = id_edge[i];
-      if (is_lg_leg(e, v, r_src) && 
-          is_lg_leg(e, v, dest) &&
-          cc_size[cc_id] > MIN_COMPONENT &&
-          kh_get(khInt, set_v, i) == kh_end(set_v))
-      __VERBOSE("Edge %d\n, component size %d\n", i, cc_size[cc_id]);
-      kh_put(khInt, set_v, i, &ret);
-      kh_put(khInt, set_v, e[i].rc_id, &ret);
+      if (is_lg_leg(e, v, r_src, 2) && is_lg_leg(e, v, dest, 2)){ //neighbor edges must be large
+          __VERBOSE("Edge %d\n - bridge\n", i);
+          flag = 1;
+      } else if (is_lg_leg(e, v, r_src, 1) && is_lg_leg(e, v, dest, 1)){ //1 neighbor edge must be large
+          if (is_trivial_loop(e, v, i)){
+            __VERBOSE("Edge %d\n - loop\n", i);
+            flag = 1;
+          }
+      }
     }
+      if (flag){
+        kh_put(khInt, set_v, i, &ret);
+        kh_put(khInt, set_v, e[i].rc_id, &ret);
+      }
   }
+  kh_destroy(khInt, set_v);
+  free(id_node);
+  free(id_edge);
 }
 
 void find_forest(struct asm_graph_t *g0)
