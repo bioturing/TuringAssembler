@@ -4,10 +4,6 @@
 #include "simple.h"
 
 #include "io_utils.h"
-#include "k31hash.h"
-#include "k63hash.h"
-#include "k31_count.h"
-#include "k63_count.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
@@ -15,6 +11,7 @@
 #define MIN_CON_LEN 7000
 #define MIN_RATIO_COV 1.7
 #define MIN_BRIDGE_LEG 7000
+#define MIN_COMPONENT 250
 
 static uint64_t g_cov;
 
@@ -53,17 +50,36 @@ int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i)
 void find_bridge(struct asm_graph_t *g0)
 {
   int i;
+  int ret;
   gint_t r_src;
   gint_t src, dest;
   struct asm_edge_t *e = g0->edges;
   struct asm_node_t *v = g0->nodes;
+
+  khash_t(khInt) *set_v; // for keeping visited nodes
+  khint_t k;
+  set_v = kh_init(khInt);
+
+  gint_t *id_node, *id_edge, *cc_size; // for the connected component
+  gint_t cc_id;
+  id_node = malloc(g0->n_v * sizeof(gint_t));
+  id_edge = malloc(g0->n_e * sizeof(gint_t));
+  cc_size = NULL;
+  asm_get_cc(g0, id_node, id_edge, &cc_size);
+
   for (i = 0 ; i < g0->n_e; i++){
     src = e[i].source;
     dest = e[i].target;
     r_src = v[src].rc_id;
     if (v[r_src].deg == 2 && v[dest].deg == 2){
-      if (is_lg_leg(e, v, r_src) && is_lg_leg(e, v, dest))
-      __VERBOSE("Edge %d\n", i);
+      cc_id = id_edge[i];
+      if (is_lg_leg(e, v, r_src) && 
+          is_lg_leg(e, v, dest) &&
+          cc_size[cc_id] > MIN_COMPONENT &&
+          kh_get(khInt, set_v, i) == kh_end(set_v))
+      __VERBOSE("Edge %d\n, component size %d\n", i, cc_size[cc_id]);
+      kh_put(khInt, set_v, i, &ret);
+      kh_put(khInt, set_v, e[i].rc_id, &ret);
     }
   }
 }

@@ -46,8 +46,26 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
 
+/* @abstract: Serialize assembly graph
+ * @param g: pointer of the graph
+ * @param path: serialized graph file path
+ * @return : Save the graph into the file
+ * */
 void save_asm_graph(struct asm_graph_t *g, const char *path);
 
+/* @abstract: Load the serialized assembly graph
+ * @param g: pointer of the graph
+ * @param path: serialized graph file path
+ * @return : load the graph into the pointer
+ */
 void load_asm_graph(struct asm_graph_t *g, const char *path);
+
+/* @abstract: Get the connected component of the graph
+ * @param g: graph struct
+ * @param id_node: connected component identity of each node
+ * @param id_edge: connected component identity of each edge
+ * @param ret_size: component sizes
+ */
+void asm_get_cc(struct asm_graph_t *g, gint_t *id_node, gint_t *id_edge, gint_t **ret_size);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
