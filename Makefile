@@ -1,6 +1,6 @@
 GCC = gcc
 
-AR = gcc-ar
+AR = ar
 
 LIBS = -L./ -pthread -flto -lm -lz -fsanitize=undefined,address
 
