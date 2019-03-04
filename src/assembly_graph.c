@@ -138,7 +138,7 @@ void build1_2_process(struct opt_build_t *opt)
 	load_asm_graph(g0, opt->in_path);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips\n");
+	__VERBOSE("Removing tips using graph topology\n");
 	struct asm_graph_t *g1;
 	g1 = calloc(1, sizeof(struct asm_graph_t));
 	remove_tips_topology(g0, g1);
@@ -152,6 +152,33 @@ void build1_2_process(struct opt_build_t *opt)
 	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, g0->ksize);
 	dump_fasta(g1, path);
 	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0->ksize);
+	save_asm_graph(g1, path);
+}
+
+void build2_3_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing simple branching\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", g0->ksize,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, g0->ksize);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, g0->ksize);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, g0->ksize);
 	save_asm_graph(g1, path);
 }
 
@@ -633,30 +660,55 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	/* "Don't you want a balloon?"
-	 *        u            v
-	 * o----->o----------->o------>o
-	 *         \           ^
-	 *          \          |
-	 *           +---------+
+	 * 1g = 1 genome walk
+	 *                   0.8g
+	 *                +--------+
+	 *               /          \
+	 *       1g     /            v    1g
+	 * o---------->U             V--------->o
+	 *              \            ^
+	 *               \   0.3g   /
+	 *                +--------+
 	 */
+	double uni_cov = get_uni_genome_coverage(g0);
+	__VERBOSE("1 genome walk coverage: %lf\n", uni_cov);
 	gint_t cnt_rm = 0;
 	gint_t u;
 	for (u = 0; u < g0->n_v; ++u) {
 		if (u % 1000 == 0)
 			fprintf(stderr, "\rRemoving bubble node %ld", u);
+		gint_t ctg;
+		double cov;
+		/* check topology of node u */
 		gint_t u_rc = g0->nodes[u].rc_id;
 		if (g0->nodes[u_rc].deg != 1 || g0->nodes[u].deg != 2)
 			continue;
+		/* check if previous contig is uni genome walk */
+		ctg = g0->nodes[u_rc].adj[0];
+		cov = g0->edges[ctg].count * 1.0 /
+			(g0->edges[ctg].seq_len - g0->ksize);
+		if (cov / uni_cov < 0.75 || cov / uni_cov > 1.25)
+			continue;
+
+		/* check topology of 2 small contigs (end at same node) */
 		gint_t e0, e1;
 		e0 = g0->nodes[u].adj[0];
 		e1 = g0->nodes[u].adj[1];
 		if (g0->edges[e0].target != g0->edges[e1].target)
 			continue;
+		/* check topology of node v */
 		gint_t v, v_rc;
 		v = g0->edges[e0].target;
 		v_rc = g0->nodes[v].rc_id;
 		if (g0->nodes[v_rc].deg != 2 || g0->nodes[v].deg != 1)
 			continue;
+		/* check if next contig is uni genome walk */
+		ctg = g0->nodes[v].adj[0];
+		cov = g0->edges[ctg].count * 1.0 /
+			(g0->edges[ctg].seq_len - g0->ksize);
+		if (cov / uni_cov < 0.75 || cov / uni_cov > 1.25)
+			continue;
+
 		gint_t e_rc0, e_rc1;
 		e_rc0 = g0->nodes[v_rc].adj[0];
 		e_rc1 = g0->nodes[v_rc].adj[1];
