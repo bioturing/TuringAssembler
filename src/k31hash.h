@@ -99,4 +99,22 @@ kmint_t k31_idhash_get(struct k31_idhash_t *h, k31key_t key);
 
 kmint_t k31_idhash_put(struct k31_idhash_t *h, k31key_t key);
 
+/***************************** Table for barcode ******************************/
+
+struct barcode_hash_t {
+	uint32_t size;
+	uint32_t n_item;
+
+	k31key_t *keys;
+	uint32_t *cnts;
+};
+
+void barcode_hash_init(struct barcode_hash_t *h, uint32_t size);
+
+void barcode_hash_clean(struct barcode_hash_t *h);
+
+uint32_t barcode_hash_get(struct barcode_hash_t *h, k31key_t key);
+
+uint32_t barcode_hash_put(struct barcode_hash_t *h, k31key_t key);
+
 #endif

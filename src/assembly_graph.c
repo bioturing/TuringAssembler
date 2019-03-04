@@ -12,7 +12,7 @@
 #include "verbose.h"
 
 #define TIPS_THRESHOLD			5.0
-#define TIPS_RATIO_THRESHOLD		0.1
+#define TIPS_RATIO_THRESHOLD		0.0625
 
 #define NON_TIPS_LEN			250
 
@@ -843,7 +843,7 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 				continue;
 			cov = g0->edges[e_id].count * 1.0 /
 					(g0->edges[e_id].seq_len - g0->ksize);
-			if (cov / max_cov < TIPS_RATIO_THRESHOLD && cov < TIPS_THRESHOLD) {
+			if (cov / max_cov < TIPS_RATIO_THRESHOLD) {
 				gint_t v, v_rc;
 				v = g0->edges[e_id].target;
 				v_rc = g0->nodes[v].rc_id;

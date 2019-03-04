@@ -30,6 +30,24 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
+struct asm_edge2_t {
+	uint64_t count;
+	uint32_t *seq;
+	gint_t seq_len;
+	gint_t source;
+	gint_t target;
+	gint_t rc_id;
+	struct barcode_hash_t *bc_bucks;
+};
+
+struct asm_graph2_t {
+	int ksize;
+	gint_t n_v, n_e;
+
+	struct asm_node_t *nodes;
+	struct asm_edge_t *edges;
+};
+
 void assembly_process(struct opt_count_t *opt);
 
 void k31_process(struct opt_count_t *opt);
