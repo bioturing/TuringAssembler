@@ -1,6 +1,6 @@
-GCC = clang
+GCC = gcc
 
-AR = ar
+AR = gcc-ar
 
 LIBS = -L./ -pthread -flto -lm -lz -fsanitize=undefined,address
 
@@ -39,13 +39,13 @@ $(EXEC):
 .SUFFIXES:.c .o
 
 .c.o:
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@ $(LIBS)
 
 libskip.a: $(OBJS)
 	$(AR) -csru $@ $(OBJS)
 
 simple: $(OBJS) libskip.a src/simple.o
-	$(CC) -o simple src/simple.o $(CFLAGS) $(LIBS) -lskip
+	$(CC) -o simple src/simple.o libskip.a $(CFLAGS) $(LIBS) 
 
 all: $(EXEC)
 
@@ -57,3 +57,4 @@ mem: $(EXEC)
 clean:
 	rm -f $(EXEC)
 	rm -rf libskip.a
+	rm -rf src/*.o

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "attribute.h"
+#include "assembly_graph.h"
 #include "k31hash.h"
 #include "k63hash.h"
 
