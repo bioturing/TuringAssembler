@@ -2,7 +2,7 @@ GCC = gcc
 
 AR = ar
 
-LIBS = -L./ -pthread -flto -lm -lz -fsanitize=undefined,address
+LIBS = -L./ -pthread -lm -lz -fsanitize=undefined,address
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -g
 
@@ -39,7 +39,7 @@ $(EXEC):
 .SUFFIXES:.c .o
 
 .c.o:
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@ $(LIBS)
+		$(CC) -c $(CFLAGS) $(INCLUDES) $< -o $@ $(LIBS)
 
 libskip.a: $(OBJS)
 	$(AR) -csru $@ $(OBJS)
