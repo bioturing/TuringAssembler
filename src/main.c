@@ -23,11 +23,9 @@ void print_usage_assembly(const char *prog)
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         -k1                    <1st kmer size>\n");
-	__VERBOSE("         -k2                    <2nd kmer size>\n");
-	__VERBOSE("         -k3                    <3rd kmer size>\n");
-	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
-	__VERBOSE("         --help                 show help\n");
+	__VERBOSE("         -k0                    <1st kmer size>\n");
+	__VERBOSE("         -k1                    <2nd kmer size>\n");
+	__VERBOSE("         -k2                    <3rd kmer size>\n");
 }
 
 void print_usage_build0(const char *prog)
@@ -36,11 +34,9 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         -k1                    <1st kmer size>\n");
-	__VERBOSE("         -k2                    <2nd kmer size>\n");
-	__VERBOSE("         -k3                    <3rd kmer size>\n");
-	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
-	__VERBOSE("         --help                 show help\n");
+	__VERBOSE("         -k0                    <1st kmer size>\n");
+	__VERBOSE("         -k1                    <2nd kmer size>\n");
+	__VERBOSE("         -k2                    <3rd kmer size>\n");
 }
 
 void print_usage_count(const char *prog)
@@ -50,12 +46,11 @@ void print_usage_count(const char *prog)
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
 	__VERBOSE("         --kmer                 <small kmer size>\n");
-	__VERBOSE("         --filter-threshold     <kmer count cut off>\n");
 }
 
 void print_usage_build(const char *prog)
 {
-	__VERBOSE("Usage: %s build_x_y [options] \n", prog);
+	__VERBOSE("Usage: %s build_x_y [options]\n", prog);
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
@@ -66,7 +61,8 @@ void print_usage(const char *prog)
 {
 	__VERBOSE("Usage: %s\n", prog);
 	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
-	__VERBOSE("          count [options] read.[fq|fa]\n");
+	__VERBOSE("          build_x_y [options]\n");
+	__VERBOSE("          build0 [options] -1 read_1.fq -2 read_2.fq\n");
 }
 
 struct opt_count_t *init_opt_count()
@@ -110,7 +106,7 @@ int opt_count_list(int argc, char *argv[])
 
 struct opt_build_t *parse_build_option(int argc, char *argv[])
 {
-	int pos = 0, n;
+	int pos = 0;
 	struct opt_build_t *opt = init_opt_build();
 	while (pos < argc) {
 		if (!strcmp(argv[pos], "-t")) {
@@ -148,13 +144,13 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "-k1")) {
+		} else if (!strcmp(argv[pos], "-k0")) {
 			opt->k0 = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "-k2")) {
+		} else if (!strcmp(argv[pos], "-k1")) {
 			opt->k1 = atoi(argv[pos + 1]);
 			pos += 2;
-		} else if (!strcmp(argv[pos], "-k3")) {
+		} else if (!strcmp(argv[pos], "-k2")) {
 			opt->k2 = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-o")) {
@@ -353,6 +349,20 @@ void build0_1_opt_process(int argc, char *argv[])
 	build0_1_process(opt);
 }
 
+void build1_2_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	init_log(tmp_dir);
+	build1_2_process(opt);
+}
+
 void build0_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
@@ -366,6 +376,20 @@ void build0_opt_process(int argc, char *argv[])
 	init_log(tmp_dir);
 	print_opt_count_info(opt, argc, argv);
 	build0_process(opt);
+}
+
+void graph_convert_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/convert.log");
+	init_log(tmp_dir);
+	graph_convert_process(opt);
 }
 
 // ./skipping asm_graph0 -g <graph.bin> -o <output_folder>
@@ -391,6 +415,10 @@ int main(int argc, char *argv[])
 		build0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build0_1_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_1_2"))
+		build1_2_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "bin2text"))
+		graph_convert_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 

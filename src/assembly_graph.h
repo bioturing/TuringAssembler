@@ -50,4 +50,12 @@ void save_asm_graph(struct asm_graph_t *g, const char *path);
 
 void load_asm_graph(struct asm_graph_t *g, const char *path);
 
+void build0_1_process(struct opt_build_t *opt);
+
+void build1_2_process(struct opt_build_t *opt);
+
+void build0_process(struct opt_count_t *opt);
+
+void graph_convert_process(struct opt_build_t *opt);
+
 #endif  /* __ASSEMBLY_GRAPH_H__ */
