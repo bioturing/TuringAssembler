@@ -812,7 +812,7 @@ kmint_t k31_idhash_put(struct k31_idhash_t *h, k31key_t key)
 
 void barcode_hash_init(struct barcode_hash_t *h, uint32_t size)
 {
-	h->size = size;
+	h->size = size - 1;
 	__round_up_32(h->size);
 	h->n_item = 0;
 	h->keys = malloc(h->size * sizeof(k31key_t));
@@ -826,7 +826,8 @@ void barcode_hash_clean(struct barcode_hash_t *h)
 {
 	free(h->keys);
 	free(h->cnts);
-	h->keys = h->cnts = NULL;
+	h->keys = NULL;
+	h->cnts = NULL;
 	h->n_item = h->size = 0;
 }
 

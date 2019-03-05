@@ -20,27 +20,11 @@ struct asm_edge_t {
 	gint_t source;
 	gint_t target;
 	gint_t rc_id;
+	struct barcode_hash_t *bc_bucks;
+	pthread_mutex_t lock;
 };
 
 struct asm_graph_t {
-	int ksize;
-	gint_t n_v, n_e;
-
-	struct asm_node_t *nodes;
-	struct asm_edge_t *edges;
-};
-
-struct asm_edge2_t {
-	uint64_t count;
-	uint32_t *seq;
-	gint_t seq_len;
-	gint_t source;
-	gint_t target;
-	gint_t rc_id;
-	struct barcode_hash_t *bc_bucks;
-};
-
-struct asm_graph2_t {
 	int ksize;
 	gint_t n_v, n_e;
 
@@ -71,6 +55,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path);
 void build0_1_process(struct opt_build_t *opt);
 
 void build1_2_process(struct opt_build_t *opt);
+
+void build2_3_process(struct opt_build_t *opt);
 
 void build0_process(struct opt_count_t *opt);
 
