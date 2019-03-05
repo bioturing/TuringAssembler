@@ -44,6 +44,14 @@ int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i, int cnt)
           (e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt);
 }
 
+/*            ______
+ *           /      \
+ *          / self   \
+ *          \ loop   /
+ *           \______/
+ *___________/      \_____________
+ *
+ */
 int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 {
   gint_t u;
