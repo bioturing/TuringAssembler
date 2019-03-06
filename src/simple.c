@@ -122,22 +122,22 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
   if (e[e_i].seq_len < MIN_BRIDGE_LEG)
     return 0;
 
-  aqueue_add(q, e[e_i].target); //add the big edge to queue
+  aqueue_add(q, e_i); //add the big edge to queue
   while (1){
     n_items = q->n;
     if (n_items == 0)
       break;
     for (j = 0; j < n_items; j++){
-      u = aqueue_pop(q);
-      for (i = 0 ; i < v[u].deg; i++){
-        next_e = v[u].adj[i];
-        if (kh_get(khInt, set_v, e[next_e].target) == kh_end(set_v)){ // visited or not
+      u = aqueue_pop(q); //u is an edge
+      for (i = 0 ; i < v[e[u].target].deg; i++){
+        next_e = v[e[u].target].adj[i]; //iterate outgoing edge of the target of u
+        if (kh_get(khInt, set_v, next_e) == kh_end(set_v)){ // visited or not
           if (e[next_e].seq_len > MIN_BRIDGE_LEG){
              n_larges++;
              lg = next_e;
           }
-          aqueue_add(q, e[next_e].target); //add neighbor edge
-          kh_put(khInt, set_v, e[next_e].target, &missing);
+          aqueue_add(q, next_e); //add neighbor edge
+          kh_put(khInt, set_v, next_e, &missing);
           comp_sz += e[next_e].seq_len; //add size of the edge to total size
         }
       }
@@ -148,9 +148,10 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 
   printf("Visisted nodes: %d, n_larges: %d, edge %d\n", kh_size(set_v), n_larges, e_i);
   for (i = q->p; i < q->n; i++){
-    u = q->e[i];
-    for (j = 0; j < v[u].deg; j++){
-      if (kh_get(khInt, set_v, e[v[u].adj[j]].target) == kh_end(set_v)){
+    u = q->e[i]; //u is an edge
+    dest = e[u].target;
+    for (j = 0; j < v[dest].deg; j++){
+      if (kh_get(khInt, set_v, v[dest].adj[j]) == kh_end(set_v)){
         __VERBOSE("%d - One remain node* have outgoing edge* or region is too complex\n", e_i);
         return 0;
       }
@@ -190,7 +191,7 @@ void find_forest(struct asm_graph_t *g0)
   khash_t(khInt) *set_v; // for keeping visited nodes
   set_v = kh_init(khInt);
 
-  gint_t *id_node, *id_edge, *cc_size; // for the connected component
+  gint_t *id_edge, *cc_size; // for the connected component
   gint_t cc_id;
   id_edge = malloc(g0->n_e * sizeof(gint_t));
   cc_size = NULL;
@@ -222,7 +223,6 @@ void find_forest(struct asm_graph_t *g0)
     }
   }
   kh_destroy(khInt, set_v);
-  free(id_node);
   free(id_edge);
 
 }
@@ -233,7 +233,10 @@ int main(int argc, char *argv[])
   char *path = argv[1];
   load_asm_graph(g0, path);
   gint_t k;
-  is_simple_tandem(g0->edges, g0->nodes, 661461, &k);
+  int correct = is_simple_tandem(g0->edges, g0->nodes, 661461, &k);
+  if (correct){
+    printf("CORRECT!");
+  }
   find_forest(g0);
   return 0;
 }
