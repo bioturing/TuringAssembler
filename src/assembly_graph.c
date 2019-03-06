@@ -513,9 +513,6 @@ int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2)
 		c1 = __bin_seq_get_char(seq1, i);
 		c2 = __bin_seq_get_char(seq2, k);
 		if (c1 != (c2 ^ 3)) {
-			fprintf(stderr, "diff at position %ld/%ld: %u <-> %u\n",
-				i, l1, c1, c2);
-			assert(0);
 			return 0;
 		}
 	}
@@ -762,6 +759,7 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		++cnt_rm;
 	}
 	__VERBOSE("\nNumber of removed edges: %ld\n", cnt_rm);
+	test2_asm_graph(g0);
 	asm_condense(g0, g);
 }
 
@@ -1041,6 +1039,26 @@ static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 
 void test2_asm_graph(struct asm_graph_t *g)
 {
+	gint_t u, e;
+	for (u = 0; u < g->n_v; ++u) {
+		gint_t j;
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			gint_t e_rc = g->edges[e].rc_id;
+			if (!asm_is_edge_rc(g->edges[e].seq, g->edges[e].seq_len,
+					g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
+				fprintf(stderr, "seq_len = %ld; rc_seq_len = %ld\n",
+					g->edges[e].seq_len, g->edges[e_rc].seq_len);
+				assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
+				char *seq = malloc(g->edges[e].seq_len + 1);
+				dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+				fprintf(stderr, "seq    = %s\n", seq);
+				dump_bin_seq(seq, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+				fprintf(stderr, "seq_rc = %s\n", seq);
+				assert(0 && "Smart error");
+			}
+		}
+	}
 }
 
 void test_asm_graph(struct asm_graph_t *g)
