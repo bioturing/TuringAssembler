@@ -815,11 +815,11 @@ void barcode_hash_init(struct barcode_hash_t *h, uint32_t size)
 	h->size = size - 1;
 	__round_up_32(h->size);
 	h->n_item = 0;
-	h->keys = malloc(h->size * sizeof(k31key_t));
+	h->keys = malloc(h->size * sizeof(uint64_t));
 	h->cnts = calloc(h->size, sizeof(uint32_t));
 	uint32_t i;
 	for (i = 0; i < h->size; ++i)
-		h->keys[i] = K31_NULL;
+		h->keys[i] = (uint64_t)-1;
 }
 
 void barcode_hash_clean(struct barcode_hash_t *h)
@@ -831,12 +831,12 @@ void barcode_hash_clean(struct barcode_hash_t *h)
 	h->n_item = h->size = 0;
 }
 
-uint32_t barcode_hash_get(struct barcode_hash_t *h, k31key_t key)
+uint32_t barcode_hash_get(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t i, last, mask, step = 0;
 	uint64_t k;
 	mask = h->size - 1;
-	k = __hash_k31(key); i = k & mask;
+	k = __hash_int(key); i = k & mask;
 	last = i;
 	while (h->keys[i] != K31_NULL && h->keys[i] != key) {
 		i = (i + (++step)) & mask;
@@ -845,26 +845,30 @@ uint32_t barcode_hash_get(struct barcode_hash_t *h, k31key_t key)
 	return h->keys[i] == key ? i : BARCODE_HASH_END(h);
 }
 
-static inline uint32_t internal_barcode_hash_put(struct barcode_hash_t *h, k31key_t key)
+static inline uint32_t internal_barcode_hash_put(struct barcode_hash_t *h, uint64_t key)
 {
 	if (h->n_item >= (uint32_t)(h->size * BARCODE_HASH_UPPER))
 		return BARCODE_HASH_END(h);
 	uint32_t i, last, mask, step = 0;
 	uint64_t k;
 	mask = h->size - 1;
-	k = __hash_k31(key); i = k & mask;
-	if (h->keys[i] == K31_NULL) {
+	k = __hash_int(key); i = k & mask;
+	if (h->keys[i] == (uint64_t)-1) {
 		h->keys[i] = key;
+		++h->n_item;
 		return i;
 	}
 	last = i;
-	while (h->keys[i] != K31_NULL && h->keys[i] != key) {
+	while (h->keys[i] != (uint64_t)-1 && h->keys[i] != key) {
 		i = (i + (++step)) & mask;
 		if (i == last)
 			break;
 	}
-	if (h->keys[i] == K31_NULL) {
-		h->keys[i] = key;
+	if (h->keys[i] == (uint64_t)-1 || h->keys[i] == key) {
+		if (h->keys[i] == (uint64_t)-1) {
+			h->keys[i] = key;
+			++h->n_item;
+		}
 		return i;
 	} else {
 		return BARCODE_HASH_END(h);
@@ -877,7 +881,7 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 	old_size = h->size;
 	h->size <<= 1;
 	mask = h->size - 1;
-	h->keys = realloc(h->keys, h->size * sizeof(k31key_t));
+	h->keys = realloc(h->keys, h->size * sizeof(uint64_t));
 	h->cnts = realloc(h->cnts, h->size * sizeof(uint32_t));
 	uint32_t *flag = calloc(h->size >> 4, sizeof(uint32_t));
 
@@ -893,7 +897,7 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 
 	for (i = 0; i < old_size; ++i) {
 		if (rs_is_old(flag, i)) {
-			k31key_t x = h->keys[i], xt;
+			uint64_t x = h->keys[i], xt;
 			uint32_t y = h->cnts[i], yt;
 			rs_set_empty(flag, i);
 			h->keys[i] = K31_NULL;
@@ -927,14 +931,29 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 	free(flag);
 }
 
-uint32_t barcode_hash_put(struct barcode_hash_t *h, k31key_t key)
+uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t k;
+	pthread_mutex_lock(h->lock);
 	k = internal_barcode_hash_put(h, key);
 	while (k == BARCODE_HASH_END(h)) {
 		barcode_hash_resize(h);
 		k = internal_barcode_hash_put(h, key);
 	}
+	pthread_mutex_unlock(h->lock);
 	return k;
+}
 
+uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key)
+{
+	uint32_t k;
+	pthread_mutex_lock(h->lock);
+	k = internal_barcode_hash_put(h, key);
+	while (k == BARCODE_HASH_END(h)) {
+		barcode_hash_resize(h);
+		k = internal_barcode_hash_put(h, key);
+	}
+	++h->cnts[k];
+	pthread_mutex_unlock(h->lock);
+	return k;
 }

@@ -20,7 +20,7 @@ struct asm_edge_t {
 	gint_t source;
 	gint_t target;
 	gint_t rc_id;
-	struct barcode_hash_t *bc_bucks;
+	struct barcode_hash_t *bucks;
 	pthread_mutex_t lock;
 };
 
@@ -34,18 +34,23 @@ struct asm_graph_t {
 
 void assembly_process(struct opt_count_t *opt);
 
+/* deprecated */
 void k31_process(struct opt_count_t *opt);
 
+/* deprecated */
 void k63_process(struct opt_count_t *opt);
 
 void test_asm_graph(struct asm_graph_t *g);
 
+/* deprecated */
 void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
 			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
+/* deprecated */
 void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
+/* should not put here */
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
 
 void save_asm_graph(struct asm_graph_t *g, const char *path);
@@ -61,5 +66,7 @@ void build2_3_process(struct opt_build_t *opt);
 void build0_process(struct opt_count_t *opt);
 
 void graph_convert_process(struct opt_build_t *opt);
+
+void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */

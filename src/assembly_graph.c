@@ -12,12 +12,6 @@
 #include "time_utils.h"
 #include "verbose.h"
 
-struct bctrie_bundle_t {
-	struct dqueue_t *q;
-	struct asm_graph_t *graph;
-	int64_t *n_reads;
-};
-
 static void dump_bin_seq(char *seq, uint32_t *bin, gint_t len)
 {
 	gint_t i;
@@ -199,6 +193,21 @@ void build2_3_process(struct opt_build_t *opt)
 	dump_fasta(g1, path);
 	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, g0->ksize);
 	save_asm_graph(g1, path);
+}
+
+void build2_3a_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building barcode information\n");
+	construct_barcode_map(g0, opt);
 }
 
 void assembly_process(struct opt_count_t *opt)
@@ -1235,199 +1244,3 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	fclose(fp);
 }
 
-void asm_graph_init_barcode(struct asm_graph_t *g, int buck_len)
-{
-	gint_t i, e;
-	for (e = 0; e < g->n_e; ++e) {
-		gint_t n_bucks = (g->edges[e].seq_len + buck_len - 1) / buck_len;
-		g->edges[e].bc_bucks = calloc(n_bucks, sizeof(struct barcode_hash_t));
-		for (i = 0; i < n_bucks; ++i)
-			barcode_hash_init(g->edges[e].bc_bucks + i, 4);
-	}
-}
-
-void k31_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
-							struct k31_idhash_t *h)
-{
-	asm_graph_init_barcode(g, opt->split_len);
-	gint_t e, i;
-	k31_idhash_init(h, opt->hash_size, 0);
-	k31key_t knum, krev, kmask;
-	knum = krev = 0;
-	kmask = ((k31key_t)1 << (g->ksize << 1)) - 1;
-	int lmc = (g->ksize << 1) - 2;
-	for (e = 0; e < g->n_e; ++e) {
-		for (i = 0; i < g->edges[e].seq_len; ++i) {
-			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
-			knum = ((knum << 2) & kmask) | c;
-			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
-			if (i + 1 >= g->ksize) {
-				if (knum < krev) {
-					kmint_t k = k31_idhash_put(h, knum);
-					IDHASH_ID(h, k) = e;
-				} else {
-					kmint_t k = k31_idhash_put(h, krev);
-					IDHASH_ID(h, k) = e;
-				}
-			}
-		}
-	}
-}
-
-void k63_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
-							struct k63_idhash_t *h)
-{
-	asm_graph_init_barcode(g, opt->split_len);
-	gint_t e, i;
-	k63_idhash_init(h, opt->hash_size, 0);
-	k63key_t knum, krev, kmask;
-	kmask.bin[0] = (uint64_t)-1;
-	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
-	int lmc = (g->ksize - 1) << 1;
-	for (e = 0; e < g->n_e; ++e) {
-		for (i = 0; i < g->edges[e].seq_len; ++i) {
-			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
-			__k63_lshift2(knum); __k63_and(knum, kmask);
-			knum.bin[0] |= c;
-			__k63_rshift2(krev);
-			krev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
-			if (i + 1 >= g->ksize) {
-				if (__k63_lt(knum, krev)) {
-					kmint_t k = k63_idhash_put(h, knum);
-					IDHASH_ID(h, k) = e;
-				} else {
-					kmint_t k = k63_idhash_put(h, krev);
-					IDHASH_ID(h, k) = e;
-				}
-			}
-		}
-	}
-}
-
-void retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
-{
-	asm_graph_init_barcode(g, opt);
-	if (g->ksize < 32) {
-		struct k31_idhash_t *edict;
-		edict = calloc(1, sizeof(struct k31_idhash_t));
-		k31_rebuild_graph_index(g, opt, edict);
-		k31_retrieve_barcode(g, opt, edict);
-	} else if (g->ksize >= 32 && g->ksize < 64) {
-		struct k63_idhash_t *edict;
-		edict = calloc(1, sizeof(struct k63_idhash_t));
-		k63_rebuild_graph_index(g, opt, edict);
-		k63_retrieve_barcode(g, opt);
-	}
-}
-
-static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g)
-{
-	
-}
-
-static void *k31_barcode_retriever(void *data)
-{
-	struct bctrie_bundle_t *bundle = (struct bctrie_bundle_t *)data;
-	struct dqueue_t *q = bundle->q;
-	struct asm_graph_t *graph = bundle->graph;
-
-	struct read_t read1, read2;
-	struct pair_buffer_t *own_buf, *ext_buf;
-	own_buf = init_pair_buffer();
-
-	char *buf1, *buf2;
-	int pos1, pos2, rc1, rc2, input_format;
-
-	int64_t n_reads;
-	int64_t *gcnt_reads;
-	gcnt_reads = bundle->n_reads;
-
-	while (1) {
-		ext_buf = d_dequeue_in(q);
-		if (!ext_buf)
-			break;
-		d_enqueue_out(q, own_buf);
-		own_buf = ext_buf;
-		pos1 = pos2 = 0;
-		buf1 = ext_buf->buf1;
-		buf2 = ext_buf->buf2;
-		input_format = ext_buf->input_format;
-
-		n_reads = 0;
-		while (1) {
-			rc1 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read1, buf1, &pos1) :
-				get_read_from_fa(&read1, buf1, &pos1);
-
-			rc2 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read2, buf2, &pos2) :
-				get_read_from_fa(&read2, buf2, &pos2);
-
-
-			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
-
-			++n_reads;
-			k31_barcode_retrieve_read(&read1, graph);
-			k31_barcode_retrieve_read(&read2, graph);
-
-			if (rc1 == READ_END)
-				break;
-		}
-		n_reads = atomic_add_and_fetch64(gcnt_reads, n_reads);
-		__VERBOSE("\rNumber of process read:    %lld", (long long)n_reads);
-	}
-
-	free_pair_buffer(own_buf);
-	pthread_exit(NULL);
-}
-
-void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
-{
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	int i;
-
-	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
-
-	struct bctrie_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
-
-	int64_t n_reads;
-	n_reads = 0;
-
-	for (i = 0; i < opt->n_threads; ++i) {
-		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].graph = g;
-		worker_bundles[i].n_reads = &n_reads;
-	}
-
-	pthread_t *producer_threads, *worker_threads;
-	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
-				producer_bundles + i);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, k31_barcode_retriever,
-				worker_bundles + i);
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i], NULL);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_join(worker_threads[i], NULL);
-
-	free_fastq_PE(producer_bundles, opt->n_files);
-	free(worker_bundles);
-
-	free(producer_threads);
-	free(worker_threads);
-}

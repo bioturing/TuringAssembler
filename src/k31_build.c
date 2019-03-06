@@ -14,23 +14,6 @@
 
 #define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
 
-#define __reverse_bit_order64(x)					       \
-(									       \
-	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
-	(x) = (((x) & 0xffff0000ffff0000ull) >> 16) | (((x) & 0x0000ffff0000ffffull) << 16), \
-	(x) = (((x) & 0xff00ff00ff00ff00ull) >>  8) | (((x) & 0x00ff00ff00ff00ffull) <<  8), \
-	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
-	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2)  \
-)
-
-#define __k31_revc_num(y, x, l, mask)					       \
-(									       \
-	(x) = (y) << (64 - ((l) << 1)),					       \
-	__reverse_bit_order64(x), (x) ^= 0xffffffffffffffffull, (x) &= (mask)  \
-)
-
-#define __k31_rev_num(y, x, l)	\
-		((x) = (y) << (64 - ((l) << 1)), __reverse_bit_order64(x))
 
 struct edgecount_bundle_t {
 	struct dqueue_t *q;

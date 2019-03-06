@@ -29,7 +29,6 @@ struct opt_count_t {
 	int k0;
 	int k1;
 	int k2;
-	int filter_thres;
 	int split_len;
 	int n_files;
 	char **files_1, **files_2;
@@ -41,6 +40,9 @@ struct opt_build_t {
 	int hash_size;
 	char *in_path;
 	char *out_dir;
+	int n_files;
+	char **files_1, **files_2;
+	int split_len;
 };
 
 struct producer_bundle_t {

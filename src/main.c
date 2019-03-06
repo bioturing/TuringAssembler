@@ -22,6 +22,7 @@ void print_usage_assembly(const char *prog)
 	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -sl                    <split length of edge sequence>\n");
 	__VERBOSE("         -o                     <output directory>\n");
 	__VERBOSE("         -k0                    <1st kmer size>\n");
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
@@ -33,6 +34,7 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("Usage: %s build0 [options] -1 read_1.fq -2 read_2.fq\n", prog);
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
+	__VERBOSE("         -sl                    <split length of edge sequence>\n");
 	__VERBOSE("         -o                     <output directory>\n");
 	__VERBOSE("         -k0                    <1st kmer size>\n");
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
@@ -50,11 +52,12 @@ void print_usage_count(const char *prog)
 
 void print_usage_build(const char *prog)
 {
-	__VERBOSE("Usage: %s build_x_y [options]\n", prog);
+	__VERBOSE("Usage: %s build_x_y [options] -1 read_1.fq -2 read_2.fq\n", prog);
 	__VERBOSE("Options: -t                     <number of threads>\n");
 	__VERBOSE("         -s                     <pre-alloc size>\n");
 	__VERBOSE("         -o                     <output directory>\n");
 	__VERBOSE("         -i                     <input graph>\n");
+	__VERBOSE("         -sl                    <split length of edge sequence>\n");
 }
 
 void print_usage(const char *prog)
@@ -75,7 +78,7 @@ struct opt_count_t *init_opt_count()
 	opt->k1 = 31;
 	opt->k2 = 55;
 	opt->n_files = 0;
-	opt->filter_thres = 0;
+	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
 	return opt;
@@ -89,6 +92,9 @@ struct opt_build_t *init_opt_build()
 	opt->hash_size = 1 << 24;
 	opt->out_dir = ".";
 	opt->in_path = NULL;
+	opt->split_len = 1000;
+	opt->files_1 = opt->files_2 = NULL;
+	opt->out_dir = ".";
 	return opt;
 }
 
@@ -106,7 +112,7 @@ int opt_count_list(int argc, char *argv[])
 
 struct opt_build_t *parse_build_option(int argc, char *argv[])
 {
-	int pos = 0;
+	int pos = 0, n;
 	struct opt_build_t *opt = init_opt_build();
 	while (pos < argc) {
 		if (!strcmp(argv[pos], "-t")) {
@@ -121,6 +127,23 @@ struct opt_build_t *parse_build_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-sl")) {
+			opt->split_len = atoi(argv[pos + 1]);
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-1")) {
+			n = opt_count_list(argc - pos, argv + pos);
+			if (opt->n_files > 0 && opt->n_files != n)
+				__ERROR("Inconsistent number of files");
+			opt->n_files = n;
+			opt->files_1 = argv + pos + 1;
+			pos += (n + 1);
+		} else if (!strcmp(argv[pos], "-2")) {
+			n = opt_count_list(argc - pos, argv + pos);
+			if (opt->n_files > 0 && opt->n_files != n)
+				__ERROR("Inconsistent number of files");
+			opt->n_files = n;
+			opt->files_2 = argv + pos + 1;
+			pos += (n + 1);
 		} else {
 			__ERROR("Unknown option %s", argv[pos]);
 		}
@@ -170,8 +193,8 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
 			pos += (n + 1);
-		} else if (!strcmp(argv[pos], "--filter-threshold")) {
-			opt->filter_thres = atoi(argv[pos + 1]);
+		} else if (!strcmp(argv[pos], "-sl")) {
+			opt->split_len = atoi(argv[pos + 1]);
 			pos += 2;
 		} else if (argv[pos][0] != '-') {
 			if (opt->n_files != 0)
@@ -210,6 +233,7 @@ void print_opt_count_info(struct opt_count_t *opt, int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "k2: %d\n", opt->k2);
 	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
 	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
+	__VERBOSE_LOG("INFO", "split bucket length: %d\n", opt->split_len);
 	if (opt->n_files == 0) {
 		__VERBOSE_LOG("INFO", "input: { stdin }\n");
 	} else {
