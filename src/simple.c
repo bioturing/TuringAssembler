@@ -54,6 +54,15 @@ int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i, int cnt)
  */
 int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 {
+  gint_t src = e[i].source;
+  gint_t dest = e[i].target;
+  gint_t r_src = v[src].rc_id;
+
+  if (!(v[r_src].deg == 2 && v[dest].deg == 2))
+    return 0;
+  if (!is_lg_leg(e, v, r_src, 1) || !is_lg_leg(e, v, dest, 1))// needed condition
+    return 0;
+
   gint_t u;
   u = e[i].target;
   gint_t j = e[v[u].adj[0]].seq_len > MIN_BRIDGE_LEG ? v[u].adj[1] : v[u].adj[0];
@@ -71,8 +80,32 @@ int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
  *  /                       \
  * /                         \
  */                           
-void find_bridge(struct asm_graph_t *g0)
+int is_bridge(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 {
+  gint_t src = e[i].source;
+  gint_t dest = e[i].target;
+  gint_t r_src = v[src].rc_id;
+  if (!(v[r_src].deg == 2 && v[dest].deg == 2))
+    return 0;
+  if (is_lg_leg(e, v, r_src, 2) && is_lg_leg(e, v, dest, 2))
+    return 1;
+  return 0;
+}
+
+void find_forest(struct asm_graph_t *g0)
+{
+  init_clock();
+  g_cov = get_genome_cov(g0);
+
+  __VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+  __VERBOSE("\n+------------------------------------------------------------------------------+\n");
+  __VERBOSE("Removing tips\n");
+  __VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", g0->ksize,
+  						(long long)g0->n_v);
+  __VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", g0->ksize,
+  						(long long)g0->n_e);
+  __VERBOSE("Genome walk coverage %d\n", (int)g_cov);
+
   int i;
   int ret, flag, loop;
   gint_t r_src;
@@ -98,41 +131,23 @@ void find_bridge(struct asm_graph_t *g0)
     dest = e[i].target;
     r_src = v[src].rc_id;
     flag = 0;
-    if (v[r_src].deg == 2 && v[dest].deg == 2){
-      if (is_lg_leg(e, v, r_src, 2) && is_lg_leg(e, v, dest, 2)){ //neighbor edges must be large
-          __VERBOSE("Edge %d\n - bridge\n", i);
-          flag = 1;
-      } else if (is_lg_leg(e, v, r_src, 1) && is_lg_leg(e, v, dest, 1)){ //1 neighbor edge must be large
-          if (is_trivial_loop(e, v, i)){
-            __VERBOSE("Edge %d\n - loop\n", i);
-            flag = 1;
-          }
-      }
+    if (is_bridge(e, v, i)){
+      __VERBOSE("Edge %d\n - bridge\n", i);
+      flag = 1;
     }
-      if (flag){
-        kh_put(khInt, set_v, i, &ret);
-        kh_put(khInt, set_v, e[i].rc_id, &ret);
-      }
+    if (is_trivial_loop(e, v, i)){
+      __VERBOSE("Edge %d\n - loop\n", i);
+      flag = 1;
+    }
+    if (flag){
+      kh_put(khInt, set_v, i, &ret);
+      kh_put(khInt, set_v, e[i].rc_id, &ret);
+    }
   }
   kh_destroy(khInt, set_v);
   free(id_node);
   free(id_edge);
-}
 
-void find_forest(struct asm_graph_t *g0)
-{
-	init_clock();
-    g_cov = get_genome_cov(g0);
-    find_bridge(g0);
-
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips\n");
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", g0->ksize,
-							(long long)g0->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", g0->ksize,
-							(long long)g0->n_e);
-    __VERBOSE("Genome walk coverage %d\n", (int)g_cov);
 }
 
 int main(int argc, char *argv[])
