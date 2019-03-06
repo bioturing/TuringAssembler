@@ -4,7 +4,7 @@ AR = ar
 
 LIBS = -pthread -flto -lm -lz
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
+CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -g
 
 EXEC = skipping
 
@@ -46,7 +46,7 @@ BASESRC = 						\
       src/utils.c 				\
       src/verbose.c 				\
       src/test_hash_count.c 			\
-      src/simple.c
+      src/queue.c
 
 
 OBJS= src/dqueue.o src/assembly_graph.o src/fastq_producer.o src/get_buffer.o \
@@ -66,7 +66,7 @@ libskip.a: $(OBJS)
 	$(AR) -csru $@ $(OBJS)
 
 simple: 
-	$(CC) -o simple $(CFLAGS) $(BASESRC) $(LIBS) 
+	$(CC) -o simple $(CFLAGS) src/simple.c $(BASESRC) $(LIBS) 
 
 all: $(EXEC)
 

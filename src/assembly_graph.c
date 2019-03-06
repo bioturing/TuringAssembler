@@ -1274,53 +1274,53 @@ void k31_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
 	}
 }
 
-void k63_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
-							struct k63_idhash_t *h)
-{
-	asm_graph_init_barcode(g, opt->split_len);
-	gint_t e, i;
-	k63_idhash_init(h, opt->hash_size, 0);
-	k63key_t knum, krev, kmask;
-	kmask.bin[0] = (uint64_t)-1;
-	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
-	int lmc = (g->ksize - 1) << 1;
-	for (e = 0; e < g->n_e; ++e) {
-		for (i = 0; i < g->edges[e].seq_len; ++i) {
-			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
-			__k63_lshift2(knum); __k63_and(knum, kmask);
-			knum.bin[0] |= c;
-			__k63_rshift2(krev);
-			krev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
-			if (i + 1 >= g->ksize) {
-				if (__k63_lt(knum, krev)) {
-					kmint_t k = k63_idhash_put(h, knum);
-					IDHASH_ID(h, k) = e;
-				} else {
-					kmint_t k = k63_idhash_put(h, krev);
-					IDHASH_ID(h, k) = e;
-				}
-			}
-		}
-	}
-}
+//void k63_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
+//							struct k63_idhash_t *h)
+//{
+//	asm_graph_init_barcode(g, opt->split_len);
+//	gint_t e, i;
+//	k63_idhash_init(h, opt->hash_size, 0);
+//	k63key_t knum, krev, kmask;
+//	kmask.bin[0] = (uint64_t)-1;
+//	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
+//	knum = krev = (k63key_t){{0ull, 0ull}};
+//	int lmc = (g->ksize - 1) << 1;
+//	for (e = 0; e < g->n_e; ++e) {
+//		for (i = 0; i < g->edges[e].seq_len; ++i) {
+//			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
+//			__k63_lshift2(knum); __k63_and(knum, kmask);
+//			knum.bin[0] |= c;
+//			__k63_rshift2(krev);
+//			krev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
+//			if (i + 1 >= g->ksize) {
+//				if (__k63_lt(knum, krev)) {
+//					kmint_t k = k63_idhash_put(h, knum);
+//					IDHASH_ID(h, k) = e;
+//				} else {
+//					kmint_t k = k63_idhash_put(h, krev);
+//					IDHASH_ID(h, k) = e;
+//				}
+//			}
+//		}
+//	}
+//}
 
-void retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
-{
-	asm_graph_init_barcode(g, opt);
-	if (g->ksize < 32) {
-		struct k31_idhash_t *edict;
-		edict = calloc(1, sizeof(struct k31_idhash_t));
-		k31_rebuild_graph_index(g, opt, edict);
-		k31_retrieve_barcode(g, opt, edict);
-	} else if (g->ksize >= 32 && g->ksize < 64) {
-		struct k63_idhash_t *edict;
-		edict = calloc(1, sizeof(struct k63_idhash_t));
-		k63_rebuild_graph_index(g, opt, edict);
-		k63_retrieve_barcode(g, opt);
-	}
-}
-
+//void retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
+//{
+//	asm_graph_init_barcode(g, opt);
+//	if (g->ksize < 32) {
+//		struct k31_idhash_t *edict;
+//		edict = calloc(1, sizeof(struct k31_idhash_t));
+//		k31_rebuild_graph_index(g, opt, edict);
+//		k31_retrieve_barcode(g, opt);
+//	} else if (g->ksize >= 32 && g->ksize < 64) {
+//		struct k63_idhash_t *edict;
+//		edict = calloc(1, sizeof(struct k63_idhash_t));
+//		k63_rebuild_graph_index(g, opt, edict);
+//		k63_retrieve_barcode(g, opt);
+//	}
+//}
+//
 static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g)
 {
 	
@@ -1383,51 +1383,51 @@ static void *k31_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
-{
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	int i;
-
-	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
-
-	struct bctrie_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
-
-	int64_t n_reads;
-	n_reads = 0;
-
-	for (i = 0; i < opt->n_threads; ++i) {
-		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].graph = g;
-		worker_bundles[i].n_reads = &n_reads;
-	}
-
-	pthread_t *producer_threads, *worker_threads;
-	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
-				producer_bundles + i);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, k31_barcode_retriever,
-				worker_bundles + i);
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i], NULL);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_join(worker_threads[i], NULL);
-
-	free_fastq_PE(producer_bundles, opt->n_files);
-	free(worker_bundles);
-
-	free(producer_threads);
-	free(worker_threads);
-}
+//void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt)
+//{
+//	pthread_attr_t attr;
+//	pthread_attr_init(&attr);
+//	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+//	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+//
+//	int i;
+//
+//	struct producer_bundle_t *producer_bundles;
+//	producer_bundles = init_fastq_PE(opt);
+//
+//	struct bctrie_bundle_t *worker_bundles;
+//	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
+//
+//	int64_t n_reads;
+//	n_reads = 0;
+//
+//	for (i = 0; i < opt->n_threads; ++i) {
+//		worker_bundles[i].q = producer_bundles->q;
+//		worker_bundles[i].graph = g;
+//		worker_bundles[i].n_reads = &n_reads;
+//	}
+//
+//	pthread_t *producer_threads, *worker_threads;
+//	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+//	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+//
+//	for (i = 0; i < opt->n_files; ++i)
+//		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
+//				producer_bundles + i);
+//
+//	for (i = 0; i < opt->n_threads; ++i)
+//		pthread_create(worker_threads + i, &attr, k31_barcode_retriever,
+//				worker_bundles + i);
+//
+//	for (i = 0; i < opt->n_files; ++i)
+//		pthread_join(producer_threads[i], NULL);
+//
+//	for (i = 0; i < opt->n_threads; ++i)
+//		pthread_join(worker_threads[i], NULL);
+//
+//	free_fastq_PE(producer_bundles, opt->n_files);
+//	free(worker_bundles);
+//
+//	free(producer_threads);
+//	free(worker_threads);
+//}

@@ -6,6 +6,8 @@
 #include "attribute.h"
 #include "k31hash.h"
 #include "k63hash.h"
+#include "k63_count.h"
+#include "k31_count.h"
 
 struct asm_node_t {
 	gint_t rc_id;
@@ -69,5 +71,15 @@ void load_asm_graph(struct asm_graph_t *g, const char *path);
  * @param ret_size: component sizes
  */
 void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size);
+
+void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt);
+static void *k31_barcode_retriever(void *data);
+static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g);
+void retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt);
+void k63_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
+							struct k63_idhash_t *h);
+void k31_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
+							struct k31_idhash_t *h);
+
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
