@@ -181,6 +181,7 @@ void build2_3_process(struct opt_build_t *opt)
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Removing simple branching\n");
@@ -255,22 +256,22 @@ void assembly_process(struct opt_count_t *opt)
 	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
 	save_asm_graph(g2, path);
 
-	// __VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	// __VERBOSE("Removing bubbles\n");
-	// struct asm_graph_t *g3;
-	// g3 = calloc(1, sizeof(struct asm_graph_t));
-	// remove_bubble_simple(g2, g3);
-	// __VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", opt->k0,
-	// 						(long long)g3->n_v);
-	// __VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", opt->k0,
-	// 						(long long)g3->n_e);
-	// test_asm_graph(g3);
-	// snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, opt->k0);
-	// write_gfa(g3, path);
-	// snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, opt->k0);
-	// dump_fasta(g3, path);
-	// snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
-	// save_asm_graph(g3, path);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing bubbles\n");
+	struct asm_graph_t *g3;
+	g3 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g2, g3);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", opt->k0,
+							(long long)g3->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", opt->k0,
+							(long long)g3->n_e);
+	test_asm_graph(g3);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, opt->k0);
+	write_gfa(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
+	save_asm_graph(g3, path);
 }
 
 void k63_process(struct opt_count_t *opt)
@@ -721,6 +722,8 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		gint_t e0, e1;
 		e0 = g0->nodes[u].adj[0];
 		e1 = g0->nodes[u].adj[1];
+		if (e0 == g0->edges[e1].rc_id)
+			continue;
 		if (g0->edges[e0].target != g0->edges[e1].target)
 			continue;
 		/* check topology of node v */
