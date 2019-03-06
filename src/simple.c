@@ -88,7 +88,7 @@ void find_bridge(struct asm_graph_t *g0)
   id_node = malloc(g0->n_v * sizeof(gint_t));
   id_edge = malloc(g0->n_e * sizeof(gint_t));
   cc_size = NULL;
-  asm_get_cc(g0, id_node, id_edge, &cc_size);
+  asm_edge_cc(g0, id_edge, &cc_size);
 
   for (i = 0 ; i < g0->n_e; i++){
     cc_id = id_edge[i];

@@ -1,8 +1,8 @@
-GCC = gcc
+GCC = cc
 
 AR = ar
 
-LIBS = -L./ -pthread -lm -lz -fsanitize=undefined,address
+LIBS = -pthread -flto -lm -lz
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -g
 

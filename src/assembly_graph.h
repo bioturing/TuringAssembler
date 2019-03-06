@@ -20,6 +20,8 @@ struct asm_edge_t {
 	gint_t source;
 	gint_t target;
 	gint_t rc_id;
+	struct barcode_hash_t *bc_bucks;
+	pthread_mutex_t lock;
 };
 
 struct asm_graph_t {
@@ -66,6 +68,6 @@ void load_asm_graph(struct asm_graph_t *g, const char *path);
  * @param id_edge: connected component identity of each edge
  * @param ret_size: component sizes
  */
-void asm_get_cc(struct asm_graph_t *g, gint_t *id_node, gint_t *id_edge, gint_t **ret_size);
+void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
