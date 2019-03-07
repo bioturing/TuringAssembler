@@ -40,6 +40,39 @@ static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 					khash_t(k63_dict) *dict);
 
+gint_t get_barcode_intersect(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
+{
+	gint_t ret = 0;
+	gint_t i, k;
+	for (i = 0; i < t1->size; ++i) {
+		if (t1->keys[i] == (uint64_t)-1)
+			continue;
+		k = barcode_hash_get(t2, t1->keys[i]);
+		if (k != BARCODE_HASH_END(t2))
+			++ret;
+	}
+	return ret;
+}
+
+void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	assert(e1 < g->n_e && e2 < g->n_e);
+	fprintf(stdout, "Print table (%ld <-> %ld)\n", e1, e2);
+	gint_t n1, n2, e_rc1, e_rc2;
+	e_rc1 = g->edges[e1].rc_id;
+	e_rc2 = g->edges[e2].rc_id;
+	n1 = (g->edges[e1].seq_len + g->bin_size - 1) / g->bin_size;
+	n2 = (g->edges[e2].seq_len + g->bin_size - 1) / g->bin_size;
+	gint_t i, k;
+	for (i = 0; i < n1; ++i) {
+		for (k = 0; k < n2; ++k) {
+			gint_t s = get_barcode_intersect(g->edges[e1].bucks + (e1 <= e_rc1 ? i : n1 - i - 1),
+					g->edges[e2].bucks + (e2 <= e_rc2 ? k : n2 - k - 1));
+			fprintf(stdout, k + 1 == n2 ? "%ld\n" : "%ld,", s);
+		}
+	}
+}
+
 void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt)
 {
 	init_barcode_map(g, opt->split_len);
@@ -78,6 +111,7 @@ void init_barcode_map(struct asm_graph_t *g, int buck_len)
 			g->edges[e].bucks[i].lock = &(g->edges[e].lock);
 		}
 	}
+	g->bin_size = buck_len;
 }
 
 void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
@@ -268,8 +302,6 @@ static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	// producer_bundles = init_fastq_PE(opt);
-	fprintf(stderr, "num threads = %d\n", opt->n_threads);
 	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
 						opt->files_1, opt->files_2);
 

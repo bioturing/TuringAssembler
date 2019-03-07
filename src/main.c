@@ -65,7 +65,10 @@ void print_usage(const char *prog)
 	__VERBOSE("Usage: %s\n", prog);
 	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
 	__VERBOSE("          build_x_y [options]\n");
+	__VERBOSE("          bin2text [options]\n");
+	__VERBOSE("          build_barcode [options] -1 read_1.fq -2 read_2.fq\n");
 	__VERBOSE("          build0 [options] -1 read_1.fq -2 read_2.fq\n");
+	__VERBOSE("          query -i <input_graph> -f <list edge>\n");
 }
 
 struct opt_count_t *init_opt_count()
@@ -92,6 +95,7 @@ struct opt_build_t *init_opt_build()
 	opt->hash_size = 1 << 24;
 	opt->out_dir = ".";
 	opt->in_path = NULL;
+	opt->in_file = NULL;
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
@@ -123,6 +127,9 @@ struct opt_build_t *parse_build_option(int argc, char *argv[])
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-i")) {
 			opt->in_path = argv[pos + 1];
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-f")) {
+			opt->in_file = argv[pos + 1];
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-s")) {
 			opt->hash_size = atoi(argv[pos + 1]);
@@ -430,6 +437,34 @@ void build0_opt_process(int argc, char *argv[])
 	build0_process(opt);
 }
 
+void build_barcode_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build_barcode.log");
+	init_log(tmp_dir);
+	build_barcode_process(opt);
+}
+
+void graph_query_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/query.log");
+	init_log(tmp_dir);
+	graph_query_process(opt);
+}
+
 void graph_convert_opt_process(int argc, char *argv[])
 {
 	struct opt_build_t *opt;
@@ -465,6 +500,8 @@ int main(int argc, char *argv[])
 		test31_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build0"))
 		build0_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_barcode"))
+		build_barcode_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build0_1_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_1_2"))
@@ -475,6 +512,8 @@ int main(int argc, char *argv[])
 		build2_3a_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "query"))
+		graph_query_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 

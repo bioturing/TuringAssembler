@@ -26,11 +26,15 @@ struct asm_edge_t {
 
 struct asm_graph_t {
 	int ksize;
+	int bin_size;
 	gint_t n_v, n_e;
 
 	struct asm_node_t *nodes;
 	struct asm_edge_t *edges;
 };
+
+/* for testing purpose */
+void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 void assembly_process(struct opt_count_t *opt);
 
@@ -53,9 +57,20 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 /* should not put here */
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
 
-void save_asm_graph(struct asm_graph_t *g, const char *path);
+/* only save graph topology */
+void save_asm_graph_simple(struct asm_graph_t *g, const char *path);
 
+/* save both graph topology and barcode info */
+void save_asm_graph_barcode(struct asm_graph_t *g, const char *path);
+
+/* auto detect saved type */
 void load_asm_graph(struct asm_graph_t *g, const char *path);
+
+/* only load graph topology */
+void load_asm_graph_simple(struct asm_graph_t *g, const char *path);
+
+/* must load barcode info */
+void load_asm_graph_complex(struct asm_graph_t *g, const char *path);
 
 void build0_1_process(struct opt_build_t *opt);
 
@@ -66,6 +81,8 @@ void build2_3_process(struct opt_build_t *opt);
 void build2_3a_process(struct opt_build_t *opt);
 
 void build0_process(struct opt_count_t *opt);
+
+void build_barcode_process(struct opt_build_t *opt);
 
 void graph_convert_process(struct opt_build_t *opt);
 

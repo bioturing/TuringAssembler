@@ -38,6 +38,7 @@ struct opt_count_t {
 struct opt_build_t {
 	int n_threads;
 	int hash_size;
+	char *in_file;
 	char *in_path;
 	char *out_dir;
 	int n_files;
