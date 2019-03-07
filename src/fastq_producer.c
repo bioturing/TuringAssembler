@@ -68,7 +68,8 @@ void *fastq_PE_producer(void *data)
 	pthread_exit(NULL);
 }
 
-struct producer_bundle_t *init_fastq_PE(struct opt_count_t *opt)
+struct producer_bundle_t *init_fastq_PE(int n_threads, int n_files,
+						char **files_1, char **files_2)
 {
 	struct producer_bundle_t *ret;
 	struct dqueue_t *q;
@@ -77,19 +78,19 @@ struct producer_bundle_t *init_fastq_PE(struct opt_count_t *opt)
 	pthread_mutex_t *lock;
 	pthread_barrier_t *barrier;
 
-	ret = calloc(opt->n_files, sizeof(struct producer_bundle_t));
-	q = init_dqueue_PE(__max(opt->n_threads, opt->n_files) * 2);
+	ret = calloc(n_files, sizeof(struct producer_bundle_t));
+	q = init_dqueue_PE(__max(n_threads, n_files) * 2);
 	n_consumer = malloc(sizeof(int));
-	*n_consumer = opt->n_threads * 2;
+	*n_consumer = n_threads * 2;
 	lock = malloc(sizeof(pthread_mutex_t));
 	barrier = malloc(sizeof(pthread_barrier_t));
 
 	pthread_mutex_init(lock, NULL);
-	pthread_barrier_init(barrier, NULL, opt->n_files);
+	pthread_barrier_init(barrier, NULL, n_files);
 
-	for (i = 0; i < opt->n_files; ++i) {
+	for (i = 0; i < n_files; ++i) {
 		struct gb_pair_data *data = calloc(1, sizeof(struct gb_pair_data));
-		gb_pair_init(data, opt->files_1[i], opt->files_2[i]);
+		gb_pair_init(data, files_1[i], files_2[i]);
 
 		ret[i].n_consumer = n_consumer;
 		ret[i].stream = (void *)data;

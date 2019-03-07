@@ -401,6 +401,20 @@ void build2_3_opt_process(int argc, char *argv[])
 	build2_3_process(opt);
 }
 
+void build2_3a_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	init_log(tmp_dir);
+	build2_3a_process(opt);
+}
+
 void build0_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
@@ -457,6 +471,8 @@ int main(int argc, char *argv[])
 		build1_2_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_2_3"))
 		build2_3_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_2_3a"))
+		build2_3a_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else

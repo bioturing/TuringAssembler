@@ -176,7 +176,9 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct maincount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));

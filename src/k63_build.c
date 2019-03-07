@@ -480,7 +480,9 @@ static void k63_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct edgecount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct edgecount_bundle_t));

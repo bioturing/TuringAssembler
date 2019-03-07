@@ -654,21 +654,23 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
 		uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
 		/* print fake count for correct coverage display on Bandage */
-		fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
-					(long long unsigned)fake_count);
+		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
+			(long long)e_rc, seq, (long long unsigned)fake_count);
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < 250)
 			continue;
 		e_rc = g->edges[e].rc_id;
-		gint_t pe, next_pe;
+		gint_t pe, pe_rc, next_pe, next_pe_rc;
 		char ce, next_ce;
 		if (e > e_rc) {
 			pe = e_rc;
+			pe_rc = e;
 			ce = '-';
 		} else {
 			pe = e;
+			pe_rc = e_rc;
 			ce = '+';
 		}
 		gint_t n = g->edges[e].target;
@@ -679,13 +681,16 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			next_e_rc = g->edges[next_e].rc_id;
 			if (next_e > next_e_rc) {
 				next_pe = next_e_rc;
+				next_pe_rc = next_e;
 				next_ce = '-';
 			} else {
 				next_pe = next_e;
+				next_pe_rc = next_e_rc;
 				next_ce = '+';
 			}
-			fprintf(fp, "L\t%lld\t%c\t%lld\t%c\t%dM\n",
-				(long long)pe, ce, (long long)next_pe, next_ce,
+			fprintf(fp, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
+				(long long)pe, (long long)pe_rc, ce,
+				(long long)next_pe, (long long)next_pe_rc, next_ce,
 				g->ksize);
 		}
 	}
@@ -771,7 +776,6 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		++cnt_rm;
 	}
 	__VERBOSE("\nNumber of removed edges: %ld\n", cnt_rm);
-	test2_asm_graph(g0);
 	asm_condense(g0, g);
 }
 

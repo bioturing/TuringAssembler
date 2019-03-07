@@ -268,7 +268,10 @@ static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	fprintf(stderr, "num threads = %d\n", opt->n_threads);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct bctrie_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
@@ -419,7 +422,9 @@ static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct bctrie_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));

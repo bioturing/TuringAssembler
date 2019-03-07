@@ -883,7 +883,7 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 	mask = h->size - 1;
 	h->keys = realloc(h->keys, h->size * sizeof(uint64_t));
 	h->cnts = realloc(h->cnts, h->size * sizeof(uint32_t));
-	uint32_t *flag = calloc(h->size >> 4, sizeof(uint32_t));
+	uint8_t *flag = calloc(h->size, sizeof(uint8_t));
 
 	for (i = old_size; i < h->size; ++i) {
 		h->keys[i] = K31_NULL;
@@ -892,31 +892,32 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 
 	for (i = 0; i < old_size; ++i) {
 		if (h->keys[i] != K31_NULL)
-			rs_set_old(flag, i);
+			flag[i] = KMFLAG_OLD;
 	}
 
 	for (i = 0; i < old_size; ++i) {
-		if (rs_is_old(flag, i)) {
+		if (flag[i] == KMFLAG_OLD) {
 			uint64_t x = h->keys[i], xt;
 			uint32_t y = h->cnts[i], yt;
-			rs_set_empty(flag, i);
+			flag[i] = KMFLAG_EMPTY;
 			h->keys[i] = K31_NULL;
 			h->cnts[i] = 0;
 			while (1) {
 				uint64_t k = __hash_k31(x);
 				uint32_t j = k & mask, step = 0, last;
 				last = j;
-				while (!rs_is_empty(flag, j) && !rs_is_old(flag, j)) {
+				while (flag[j] != KMFLAG_EMPTY && flag[j] != KMFLAG_OLD) {
 					j = (j + (++step)) & mask;
 					if (j == last)
 						break;
 				}
-				if (rs_is_empty(flag, j)) {
-					rs_set_new(flag, j);
+				if (flag[j] == KMFLAG_EMPTY) {
+					flag[j] = KMFLAG_NEW;
 					h->keys[j] = x;
 					h->cnts[j] = y;
 					break;
-				} else if (rs_is_old(flag, j)) {
+				} else if (flag[j] == KMFLAG_OLD) {
+					flag[j] = KMFLAG_NEW;
 					xt = h->keys[j];
 					yt = h->cnts[j];
 					h->keys[j] = x;

@@ -63,6 +63,8 @@ void build1_2_process(struct opt_build_t *opt);
 
 void build2_3_process(struct opt_build_t *opt);
 
+void build2_3a_process(struct opt_build_t *opt);
+
 void build0_process(struct opt_count_t *opt);
 
 void graph_convert_process(struct opt_build_t *opt);
