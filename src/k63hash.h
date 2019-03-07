@@ -15,6 +15,38 @@ typedef struct {
 
 #define __k63_lt(x, y) ((x).bin[1] < (y).bin[1] || ((x).bin[1] == (y).bin[1] && (x).bin[0] < (y).bin[0]))
 
+#define __k63_lshift2(k) (((k).bin[1] = ((k).bin[1] << 2) | ((k).bin[0] >> 62)), \
+				((k).bin[0] <<= 2))
+#define __k63_rshift2(k) (((k).bin[0] = ((k).bin[0] >> 2) | (((k).bin[1] & 0x3ull) << 62)), \
+				((k).bin[1] >>= 2))
+
+#define __k63_lshift(k, l) (((k).bin[1] = ((k).bin[1] << (l)) | ((k).bin[0] >> (64 - (l)))), \
+				((k).bin[0] <<= (l)))
+#define __k63_rshift(k, l) (((k).bin[0] = ((k).bin[0] >> (l)) | (((k).bin[1] & ((1ull << (l)) - 1)) << (64 - (l))), \
+				((k).bin[1] >>= (l))))
+
+#define __k63_and(k, v) ((k).bin[0] &= (v).bin[0], (k).bin[1] &= (v).bin[1])
+
+#define __k63_revc_num(y, x, l, mask)					       \
+(									       \
+	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
+	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1]),  \
+	(x).bin[0] ^= (x).bin[1],					       \
+	(x).bin[1] ^= (x).bin[0],					       \
+	(x).bin[0] ^= (x).bin[1],					       \
+	(x).bin[0] ^= 0xffffffffffffffffull, (x).bin[0] &= (mask).bin[0],      \
+	(x).bin[1] ^= 0xffffffffffffffffull, (x).bin[1] &= (mask).bin[1]       \
+)
+
+#define __k63_rev_num(y, x, l)	\
+(									       \
+	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
+	(x).bin[0] ^= (x).bin[1],					       \
+	(x).bin[1] ^= (x).bin[0],					       \
+	(x).bin[0] ^= (x).bin[1],					       \
+	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1])   \
+)
+
 static inline uint64_t __hash_k63(k63key_t x)
 {
 	uint64_t k1, k2, k;

@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "assembly_graph.h"
+#include "fastq_producer.h"
 #include "io_utils.h"
 #include "k31hash.h"
 #include "k63hash.h"
@@ -11,7 +12,18 @@
 #include "time_utils.h"
 #include "verbose.h"
 
-#define TIPS_THRESHOLD			10.0
+static void dump_bin_seq(char *seq, uint32_t *bin, gint_t len)
+{
+	gint_t i;
+	for (i = 0; i < len; ++i)
+		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & 3];
+	seq[len] = '\0';
+}
+
+#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
+
+
+#define TIPS_THRESHOLD			5.0
 #define TIPS_RATIO_THRESHOLD		0.1
 
 #define NON_TIPS_LEN			250
@@ -25,6 +37,299 @@ void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g);
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 			gint_t len, gint_t max_len, int ksize);
 
+void k63_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	struct k63hash_t *kmer_hash;
+	kmer_hash = calloc(1, sizeof(struct k63hash_t));
+	__VERBOSE("Estimating kmer\n");
+	build_k63_table_lazy(opt, kmer_hash, ksize);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("\nBuilding assembly graph\n");
+	build_asm_graph_from_k63(opt, ksize, kmer_hash, g0);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of nodes: %lld\n", ksize,
+							(long long)g0->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of edges: %lld\n", ksize,
+							(long long)g0->n_e);
+}
+
+void k31_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	struct k31hash_t *kmer_hash;
+	kmer_hash = calloc(1, sizeof(struct k31hash_t));
+	__VERBOSE("Estimating kmer\n");
+	build_k31_table_lazy(opt, kmer_hash, ksize);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("\nBuilding assembly graph\n");
+	build_asm_graph_from_k31(opt, ksize, kmer_hash, g0);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of nodes: %lld\n", ksize,
+							(long long)g0->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of edges: %lld\n", ksize,
+							(long long)g0->n_e);
+}
+
+void graph_convert_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Dump graph from bin archive\n");
+	struct asm_graph_t *g;
+	g = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g, opt->in_path);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g->ksize);
+	test_asm_graph(g);
+	snprintf(path, 1024, "%s/graph_k_%d_loaded.gfa", opt->out_dir, g->ksize);
+	write_gfa(g, path);
+	snprintf(path, 1024, "%s/graph_k_%d_loaded.fasta", opt->out_dir, g->ksize);
+	dump_fasta(g, path);
+}
+
+void build0_process(struct opt_count_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building assembly graph using kmer size %d\n", opt->k0);
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	if (opt->k0 < 32)
+		k31_build0(opt, opt->k0, g0);
+	else if (opt->k0 > 32 && opt->k0 < 64)
+		k63_build0(opt, opt->k0, g0);
+	test_asm_graph(g0);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.gfa", opt->out_dir, opt->k0);
+	write_gfa(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.bin", opt->out_dir, opt->k0);
+	save_asm_graph_simple(g0, path);
+}
+
+void build0_1_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", g0->ksize,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.gfa", opt->out_dir, g0->ksize);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.fasta", opt->out_dir, g0->ksize);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_simple(g1, path);
+}
+
+void build1_2_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips using graph topology\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips_topology(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of edges: %lld\n", g0->ksize,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.gfa", opt->out_dir, g0->ksize);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, g0->ksize);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_simple(g1, path);
+}
+
+void build2_3_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing simple branching\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", g0->ksize,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, g0->ksize);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, g0->ksize);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_simple(g1, path);
+}
+
+void build_barcode_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building barcode information\n");
+	construct_barcode_map(g0, opt);
+	__VERBOSE("\n");
+
+	snprintf(path, 1024, "%s/graph_k_%d_added_barcode.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_barcode(g0, path);
+}
+
+void graph_query_process(struct opt_build_t *opt)
+{
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	fprintf(stderr, "bin size = %d\n", g0->bin_size);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Querying pair-edge barcode information\n");
+	gint_t u, v;
+	FILE *fp;
+	fp = xfopen(opt->in_file, "r");
+	while (1) {
+		int ret = fscanf(fp, "%ld%ld", &u, &v);
+		if (ret == EOF || ret == 0)
+			break;
+		print_test_barcode_edge(g0, u, v);
+	}
+	fclose(fp);
+
+}
+
+void build2_3a_process(struct opt_build_t *opt)
+{
+	// char path[1024];
+	// init_clock();
+
+	// struct asm_graph_t *g0;
+	// g0 = calloc(1, sizeof(struct asm_graph_t));
+	// load_asm_graph(g0, opt->in_path);
+	// test_asm_graph(g0);
+	// __VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	// __VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	// __VERBOSE("Building barcode information\n");
+	// construct_barcode_map(g0, opt);
+	// __VERBOSE("\n");
+	// print_test_barcode_edge(g0, 140382, 101945, opt->split_len);
+	// print_test_barcode_edge(g0, 109035, 101945, opt->split_len);
+}
+
+void assembly_process(struct opt_count_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building assembly graph using kmer size %d\n", opt->k0);
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	if (opt->k0 < 32)
+		k31_build0(opt, opt->k0, g0);
+	else if (opt->k0 > 32 && opt->k0 < 64)
+		k63_build0(opt, opt->k0, g0);
+	test_asm_graph(g0);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.gfa", opt->out_dir, opt->k0);
+	write_gfa(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g0, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_0.bin", opt->out_dir, opt->k0);
+	save_asm_graph_simple(g0, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips\n");
+	struct asm_graph_t *g1;
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", opt->k0,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", opt->k0,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.gfa", opt->out_dir, opt->k0);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
+	save_asm_graph_simple(g1, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing tips #2\n");
+	struct asm_graph_t *g2;
+	g2 = calloc(1, sizeof(struct asm_graph_t));
+	remove_tips_topology(g1, g2);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of nodes: %lld\n", opt->k0,
+							(long long)g2->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of edges: %lld\n", opt->k0,
+							(long long)g2->n_e);
+	test_asm_graph(g2);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.gfa", opt->out_dir, opt->k0);
+	write_gfa(g2, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g2, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
+	save_asm_graph_simple(g2, path);
+
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Removing bubbles\n");
+	struct asm_graph_t *g3;
+	g3 = calloc(1, sizeof(struct asm_graph_t));
+	remove_bubble_simple(g2, g3);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", opt->k0,
+							(long long)g3->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", opt->k0,
+							(long long)g3->n_e);
+	test_asm_graph(g3);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, opt->k0);
+	write_gfa(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, opt->k0);
+	dump_fasta(g3, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
+	save_asm_graph_simple(g3, path);
+}
+
 void k63_process(struct opt_count_t *opt)
 {
 	char path[1024];
@@ -33,7 +338,7 @@ void k63_process(struct opt_count_t *opt)
 	struct k63hash_t *kmer_hash;
 	kmer_hash = calloc(1, sizeof(struct k63hash_t));
 	__VERBOSE("Estimating kmer\n");
-	build_k63_table_lazy(opt, kmer_hash, opt->kmer_slave);
+	build_k63_table_lazy(opt, kmer_hash, opt->k0);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
@@ -41,7 +346,7 @@ void k63_process(struct opt_count_t *opt)
 	__VERBOSE("\nBuilding assembly graph\n");
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k63(opt, opt->kmer_slave, kmer_hash, g0);
+	build_asm_graph_from_k63(opt, opt->k0, kmer_hash, g0);
 	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
 	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.gfa");
@@ -50,7 +355,7 @@ void k63_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.fasta");
 	dump_fasta(g0, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.bin");
-	save_asm_graph(g0, path);
+	save_asm_graph_simple(g0, path);
 
 	__VERBOSE("\nRemoving tips\n");
 	struct asm_graph_t *g1;
@@ -64,7 +369,7 @@ void k63_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_1.fasta");
 	dump_fasta(g1, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_1.bin");
-	save_asm_graph(g1, path);
+	save_asm_graph_simple(g1, path);
 
 
 	__VERBOSE("\nRemoving tips #2\n");
@@ -79,7 +384,7 @@ void k63_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.fasta");
 	dump_fasta(g2, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.bin");
-	save_asm_graph(g2, path);
+	save_asm_graph_simple(g2, path);
 
 	__VERBOSE("\nRemoving bubble\n");
 	struct asm_graph_t *g3;
@@ -93,7 +398,7 @@ void k63_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.fasta");
 	dump_fasta(g3, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.bin");
-	save_asm_graph(g3, path);
+	save_asm_graph_simple(g3, path);
 }
 
 void k31_process(struct opt_count_t *opt)
@@ -104,7 +409,7 @@ void k31_process(struct opt_count_t *opt)
 	struct k31hash_t *kmer_hash;
 	kmer_hash = calloc(1, sizeof(struct k31hash_t));
 	__VERBOSE("Estimating kmer\n");
-	build_k31_table_lazy(opt, kmer_hash, opt->kmer_slave);
+	build_k31_table_lazy(opt, kmer_hash, opt->k0);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
@@ -112,7 +417,7 @@ void k31_process(struct opt_count_t *opt)
 	__VERBOSE("\nBuilding assembly graph\n");
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k31(opt, opt->kmer_slave, kmer_hash, g0);
+	build_asm_graph_from_k31(opt, opt->k0, kmer_hash, g0);
 	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
 	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.gfa");
@@ -121,7 +426,7 @@ void k31_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.fasta");
 	dump_fasta(g0, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.bin");
-	save_asm_graph(g0, path);
+	save_asm_graph_simple(g0, path);
 
 	__VERBOSE("\nRemoving tips\n");
 	struct asm_graph_t *g1;
@@ -135,7 +440,7 @@ void k31_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_1.fasta");
 	dump_fasta(g1, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_1.bin");
-	save_asm_graph(g1, path);
+	save_asm_graph_simple(g1, path);
 
 	__VERBOSE("\nRemoving tips #2\n");
 	struct asm_graph_t *g2;
@@ -149,7 +454,7 @@ void k31_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.fasta");
 	dump_fasta(g2, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.bin");
-	save_asm_graph(g2, path);
+	save_asm_graph_simple(g2, path);
 
 	__VERBOSE("\nRemoving bubble\n");
 	struct asm_graph_t *g3;
@@ -163,12 +468,45 @@ void k31_process(struct opt_count_t *opt)
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.fasta");
 	dump_fasta(g3, path);
 	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.bin");
-	save_asm_graph(g3, path);
+	save_asm_graph_simple(g3, path);
+}
+
+double get_uni_genome_coverage(struct asm_graph_t *g)
+{
+	gint_t max_len, e;
+	double ret_cov = 0.0;
+	max_len = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].seq_len > max_len) {
+			max_len = g->edges[e].seq_len;
+			ret_cov = g->edges[e].count * 1.0 /
+				(g->edges[e].seq_len - g->ksize);
+		}
+	}
+	return ret_cov;
 }
 
 static uint32_t *append_bin_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 					gint_t slen, int skip)
 {
+	{
+		gint_t i;
+		for (i = 0; i < skip; ++i) {
+			uint32_t c1, c2;
+			c1 = __bin_seq_get_char(src, i);
+			c2 = __bin_seq_get_char(dst, dlen - (skip - i));
+			if (c1 != c2) {
+				char *seq1, *seq2;
+				seq1 = malloc(dlen + 1);
+				dump_bin_seq(seq1, dst, dlen);
+				fprintf(stderr, "dst = %s\n", seq1);
+				seq2 = malloc(slen + skip + 1);
+				dump_bin_seq(seq2, src, slen + skip);
+				fprintf(stderr, "src = %s\n", seq2);
+				assert(0 && "Fail when append");
+			}
+		}
+	}
 	uint32_t *new_ptr;
 	gint_t cur_m, m, i, k;
 	cur_m = (dlen + 15) >> 4;
@@ -182,6 +520,7 @@ static uint32_t *append_bin_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 	for (i = skip; i < skip + slen; ++i) {
 		k = dlen + (i - skip);
 		new_ptr[k >> 4] |= ((src[i >> 4] >> ((i & 15) << 1)) & (uint32_t)3) << ((k & 15) << 1);
+		assert(__bin_seq_get_char(new_ptr, k) == ((src[i >> 4] >> ((i & 15) << 1)) & (uint32_t)3));
 	}
 	return new_ptr;
 }
@@ -220,16 +559,6 @@ static gint_t asm_only_positive_edge(gint_t *adj, int deg)
 	return ret;
 }
 
-static void dump_bin_seq(char *seq, uint32_t *bin, gint_t len)
-{
-	gint_t i;
-	for (i = 0; i < len; ++i)
-		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & 3];
-	seq[len] = '\0';
-}
-
-#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
-
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2)
 {
 	if (l1 != l2)
@@ -247,64 +576,49 @@ int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2)
 	return 1;
 }
 
-void asm_get_cc(struct asm_graph_t *g, gint_t *id_node, gint_t *id_edge,
-		gint_t **ret_size)
+void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
 {
-	memset(id_node, 255, g->n_v * sizeof(gint_t));
 	memset(id_edge, 255, g->n_e * sizeof(gint_t));
 	gint_t m_cc = 0x10000;
 	gint_t *size = malloc(m_cc * sizeof(gint_t));
 	gint_t n_cc = 0;
 	gint_t k, l, r;
-	gint_t *q = malloc(g->n_v * sizeof(gint_t));
-	for (k = 0; k < g->n_v; ++k) {
-		if (id_node[k] != -1)
+	gint_t *q = malloc(g->n_e * sizeof(gint_t));
+
+	for (k = 0; k < g->n_e; ++k) {
+		if (id_edge[k] != -1)
 			continue;
-		id_node[k] = id_node[g->nodes[k].rc_id] = n_cc;
+		id_edge[k] = id_edge[g->edges[k].rc_id] = n_cc;
 		gint_t cur_size = 0;
 		l = r = 0;
 		q[0] = k;
 		while (l <= r) {
-			gint_t u = q[l++];
-			gint_t u_rc = g->nodes[u].rc_id;
+			gint_t e = q[l++];
+			gint_t e_rc = g->edges[e].rc_id;
+			cur_size += 2 * (g->edges[e].seq_len - g->ksize);
+
+			gint_t u, c;
+			u = g->edges[e].target;
 			if (g->nodes[u].deg == 0)
 				cur_size += g->ksize;
-			if (g->nodes[u_rc].deg == 0)
-				cur_size += g->ksize;
-			gint_t c;
 			for (c = 0; c < g->nodes[u].deg; ++c) {
-				gint_t e = g->nodes[u].adj[c];
-				gint_t e_rc = g->edges[e].rc_id;
-				if (id_edge[e] == -1) {
-					id_edge[e] = n_cc;
-					cur_size += g->edges[e].seq_len - g->ksize;
-				}
-				if (id_edge[e_rc] == -1) {
-					id_edge[e_rc] = n_cc;
-					cur_size += g->edges[e_rc].seq_len - g->ksize;
-				}
-				gint_t v = g->edges[e].target;
-				if (id_node[v] == -1) {
-					id_node[v] = id_node[g->nodes[v].rc_id] = n_cc;
-					q[++r] = v;
+				gint_t next_e = g->nodes[u].adj[c];
+				gint_t next_e_rc = g->edges[next_e].rc_id;
+				if (id_edge[next_e] == -1) {
+					id_edge[next_e] = id_edge[next_e_rc] = n_cc;
+					q[++r] = next_e;
 				}
 			}
 
-			for (c = 0; c < g->nodes[u_rc].deg; ++c) {
-				gint_t e = g->nodes[u_rc].adj[c];
-				gint_t e_rc = g->edges[e].rc_id;
-				if (id_edge[e] == -1) {
-					id_edge[e] = n_cc;
-					cur_size += g->edges[e].seq_len - g->ksize;
-				}
-				if (id_edge[e_rc] == -1) {
-					id_edge[e_rc] = n_cc;
-					cur_size += g->edges[e_rc].seq_len - g->ksize;
-				}
-				gint_t v = g->edges[e].target;
-				if (id_node[v] == -1) {
-					id_node[v] = id_node[g->nodes[v].rc_id] = n_cc;
-					q[++r] = v;
+			u = g->edges[e_rc].target;
+			if (g->nodes[u].deg == 0)
+				cur_size += g->ksize;
+			for (c = 0; c < g->nodes[u].deg; ++c) {
+				gint_t next_e = g->nodes[u].adj[c];
+				gint_t next_e_rc = g->edges[next_e].rc_id;
+				if (id_edge[next_e] == -1) {
+					id_edge[next_e] = id_edge[next_e_rc] = n_cc;
+					q[++r] = next_e;
 				}
 			}
 		}
@@ -321,11 +635,10 @@ void asm_get_cc(struct asm_graph_t *g, gint_t *id_node, gint_t *id_edge,
 
 void dump_fasta(struct asm_graph_t *g, const char *path)
 {
-	gint_t *id_node, *id_edge, *cc_size;
-	id_node = malloc(g->n_v * sizeof(gint_t));
+	gint_t *id_edge, *cc_size;
 	id_edge = malloc(g->n_e * sizeof(gint_t));
 	cc_size = NULL;
-	asm_get_cc(g, id_node, id_edge, &cc_size);
+	asm_edge_cc(g, id_edge, &cc_size);
 
 	FILE *fp = xfopen(path, "w");
 	char *seq = NULL;
@@ -358,18 +671,16 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 	fclose(fp);
 
 	free(id_edge);
-	free(id_node);
 	free(cc_size);
-
 }
+
 
 void write_gfa(struct asm_graph_t *g, const char *path)
 {
-	gint_t *id_node, *id_edge, *cc_size;
-	id_node = malloc(g->n_v * sizeof(gint_t));
+	gint_t *id_edge, *cc_size;
 	id_edge = malloc(g->n_e * sizeof(gint_t));
 	cc_size = NULL;
-	asm_get_cc(g, id_node, id_edge, &cc_size);
+	asm_edge_cc(g, id_edge, &cc_size);
 
 	FILE *fp = xfopen(path, "w");
 	char *seq = NULL;
@@ -389,76 +700,106 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
 		double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
 		uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
-		// fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
-		// 			(long long unsigned)g->edges[e].count);
-		fprintf(fp, "S\t%lld\t%s\tKC:i:%llu\n", (long long)e, seq,
-					(long long unsigned)fake_count);
+		/* print fake count for correct coverage display on Bandage */
+		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
+			(long long)e_rc, seq, (long long unsigned)fake_count);
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < 250)
 			continue;
 		e_rc = g->edges[e].rc_id;
-		gint_t pe, next_pe;
+		gint_t pe, pe_rc, next_pe, next_pe_rc;
 		char ce, next_ce;
 		if (e > e_rc) {
 			pe = e_rc;
+			pe_rc = e;
 			ce = '-';
 		} else {
 			pe = e;
+			pe_rc = e_rc;
 			ce = '+';
 		}
 		gint_t n = g->edges[e].target;
-		int k;
+		gint_t k;
 		for (k = 0; k < g->nodes[n].deg; ++k) {
 			gint_t next_e, next_e_rc;
 			next_e = g->nodes[n].adj[k];
 			next_e_rc = g->edges[next_e].rc_id;
 			if (next_e > next_e_rc) {
 				next_pe = next_e_rc;
+				next_pe_rc = next_e;
 				next_ce = '-';
 			} else {
 				next_pe = next_e;
+				next_pe_rc = next_e_rc;
 				next_ce = '+';
 			}
-			fprintf(fp, "L\t%lld\t%c\t%lld\t%c\t%dM\n",
-				(long long)pe, ce, (long long)next_pe, next_ce,
+			fprintf(fp, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
+				(long long)pe, (long long)pe_rc, ce,
+				(long long)next_pe, (long long)next_pe_rc, next_ce,
 				g->ksize);
 		}
 	}
 	fclose(fp);
 	free(id_edge);
-	free(id_node);
 	free(cc_size);
 }
 
 void remove_bubble_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	/* "Don't you want a balloon?"
-	 *        u            v
-	 * o----->o----------->o------>o
-	 *         \           ^
-	 *          \          |
-	 *           +---------+
+	 * 1g = 1 genome walk
+	 *                   0.8g
+	 *                +--------+
+	 *               /          \
+	 *       1g     /            v    1g
+	 * o---------->U             V--------->o
+	 *              \            ^
+	 *               \   0.3g   /
+	 *                +--------+
 	 */
+	double uni_cov = get_uni_genome_coverage(g0);
+	__VERBOSE("1 genome walk coverage: %lf\n", uni_cov);
 	gint_t cnt_rm = 0;
 	gint_t u;
 	for (u = 0; u < g0->n_v; ++u) {
 		if (u % 1000 == 0)
 			fprintf(stderr, "\rRemoving bubble node %ld", u);
+		gint_t ctg;
+		double cov;
+		/* check topology of node u */
 		gint_t u_rc = g0->nodes[u].rc_id;
 		if (g0->nodes[u_rc].deg != 1 || g0->nodes[u].deg != 2)
 			continue;
+		/* check if previous contig is uni genome walk */
+		ctg = g0->nodes[u_rc].adj[0];
+		cov = g0->edges[ctg].count * 1.0 /
+			(g0->edges[ctg].seq_len - g0->ksize);
+		if (cov / uni_cov < 0.75 || cov / uni_cov > 1.25)
+			continue;
+
+		/* check topology of 2 small contigs (end at same node) */
 		gint_t e0, e1;
 		e0 = g0->nodes[u].adj[0];
 		e1 = g0->nodes[u].adj[1];
+		if (e0 == g0->edges[e1].rc_id)
+			continue;
 		if (g0->edges[e0].target != g0->edges[e1].target)
 			continue;
+		/* check topology of node v */
 		gint_t v, v_rc;
 		v = g0->edges[e0].target;
 		v_rc = g0->nodes[v].rc_id;
 		if (g0->nodes[v_rc].deg != 2 || g0->nodes[v].deg != 1)
 			continue;
+		/* check if next contig is uni genome walk */
+		ctg = g0->nodes[v].adj[0];
+		cov = g0->edges[ctg].count * 1.0 /
+			(g0->edges[ctg].seq_len - g0->ksize);
+		if (cov / uni_cov < 0.75 || cov / uni_cov > 1.25)
+			continue;
+
 		gint_t e_rc0, e_rc1;
 		e_rc0 = g0->nodes[v_rc].adj[0];
 		e_rc1 = g0->nodes[v_rc].adj[1];
@@ -505,6 +846,15 @@ static inline void ec_sort(struct edge_cov_t *b, struct edge_cov_t *e)
 
 void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+	/*             o
+	 *             ^      o
+	 *       o<--+ |      ^
+	 *            \|     /         TIP
+	 *        o<---o--->o--->o
+	 *             ^
+	 *            /
+	 * o-------->o-------->o------>o------>o
+	 */
 	gint_t u, e;
 	uint32_t *flag = calloc((g0->n_e + 31) >> 5, sizeof(uint32_t));
 	struct edge_cov_t *tmp = NULL;
@@ -574,6 +924,15 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+	/*
+	 *                      o
+	 *                      ^
+	 *                     /
+	 *              cov~1 /
+	 *                   /
+	 *       cov~10     /   cov~10
+	 * o-------------->o------------->o---------->o
+	 */
 	gint_t u;
 	for (u = 0; u < g0->n_v; ++u) {
 		double max_cov = 0.0, cov;
@@ -681,7 +1040,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 							g0->edges[e_id].seq,
 							g0->edges[e_id].seq_len
 								- g0->ksize,
-							g->ksize);
+							g0->ksize);
 					edges[n_e].seq_len +=
 						g0->edges[e_id].seq_len - g0->ksize;
 					edges[n_e].count += g0->edges[e_id].count;
@@ -741,6 +1100,30 @@ static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 	return 1;
 }
 
+void test2_asm_graph(struct asm_graph_t *g)
+{
+	gint_t u, e;
+	for (u = 0; u < g->n_v; ++u) {
+		gint_t j;
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			gint_t e_rc = g->edges[e].rc_id;
+			if (!asm_is_edge_rc(g->edges[e].seq, g->edges[e].seq_len,
+					g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
+				fprintf(stderr, "seq_len = %ld; rc_seq_len = %ld\n",
+					g->edges[e].seq_len, g->edges[e_rc].seq_len);
+				assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
+				char *seq = malloc(g->edges[e].seq_len + 1);
+				dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+				fprintf(stderr, "seq    = %s\n", seq);
+				dump_bin_seq(seq, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+				fprintf(stderr, "seq_rc = %s\n", seq);
+				assert(0 && "Smart error");
+			}
+		}
+	}
+}
+
 void test_asm_graph(struct asm_graph_t *g)
 {
 	gint_t u, e;
@@ -757,12 +1140,37 @@ void test_asm_graph(struct asm_graph_t *g)
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t e_rc = g->edges[e].rc_id;
+		// if (e == 12584 || e_rc == 12584)
+		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
+		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
+		// if (e == 12586 || e_rc == 12586)
+		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
+		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
+		// if (e == 86376 || e_rc == 86376)
+		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
+		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
+
 		if (e != g->edges[e_rc].rc_id) {
 			fprintf(stderr, "edge = (%ld -> %ld)\n",
 				g->edges[e].source, g->edges[e].target);
 			fprintf(stderr, "edge_rc = (%ld -> %ld)\n",
 				g->edges[e_rc].source, g->edges[e_rc].target);
 			assert(0 && "Fail edge reverse complement id");
+		}
+	}
+	for (u = 0; u < g->n_v; ++u) {
+		int c;
+		for (c = 0; c < g->ksize; ++c) {
+			int prev_c = -1;
+			gint_t k;
+			for (k = 0; k < g->nodes[u].deg; ++k) {
+				gint_t e = g->nodes[u].adj[k];
+				int ck = __bin_seq_get_char(g->edges[e].seq, c);
+				if (ck != prev_c && prev_c != -1) {
+					assert(0 && "Mistake in sequence extract");
+				}
+				prev_c = ck;
+			}
 		}
 	}
 	for (u = 0; u < g->n_v; ++u) {
@@ -795,6 +1203,18 @@ void test_asm_graph(struct asm_graph_t *g)
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t e_rc = g->edges[e].rc_id;
+		if (!asm_is_edge_rc(g->edges[e].seq, g->edges[e].seq_len,
+				g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
+			fprintf(stderr, "seq_len = %ld; rc_seq_len = %ld\n",
+				g->edges[e].seq_len, g->edges[e_rc].seq_len);
+			assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
+			char *seq = malloc(g->edges[e].seq_len + 1);
+			dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+			fprintf(stderr, "seq    = %s\n", seq);
+			dump_bin_seq(seq, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+			fprintf(stderr, "seq_rc = %s\n", seq);
+			assert(0 && "Stupid error");
+		}
 		assert(e_rc != -1);
 		gint_t src, tgt, src_rc, tgt_rc;
 		src = g->edges[e].source;
@@ -814,9 +1234,8 @@ void test_asm_graph(struct asm_graph_t *g)
 	}
 }
 
-void save_asm_graph(struct asm_graph_t *g, const char *path)
+void save_graph(struct asm_graph_t *g, FILE *fp)
 {
-	FILE *fp = xfopen(path, "wb");
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
@@ -835,12 +1254,44 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 		xfwrite(&g->edges[e].seq_len, sizeof(gint_t), 1, fp);
 		xfwrite(g->edges[e].seq, sizeof(uint32_t), (g->edges[e].seq_len + 15) >> 4, fp);
 	}
+}
+
+void save_asm_graph_simple(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "wb");
+	char *sig = "asmg";
+	xfwrite(sig, 4, 1, fp);
+	save_graph(g, fp);
 	fclose(fp);
 }
 
-void load_asm_graph(struct asm_graph_t *g, const char *path)
+void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
 {
-	FILE *fp = xfopen(path, "rb");
+	FILE *fp = xfopen(path, "wb");
+	char *sig = "asmb";
+	xfwrite(sig, 4, 1, fp);
+	save_graph(g, fp);
+	xfwrite(&g->bin_size, sizeof(int), 1, fp);
+	gint_t e;
+	for (e = 0; e < g->n_e; ++e) {
+		gint_t e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		gint_t n, k;
+		n = (g->edges[e].seq_len + g->bin_size - 1) / g->bin_size;
+		for (k = 0; k < n; ++k) {
+			struct barcode_hash_t *h = g->edges[e].bucks + k;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+		}
+	}
+	fclose(fp);
+}
+
+void load_graph(struct asm_graph_t *g, FILE *fp)
+{
 	xfread(&g->ksize, sizeof(int), 1, fp);
 	xfread(&g->n_v, sizeof(gint_t), 1, fp);
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
@@ -866,5 +1317,65 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 		g->edges[e].seq = calloc((g->edges[e].seq_len + 15) >> 4, sizeof(uint32_t));
 		xfread(g->edges[e].seq, sizeof(uint32_t), (g->edges[e].seq_len + 15) >> 4, fp);
 	}
+}
+
+void load_barcode(struct asm_graph_t *g, FILE *fp)
+{
+	xfread(&g->bin_size, sizeof(int), 1, fp);
+	gint_t e;
+	for (e = 0; e < g->n_e; ++e) {
+		gint_t e_rc = g->edges[e].rc_id;
+		if (e > e_rc) {
+			g->edges[e].bucks = g->edges[e_rc].bucks;
+			continue;
+		}
+		gint_t n, k;
+		n = (g->edges[e].seq_len + g->bin_size - 1) / g->bin_size;
+		g->edges[e].bucks = calloc(n, sizeof(struct barcode_hash_t));
+		for (k = 0; k < n; ++k) {
+			struct barcode_hash_t *h = g->edges[e].bucks + k;
+			xfread(&h->size, sizeof(uint32_t), 1, fp);
+			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			h->keys = malloc(h->size * sizeof(uint64_t));
+			h->cnts = malloc(h->size * sizeof(uint32_t));
+			xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+		}
+	}
+}
+
+void load_asm_graph(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	char sig[4];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "asmg", 4) && strncmp(sig, "asmb", 4))
+		__ERROR("Not assembly graph format file");
+	load_graph(g, fp);
+	if (strncmp(sig, "asmb", 4) == 0)
+		load_barcode(g, fp);
+	fclose(fp);
+}
+
+void load_asm_graph_simple(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	char sig[4];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "asmg", 4) && strncmp(sig, "asmb", 4))
+		__ERROR("Not assembly graph format file");
+	load_graph(g, fp);
+	fclose(fp);
+}
+
+void load_asm_graph_complex(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	char sig[4];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "asmb", 4))
+		__ERROR("Not assembly graph with barcode format file");
+	load_graph(g, fp);
+	load_barcode(g, fp);
 	fclose(fp);
 }

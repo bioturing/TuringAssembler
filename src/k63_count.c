@@ -31,38 +31,6 @@ struct maincount_bundle_t {
 	pthread_mutex_t *lock_hash;
 };
 
-#define __k63_lshift2(k) (((k).bin[1] = ((k).bin[1] << 2) | ((k).bin[0] >> 62)), \
-				((k).bin[0] <<= 2))
-#define __k63_rshift2(k) (((k).bin[0] = ((k).bin[0] >> 2) | (((k).bin[1] & 0x3ull) << 62)), \
-				((k).bin[1] >>= 2))
-
-#define __k63_lshift(k, l) (((k).bin[1] = ((k).bin[1] << (l)) | ((k).bin[0] >> (64 - (l)))), \
-				((k).bin[0] <<= (l)))
-#define __k63_rshift(k, l) (((k).bin[0] = ((k).bin[0] >> (l)) | (((k).bin[1] & ((1ull << (l)) - 1)) << (64 - (l))), \
-				((k).bin[1] >>= (l))))
-
-#define __k63_and(k, v) ((k).bin[0] &= (v).bin[0], (k).bin[1] &= (v).bin[1])
-
-#define __reverse_bit_order64(x)					       \
-(									       \
-	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
-	(x) = (((x) & 0xffff0000ffff0000ull) >> 16) | (((x) & 0x0000ffff0000ffffull) << 16), \
-	(x) = (((x) & 0xff00ff00ff00ff00ull) >>  8) | (((x) & 0x00ff00ff00ff00ffull) <<  8), \
-	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
-	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2)  \
-)
-
-#define __k63_revc_num(y, x, l, mask)					       \
-(									       \
-	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	(x).bin[1] ^= (x).bin[0],					       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1]),  \
-	(x).bin[0] ^= 0xffffffffffffffffull, (x).bin[0] &= (mask).bin[0],      \
-	(x).bin[1] ^= 0xffffffffffffffffull, (x).bin[1] &= (mask).bin[1]       \
-)
-
 static void k63_dump_kmer(k63key_t key, char *seq, int l)
 {
 	seq[l] = '\0';
@@ -208,7 +176,9 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct maincount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct maincount_bundle_t));
@@ -395,7 +365,7 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 	k63_correct_edge(h, ksize);
 	k63_check_edge(h, ksize);
 	// recount_edge(h);
-	// check_edge(h, opt->kmer_master);
+	// check_edge(h, opt->k1);
 }
 
 void k63_test_process(struct opt_count_t *opt)
@@ -403,8 +373,8 @@ void k63_test_process(struct opt_count_t *opt)
 	struct k63hash_t *hm;
 	hm = calloc(1, sizeof(struct k63hash_t));
 	__VERBOSE("Lazy count %d-mer with max word size %lu\n",
-		opt->kmer_master, (long unsigned)sizeof(k63key_t));
-	build_k63_table_lazy(opt, hm, opt->kmer_master);
-	test_kmer_count(opt, opt->kmer_master);
+		opt->k1, (long unsigned)sizeof(k63key_t));
+	build_k63_table_lazy(opt, hm, opt->k1);
+	test_kmer_count(opt, opt->k1);
 }
 

@@ -20,6 +20,8 @@
 #define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 
+#define BARCODE_HASH_UPPER	0.77
+
 typedef uint64_t kmint_t;
 #define atomic_add_and_fetch_kmint	atomic_add_and_fetch64
 
@@ -40,6 +42,8 @@ typedef uint64_t kmint_t;
 
 #define KMHASH_KEY(h, k) ((h)->keys[k])
 
+#define BARCODE_HASH_END(h) ((h)->size)
+
 static inline uint64_t __hash_int(uint64_t k)
 {
 	uint64_t x = k;
@@ -59,5 +63,13 @@ static inline kmint_t estimate_probe_3(kmint_t size)
 	}
 	return i;
 }
+#define __reverse_bit_order64(x)					       \
+(									       \
+	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
+	(x) = (((x) & 0xffff0000ffff0000ull) >> 16) | (((x) & 0x0000ffff0000ffffull) << 16), \
+	(x) = (((x) & 0xff00ff00ff00ff00ull) >>  8) | (((x) & 0x00ff00ff00ff00ffull) <<  8), \
+	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
+	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2)  \
+)
 
 #endif /* __ASM_HASH_H__ */

@@ -12,9 +12,22 @@ typedef uint64_t k31key_t;
 
 #define __hash_k31(x)		__hash_int((uint64_t)(x))
 
+#define __k31_equal(x, y) ((x) == (y))
+
+#define __k31_lt(x, y) ((x) < (y))
+
 #define k31_exist(h, i) ((h)->keys[i] != (k31key_t)-1)
 
 #define K31_NULL		((k31key_t)-1)
+
+#define __k31_revc_num(y, x, l, mask)					       \
+(									       \
+	(x) = (y) << (64 - ((l) << 1)),					       \
+	__reverse_bit_order64(x), (x) ^= 0xffffffffffffffffull, (x) &= (mask)  \
+)
+
+#define __k31_rev_num(y, x, l)	\
+		((x) = (y) << (64 - ((l) << 1)), __reverse_bit_order64(x))
 
 struct k31hash_t {
 	/* multi-threaded singleton kmer filtered hash table */
@@ -98,5 +111,26 @@ void k31_idhash_clean(struct k31_idhash_t *h);
 kmint_t k31_idhash_get(struct k31_idhash_t *h, k31key_t key);
 
 kmint_t k31_idhash_put(struct k31_idhash_t *h, k31key_t key);
+
+/***************************** Table for barcode ******************************/
+
+struct barcode_hash_t {
+	uint32_t size;
+	uint32_t n_item;
+
+	uint64_t *keys;
+	uint32_t *cnts;
+	pthread_mutex_t *lock;
+};
+
+void barcode_hash_init(struct barcode_hash_t *h, uint32_t size);
+
+void barcode_hash_clean(struct barcode_hash_t *h);
+
+uint32_t barcode_hash_get(struct barcode_hash_t *h, uint64_t key);
+
+uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key);
+
+uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key);
 
 #endif
