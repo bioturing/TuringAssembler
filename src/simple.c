@@ -164,6 +164,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
     if (n_items == 0)
       break;
     for (j = 0; j < n_items; j++){
+      //printf("Visited node %d, q size %d, pointer %d, capacity %d\n", u, q->n, q->p, q->s);
       u = aqueue_pop(q); //u is an edge
       if (u >= n_edges){
         printf("Here\n");

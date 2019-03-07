@@ -30,7 +30,7 @@ void aqueue_add(aqueue_t *q, gint_t e_)
     if (q->p > 0)
       memmove(q->e, q->e + q->p, q->n * sizeof(gint_t));
     else{
-      q->e = (gint_t *)realloc(q->e, q->s << 1);
+      q->e = (gint_t *)realloc(q->e, sizeof(gint_t) * (q->s << 1));
       q->s <<= 1;
     }
     q->p = 0;
