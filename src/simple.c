@@ -122,8 +122,6 @@ void simple_tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
          continue;
       }
       assert(next_e <= n_edges);
-      if (next_e == 194333)
-        printf("here");
       aqueue_add(q, next_e); //add neighbor edge
       kh_put(khInt, set_v, next_e, &missing);
       *comp_sz += e[next_e].seq_len; //add size of the edge to total size
@@ -167,7 +165,6 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
       u = aqueue_pop(q); //u is an edge
       //if (u >=  n_edges)
       //  printf("here\n");
-      printf("U is %d, length of queue %d\n", u, q->n);
       assert(u < n_edges);
       simple_tandem_helper(e, v, u, set_v, &comp_sz, q, &n_larges, &lg);
       ///simple_tandem_helper(e, v, e[u].rc_id, set_v, &comp_sz, q, &n_larges, &lg);
