@@ -16,6 +16,8 @@
 #define MAX_COMPONENT_REGION 3000
 #define MIN_LAYER 100
 #define MIN_VISITED_NODES 3
+#define MIN_RATIO_LOOP_COV 1.5
+
 
 static uint64_t g_cov;
 static uint32_t n_edges;
@@ -163,11 +165,11 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
       break;
     for (j = 0; j < n_items; j++){
       u = aqueue_pop(q); //u is an edge
-      //if (u >=  n_edges)
-      //  printf("here\n");
+      if (u >= n_edges){
+        printf("Here\n");
+      }
       assert(u < n_edges);
       simple_tandem_helper(e, v, u, set_v, &comp_sz, q, &n_larges, &lg);
-      ///simple_tandem_helper(e, v, e[u].rc_id, set_v, &comp_sz, q, &n_larges, &lg);
     }
     if (++cnt > MIN_LAYER) //very complex region, never end
       break;
@@ -193,6 +195,40 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
     *k = lg;
     return 1;
   }
+}
+
+void resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
+                  gint_t ksize)
+{
+  uint32_t cov, t_cov;
+  uint32_t *seq;
+  gint_t t, dest;
+  gint_t rc_src;
+
+  cov = get_seq_cov(e + u, ksize);
+  dest = e[u].target;
+  rc_src = v[e[u].source].rc_id;
+
+  t = e[v[dest].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
+  t_cov = get_seq_cov(e + t, ksize);
+  
+  if (!(cov/t_cov < MIN_RATIO_COV && (uint32_t)(cov/g_cov) == 2))
+    __VERBOSE("Loop is not double of the genome walk\n");
+  
+  e[u].seq_len = 2*e[u].seq_len + e[t].seq_len - 2*ksize;
+  e[u].count += e[t].count;
+  seq = append_bin_seq(e[t].seq, e[t].seq_len, e[u], e[u].seq_len, ksize);
+  seq = append_bin_seq(e[u].seq, e[u].seq_len, seq , e[u].seq_len + e[t].seq_len - ksize, ksize); 
+
+  e[u].seq = seq;
+  e[e[u].rc_id].seq = seq;
+
+  t = t == v[dest].adj[1] ? v[dest].adj[0] : v[dest].adj[1]; //t is now the big leg;
+  v[dest].deg = 1;
+  v[dest].adj[0] = t;
+
+  t = e[v[rc_src].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
+
 }
 
 void find_forest(struct asm_graph_t *g0)
@@ -259,6 +295,7 @@ void find_forest(struct asm_graph_t *g0)
   free(id_edge);
 
 }
+
 
 int main(int argc, char *argv[])
 {

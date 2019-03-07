@@ -1,4 +1,4 @@
-GCC = cc
+GCC = gcc
 
 AR = ar
 
@@ -66,7 +66,7 @@ libskip.a: $(OBJS)
 	$(AR) -csru $@ $(OBJS)
 
 simple: 
-	$(CC) -o simple $(CFLAGS) src/simple.c $(BASESRC) $(LIBS) 
+	$(CC) -o simple $(CFLAGS)  $(BASESRC) src/simple.c $(LIBS) 
 
 all: $(EXEC)
 

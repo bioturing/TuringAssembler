@@ -430,7 +430,7 @@ double get_uni_genome_coverage(struct asm_graph_t *g)
 	return ret_cov;
 }
 
-static uint32_t *append_bin_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
+uint32_t *append_bin_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 					gint_t slen, int skip)
 {
 	{
