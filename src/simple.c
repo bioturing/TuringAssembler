@@ -11,12 +11,16 @@
 
 #define MIN_CON_LEN 7000
 #define MIN_RATIO_COV 1.7
-#define MIN_BRIDGE_LEG 7000
+#define MIN_BRIDGE_LEG 3000
 #define MIN_COMPONENT 250
 #define MAX_COMPONENT_REGION 3000
-#define MIN_LAYER 10
+#define MIN_LAYER 100
+#define MIN_VISITED_NODES 3
 
 static uint64_t g_cov;
+static uint32_t n_edges;
+static uint32_t n_nodes;
+
 
 uint32_t get_seq_cov(struct asm_edge_t *e, int ksize)
 {
@@ -95,6 +99,38 @@ int is_bridge(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
   return 0;
 }
 
+
+void simple_tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
+                          gint_t u, khash_t(khInt) *set_v, uint32_t *comp_sz,
+                          aqueue_t *q, int *n_larges, gint_t *lg)
+{
+  gint_t next_e;
+  int i, missing;
+  gint_t src, dest;
+  src = e[u].source;
+  dest = e[u].target;
+
+  assert(src < n_nodes);
+  assert(dest < n_nodes);
+
+  for (i = 0 ; i < v[dest].deg; i++){
+    next_e = v[dest].adj[i]; //iterate outgoing edge of the target of u
+    if (kh_get(khInt, set_v, next_e) == kh_end(set_v)){ // visited or not
+      if (e[next_e].seq_len > MIN_BRIDGE_LEG){
+         (*n_larges)++;
+         *lg = next_e;
+         continue;
+      }
+      assert(next_e <= n_edges);
+      if (next_e == 194333)
+        printf("here");
+      aqueue_add(q, next_e); //add neighbor edge
+      kh_put(khInt, set_v, next_e, &missing);
+      *comp_sz += e[next_e].seq_len; //add size of the edge to total size
+    }
+  }
+}
+
 /*              ___________
  *             /           \
  *            /    /\       \
@@ -115,7 +151,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
   set_v = kh_init(khInt);
   aqueue_t *q = init_aqueue();
   uint32_t comp_sz = 0;
-  gint_t next_e, u, dest, lg;
+  gint_t next_e, u, src, dest, lg;
 
   *k = NULL;
 
@@ -129,24 +165,20 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
       break;
     for (j = 0; j < n_items; j++){
       u = aqueue_pop(q); //u is an edge
-      for (i = 0 ; i < v[e[u].target].deg; i++){
-        next_e = v[e[u].target].adj[i]; //iterate outgoing edge of the target of u
-        if (kh_get(khInt, set_v, next_e) == kh_end(set_v)){ // visited or not
-          if (e[next_e].seq_len > MIN_BRIDGE_LEG){
-             n_larges++;
-             lg = next_e;
-          }
-          aqueue_add(q, next_e); //add neighbor edge
-          kh_put(khInt, set_v, next_e, &missing);
-          comp_sz += e[next_e].seq_len; //add size of the edge to total size
-        }
-      }
+      //if (u >=  n_edges)
+      //  printf("here\n");
+      printf("U is %d, length of queue %d\n", u, q->n);
+      assert(u < n_edges);
+      simple_tandem_helper(e, v, u, set_v, &comp_sz, q, &n_larges, &lg);
+      ///simple_tandem_helper(e, v, e[u].rc_id, set_v, &comp_sz, q, &n_larges, &lg);
     }
-    if (++cnt > MIN_LAYER)
+    if (++cnt > MIN_LAYER) //very complex region, never end
       break;
   }
-
-  printf("Visisted nodes: %d, n_larges: %d, edge %d\n", kh_size(set_v), n_larges, e_i);
+  
+  //must be visited at least 3 node and completed tour
+  if (kh_size(set_v) < MIN_VISITED_NODES || cnt > MIN_LAYER)
+    return 0;
   for (i = q->p; i < q->n; i++){
     u = q->e[i]; //u is an edge
     dest = e[u].target;
@@ -180,6 +212,9 @@ void find_forest(struct asm_graph_t *g0)
   						(long long)g0->n_e);
   __VERBOSE("Genome walk coverage %d\n", (int)g_cov);
 
+  n_edges = g0->n_e;
+  n_nodes = g0->n_v;
+
   int i;
   int ret, flag, loop;
   gint_t r_src;
@@ -197,6 +232,7 @@ void find_forest(struct asm_graph_t *g0)
   cc_size = NULL;
   asm_edge_cc(g0, id_edge, &cc_size);
 
+  /* MAIN STUFF HERE */
   for (i = 0 ; i < g0->n_e; i++){
     cc_id = id_edge[i];
     if (cc_size[cc_id] < MIN_COMPONENT || kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
@@ -206,15 +242,15 @@ void find_forest(struct asm_graph_t *g0)
     r_src = v[src].rc_id;
     flag = 0;
     if (is_bridge(e, v, i)){
-      __VERBOSE("Edge %d\n - bridge\n", i);
+      __VERBOSE("Edge %d - %d\n - bridge\n", i, e[i].rc_id);
       flag = 1;
     }
     if (is_trivial_loop(e, v, i)){
-      __VERBOSE("Edge %d\n - loop\n", i);
+      __VERBOSE("Edge %d - %d\n - loop\n", i, e[i].rc_id);
       flag = 1;
     }
     if (is_simple_tandem(e, v, i, &lg)){
-      __VERBOSE("Edge %d\n - simple complex\n", i);
+      __VERBOSE("Edge %d - %d\n - simple complex\n", i, e[i].rc_id);
       flag = 1;
     }
     if (flag){
@@ -233,10 +269,6 @@ int main(int argc, char *argv[])
   char *path = argv[1];
   load_asm_graph(g0, path);
   gint_t k;
-  int correct = is_simple_tandem(g0->edges, g0->nodes, 661461, &k);
-  if (correct){
-    printf("CORRECT!");
-  }
   find_forest(g0);
   return 0;
 }
