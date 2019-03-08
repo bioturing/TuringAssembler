@@ -18,11 +18,36 @@
 #define MIN_VISITED_NODES 3
 #define MIN_RATIO_LOOP_COV 1.5
 
+#define __shift_seq_i(i) 32 - ((i & 15) + 1)*2
+#define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & 3;
 
 static uint64_t g_cov;
 static uint32_t n_edges;
 static uint32_t n_nodes;
 
+static void __set_c_bin(uint32_t *s, int i, uint32_t c)
+{
+  s[i >> 4] = s[i >> 4] & ~((uint32_t)3 << __shift_seq_i(i)) | c << __shift_seq_i(i);
+}
+
+uint32_t *rev_bin(uint32_t *seq, size_t l)
+{
+  int i, n;
+  uint32_t t;
+  n = (l + 15) >> 4;
+  uint32_t u, v;
+  uint32_t *s = (uint32_t *)calloc(n, sizeof(uint32_t));
+  memcpy(s, seq, n * sizeof(uint32_t));
+
+  for (i = 0; i <= l >> 1; i++){
+    u = __get_c_bin(s, i);
+    v = __get_c_bin(s, l - i - 1);
+    __set_c_bin(s, l - i - 1, u^3);
+    __set_c_bin(s, i, v^3);
+  }
+  return s;
+}
+  
 
 uint32_t get_seq_cov(struct asm_edge_t *e, int ksize)
 {
@@ -164,11 +189,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
     if (n_items == 0)
       break;
     for (j = 0; j < n_items; j++){
-      //printf("Visited node %d, q size %d, pointer %d, capacity %d\n", u, q->n, q->p, q->s);
       u = aqueue_pop(q); //u is an edge
-      if (u >= n_edges){
-        printf("Here\n");
-      }
       assert(u < n_edges);
       simple_tandem_helper(e, v, u, set_v, &comp_sz, q, &n_larges, &lg);
     }
@@ -297,6 +318,17 @@ void find_forest(struct asm_graph_t *g0)
 
 }
 
+void dump_bin_seq(uint32_t *s, size_t l)
+{
+  extern char *nt4_char;
+  int i, k;
+  uint32_t b;
+  for(i = 0; i < l; i++){
+    b = (s[i >> 4] >> (32 - ((i & 15) + 1)<<1)) & 3;
+   putc(nt4_char[b], stdout);
+  }
+  putc('\n', stdout);
+}
 
 int main(int argc, char *argv[])
 {
