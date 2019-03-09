@@ -17,6 +17,7 @@
 #define MIN_LAYER 100
 #define MIN_VISITED_NODES 3
 #define MIN_RATIO_LOOP_COV 1.5
+#define MAX_MARGIN_RATIO 1.75
 
 #define __shift_seq_i(i) 32 - ((i & 15) + 1)*2
 #define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & 3;
@@ -39,7 +40,7 @@ uint32_t *rev_bin(uint32_t *seq, size_t l)
   uint32_t *s = (uint32_t *)calloc(n, sizeof(uint32_t));
   memcpy(s, seq, n * sizeof(uint32_t));
 
-  for (i = 0; i <= l >> 1; i++){
+  for (i = 0; i < l >> 1; i++){
     u = __get_c_bin(s, i);
     v = __get_c_bin(s, l - i - 1);
     __set_c_bin(s, l - i - 1, u^3);
@@ -51,7 +52,7 @@ uint32_t *rev_bin(uint32_t *seq, size_t l)
 
 uint32_t get_seq_cov(struct asm_edge_t *e, int ksize)
 {
-  uint32_t cov = e->count / (e->seq_len + 2 * ksize);
+  uint32_t cov = e->count / (e->seq_len - ksize);
   return cov;
 }
 
@@ -219,7 +220,25 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
   }
 }
 
-void resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
+static void clone_edge(struct asm_edge_t *d, struct asm_edge_t *s)
+{
+  d->seq = rev_bin(s->seq, s->seq_len);
+  d->seq_len = s->seq_len;
+  d->count = s->count;
+}
+
+static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
+{
+  gint_t dst = e[e_i].target;
+  gint_t src = e[e_i].source;
+
+  v[dst].deg = 0;
+  v[src].deg = 0;
+  v[v[dst].rc_id].deg = 0;
+  v[v[src].rc_id].deg = 0;
+}
+
+int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
                   gint_t ksize)
 {
   uint32_t cov, t_cov;
@@ -234,23 +253,35 @@ void resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
   t = e[v[dest].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
   t_cov = get_seq_cov(e + t, ksize);
   
-  if (!(cov/t_cov < MIN_RATIO_COV && (uint32_t)(cov/g_cov) == 2))
-    __VERBOSE("Loop is not double of the genome walk\n");
+  if (!((double)cov/t_cov > MIN_RATIO_LOOP_COV && (double)cov/g_cov < MAX_MARGIN_RATIO && (double)cov/g_cov > MIN_RATIO_LOOP_COV)){
+    fprintf(stderr, "cov/gcov %.2f\n", (double)cov/g_cov);
+    fprintf(stderr, "cov/tcov %.2f\n", (double)cov/t_cov);
+    fprintf(stderr, "(double)cov/t_cov > MIN_RATIO_COV %d\n", ((double)cov/t_cov) > MIN_RATIO_LOOP_COV);
+    fprintf(stderr, "(double)cov/g_cov < MAX_MARGIN_RATIO %d\n", ((double)cov/g_cov) < MAX_MARGIN_RATIO);
+    fprintf(stderr, "(double)cov/g_cov > MIN_RATIO_COV %d\n", ((double)cov/g_cov) > MIN_RATIO_LOOP_COV);
+    assert(0 && "Loop is not double of the genome walk\n");
+  }
   
-  e[u].seq_len = 2*e[u].seq_len + e[t].seq_len - 2*ksize;
   e[u].count += e[t].count;
-  seq = append_bin_seq(e[t].seq, e[t].seq_len, e[u], e[u].seq_len, ksize);
-  seq = append_bin_seq(e[u].seq, e[u].seq_len, seq , e[u].seq_len + e[t].seq_len - ksize, ksize); 
-
+  seq = append_bin_seq(e[u].seq, e[u].seq_len, e[t].seq, e[t].seq_len - ksize, ksize);
+  seq = append_bin_seq(e[u].seq, e[u].seq_len, seq , e[u].seq_len + e[t].seq_len - 2*ksize, ksize); 
   e[u].seq = seq;
-  e[e[u].rc_id].seq = seq;
+  e[u].seq_len = 2*e[u].seq_len + e[t].seq_len - 2*ksize;
+ 
+  clone_edge(e + u, e + e[u].rc_id);
+  isolate_edge(e, v, t);
 
   t = t == v[dest].adj[1] ? v[dest].adj[0] : v[dest].adj[1]; //t is now the big leg;
-  v[dest].deg = 1;
-  v[dest].adj[0] = t;
+  v[dest].deg = 1;    /* Remove the outgoing edge to the loop */
+  v[dest].adj[0] = t; /* Only keep the outgoing big leg */
 
-  t = e[v[rc_src].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
 
+  if (e[v[rc_src].adj[0]].seq_len >= MIN_BRIDGE_LEG)
+    t = v[rc_src].adj[0];
+  else                  /* Now t is the in-going big leg */
+    t = v[rc_src].adj[1];
+  v[rc_src].deg = 1;    /* Only keep the in-going big leg */
+  v[rc_src].adj[0] = t;
 }
 
 void find_forest(struct asm_graph_t *g0)
@@ -302,6 +333,7 @@ void find_forest(struct asm_graph_t *g0)
     }
     if (is_trivial_loop(e, v, i)){
       __VERBOSE("Edge %d - %d\n - loop\n", i, e[i].rc_id);
+      resolve_loop(e, v, i, g0->ksize);
       flag = 1;
     }
     if (is_simple_tandem(e, v, i, &lg)){
@@ -318,7 +350,7 @@ void find_forest(struct asm_graph_t *g0)
 
 }
 
-void dump_bin_seq(uint32_t *s, size_t l)
+void dump_b_seq(uint32_t *s, size_t l)
 {
   extern char *nt4_char;
   int i, k;
@@ -337,5 +369,10 @@ int main(int argc, char *argv[])
   load_asm_graph(g0, path);
   gint_t k;
   find_forest(g0);
+
+  uint32_t s = 123121;
+  uint32_t *seq = rev_bin(&s, 10);
+  dump_b_seq(&s, 10);
+  dump_b_seq(seq, 10);
   return 0;
 }
