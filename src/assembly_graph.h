@@ -6,8 +6,6 @@
 #include "attribute.h"
 #include "k31hash.h"
 #include "k63hash.h"
-#include "k63_count.h"
-#include "k31_count.h"
 
 struct asm_node_t {
 	gint_t rc_id;
@@ -22,8 +20,6 @@ struct asm_edge_t {
 	gint_t source;
 	gint_t target;
 	gint_t rc_id;
-	struct barcode_hash_t *bc_bucks;
-	pthread_mutex_t lock;
 };
 
 struct asm_graph_t {
@@ -33,8 +29,6 @@ struct asm_graph_t {
 	struct asm_node_t *nodes;
 	struct asm_edge_t *edges;
 };
-
-void assembly_process(struct opt_count_t *opt);
 
 void k31_process(struct opt_count_t *opt);
 
@@ -50,36 +44,8 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 
 int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
 
-/* @abstract: Serialize assembly graph
- * @param g: pointer of the graph
- * @param path: serialized graph file path
- * @return : Save the graph into the file
- * */
 void save_asm_graph(struct asm_graph_t *g, const char *path);
 
-/* @abstract: Load the serialized assembly graph
- * @param g: pointer of the graph
- * @param path: serialized graph file path
- * @return : load the graph into the pointer
- */
 void load_asm_graph(struct asm_graph_t *g, const char *path);
-
-/* @abstract: Get the connected component of the graph
- * @param g: graph struct
- * @param id_node: connected component identity of each node
- * @param id_edge: connected component identity of each edge
- * @param ret_size: component sizes
- */
-void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size);
-
-void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt);
-static void *k31_barcode_retriever(void *data);
-static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g);
-void retrieve_barcode(struct asm_graph_t *g, struct opt_count_t *opt);
-void k63_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
-							struct k63_idhash_t *h);
-void k31_rebuild_naive_index(struct asm_graph_t *g, struct opt_count_t *opt,
-							struct k31_idhash_t *h);
-
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */

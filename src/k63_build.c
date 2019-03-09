@@ -22,49 +22,6 @@ struct edgecount_bundle_t {
 
 #define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
 
-#define __k63_lt(x, y) ((x).bin[1] < (y).bin[1] || ((x).bin[1] == (y).bin[1] && (x).bin[0] < (y).bin[0]))
-
-#define __k63_lshift2(k) (((k).bin[1] = ((k).bin[1] << 2) | ((k).bin[0] >> 62)), \
-				((k).bin[0] <<= 2))
-#define __k63_rshift2(k) (((k).bin[0] = ((k).bin[0] >> 2) | (((k).bin[1] & 0x3ull) << 62)), \
-				((k).bin[1] >>= 2))
-
-#define __k63_lshift(k, l) (((k).bin[1] = ((k).bin[1] << (l)) | ((k).bin[0] >> (64 - (l)))), \
-				((k).bin[0] <<= (l)))
-#define __k63_rshift(k, l) (((k).bin[0] = ((k).bin[0] >> (l)) | (((k).bin[1] & ((1ull << (l)) - 1)) << (64 - (l))), \
-				((k).bin[1] >>= (l))))
-
-#define __k63_and(k, v) ((k).bin[0] &= (v).bin[0], (k).bin[1] &= (v).bin[1])
-
-#define __reverse_bit_order64(x)					       \
-(									       \
-	(x) = (((x) & 0xffffffff00000000ull) >> 32) | (((x) & 0x00000000ffffffffull) << 32), \
-	(x) = (((x) & 0xffff0000ffff0000ull) >> 16) | (((x) & 0x0000ffff0000ffffull) << 16), \
-	(x) = (((x) & 0xff00ff00ff00ff00ull) >>  8) | (((x) & 0x00ff00ff00ff00ffull) <<  8), \
-	(x) = (((x) & 0xf0f0f0f0f0f0f0f0ull) >>  4) | (((x) & 0x0f0f0f0f0f0f0f0full) <<  4), \
-	(x) = (((x) & 0xccccccccccccccccull) >>  2) | (((x) & 0x3333333333333333ull) <<  2)  \
-)
-
-#define __k63_revc_num(y, x, l, mask)					       \
-(									       \
-	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
-	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1]),  \
-	(x).bin[0] ^= (x).bin[1],					       \
-	(x).bin[1] ^= (x).bin[0],					       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	(x).bin[0] ^= 0xffffffffffffffffull, (x).bin[0] &= (mask).bin[0],      \
-	(x).bin[1] ^= 0xffffffffffffffffull, (x).bin[1] &= (mask).bin[1]       \
-)
-
-#define __k63_rev_num(y, x, l)	\
-(									       \
-	(x) = (y), __k63_lshift(x, 128 - ((l) << 1)),			       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	(x).bin[1] ^= (x).bin[0],					       \
-	(x).bin[0] ^= (x).bin[1],					       \
-	__reverse_bit_order64((x).bin[0]), __reverse_bit_order64((x).bin[1])   \
-)
-
 static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 {
 	k63key_t tmp;
@@ -523,7 +480,9 @@ static void k63_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt);
+	// producer_bundles = init_fastq_PE(opt);
+	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+						opt->files_1, opt->files_2);
 
 	struct edgecount_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct edgecount_bundle_t));

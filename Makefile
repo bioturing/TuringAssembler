@@ -10,6 +10,7 @@ EXEC = skipping
 
 SRC = 						\
       src/assembly_graph.c 			\
+      src/barcode_retriever.c 			\
       src/dqueue.c 				\
       src/fastq_producer.c 			\
       src/get_buffer.c 				\
