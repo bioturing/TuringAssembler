@@ -19,12 +19,15 @@
 #define MIN_RATIO_LOOP_COV 1.5
 #define MAX_MARGIN_RATIO 1.75
 
-#define __shift_seq_i(i) 32 - ((i & 15) + 1)*2
-#define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & 3;
+#define __shift_seq_i(i) ((i & 15) << 1)
+#define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & (uint32_t)0x3
 
 static uint64_t g_cov;
 static uint32_t n_edges;
 static uint32_t n_nodes;
+
+static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
+					gint_t slen, int skip);
 
 static void __set_c_bin(uint32_t *s, int i, uint32_t c)
 {
@@ -238,6 +241,44 @@ static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
   v[v[src].rc_id].deg = 0;
 }
 
+static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
+					gint_t slen, int skip)
+{
+	{
+		gint_t i;
+		for (i = 0; i < skip; ++i) {
+			uint32_t c1, c2;
+			c1 = __get_c_bin(src, i);
+			c2 = __get_c_bin(dst, dlen - (skip - i));
+			if (c1 != c2) {
+				dump_b_seq(dst, dlen);
+				dump_b_seq(src, slen + skip);
+				assert(0 && "Fail when append");
+			}
+		}
+	}
+	uint32_t *new_ptr;
+	gint_t cur_m, m, i, k;
+	cur_m = (dlen + 15) >> 4;
+	m = (dlen + slen + 15) >> 4;
+	if (m > cur_m) {
+		new_ptr = (uint32_t *)malloc(m * sizeof(uint32_t));
+        memcpy(new_ptr, dst, ((dlen + 15) >> 4) * sizeof(uint32_t));
+		memset(new_ptr + cur_m, 0, (m - cur_m) * sizeof(uint32_t));
+	} else {
+		new_ptr = dst;
+	}
+    uint32_t u, v;
+	for (i = skip; i < skip + slen; ++i) {
+		k = dlen + (i - skip);
+        u = __get_c_bin(src, i);
+		__set_c_bin(new_ptr, k , u);
+        v = __get_c_bin(new_ptr, k);
+		assert(v == u);	//check assign successfully
+    }
+	return new_ptr;
+}
+
 int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
                   gint_t ksize)
 {
@@ -253,18 +294,9 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
   t = e[v[dest].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
   t_cov = get_seq_cov(e + t, ksize);
   
-  if (!((double)cov/t_cov > MIN_RATIO_LOOP_COV && (double)cov/g_cov < MAX_MARGIN_RATIO && (double)cov/g_cov > MIN_RATIO_LOOP_COV)){
-    fprintf(stderr, "cov/gcov %.2f\n", (double)cov/g_cov);
-    fprintf(stderr, "cov/tcov %.2f\n", (double)cov/t_cov);
-    fprintf(stderr, "(double)cov/t_cov > MIN_RATIO_COV %d\n", ((double)cov/t_cov) > MIN_RATIO_LOOP_COV);
-    fprintf(stderr, "(double)cov/g_cov < MAX_MARGIN_RATIO %d\n", ((double)cov/g_cov) < MAX_MARGIN_RATIO);
-    fprintf(stderr, "(double)cov/g_cov > MIN_RATIO_COV %d\n", ((double)cov/g_cov) > MIN_RATIO_LOOP_COV);
-    assert(0 && "Loop is not double of the genome walk\n");
-  }
-  
   e[u].count += e[t].count;
-  seq = append_bin_seq(e[u].seq, e[u].seq_len, e[t].seq, e[t].seq_len - ksize, ksize);
-  seq = append_bin_seq(e[u].seq, e[u].seq_len, seq , e[u].seq_len + e[t].seq_len - 2*ksize, ksize); 
+  seq = concat_b_seq(e[u].seq, e[u].seq_len, e[t].seq, e[t].seq_len - ksize, ksize);
+  seq = concat_b_seq(seq , e[u].seq_len + e[t].seq_len - ksize, e[u].seq, e[u].seq_len - ksize,  ksize); 
   e[u].seq = seq;
   e[u].seq_len = 2*e[u].seq_len + e[t].seq_len - 2*ksize;
  
@@ -345,6 +377,11 @@ void find_forest(struct asm_graph_t *g0)
       kh_put(khInt, set_v, e[i].rc_id, &ret);
     }
   }
+
+  struct asm_graph_t g1;
+  asm_condense(g0, &g1);
+  write_gfa(&g1, "resolved_loop.gfa");
+  dump_fasta(&g1, "resolved_loop.fasta");
   kh_destroy(khInt, set_v);
   free(id_edge);
 
@@ -353,13 +390,11 @@ void find_forest(struct asm_graph_t *g0)
 void dump_b_seq(uint32_t *s, size_t l)
 {
   extern char *nt4_char;
-  int i, k;
-  uint32_t b;
+  size_t i;
   for(i = 0; i < l; i++){
-    b = (s[i >> 4] >> (32 - ((i & 15) + 1)<<1)) & 3;
-   putc(nt4_char[b], stdout);
+   putc(nt4_char[__get_c_bin(s, i)], stderr);
   }
-  putc('\n', stdout);
+  putc('\n', stderr);
 }
 
 int main(int argc, char *argv[])
@@ -367,12 +402,7 @@ int main(int argc, char *argv[])
   struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
   char *path = argv[1];
   load_asm_graph(g0, path);
-  gint_t k;
   find_forest(g0);
 
-  uint32_t s = 123121;
-  uint32_t *seq = rev_bin(&s, 10);
-  dump_b_seq(&s, 10);
-  dump_b_seq(seq, 10);
   return 0;
 }
