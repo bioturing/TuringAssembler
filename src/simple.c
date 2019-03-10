@@ -241,6 +241,7 @@ static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
   v[v[dst].rc_id].deg = 0;
   v[v[src].rc_id].deg = 0;
   e[e_i].seq_len = 0;
+  e[e[e_i].rc_id].seq_len = 0;
 }
 
 static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
@@ -304,12 +305,19 @@ static void condense_3_seq(gint_t e1, gint_t e2, gint_t e3, struct asm_edge_t *e
   e[e2].seq = seq;
   e[e2].seq_len = len;
   clone_edge(e + e[e2].rc_id, e + e2);
+  __VERBOSE("Condensed length of %d: %d\n", e2, len);
 
   e[e2].source = e[e1].source;
   e[e2].target = e[e3].target;
 
-  e[e1].source = e[e1].target;
-  e[e3].target = e[e3].source;
+  e[e1].source = v[e[e1].target].rc_id;
+  e[e3].target = v[e[e3].source].rc_id;
+
+  e[e1].seq_len = 0;
+  e[e[e1].rc_id].seq_len = 0;
+  e[e3].seq_len = 0;
+  e[e[e3].rc_id].seq_len = 0;
+
 }
 
 int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
