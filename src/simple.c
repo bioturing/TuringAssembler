@@ -26,6 +26,7 @@ static uint64_t g_cov;
 static uint32_t n_edges;
 static uint32_t n_nodes;
 
+void dump_b_seq(uint32_t *s, size_t l);
 static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 					gint_t slen, int skip);
 
@@ -239,6 +240,7 @@ static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
   v[src].deg = 0;
   v[v[dst].rc_id].deg = 0;
   v[v[src].rc_id].deg = 0;
+  e[e_i].seq_len = 0;
 }
 
 static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
@@ -279,6 +281,37 @@ static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 	return new_ptr;
 }
 
+static uint32_t *concat_3_seq(struct asm_edge_t e1, struct asm_edge_t e2,
+                              struct asm_edge_t e3, gint_t ksize, gint_t *len)
+{
+  uint32_t *seq;
+  seq = concat_b_seq(e1.seq, e1.seq_len, e2.seq, e2.seq_len - ksize, ksize);
+  seq = concat_b_seq(seq , e1.seq_len + e2.seq_len - ksize, e3.seq, e3.seq_len  - ksize,  ksize); 
+  *len = e1.seq_len + e2.seq_len + e3.seq_len - 2*ksize;
+  return seq;
+}
+
+static void condense_3_seq(gint_t e1, gint_t e2, gint_t e3, struct asm_edge_t *e, 
+                          struct asm_node_t *v, gint_t ksize)
+{
+  v[e[e1].target].deg = 0;
+  v[e[e3].source].deg = 0;
+  uint32_t *seq;
+  gint_t len;
+
+  seq = concat_3_seq(e[e1], e[e2], e[e3], ksize, &len);
+  e[e2].count = e[e1].count + e[e2].count + e[e3].count;
+  e[e2].seq = seq;
+  e[e2].seq_len = len;
+  clone_edge(e + e[e2].rc_id, e + e2);
+
+  e[e2].source = e[e1].source;
+  e[e2].target = e[e3].target;
+
+  e[e1].source = e[e1].target;
+  e[e3].target = e[e3].source;
+}
+
 int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
                   gint_t ksize)
 {
@@ -286,34 +319,41 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
   uint32_t *seq;
   gint_t t, dest;
   gint_t rc_src;
+  gint_t len;
+  gint_t e_in, e_out;
 
   cov = get_seq_cov(e + u, ksize);
   dest = e[u].target;
   rc_src = v[e[u].source].rc_id;
 
-  t = e[v[dest].adj[0]].seq_len >= MIN_BRIDGE_LEG ? v[dest].adj[1]:v[dest].adj[0];
+  if (e[v[dest].adj[0]].seq_len >= MIN_BRIDGE_LEG)
+    t = v[dest].adj[1];
+  else
+    t = v[dest].adj[0];
   t_cov = get_seq_cov(e + t, ksize);
   
   e[u].count += e[t].count;
-  seq = concat_b_seq(e[u].seq, e[u].seq_len, e[t].seq, e[t].seq_len - ksize, ksize);
-  seq = concat_b_seq(seq , e[u].seq_len + e[t].seq_len - ksize, e[u].seq, e[u].seq_len - ksize,  ksize); 
-  e[u].seq = seq;
-  e[u].seq_len = 2*e[u].seq_len + e[t].seq_len - 2*ksize;
+
+  __VERBOSE("Concat the loop and the shared\n");
+  if (u == 90731)
+    printf("here\n");
+  e[u].seq = concat_3_seq(e[u], e[t], e[u], ksize, &len);
+  e[u].seq_len = len;
  
-  clone_edge(e + u, e + e[u].rc_id);
+  clone_edge(e + e[u].rc_id, e + u);
   isolate_edge(e, v, t);
 
-  t = t == v[dest].adj[1] ? v[dest].adj[0] : v[dest].adj[1]; //t is now the big leg;
-  v[dest].deg = 1;    /* Remove the outgoing edge to the loop */
-  v[dest].adj[0] = t; /* Only keep the outgoing big leg */
-
+  e_out = t == v[dest].adj[1] ? v[dest].adj[0] : v[dest].adj[1]; //t is now the outgoing big leg;
 
   if (e[v[rc_src].adj[0]].seq_len >= MIN_BRIDGE_LEG)
-    t = v[rc_src].adj[0];
-  else                  /* Now t is the in-going big leg */
-    t = v[rc_src].adj[1];
-  v[rc_src].deg = 1;    /* Only keep the in-going big leg */
-  v[rc_src].adj[0] = t;
+    e_in = v[rc_src].adj[0];
+  else                  /* Now t is the reverse of in-going big leg */
+    e_in = v[rc_src].adj[1];
+  e_in = e[e_in].rc_id;
+  __VERBOSE("Condense 3 consecutive edge\n");
+  condense_3_seq(e_in, u, e_out, e, v, ksize);
+  __VERBOSE("Resolve done!\n");
+
 }
 
 void find_forest(struct asm_graph_t *g0)
@@ -334,7 +374,7 @@ void find_forest(struct asm_graph_t *g0)
   n_nodes = g0->n_v;
 
   int i;
-  int ret, flag, loop;
+  int ret, flag;
   gint_t r_src;
   gint_t src, dest;
   gint_t lg;
@@ -378,10 +418,8 @@ void find_forest(struct asm_graph_t *g0)
     }
   }
 
-  struct asm_graph_t g1;
-  asm_condense(g0, &g1);
-  write_gfa(&g1, "resolved_loop.gfa");
-  dump_fasta(&g1, "resolved_loop.fasta");
+  write_gfa(g0, "resolved_loop.gfa");
+  dump_fasta(g0, "resolved_loop.fasta");
   kh_destroy(khInt, set_v);
   free(id_edge);
 
