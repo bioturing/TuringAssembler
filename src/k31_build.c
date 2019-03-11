@@ -70,10 +70,10 @@ void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
 	free(ndict);
 }
 
-static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, gint_t len)
+static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t len)
 {
 	char *seq;
-	int i;
+	uint32_t i;
 	seq = malloc(len + 1);
 	for (i = 0; i < len; ++i) {
 		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & (uint32_t)0x3];
@@ -122,7 +122,7 @@ static void k31_internal_build(int ksize, struct k31_idhash_t *edict,
 		gint_t id_fw, id_rv;
 		int c, cur_c;
 		uint32_t *e_seq;
-		gint_t e_len;
+		uint32_t e_len;
 
 		node_knum = IDHASH_KEY(ndict, i);
 		__k31_revc_num(node_knum, node_krev, ksize, kmask);

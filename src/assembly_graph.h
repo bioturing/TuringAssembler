@@ -15,8 +15,17 @@ struct asm_node_t {
 
 struct asm_edge_t {
 	uint64_t count;
-	uint32_t *seq;
-	gint_t seq_len;
+
+	uint32_t *seq;		/* only store contigs */
+	uint32_t seq_len;	/* length of "seq" */
+
+	uint32_t n_holes;	/* number of gaps */
+	/* the i-th gap starts right after the position p_holes[i]-th of seq and
+	 * has length equal to l_holes[i]
+	 */
+	uint32_t *p_holes;
+	uint32_t *l_holes;
+
 	gint_t source;
 	gint_t target;
 	gint_t rc_id;
@@ -55,7 +64,7 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
 /* should not put here */
-int asm_is_edge_rc(uint32_t *seq1, gint_t l1, uint32_t *seq2, gint_t l2);
+int asm_is_edge_rc(uint32_t *seq1, uint32_t l1, uint32_t *seq2, uint32_t l2);
 
 /* only save graph topology */
 void save_asm_graph_simple(struct asm_graph_t *g, const char *path);
@@ -85,6 +94,8 @@ void build0_process(struct opt_count_t *opt);
 void build_barcode_process(struct opt_build_t *opt);
 
 void graph_convert_process(struct opt_build_t *opt);
+
+void graph_query_process(struct opt_build_t *opt);
 
 void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt);
 
