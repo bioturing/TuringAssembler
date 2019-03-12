@@ -34,6 +34,7 @@ static void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 			++j;
 		}
 	}
+	(*seq)[k++] = '\0';
 }
 
 static void dump_bin_seq(char *seq, uint32_t *bin, gint_t len)
@@ -634,9 +635,17 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 	free(cc_size);
 }
 
+static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
+{
+	double cov = e->count * 1.0 / ((e->n_holes + 1) * ksize);
+	uint32_t i, len = e->seq_len;
+	for (i = 0; i < e->n_holes; ++i)
+		len += e->l_holes[i];
+	return (uint64_t)(cov * len);
+}
+
 void write_gfa(struct asm_graph_t *g, const char *path)
 {
-	fprintf(stderr, "print gfa\n");
 	gint_t *id_edge, *cc_size;
 	id_edge = malloc(g->n_e * sizeof(gint_t));
 	cc_size = NULL;
@@ -659,8 +668,9 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		// }
 		// dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
 		dump_edge_seq(&seq, &seq_len, g->edges + e);
-		double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
-		uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
+		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
+		// double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
+		// uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
 			(long long)e_rc, seq, (long long unsigned)fake_count);
@@ -706,7 +716,6 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 	free(seq);
 	free(id_edge);
 	free(cc_size);
-	fprintf(stderr, "done print gfa\n");
 }
 
 void remove_self_loop(struct asm_graph_t *g, double uni_cov)
