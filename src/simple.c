@@ -241,7 +241,7 @@ static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 	m = (dlen + slen + 15) >> 4;
 	if (m > cur_m) {
 		new_ptr = (uint32_t *)malloc(m * sizeof(uint32_t));
-				memcpy(new_ptr, dst, ((dlen + 15) >> 4) * sizeof(uint32_t));
+		memcpy(new_ptr, dst, ((dlen + 15) >> 4) * sizeof(uint32_t));
 		memset(new_ptr + cur_m, 0, (m - cur_m) * sizeof(uint32_t));
 	} else {
 		new_ptr = dst;
@@ -249,9 +249,9 @@ static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 		uint32_t u, v;
 	for (i = skip; i < skip + slen; ++i) {
 		k = dlen + (i - skip);
-				u = __get_c_bin(src, i);
+		u = __get_c_bin(src, i);
 		__set_c_bin(new_ptr, k , u);
-				v = __get_c_bin(new_ptr, k);
+		v = __get_c_bin(new_ptr, k);
 		assert(v == u);	//check assign successfully
 		}
 	return new_ptr;
@@ -262,7 +262,7 @@ static uint32_t *concat_3_seq(struct asm_edge_t e1, struct asm_edge_t e2,
 {
 	uint32_t *seq;
 	seq = concat_b_seq(e1.seq, e1.seq_len, e2.seq, e2.seq_len - ksize, ksize);
-	seq = concat_b_seq(seq , e1.seq_len + e2.seq_len - ksize, e3.seq, e3.seq_len	- ksize,	ksize); 
+	seq = concat_b_seq(seq , e1.seq_len + e2.seq_len - ksize, e3.seq, e3.seq_len - ksize, ksize); 
 	*len = e1.seq_len + e2.seq_len + e3.seq_len - 2*ksize;
 	return seq;
 }
@@ -296,7 +296,7 @@ static void condense_3_seq(gint_t e1, gint_t e2, gint_t e3, struct asm_edge_t *e
 }
 
 int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
-									gint_t ksize)
+		gint_t ksize)
 {
 	uint32_t cov, t_cov;
 	uint32_t *seq;
