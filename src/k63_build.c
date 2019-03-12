@@ -38,10 +38,10 @@ static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 	return ret;
 }
 
-static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, gint_t len)
+static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t len)
 {
 	char *seq;
-	int i;
+	uint32_t i;
 	seq = malloc(len + 1);
 	for (i = 0; i < len; ++i) {
 		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & (uint32_t)0x3];
@@ -119,7 +119,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		gint_t id_fw, id_rv;
 		int c, cur_c;
 		uint32_t *e_seq;
-		gint_t e_len;
+		uint32_t e_len;
 
 		node_knum = IDHASH_KEY(ndict, i);
 		__k63_revc_num(node_knum, node_krev, ksize, kmask);

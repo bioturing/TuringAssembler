@@ -222,7 +222,6 @@ void *k31hash_resize_worker(void *data)
 				step = 0;
 				current_flag = KMFLAG_NEW;
 				while (step <= n_probe) {
-					j = (j + step * (step + 1) / 2) & mask;
 					if ((current_flag =
 						atomic_val_CAS8(flag + j,
 							KMFLAG_OLD, KMFLAG_NEW))
@@ -256,6 +255,7 @@ void *k31hash_resize_worker(void *data)
 						continue;
 					}
 					++step;
+					j = (j + step * (step + 1) / 2) & mask;
 				}
 				if (current_flag == KMFLAG_EMPTY)
 					break;
@@ -410,6 +410,7 @@ void k31hash_resize_single(struct k31hash_t *h, int adj_included)
 			}
 		}
 	}
+	free(flag);
 }
 
 void k31hash_resize(struct k31hash_t *h, int adj_included)
