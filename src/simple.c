@@ -21,8 +21,10 @@
 
 #define __shift_seq_i(i) ((i & 15) << 1)
 #define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & (uint32_t)0x3
-#define is_lg_leg(e, v, i, cnt) ((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + \
-		(e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt;
+#define is_lg_leg(e, v, i, cnt) (((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + \
+		(e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt)
+
+#define get_seq_cov(e, ksize) (e.count / (e.seq_len - ksize))
 
 static uint64_t g_cov;
 static uint32_t n_edges;
@@ -30,7 +32,7 @@ static uint32_t n_nodes;
 
 KHASH_SET_INIT_INT(khInt);
 
-void dump_b_seq(uint32_t *s, size_t l);
+static void dump_b_seq(uint32_t *s, size_t l);
 static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i);
 static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 					gint_t slen, int skip);
@@ -79,12 +81,6 @@ static void rev_holes(struct asm_edge_t *e)
 	}
 }
 
-uint32_t get_seq_cov(struct asm_edge_t *e, int ksize)
-{
-	uint32_t cov = e->count / (e->seq_len - ksize);
-	return cov;
-}
-
 uint32_t get_genome_cov(struct asm_graph_t *g0)
 {
 	struct asm_edge_t *e = g0->edges;
@@ -93,7 +89,7 @@ uint32_t get_genome_cov(struct asm_graph_t *g0)
 
 	for (i = 0 ; i < g0->n_e; i++) {
 		if (e[i].seq_len > MIN_CON_LEN){
-			cov += get_seq_cov(e + i, g0->ksize);
+			cov += get_seq_cov(e[i], g0->ksize);
 			cnt++;
 		}
 	}
@@ -201,7 +197,6 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 	aqueue_t *q = init_aqueue();
 	uint32_t _comp_sz = 0;
 	gint_t next_e, u, src, dest, lg;
-
 	*k = NULL;
 	*comp_sz = 0;
 
@@ -254,9 +249,9 @@ static void clone_edge(struct asm_edge_t *d, struct asm_edge_t *s)
 	if (d->n_holes != s->n_holes){
 		d->n_holes = s->n_holes;
 		if (!d->p_holes)
-			d->p_holes = (uint32_t *)malloc(d->n_holes * sizeof(uint32_t));
+			d->p_holes = malloc(d->n_holes * sizeof(uint32_t));
 		if (!d->l_holes)
-			d->l_holes = (uint32_t *)malloc(d->n_holes * sizeof(uint32_t));
+			d->l_holes = malloc(d->n_holes * sizeof(uint32_t));
 	}
 	memcpy(d->p_holes, s->p_holes, d->n_holes * sizeof(uint32_t));
 	memcpy(d->l_holes, s->l_holes, d->n_holes * sizeof(uint32_t));
@@ -362,7 +357,7 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
 	gint_t len;
 	gint_t e_in, e_out;
 
-	cov = get_seq_cov(e + u, ksize);
+	cov = get_seq_cov(e[u], ksize);
 	dest = e[u].target;
 	rc_src = v[e[u].source].rc_id;
 
@@ -370,7 +365,7 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
 		t = v[dest].adj[1];
 	else
 		t = v[dest].adj[0];
-	t_cov = get_seq_cov(e + t, ksize);
+	t_cov = get_seq_cov(e[t], ksize);
 	
 	e[u].count += e[t].count;
 
@@ -395,7 +390,7 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
 
 }
 
-void find_forest(struct asm_graph_t *g0)
+static void find_forest(struct asm_graph_t *g0)
 {
 	init_clock();
 	g_cov = get_genome_cov(g0);
@@ -466,7 +461,7 @@ void find_forest(struct asm_graph_t *g0)
 
 }
 
-void dump_b_seq(uint32_t *s, size_t l)
+static void dump_b_seq(uint32_t *s, size_t l)
 {
 	extern char *nt4_char;
 	size_t i;
