@@ -21,10 +21,14 @@
 
 #define __shift_seq_i(i) ((i & 15) << 1)
 #define __get_c_bin(s, i) (s[i >> 4] >> __shift_seq_i(i)) & (uint32_t)0x3
+#define is_lg_leg(e, v, i, cnt) ((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + \
+		(e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt;
 
 static uint64_t g_cov;
 static uint32_t n_edges;
 static uint32_t n_nodes;
+
+KHASH_SET_INIT_INT(khInt);
 
 void dump_b_seq(uint32_t *s, size_t l);
 static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i);
@@ -47,11 +51,11 @@ uint32_t *rev_bin(uint32_t *seq, size_t l)
 	uint32_t *s = (uint32_t *)calloc(n, sizeof(uint32_t));
 	memcpy(s, seq, n * sizeof(uint32_t));
 
-	for (i = 0; i < l >> 1; i++){
+	for (i = 0; i < l >> 1; i++) {
 		u = __get_c_bin(s, i);
 		v = __get_c_bin(s, l - i - 1);
-		__set_c_bin(s, l - i - 1, u^3);
-		__set_c_bin(s, i, v^3);
+		__set_c_bin(s, l - i - 1, u ^ 3);
+		__set_c_bin(s, i, v ^ 3);
 	}
 	return s;
 }
@@ -65,7 +69,7 @@ static void rev_holes(struct asm_edge_t *e)
 	while (i < e->n_holes)
 		len += e->l_holes[i++];
 	len += e->seq_len;
-	for (i = 0; i < n >> 1; ++i){
+	for (i = 0; i < n >> 1; ++i) {
 		t = e->p_holes[i];
 		e->p_holes[i] = len - (e->p_holes[n - i - 1] + 1 + e->l_holes[n - i - 1]);
 		e->p_holes[n - i - 1] = len - (t + 1 +  e->l_holes[i]);
@@ -87,7 +91,7 @@ uint32_t get_genome_cov(struct asm_graph_t *g0)
 	int i, cnt = 0;
 	uint64_t cov = 0;
 
-	for (i = 0 ; i < g0->n_e; i++){
+	for (i = 0 ; i < g0->n_e; i++) {
 		if (e[i].seq_len > MIN_CON_LEN){
 			cov += get_seq_cov(e + i, g0->ksize);
 			cnt++;
@@ -97,12 +101,7 @@ uint32_t get_genome_cov(struct asm_graph_t *g0)
 	return cov / cnt;
 }
 
-int is_lg_leg(struct asm_edge_t *e, struct asm_node_t *v , gint_t i, int cnt)
-{
-	assert(v[i].deg == 2);
-	return (((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + 
-					(e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt);
-}
+
 
 int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 {
@@ -175,7 +174,7 @@ void simple_tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
 	assert(src < n_nodes);
 	assert(dest < n_nodes);
 
-	for (i = 0 ; i < v[dest].deg; i++){
+	for (i = 0 ; i < v[dest].deg; ++i) {
 		next_e = v[dest].adj[i]; //iterate outgoing edge of the target of u
 		if (kh_get(khInt, set_v, next_e) == kh_end(set_v)){ // visited or not
 			if (e[next_e].seq_len > MIN_BRIDGE_LEG){
@@ -214,7 +213,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 		n_items = q->n;
 		if (n_items == 0)
 			break;
-		for (j = 0; j < n_items; j++){
+		for (j = 0; j < n_items; j++) {
 			u = aqueue_pop(q); //u is an edge
 			assert(u < n_edges);
 			simple_tandem_helper(e, v, u, set_v, &_comp_sz, q, &n_larges, &lg);
@@ -226,10 +225,10 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 	//must be visited at least 3 node and completed tour
 	if (kh_size(set_v) < MIN_VISITED_NODES || cnt > MIN_LAYER)
 		return 0;
-	for (i = q->p; i < q->n; i++){
+	for (i = q->p; i < q->n; i++) {
 		u = q->e[i]; //u is an edge
 		dest = e[u].target;
-		for (j = 0; j < v[dest].deg; j++){
+		for (j = 0; j < v[dest].deg; j++) {
 			if (kh_get(khInt, set_v, v[dest].adj[j]) == kh_end(set_v)){
 				__VERBOSE("%d - One remain node* have outgoing edge* or region is too complex\n", e_i);
 				return 0;
@@ -432,7 +431,7 @@ void find_forest(struct asm_graph_t *g0)
 	asm_edge_cc(g0, id_edge, &cc_size);
 
 	/* MAIN STUFF HERE */
-	for (i = 0 ; i < g0->n_e; i++){
+	for (i = 0 ; i < g0->n_e; i++) {
 		cc_id = id_edge[i];
 		if (cc_size[cc_id] < MIN_COMPONENT || kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
 			continue;
@@ -471,7 +470,7 @@ void dump_b_seq(uint32_t *s, size_t l)
 {
 	extern char *nt4_char;
 	size_t i;
-	for(i = 0; i < l; i++){
+	for(i = 0; i < l; i++) {
 	 putc(nt4_char[__get_c_bin(s, i)], stderr);
 	}
 	putc('\n', stderr);

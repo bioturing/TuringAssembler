@@ -9,9 +9,6 @@
 #include "k63hash.h"
 #include "khash.h"
 
-const int khInt = 33;
-KHASH_SET_INIT_INT(khInt);
-
 /* @abstract : compute the genome coverage using only contig > 7k
  * @param g0: level3 assembly graph struct
  * @return : genome coverage
