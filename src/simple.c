@@ -55,7 +55,25 @@ uint32_t *rev_bin(uint32_t *seq, size_t l)
 	}
 	return s;
 }
-	
+
+static void rev_holes(struct asm_edge_t *e)
+{
+	int i = 0;
+	uint32_t t;
+	uint32_t len = 0;
+	uint32_t n = e->n_holes;
+	while (i < e->n_holes)
+		len += e->l_holes[i++];
+	len += e->seq_len;
+	for (i = 0; i < n >> 1; ++i){
+		t = e->p_holes[i];
+		e->p_holes[i] = len - (e->p_holes[n - i - 1] + 1 + e->l_holes[n - i - 1]);
+		e->p_holes[n - i - 1] = len - (t + 1 +  e->l_holes[i]);
+		t = e->l_holes[i];
+		e->l_holes[i] = e->l_holes[n - i - 1];
+		e->l_holes[n - i - 1] = e->l_holes[i];
+	}
+}
 
 uint32_t get_seq_cov(struct asm_edge_t *e, int ksize)
 {
@@ -117,7 +135,8 @@ int is_bridge(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 	return 0;
 }
 
-void glue_2_seq(struct asm_edge_t *e, struct asm_node_t *v, gint_t e1, gint_t e2)
+void glue_2_seq(struct asm_edge_t *e, struct asm_node_t *v, gint_t e1, gint_t e2,
+		size_t comp_sz)
 {
 	gint_t u = e[e1].target;
 	gint_t t = e[e2].source;
@@ -125,6 +144,12 @@ void glue_2_seq(struct asm_edge_t *e, struct asm_node_t *v, gint_t e1, gint_t e2
 	v[v[t].rc_id].deg = 0;
 	v[u].deg = 0;
 	v[t].deg = 0;
+
+	e[e1].n_holes++;
+	e[e1].p_holes = realloc(e[e1].p_holes, e[e1].n_holes * sizeof(uint32_t));
+	e[e1].l_holes = realloc(e[e1].l_holes, e[e1].n_holes * sizeof(uint32_t));
+	e[e1].p_holes[e[e1].n_holes - 1] = e[e1].seq_len - 1;
+	e[e1].l_holes[e[e1].n_holes - 1] = comp_sz;
 
 	e[e1].seq = concat_b_seq(e[e1].seq, e[e1].seq_len, e[e2].seq, e[e2].seq_len, 0);
 	e[e1].seq_len = e[e1].seq_len + e[e2].seq_len;
@@ -167,7 +192,7 @@ void simple_tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
 }
 
 int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
-			gint_t *k)
+			gint_t *k, uint32_t *comp_sz)
 {
 	int j, i, n_items, cnt = 0;
 	int n_larges = 0;
@@ -175,10 +200,11 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 	khash_t(khInt) *set_v; // for keeping visited nodes
 	set_v = kh_init(khInt);
 	aqueue_t *q = init_aqueue();
-	uint32_t comp_sz = 0;
+	uint32_t _comp_sz = 0;
 	gint_t next_e, u, src, dest, lg;
 
 	*k = NULL;
+	*comp_sz = 0;
 
 	if (e[e_i].seq_len < MIN_BRIDGE_LEG)
 		return 0;
@@ -191,7 +217,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 		for (j = 0; j < n_items; j++){
 			u = aqueue_pop(q); //u is an edge
 			assert(u < n_edges);
-			simple_tandem_helper(e, v, u, set_v, &comp_sz, q, &n_larges, &lg);
+			simple_tandem_helper(e, v, u, set_v, &_comp_sz, q, &n_larges, &lg);
 		}
 		if (++cnt > MIN_LAYER) //very complex region, never end
 			break;
@@ -215,6 +241,7 @@ int is_simple_tandem(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i,
 		return 0;
 	else if (n_larges == 1){
 		*k = lg;
+		*comp_sz = _comp_sz;
 		return 1;
 	}
 }
@@ -224,6 +251,17 @@ static void clone_edge(struct asm_edge_t *d, struct asm_edge_t *s)
 	d->seq = rev_bin(s->seq, s->seq_len);
 	d->seq_len = s->seq_len;
 	d->count = s->count;
+
+	if (d->n_holes != s->n_holes){
+		d->n_holes = s->n_holes;
+		if (!d->p_holes)
+			d->p_holes = (uint32_t *)malloc(d->n_holes * sizeof(uint32_t));
+		if (!d->l_holes)
+			d->l_holes = (uint32_t *)malloc(d->n_holes * sizeof(uint32_t));
+	}
+	memcpy(d->p_holes, s->p_holes, d->n_holes * sizeof(uint32_t));
+	memcpy(d->l_holes, s->l_holes, d->n_holes * sizeof(uint32_t));
+	rev_holes(d);
 }
 
 static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
@@ -388,6 +426,7 @@ void find_forest(struct asm_graph_t *g0)
 
 	gint_t *id_edge, *cc_size; // for the connected component
 	gint_t cc_id;
+	gint_t comp_sz;
 	id_edge = malloc(g0->n_e * sizeof(gint_t));
 	cc_size = NULL;
 	asm_edge_cc(g0, id_edge, &cc_size);
@@ -410,9 +449,9 @@ void find_forest(struct asm_graph_t *g0)
 			resolve_loop(e, v, i, g0->ksize);
 			flag = 1;
 		}
-		if (is_simple_tandem(e, v, i, &lg)){
+		if (is_simple_tandem(e, v, i, &lg, &comp_sz)){
 			__VERBOSE("Edge %d - %d\n - simple complex\n", i, e[i].rc_id);
-			glue_2_seq(e, v, i, lg);
+			glue_2_seq(e, v, i, lg, comp_sz);
 			flag = 1;
 		}
 		if (flag){
