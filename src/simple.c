@@ -27,6 +27,7 @@ static uint32_t n_edges;
 static uint32_t n_nodes;
 
 void dump_b_seq(uint32_t *s, size_t l);
+static void isolate_edge(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i);
 static uint32_t *concat_b_seq(uint32_t *dst, gint_t dlen, uint32_t *src,
 					gint_t slen, int skip);
 
@@ -116,9 +117,28 @@ int is_bridge(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 	return 0;
 }
 
+void glue_2_seq(struct asm_edge_t *e, struct asm_node_t *v, gint_t e1, gint_t e2)
+{
+	gint_t u = e[e1].target;
+	gint_t t = e[e2].source;
+	v[v[u].rc_id].deg = 0;
+	v[v[t].rc_id].deg = 0;
+	v[u].deg = 0;
+	v[t].deg = 0;
 
+	e[e1].seq = concat_b_seq(e[e1].seq, e[e1].seq_len, e[e2].seq, e[e2].seq_len, 0);
+	e[e1].seq_len = e[e1].seq_len + e[e2].seq_len;
+	e[e1].count = e[e1].count + e[e2].count;
+
+	e[e1].target = e[e2].target;
+	e[e2].target = e[e2].source;
+	e[e2].seq_len = 0;
+	e[e2].count = 0;
+	
+	clone_edge(e + e[e1].rc_id, e + e1);
+}
 void simple_tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
-			  gint_t u, khash_t(khInt) *set_v, uint32_t *comp_sz
+			  gint_t u, khash_t(khInt) *set_v, uint32_t *comp_sz,
 			  aqueue_t *q, int *n_larges, gint_t *lg)
 {
 	gint_t next_e;
@@ -318,8 +338,7 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
 	e[u].count += e[t].count;
 
 	__VERBOSE("Concat the loop and the shared\n");
-	if (u == 90731)
-		printf("here\n");
+
 	e[u].seq = concat_3_seq(e[u], e[t], e[u], ksize, &len);
 	e[u].seq_len = len;
  
@@ -330,7 +349,7 @@ int resolve_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t u,
 
 	if (e[v[rc_src].adj[0]].seq_len >= MIN_BRIDGE_LEG)
 		e_in = v[rc_src].adj[0];
-	else									/* Now t is the reverse of in-going big leg */
+	else	/* Now t is the reverse of in-going big leg */
 		e_in = v[rc_src].adj[1];
 	e_in = e[e_in].rc_id;
 	__VERBOSE("Condense 3 consecutive edge\n");
@@ -393,6 +412,7 @@ void find_forest(struct asm_graph_t *g0)
 		}
 		if (is_simple_tandem(e, v, i, &lg)){
 			__VERBOSE("Edge %d - %d\n - simple complex\n", i, e[i].rc_id);
+			glue_2_seq(e, v, i, lg);
 			flag = 1;
 		}
 		if (flag){
