@@ -30,3 +30,6 @@ clean:
 cleandep:
 	rm -f $(DEP)
 
+.PHONY: cleanall
+cleanall:
+	rm -rf $(OBJ) $(EXEC) $(DEP)
