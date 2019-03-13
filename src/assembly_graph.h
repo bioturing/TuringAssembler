@@ -72,7 +72,7 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
  * float __get_edge_cov(struct asm_edge_t *e, int ksize);
  * */
 #define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
-						(((e)->n_holes + 1) * (ksize)))
+				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 /* Write plain nucleotide sequence to buffer seq */
 void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 /* Estimate coverage of 1 walk on genome */
