@@ -197,7 +197,7 @@ void test_kmer_count(struct opt_count_t *opt, int ksize)
 		if (kh_exist(h, k)) {
 			if (kh_val(h, k) == 1)
 				++cnt;
-			free(kh_key(h, k));
+			free((char *)kh_key(h, k));
 		}
 	}
 	__VERBOSE_LOG("TEST", "Number of non-singleton %d-mer: %u\n", ksize,

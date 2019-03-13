@@ -80,6 +80,22 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 	free(ndict);
 }
 
+static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
+						uint32_t *seq2, uint32_t l2)
+{
+	if (l1 != l2)
+		return 0;
+	uint32_t c1, c2, i, k;
+	for (i = 0; i < l1; ++i) {
+		k = l1 - i - 1;
+		c1 = __bin_seq_get_char(seq1, i);
+		c2 = __bin_seq_get_char(seq2, k);
+		if (c1 != (c2 ^ 3))
+			return 0;
+	}
+	return 1;
+}
+
 static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 			struct k63_idhash_t *ndict, struct asm_graph_t *g)
 {
@@ -267,7 +283,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		for (k = 0; k < nodes[v_rc].deg; ++k) {
 			e_rc = nodes[v_rc].adj[k];
 			if (edges[e_rc].target == nodes[edges[e].source].rc_id
-				&& asm_is_edge_rc(edges[e].seq, edges[e].seq_len,
+				&& is_seq_rc(edges[e].seq, edges[e].seq_len,
 					edges[e_rc].seq, edges[e_rc].seq_len)) {
 				edges[e].rc_id = e_rc;
 				edges[e_rc].rc_id = e;

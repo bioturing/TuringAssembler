@@ -12,49 +12,16 @@
 #include "time_utils.h"
 #include "verbose.h"
 
-#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
-
-static void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
-{
-	uint32_t i, j, k, len = e->seq_len;
-	for (i = 0; i < e->n_holes; ++i)
-		len += e->l_holes[i];
-	if (*m_seq < len + 1) {
-		*m_seq = len + 1;
-		*seq = realloc(*seq, *m_seq);
-	}
-	j = k = 0;
-	for (i = 0; i < e->seq_len; ++i) {
-		(*seq)[k++] = nt4_char[__bin_seq_get_char(e->seq, i)];
-		/* append holes to the sequences */
-		if (j < e->n_holes && e->p_holes[j] == i) {
-			/* fill with 'N's */
-			memset((*seq) + k, 0x4e, e->l_holes[j]);
-			k += e->l_holes[j];
-			++j;
-		}
-	}
-	(*seq)[k++] = '\0';
-}
-
-static void dump_bin_seq(char *seq, uint32_t *bin, gint_t len)
-{
-	gint_t i;
-	for (i = 0; i < len; ++i)
-		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & 3];
-	seq[len] = '\0';
-}
-
 #define TIPS_THRESHOLD			5.0
 #define TIPS_RATIO_THRESHOLD		0.1
 
-#define NON_TIPS_LEN			250
+#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
 
 void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g);
 void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g);
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
 void write_gfa(struct asm_graph_t *g, const char *path);
-void dump_fasta(struct asm_graph_t *g, const char *path);
+void write_fasta(struct asm_graph_t *g, const char *path);
 void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g);
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 			gint_t len, gint_t max_len, int ksize);
@@ -95,408 +62,11 @@ void k31_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
 							(long long)g0->n_e);
 }
 
-void graph_convert_process(struct opt_build_t *opt)
+float get_genome_coverage(struct asm_graph_t *g)
 {
-	char path[1024];
-	init_clock();
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Dump graph from bin archive\n");
-	struct asm_graph_t *g;
-	g = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g, opt->in_path);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g->ksize);
-	test_asm_graph(g);
-	snprintf(path, 1024, "%s/graph_k_%d_loaded.gfa", opt->out_dir, g->ksize);
-	write_gfa(g, path);
-	snprintf(path, 1024, "%s/graph_k_%d_loaded.fasta", opt->out_dir, g->ksize);
-	dump_fasta(g, path);
-}
-
-void build0_process(struct opt_count_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building assembly graph using kmer size %d\n", opt->k0);
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	if (opt->k0 < 32)
-		k31_build0(opt, opt->k0, g0);
-	else if (opt->k0 > 32 && opt->k0 < 64)
-		k63_build0(opt, opt->k0, g0);
-	test_asm_graph(g0);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.gfa", opt->out_dir, opt->k0);
-	write_gfa(g0, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.fasta", opt->out_dir, opt->k0);
-	dump_fasta(g0, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.bin", opt->out_dir, opt->k0);
-	save_asm_graph_simple(g0, path);
-}
-
-void build0_1_process(struct opt_build_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips(g0, g1);
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", g0->ksize,
-							(long long)g1->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", g0->ksize,
-							(long long)g1->n_e);
-	test_asm_graph(g1);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.gfa", opt->out_dir, g0->ksize);
-	write_gfa(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.fasta", opt->out_dir, g0->ksize);
-	dump_fasta(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.bin", opt->out_dir, g0->ksize);
-	save_asm_graph_simple(g1, path);
-}
-
-void build1_2_process(struct opt_build_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips using graph topology\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips_topology(g0, g1);
-	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of nodes: %lld\n", g0->ksize,
-							(long long)g1->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of edges: %lld\n", g0->ksize,
-							(long long)g1->n_e);
-	test_asm_graph(g1);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.gfa", opt->out_dir, g0->ksize);
-	write_gfa(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, g0->ksize);
-	dump_fasta(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0->ksize);
-	save_asm_graph_simple(g1, path);
-}
-
-void build2_3_process(struct opt_build_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
-	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing simple branching\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_bubble_and_loop(g0, g1);
-	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", g0->ksize,
-							(long long)g1->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", g0->ksize,
-							(long long)g1->n_e);
-	test_asm_graph(g1);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, g0->ksize);
-	write_gfa(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, g0->ksize);
-	dump_fasta(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, g0->ksize);
-	save_asm_graph_simple(g1, path);
-}
-
-void build_barcode_process(struct opt_build_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
-	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building barcode information\n");
-	construct_barcode_map(g0, opt);
-	__VERBOSE("\n");
-
-	snprintf(path, 1024, "%s/graph_k_%d_added_barcode.bin", opt->out_dir, g0->ksize);
-	save_asm_graph_barcode(g0, path);
-}
-
-void graph_query_process(struct opt_build_t *opt)
-{
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
-	fprintf(stderr, "bin size = %d\n", g0->bin_size);
-	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Querying pair-edge barcode information\n");
-	gint_t u, v;
-	FILE *fp;
-	fp = xfopen(opt->in_file, "r");
-	while (1) {
-		int ret = fscanf(fp, "%ld%ld", &u, &v);
-		if (ret == EOF || ret == 0)
-			break;
-		print_test_barcode_edge(g0, u, v);
-	}
-	fclose(fp);
-
-}
-
-void build2_3a_process(struct opt_build_t *opt)
-{
-	// char path[1024];
-	// init_clock();
-
-	// struct asm_graph_t *g0;
-	// g0 = calloc(1, sizeof(struct asm_graph_t));
-	// load_asm_graph(g0, opt->in_path);
-	// test_asm_graph(g0);
-	// __VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	// __VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	// __VERBOSE("Building barcode information\n");
-	// construct_barcode_map(g0, opt);
-	// __VERBOSE("\n");
-	// print_test_barcode_edge(g0, 140382, 101945, opt->split_len);
-	// print_test_barcode_edge(g0, 109035, 101945, opt->split_len);
-}
-
-void assembly_process(struct opt_count_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building assembly graph using kmer size %d\n", opt->k0);
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	if (opt->k0 < 32)
-		k31_build0(opt, opt->k0, g0);
-	else if (opt->k0 > 32 && opt->k0 < 64)
-		k63_build0(opt, opt->k0, g0);
-	test_asm_graph(g0);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.gfa", opt->out_dir, opt->k0);
-	write_gfa(g0, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.fasta", opt->out_dir, opt->k0);
-	dump_fasta(g0, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_0.bin", opt->out_dir, opt->k0);
-	save_asm_graph_simple(g0, path);
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips(g0, g1);
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of nodes: %lld\n", opt->k0,
-							(long long)g1->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#1", "Number of edges: %lld\n", opt->k0,
-							(long long)g1->n_e);
-	test_asm_graph(g1);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.gfa", opt->out_dir, opt->k0);
-	write_gfa(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.fasta", opt->out_dir, opt->k0);
-	dump_fasta(g1, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
-	save_asm_graph_simple(g1, path);
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips #2\n");
-	struct asm_graph_t *g2;
-	g2 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips_topology(g1, g2);
-	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of nodes: %lld\n", opt->k0,
-							(long long)g2->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#2", "Number of edges: %lld\n", opt->k0,
-							(long long)g2->n_e);
-	test_asm_graph(g2);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.gfa", opt->out_dir, opt->k0);
-	write_gfa(g2, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.fasta", opt->out_dir, opt->k0);
-	dump_fasta(g2, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
-	save_asm_graph_simple(g2, path);
-
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing bubbles\n");
-	struct asm_graph_t *g3;
-	g3 = calloc(1, sizeof(struct asm_graph_t));
-	remove_bubble_and_loop(g2, g3);
-	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of nodes: %lld\n", opt->k0,
-							(long long)g3->n_v);
-	__VERBOSE_LOG("kmer_%d_graph_#3", "Number of edges: %lld\n", opt->k0,
-							(long long)g3->n_e);
-	test_asm_graph(g3);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.gfa", opt->out_dir, opt->k0);
-	write_gfa(g3, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.fasta", opt->out_dir, opt->k0);
-	dump_fasta(g3, path);
-	snprintf(path, 1024, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
-	save_asm_graph_simple(g3, path);
-}
-
-void k63_process(struct opt_count_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct k63hash_t *kmer_hash;
-	kmer_hash = calloc(1, sizeof(struct k63hash_t));
-	__VERBOSE("Estimating kmer\n");
-	build_k63_table_lazy(opt, kmer_hash, opt->k0);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-
-	__VERBOSE("\nBuilding assembly graph\n");
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k63(opt, opt->k0, kmer_hash, g0);
-	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
-	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.gfa");
-	write_gfa(g0, path);
-	test_asm_graph(g0);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.fasta");
-	dump_fasta(g0, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_0.bin");
-	save_asm_graph_simple(g0, path);
-
-	__VERBOSE("\nRemoving tips\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips(g0, g1);
-	__VERBOSE_LOG("Graph #2", "Number of nodes: %lld\n", (long long)g1->n_v);
-	__VERBOSE_LOG("Graph #2", "Number of edges: %lld\n", (long long)g1->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_1.gfa");
-	write_gfa(g1, path);
-	test_asm_graph(g1);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_1.fasta");
-	dump_fasta(g1, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_1.bin");
-	save_asm_graph_simple(g1, path);
-
-
-	__VERBOSE("\nRemoving tips #2\n");
-	struct asm_graph_t *g2;
-	g2 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips_topology(g1, g2);
-	__VERBOSE_LOG("Graph #3", "Number of nodes: %lld\n", (long long)g2->n_v);
-	__VERBOSE_LOG("Graph #3", "Number of edges: %lld\n", (long long)g2->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.gfa");
-	write_gfa(g2, path);
-	test_asm_graph(g2);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.fasta");
-	dump_fasta(g2, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_2.bin");
-	save_asm_graph_simple(g2, path);
-
-	__VERBOSE("\nRemoving bubble\n");
-	struct asm_graph_t *g3;
-	g3 = calloc(1, sizeof(struct asm_graph_t));
-	remove_bubble_and_loop(g2, g3);
-	__VERBOSE_LOG("Graph #4", "Number of nodes: %lld\n", (long long)g3->n_v);
-	__VERBOSE_LOG("Graph #4", "Number of edges: %lld\n", (long long)g3->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.gfa");
-	write_gfa(g3, path);
-	test_asm_graph(g3);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.fasta");
-	dump_fasta(g3, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k63_3.bin");
-	save_asm_graph_simple(g3, path);
-}
-
-void k31_process(struct opt_count_t *opt)
-{
-	char path[1024];
-	init_clock();
-
-	struct k31hash_t *kmer_hash;
-	kmer_hash = calloc(1, sizeof(struct k31hash_t));
-	__VERBOSE("Estimating kmer\n");
-	build_k31_table_lazy(opt, kmer_hash, opt->k0);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-
-	__VERBOSE("\nBuilding assembly graph\n");
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	build_asm_graph_from_k31(opt, opt->k0, kmer_hash, g0);
-	__VERBOSE_LOG("Graph #1", "Number of nodes: %lld\n", (long long)g0->n_v);
-	__VERBOSE_LOG("Graph #1", "Number of edges: %lld\n", (long long)g0->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.gfa");
-	write_gfa(g0, path);
-	test_asm_graph(g0);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.fasta");
-	dump_fasta(g0, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_0.bin");
-	save_asm_graph_simple(g0, path);
-
-	__VERBOSE("\nRemoving tips\n");
-	struct asm_graph_t *g1;
-	g1 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips(g0, g1);
-	__VERBOSE_LOG("Graph #2", "Number of nodes: %lld\n", (long long)g1->n_v);
-	__VERBOSE_LOG("Graph #2", "Number of edges: %lld\n", (long long)g1->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_1.gfa");
-	write_gfa(g1, path);
-	test_asm_graph(g1);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_1.fasta");
-	dump_fasta(g1, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_1.bin");
-	save_asm_graph_simple(g1, path);
-
-	__VERBOSE("\nRemoving tips #2\n");
-	struct asm_graph_t *g2;
-	g2 = calloc(1, sizeof(struct asm_graph_t));
-	remove_tips_topology(g1, g2);
-	__VERBOSE_LOG("Graph #3", "Number of nodes: %lld\n", (long long)g2->n_v);
-	__VERBOSE_LOG("Graph #3", "Number of edges: %lld\n", (long long)g2->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.gfa");
-	write_gfa(g2, path);
-	test_asm_graph(g2);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.fasta");
-	dump_fasta(g2, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_2.bin");
-	save_asm_graph_simple(g2, path);
-
-	__VERBOSE("\nRemoving bubble\n");
-	struct asm_graph_t *g3;
-	g3 = calloc(1, sizeof(struct asm_graph_t));
-	remove_bubble_and_loop(g2, g3);
-	__VERBOSE_LOG("Graph #4", "Number of nodes: %lld\n", (long long)g3->n_v);
-	__VERBOSE_LOG("Graph #4", "Number of edges: %lld\n", (long long)g3->n_e);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.gfa");
-	write_gfa(g3, path);
-	test_asm_graph(g3);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.fasta");
-	dump_fasta(g3, path);
-	strcpy(path, opt->out_dir); strcat(path, "/graph_k31_3.bin");
-	save_asm_graph_simple(g3, path);
-}
-
-double get_uni_genome_coverage(struct asm_graph_t *g)
-{
+	/* Using the coverage of the longest contigs */
 	gint_t max_len, e;
-	double ret_cov = 0.0;
+	float ret_cov = 0.0;
 	max_len = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].seq_len > max_len) {
@@ -508,7 +78,98 @@ double get_uni_genome_coverage(struct asm_graph_t *g)
 	return ret_cov;
 }
 
-static gint_t asm_find_id(gint_t *adj, gint_t deg, gint_t id)
+void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
+{
+	uint32_t i, j, k, len = e->seq_len;
+	for (i = 0; i < e->n_holes; ++i)
+		len += e->l_holes[i];
+	if (*m_seq < len + 1) {
+		*m_seq = len + 1;
+		*seq = realloc(*seq, *m_seq);
+	}
+	j = k = 0;
+	for (i = 0; i < e->seq_len; ++i) {
+		(*seq)[k++] = nt4_char[__bin_seq_get_char(e->seq, i)];
+		/* append holes to the sequences */
+		if (j < e->n_holes && e->p_holes[j] == i) {
+			/* fill with 'N's */
+			memset((*seq) + k, 0x4e, e->l_holes[j]);
+			k += e->l_holes[j];
+			++j;
+		}
+	}
+	(*seq)[k++] = '\0';
+}
+
+void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
+{
+	dst->count = src->count;
+	dst->seq_len = src->seq_len;
+	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
+	memcpy(dst->seq, src->seq,
+		((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
+	dst->n_holes = src->n_holes;
+	dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
+	memcpy(dst->p_holes, src->p_holes, dst->n_holes * sizeof(uint32_t));
+	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
+	memcpy(dst->l_holes, src->l_holes, dst->n_holes * sizeof(uint32_t));
+}
+
+void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
+{
+	dst->count = src->count;
+	dst->seq_len = src->seq_len;
+	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
+	uint32_t i, k;
+	for (i = 0; i < dst->seq_len; ++i) {
+		k = dst->seq_len - i - 1;
+		dst->seq[i >> 4] |= (uint32_t)(__bin_seq_get_char(src->seq, k) ^ 3)
+							<< ((i & 15) << 1);
+	}
+	dst->n_holes = src->n_holes;
+	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
+	dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
+	for (i = 0; i < dst->n_holes; ++i) {
+		dst->l_holes[i] = src->l_holes[dst->n_holes - i - 1];
+		dst->p_holes[i] = dst->seq_len - 1
+			- (dst->p_holes[dst->n_holes - i - 1] + 1);
+	}
+}
+
+void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap)
+{
+	dst->count += src->count;
+	/* append the bin seq */
+	uint32_t seq_len, new_m, m;
+	seq_len = dst->seq_len + src->seq_len - overlap;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len + 15) >> 4;
+	if (new_m > m) {
+		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	}
+
+	uint32_t i, k;
+	for (i = overlap; i < src->seq_len; ++i) {
+		k = i - overlap + dst->seq_len;
+		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
+							<< ((k & 15) << 1);
+	}
+	/* append the gaps */
+	if (src->n_holes) {
+		uint32_t n_holes = dst->n_holes + src->n_holes;
+		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
+		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
+		for (i = 0; i < src->n_holes; ++i)
+			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len;
+		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
+		dst->n_holes = n_holes;
+	}
+	dst->seq_len = seq_len;
+}
+
+static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
 	ret = -1;
@@ -519,7 +180,8 @@ static gint_t asm_find_id(gint_t *adj, gint_t deg, gint_t id)
 	return ret;
 }
 
-int asm_is_edge_rc(uint32_t *seq1, uint32_t l1, uint32_t *seq2, uint32_t l2)
+static inline int asm_is_edge_rc(uint32_t *seq1, uint32_t l1,
+						uint32_t *seq2, uint32_t l2)
 {
 	if (l1 != l2)
 		return 0;
@@ -528,14 +190,13 @@ int asm_is_edge_rc(uint32_t *seq1, uint32_t l1, uint32_t *seq2, uint32_t l2)
 		k = l1 - i - 1;
 		c1 = __bin_seq_get_char(seq1, i);
 		c2 = __bin_seq_get_char(seq2, k);
-		if (c1 != (c2 ^ 3)) {
+		if (c1 != (c2 ^ 3))
 			return 0;
-		}
 	}
 	return 1;
 }
 
-void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
+static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
 {
 	memset(id_edge, 255, g->n_e * sizeof(gint_t));
 	gint_t m_cc = 0x10000;
@@ -592,7 +253,16 @@ void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
 	free(q);
 }
 
-void dump_fasta(struct asm_graph_t *g, const char *path)
+static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
+{
+	float cov = __get_edge_cov(e, ksize);
+	uint32_t i, len = e->seq_len;
+	for (i = 0; i < e->n_holes; ++i)
+		len += e->l_holes[i];
+	return (uint64_t)(cov * len);
+}
+
+void write_fasta(struct asm_graph_t *g, const char *path)
 {
 	gint_t *id_edge, *cc_size;
 	id_edge = malloc(g->n_e * sizeof(gint_t));
@@ -609,16 +279,13 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 		if (e > e_rc)
 			continue;
 		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < 250 || g->edges[e].seq_len < 100)
+		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
+			g->edges[e].seq_len < MIN_CONTIG_LEN)
 			continue;
-		// if (seq_len < g->edges[e].seq_len + 1) {
-		// 	seq_len = g->edges[e].seq_len + 1;
-		// 	seq = realloc(seq, seq_len);
-		// }
-		// dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
 		dump_edge_seq(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_length_%lld_count_%llu\n", (long long)e,
-			(long long)g->edges[e].seq_len, (long long unsigned)g->edges[e].count);
+						(long long)g->edges[e].seq_len,
+					(long long unsigned)g->edges[e].count);
 		gint_t k = 0;
 		while (k < g->edges[e].seq_len) {
 			gint_t l = __min(80, g->edges[e].seq_len - k);
@@ -629,19 +296,9 @@ void dump_fasta(struct asm_graph_t *g, const char *path)
 		}
 	}
 	fclose(fp);
-
 	free(seq);
 	free(id_edge);
 	free(cc_size);
-}
-
-static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
-{
-	double cov = e->count * 1.0 / ((e->n_holes + 1) * ksize);
-	uint32_t i, len = e->seq_len;
-	for (i = 0; i < e->n_holes; ++i)
-		len += e->l_holes[i];
-	return (uint64_t)(cov * len);
 }
 
 void write_gfa(struct asm_graph_t *g, const char *path)
@@ -662,15 +319,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < 250)
 			continue;
-		// if (seq_len < g->edges[e].seq_len + 1) {
-		// 	seq_len = g->edges[e].seq_len + 1;
-		// 	seq = realloc(seq, seq_len);
-		// }
-		// dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
 		dump_edge_seq(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
-		// double cov = g->edges[e].count * 1.0 / (g->edges[e].seq_len - g->ksize);
-		// uint64_t fake_count = (uint64_t)(cov * g->edges[e].seq_len);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
 			(long long)e_rc, seq, (long long unsigned)fake_count);
@@ -708,8 +358,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			}
 			fprintf(fp, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
 				(long long)pe, (long long)pe_rc, ce,
-				(long long)next_pe, (long long)next_pe_rc, next_ce,
-				g->ksize);
+				(long long)next_pe, (long long)next_pe_rc,
+				next_ce, g->ksize);
 		}
 	}
 	fclose(fp);
@@ -718,7 +368,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 	free(cc_size);
 }
 
-void remove_self_loop(struct asm_graph_t *g, double uni_cov)
+void remove_self_loop(struct asm_graph_t *g)
 {
 	/* Loop is bad
 	 *               +---+
@@ -836,9 +486,9 @@ void remove_bubble_simple(struct asm_graph_t *g0, double uni_cov)
 
 void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	double uni_cov = get_uni_genome_coverage(g0);
+	double uni_cov = get_genome_coverage(g0);
 	__VERBOSE("1 genome walk coverage: %lf\n", uni_cov);
-	remove_self_loop(g0, uni_cov);
+	remove_self_loop(g0);
 	remove_bubble_simple(g0, uni_cov);
 	asm_condense(g0, g);
 }
@@ -891,7 +541,7 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 			gint_t e_id;
 			e_id = g0->nodes[u].adj[c];
 			int ret = dfs_dead_end(g0, g0->edges[e_id].target,
-					g0->ksize, NON_TIPS_LEN, g0->ksize);
+					g0->ksize, MAX_TIPS_LEN, g0->ksize);
 			if (ret) {
 				tmp[cnt].e = e_id;
 				tmp[cnt].cov = g0->edges[e_id].count * 1.0 /
@@ -918,7 +568,7 @@ void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g)
 		if (!((flag[e >> 5] >> (e & 31)) & 1))
 			continue;
 		u = g0->edges[e].source;
-		gint_t c = asm_find_id(g0->nodes[u].adj, g0->nodes[u].deg, e);
+		gint_t c = find_adj_idx(g0->nodes[u].adj, g0->nodes[u].deg, e);
 		assert(c != -1);
 		g0->nodes[u].adj[c] = -1;
 	}
@@ -974,7 +624,7 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 				v = g0->edges[e_id].target;
 				v_rc = g0->nodes[v].rc_id;
 				e_rc = g0->edges[e_id].rc_id;
-				gint_t j = asm_find_id(g0->nodes[v_rc].adj,
+				gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
 						g0->nodes[v_rc].deg, e_rc);
 				assert(j != -1);
 				/* disconnect edge */
@@ -999,72 +649,6 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 	asm_condense(g0, g);
 }
 
-void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
-{
-	dst->count = src->count;
-	dst->seq_len = src->seq_len;
-	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
-	memcpy(dst->seq, src->seq,
-		((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
-	dst->n_holes = src->n_holes;
-	dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	memcpy(dst->p_holes, src->p_holes, dst->n_holes * sizeof(uint32_t));
-	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	memcpy(dst->l_holes, src->l_holes, dst->n_holes * sizeof(uint32_t));
-}
-
-void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
-{
-	dst->count = src->count;
-	dst->seq_len = src->seq_len;
-	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
-	uint32_t i, k;
-	for (i = 0; i < dst->seq_len; ++i) {
-		k = dst->seq_len - i - 1;
-		dst->seq[i >> 4] |= (uint32_t)(__bin_seq_get_char(src->seq, k) ^ 3)
-							<< ((i & 15) << 1);
-	}
-	dst->n_holes = src->n_holes;
-	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	for (i = 0; i < dst->n_holes; ++i) {
-		dst->l_holes[i] = src->l_holes[dst->n_holes - i - 1];
-		dst->p_holes[i] = dst->seq_len - 1
-			- (dst->p_holes[dst->n_holes - i - 1] + 1);
-	}
-}
-
-void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap)
-{
-	uint32_t seq_len, new_m, m;
-	dst->count += src->count;
-	/* append the bin seq */
-	seq_len = dst->seq_len + src->seq_len - overlap;
-	new_m = (seq_len + 15) >> 4;
-	m = (dst->seq_len + 15) >> 4;
-	if (new_m > m) {
-		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
-		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	}
-
-	uint32_t i, k;
-	for (i = overlap; i < src->seq_len; ++i) {
-		k = i - overlap + dst->seq_len;
-		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
-							<< ((k & 15) << 1);
-	}
-	/* append the gaps */
-	if (src->n_holes) {
-		uint32_t n_holes = dst->n_holes + src->n_holes;
-		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
-		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
-		for (i = 0; i < src->n_holes; ++i)
-			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len;
-		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
-		dst->n_holes = n_holes;
-	}
-	dst->seq_len = seq_len;
-}
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
@@ -1139,7 +723,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			asm_clone_reverse(edges + q, edges + p);
 			v_rc = g0->nodes[v].rc_id;
 			e_rc = g0->edges[e].rc_id;
-			gint_t j = asm_find_id(g0->nodes[v_rc].adj,
+			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
 						g0->nodes[v_rc].deg, e_rc);
 			assert(j >= 0);
 			g0->nodes[v_rc].adj[j] = -1;
@@ -1193,10 +777,11 @@ void test2_asm_graph(struct asm_graph_t *g)
 				fprintf(stderr, "seq_len = %u; rc_seq_len = %u\n",
 					g->edges[e].seq_len, g->edges[e_rc].seq_len);
 				assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
-				char *seq = malloc(g->edges[e].seq_len + 1);
-				dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+				char *seq = NULL;
+				uint32_t lseq = 0;
+				dump_edge_seq(&seq, &lseq, g->edges + e);
 				fprintf(stderr, "seq    = %s\n", seq);
-				dump_bin_seq(seq, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+				dump_edge_seq(&seq, &lseq, g->edges + e_rc);
 				fprintf(stderr, "seq_rc = %s\n", seq);
 				assert(0 && "Smart error");
 			}
@@ -1249,9 +834,10 @@ void test_asm_graph(struct asm_graph_t *g)
 				if (ck != prev_c && prev_c != -1) {
 					for (k = 0; k < g->nodes[u].deg; ++k) {
 						gint_t e = g->nodes[u].adj[k];
-						char *seq = malloc(g->edges[e].seq_len);
-						dump_bin_seq(seq, g->edges[e].seq,
-							g->edges[e].seq_len);
+						char *seq = NULL;
+						uint32_t lseq = 0;
+						dump_edge_seq(&seq, &lseq,
+								g->edges + e);
 						fprintf(stderr, "e = %ld; seq = %s\n",
 							e, seq);
 					}
@@ -1296,10 +882,11 @@ void test_asm_graph(struct asm_graph_t *g)
 			fprintf(stderr, "seq_len = %u; rc_seq_len = %u\n",
 				g->edges[e].seq_len, g->edges[e_rc].seq_len);
 			assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
-			char *seq = malloc(g->edges[e].seq_len + 1);
-			dump_bin_seq(seq, g->edges[e].seq, g->edges[e].seq_len);
+			char *seq = NULL;
+			uint32_t lseq = 0;
+			dump_edge_seq(&seq, &lseq, g->edges + e);
 			fprintf(stderr, "seq    = %s\n", seq);
-			dump_bin_seq(seq, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+			dump_edge_seq(&seq, &lseq, g->edges + e_rc);
 			fprintf(stderr, "seq_rc = %s\n", seq);
 			assert(0 && "Stupid error");
 		}

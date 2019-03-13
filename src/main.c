@@ -13,7 +13,7 @@
 #include "khash.h"
 #include "k31_count.h"
 #include "k63_count.h"
-#include "assembly_graph.h"
+#include "process.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -288,7 +288,7 @@ void assembly_opt_process63(int argc, char *argv[])
 	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
 	init_log(log_dir);
 	print_opt_count_info(opt, argc, argv);
-	k63_process(opt);
+	// k63_process(opt);
 }
 
 void assembly_opt_process31(int argc, char *argv[])
@@ -303,7 +303,7 @@ void assembly_opt_process31(int argc, char *argv[])
 	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
 	init_log(log_dir);
 	print_opt_count_info(opt, argc, argv);
-	k31_process(opt);
+	// k31_process(opt);
 }
 
 void assembly_opt_process(int argc, char *argv[])

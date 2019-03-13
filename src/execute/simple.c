@@ -24,6 +24,7 @@
 #define is_lg_leg(e, v, i, cnt) (((e[v[i].adj[0]].seq_len > MIN_BRIDGE_LEG) + \
 		(e[v[i].adj[1]].seq_len > MIN_BRIDGE_LEG)) == cnt)
 
+#define get_seq_cov(e, ksize) ((e).count / (e).seq_len - (ksize))
 #define get_seq_cov(e, ksize) (e.count / (e.seq_len - ksize))
 
 static uint64_t g_cov;
