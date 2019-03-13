@@ -44,8 +44,12 @@ struct asm_graph_t {
 #define MIN_CONNECT_SIZE				250
 #define MIN_CONTIG_LEN					100
 #define MAX_TIPS_LEN					250
+#define TIPS_THRESHOLD			5.0
+#define TIPS_RATIO_THRESHOLD		0.1
 
-/******************** Build graph ultilities **********************************/
+/************************* Build graph ultilities *****************************/
+/******************************************************************************/
+
 /* Build graph using kmer with length smaller than 32 */
 void k31_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0);
 void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
@@ -56,8 +60,17 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
 /********************* Utilities for edges manipulating ***********************/
+/******************************************************************************/
 
-/* Function signature: float __get_edge_cov(struct asm_edge_t *e, int ksize) */
+/* Function signature:
+ * uint32_t __binseq_get(uint32_t *seq, uint32_t k);
+ * Extract the numberic nucleotide at position k-th on seq
+ */
+#define __binseq_get(seq, k) (((seq)[(uint32_t)(k) >> 4] >>		\
+		(((uint32_t)(k) & 15) << 1)) & (uint32_t)3)
+/* Function signature:
+ * float __get_edge_cov(struct asm_edge_t *e, int ksize);
+ * */
 #define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
 						(((e)->n_holes + 1) * (ksize)))
 /* Write plain nucleotide sequence to buffer seq */
@@ -75,6 +88,7 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
 
 /********************** Utilities for graph manipulating **********************/
+/******************************************************************************/
 
 /* Write confidence contigs/scaffolds to fasta file */
 void write_fasta(struct asm_graph_t *g, const char *path);
@@ -93,9 +107,10 @@ void load_asm_graph_complex(struct asm_graph_t *g, const char *path);
 /* Construct barcode information from reads */
 void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt);
 
-
 /************************** Testing functions *********************************/
+/******************************************************************************/
 
 void test_asm_graph(struct asm_graph_t *g);
+void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */

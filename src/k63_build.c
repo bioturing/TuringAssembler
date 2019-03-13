@@ -20,8 +20,6 @@ struct edgecount_bundle_t {
 
 #define __bin_only4(e) ((((e) >> 1) & 1) * 1 + (((e) >> 2) & 1) * 2 + (((e) >> 3) & 1) * 3)
 
-#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
-
 static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 {
 	k63key_t tmp;
@@ -88,8 +86,8 @@ static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 	uint32_t c1, c2, i, k;
 	for (i = 0; i < l1; ++i) {
 		k = l1 - i - 1;
-		c1 = __bin_seq_get_char(seq1, i);
-		c2 = __bin_seq_get_char(seq2, k);
+		c1 = __binseq_get(seq1, i);
+		c2 = __binseq_get(seq2, k);
 		if (c1 != (c2 ^ 3))
 			return 0;
 	}
@@ -322,7 +320,7 @@ static inline gint_t asm_find_edge(struct asm_edge_t *edges, gint_t *adj, int l,
 	ret = -1;
 	for (i = 0; i < deg; ++i) {
 		e_id = adj[i];
-		cur_c = __bin_seq_get_char(edges[e_id].seq, l);
+		cur_c = __binseq_get(edges[e_id].seq, l);
 		if (cur_c == c) {
 			if (ret != -1)
 				return -2;

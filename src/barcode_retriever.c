@@ -17,8 +17,6 @@ KHASH_INIT(k63_dict, k63key_t, struct barcode_hash_t *, 1, __hash_k63, __k63_equ
 
 KHASH_INIT(k31_dict, k31key_t, struct barcode_hash_t *, 1, __hash_k31, __k31_equal)
 
-#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
-
 struct bctrie_bundle_t {
 	struct dqueue_t *q;
 	struct asm_graph_t *graph;
@@ -27,20 +25,17 @@ struct bctrie_bundle_t {
 };
 
 void init_barcode_map(struct asm_graph_t *g, int buck_len);
-
 void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 						khash_t(k31_dict) *dict);
-
 void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 						khash_t(k63_dict) *dict);
-
 static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 					khash_t(k31_dict) *dict);
-
 static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 					khash_t(k63_dict) *dict);
 
-gint_t get_barcode_intersect(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
+gint_t get_barcode_intersect(struct barcode_hash_t *t1,
+					struct barcode_hash_t *t2)
 {
 	gint_t ret = 0;
 	gint_t i, k;
@@ -126,7 +121,7 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 		gint_t e_rc = g->edges[e].rc_id;
 		if (e > e_rc)	continue;
 		for (i = 0; i + 1 < g->edges[e].seq_len; ++i) {
-			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
+			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			knum = ((knum << 2) & kmask) | c;
 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
 			if (i >= g->ksize) {
@@ -155,7 +150,7 @@ void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 	int lmc = (g->ksize - 1) << 1;
 	for (e = 0; e < g->n_e; ++e) {
 		for (i = 0; i < g->edges[e].seq_len; ++i) {
-			uint32_t c = __bin_seq_get_char(g->edges[e].seq, i);
+			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			__k63_lshift2(knum); __k63_and(knum, kmask);
 			knum.bin[0] |= c;
 			__k63_rshift2(krev);

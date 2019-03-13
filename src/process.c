@@ -2,16 +2,16 @@
 #include <string.h>
 
 #include "assembly_graph.h"
-#include "fastq_producer.h"
 #include "io_utils.h"
 #include "k31hash.h"
 #include "k63hash.h"
 #include "k31_count.h"
 #include "k63_count.h"
+#include "process.h"
+#include "resolve.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-#include "process.h"
 
 void graph_convert_process(struct opt_build_t *opt)
 {
