@@ -4,7 +4,7 @@ CPP = cpp
 
 LIBS = -pthread -flto -lm -lz
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -g
+CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function -fPIC -std=gnu99 -g
 
 EXEC = skipping
 
@@ -17,7 +17,7 @@ DEP = $(OBJ:.o=.d)
 $(EXEC): $(OBJ)
 	$(CC) -o $@ $^ $(LIBS)
 
--include $(dep)
+-include $(DEP)
 
 %.d: %.c
 	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
