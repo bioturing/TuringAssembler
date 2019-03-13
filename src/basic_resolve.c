@@ -117,6 +117,62 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 	g->edges = edges;
 }
 
+static inline int is_simple_loop(struct asm_graph_t *g, gint_t id)
+{
+	struct asm_edge_t *e = g->edges + id;
+	if (e->source == -1) /* edge is removed */
+		return 0;
+	u = e->source;
+	v = e->target;
+	u_rc = g->nodes[u].rc_id;
+	v_rc = g->nodes[v].rc_id;
+	if (g->nodes[u].deg != 1 || g->nodes[v].deg != 2 ||
+		g->nodes[u_rc].deg != 2 || g->nodes[v_rc].deg != 1)
+		return 0;
+	if (g->edges[g->nodes[v].adj[0]].target == u) {
+		e_return = g->nodes[v].adj[0];
+		e_right = g->nodes[v].adj[1];
+	} else if (g->edges[g->nodes[v].adj[1]].target == u) {
+		e_return = g->nodes[v].adj[1];
+		e_right = g->nodes[v].adj[0];
+	} else {
+		return 0;
+	}
+	if (g->edges[g->nodes[u_rc].adj[0]].target == v_rc) {
+		e_return_rc = g->nodes[u_rc].adj[0];
+		e_left = g->nodes[u_rc].adj[1];
+	} else if (g->edges[g->nodes[u_rc].adj[1]].target == v_rc) {
+		e_return_rc = g->nodes[u_rc].adj[1];
+		e_left = g->nodes[u_rc].adj[0];
+	} else {
+		return 0;
+	}
+	assert(g->edges[e_return].rc_id == e_return_rc);
+	cov_left = __get_edge_cov(g->edges + e_left, g->ksize);
+	cov_right = __get_edge_cov(g->edges + e_right, g->ksize);
+	cov_ahead = __get_edge_cov(e, g->ksize);
+	cov_return = __get_edge_cov(g->edges + e_return, g->ksize);
+	
+}
+
+void unroll_simple_loop(struct asm_graph_t *g)
+{
+	/*
+	 *                    1g
+	 *              +-------------+
+	 *             /               \
+	 *      1g    v       2g        \       1g
+	 * o--------->o=================>o-------------->o
+	 *            u                  v
+	 */
+	for (e = 0; e < g->n_e; ++e) {
+		if (!is_simple_loop(g, e))
+			continue;
+		u = g->edges[e].source;
+		v = g->edges[e].target;
+	}
+}
+
 void remove_self_loop(struct asm_graph_t *g)
 {
 	/* Loop is bad
