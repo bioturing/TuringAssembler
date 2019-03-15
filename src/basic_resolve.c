@@ -26,9 +26,22 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 	node_id = malloc(g0->n_v * sizeof(gint_t));
 	memset(node_id, 255, g0->n_v * sizeof(gint_t));
 
+	/* remove unused links */
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t c, deg;
+		deg = g0->nodes[u].deg;
+		g0->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g0->nodes[u].adj[c];
+			if (e_id != -1)
+				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
+		}
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
+					g0->nodes[u].deg * sizeof(gint_t));
+	}
 	/* nodes on new graph only consist of branching nodes on old graph */
 	n_v = 0;
-	gint_t u;
 	for (u = 0; u < g0->n_v; ++u) {
 		gint_t deg_fw = g0->nodes[u].deg;
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
@@ -82,7 +95,9 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 					assert(g0->nodes[v].deg == 1);
 					e = g0->nodes[v].adj[0];
 					assert(e != -1);
-					asm_append_edge(edges + p, g0->edges + e, g0->ksize);
+					asm_append_edge_seq(edges + p,
+						g0->edges + e, g0->ksize);
+					edges[p].count += g0->edges[e].count;
 				} else {
 					break;
 				}
@@ -117,13 +132,18 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 	g->edges = edges;
 }
 
-static inline int is_simple_loop(struct asm_graph_t *g, gint_t id)
+/* return 0: not at all
+ * return 1: loop
+ * return 2: false loop, just go through
+ */
+static inline int check_simple_loop(struct asm_graph_t *g, gint_t e)
 {
-	struct asm_edge_t *e = g->edges + id;
-	if (e->source == -1) /* edge is removed */
+	if (g->edges[e].source == -1) /* edge is removed */
 		return 0;
-	u = e->source;
-	v = e->target;
+	gint_t u, v, u_rc, v_rc, e_rc, e_left, e_right, e_return, e_return_rc;
+	e_rc = g->edges[e].rc_id;
+	u = g->edges[e].source;
+	v = g->edges[e].target;
 	u_rc = g->nodes[u].rc_id;
 	v_rc = g->nodes[v].rc_id;
 	if (g->nodes[u].deg != 1 || g->nodes[v].deg != 2 ||
@@ -148,11 +168,50 @@ static inline int is_simple_loop(struct asm_graph_t *g, gint_t id)
 		return 0;
 	}
 	assert(g->edges[e_return].rc_id == e_return_rc);
+	float cov_left, cov_right, cov_ahead, cov_return;
 	cov_left = __get_edge_cov(g->edges + e_left, g->ksize);
 	cov_right = __get_edge_cov(g->edges + e_right, g->ksize);
-	cov_ahead = __get_edge_cov(e, g->ksize);
+	cov_ahead = __get_edge_cov(g->edges + e, g->ksize);
 	cov_return = __get_edge_cov(g->edges + e_return, g->ksize);
-	
+
+	if (__int_cov_ratio(cov_left, cov_right) != 1)
+		return 0;
+	if (__int_cov_ratio(cov_ahead, cov_return) < 2) {
+		if (__int_cov_ratio(cov_left, cov_ahead) == 1) {
+			asm_remove_edge(g, e_return);
+			asm_remove_edge(g, e_return_rc);
+			/* remove the return edge */
+			return 2;
+		} else {
+			/* still resolve */
+			asm_append_edge_seq(g->edges + e_return,
+						g->edges + e, g->ksize);
+			asm_append_edge_seq(g->edges + e,
+						g->edges + e_return, g->ksize);
+			g->edges[e].count += g->edges[e_return].count;
+			asm_append_edge_seq(g->edges + e_return_rc,
+						g->edges + e_rc, g->ksize);
+			asm_append_edge_seq(g->edges + e_rc,
+					g->edges + e_return_rc, g->ksize);
+			asm_remove_edge(g, e_return);
+			asm_remove_edge(g, e_return_rc);
+			return 1;
+		}
+	} else {
+		/* resolve */
+		asm_append_edge_seq(g->edges + e_return,
+					g->edges + e, g->ksize);
+		asm_append_edge_seq(g->edges + e,
+					g->edges + e_return, g->ksize);
+		g->edges[e].count += g->edges[e_return].count;
+		asm_append_edge_seq(g->edges + e_return_rc,
+					g->edges + e_rc, g->ksize);
+		asm_append_edge_seq(g->edges + e_rc,
+				g->edges + e_return_rc, g->ksize);
+		asm_remove_edge(g, e_return);
+		asm_remove_edge(g, e_return_rc);
+		return 1;
+	}
 }
 
 void unroll_simple_loop(struct asm_graph_t *g)
@@ -165,12 +224,18 @@ void unroll_simple_loop(struct asm_graph_t *g)
 	 * o--------->o=================>o-------------->o
 	 *            u                  v
 	 */
+	gint_t e, cnt_loop, cnt_removed;
+	int ret;
+	cnt_loop = cnt_removed = 0;
 	for (e = 0; e < g->n_e; ++e) {
-		if (!is_simple_loop(g, e))
-			continue;
-		u = g->edges[e].source;
-		v = g->edges[e].target;
+		ret = check_simple_loop(g, e);
+		if (ret == 1)
+			++cnt_loop;
+		else if (ret == 2)
+			++cnt_removed;
 	}
+	__VERBOSE("Number of unroll loops: %ld\n", cnt_loop);
+	__VERBOSE("Number of false loops: %ld\n", cnt_removed);
 }
 
 void remove_self_loop(struct asm_graph_t *g)
@@ -187,6 +252,8 @@ void remove_self_loop(struct asm_graph_t *g)
 	gint_t e, e_rc, u, u_rc;
 	gint_t cnt = 0;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		e_rc = g->edges[e].rc_id;
 		if (e != e_rc)
 			continue;
@@ -203,7 +270,7 @@ void remove_self_loop(struct asm_graph_t *g)
 			double cov1, cov2;
 			cov1 = g->edges[e_prev].count / (g->edges[e_prev].seq_len - g->ksize);
 			cov2 = g->edges[e_true].count / (g->edges[e_true].seq_len - g->ksize);
-			if (cov1 / cov2 < 0.5 || cov1 / cov2 > 1.5)
+			if (__int_cov_ratio(cov1, cov2) != 1)
 				continue;
 			g->nodes[u].adj[0] = e_true;
 			g->nodes[u].deg = 1;
@@ -240,7 +307,7 @@ void remove_bubble_simple(struct asm_graph_t *g0, double uni_cov)
 		ctg = g0->nodes[u_rc].adj[0];
 		cov = g0->edges[ctg].count * 1.0 /
 			(g0->edges[ctg].seq_len - g0->ksize);
-		if (cov / uni_cov < 0.51 || cov / uni_cov > 1.51)
+		if (__int_cov_ratio(cov, uni_cov) != 1)
 			continue;
 
 		/* check topology of 2 small contigs (end at same node) */
@@ -261,7 +328,7 @@ void remove_bubble_simple(struct asm_graph_t *g0, double uni_cov)
 		ctg = g0->nodes[v].adj[0];
 		cov = g0->edges[ctg].count * 1.0 /
 			(g0->edges[ctg].seq_len - g0->ksize);
-		if (cov / uni_cov < 0.75 || cov / uni_cov > 1.25)
+		if (__int_cov_ratio(cov, uni_cov) != 1)
 			continue;
 
 		gint_t e_rc0, e_rc1;
@@ -286,16 +353,33 @@ void remove_bubble_simple(struct asm_graph_t *g0, double uni_cov)
 		g0->edges[g0->edges[e].rc_id].count = g0->edges[e_rc0].count + g0->edges[e_rc1].count;
 		++cnt;
 	}
-	__VERBOSE("\nNumber of collapsed bubble: %ld\n", cnt);
+	__VERBOSE("Number of collapsed bubble: %ld\n", cnt);
+}
+
+static void print_debug_info(struct asm_graph_t *g)
+{
+	fprintf(stderr, "Edge 51446 info:\n");
+	gint_t u, v;
+	u = g->edges[51446].source;
+	v = g->edges[51446].target;
+	fprintf(stderr, "Source: %ld; Target: %ld\n", u, v);
+	fprintf(stderr, "src_rc: %ld; tgt_rc: %ld\n", g->nodes[u].rc_id,
+		g->nodes[v].rc_id);
+	fprintf(stderr, "deg[u] = %ld\n", g->nodes[u].deg);
+	fprintf(stderr, "deg[v] = %ld\n", g->nodes[v].deg);
+	fprintf(stderr, "deg[u_rc] = %ld\n", g->nodes[g->nodes[u].rc_id].deg);
+	fprintf(stderr, "deg[v_rc] = %ld\n", g->nodes[g->nodes[v].rc_id].deg);
 }
 
 void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	double uni_cov = get_genome_coverage(g0);
 	__VERBOSE("1 genome walk coverage: %lf\n", uni_cov);
-	remove_self_loop(g0);
+	unroll_simple_loop(g0);
+	// remove_self_loop(g0);
 	remove_bubble_simple(g0, uni_cov);
 	asm_condense(g0, g);
+	// print_debug_info(g);
 }
 
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
@@ -453,18 +537,6 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 				g0->nodes[v_rc].adj[j] = -1;
 			}
 		}
-	}
-	for (u = 0; u < g0->n_v; ++u) {
-		gint_t c, deg;
-		deg = g0->nodes[u].deg;
-		g0->nodes[u].deg = 0;
-		for (c = 0; c < deg; ++c) {
-			gint_t e_id = g0->nodes[u].adj[c];
-			if (e_id != -1)
-				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
-		}
-		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
-					g0->nodes[u].deg * sizeof(gint_t));
 	}
 
 	asm_condense(g0, g);

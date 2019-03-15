@@ -63,6 +63,10 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 /******************************************************************************/
 
 /* Function signature:
+ * int __int_cov_ratio(float cov1, float cov2);
+ */
+#define __int_cov_ratio(cov1, cov2) ((int)((cov1) / (cov2) + 0.49999999))
+/* Function signature:
  * uint32_t __binseq_get(uint32_t *seq, uint32_t k);
  * Extract the numberic nucleotide at position k-th on seq
  */
@@ -74,18 +78,27 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 #define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
 				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 /* Write plain nucleotide sequence to buffer seq */
-void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
+gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 /* Estimate coverage of 1 walk on genome */
 float get_genome_coverage(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 /* Copy edge and do reversing complement */
 void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
-/* append sequence, gap and kmer count (please note that this function does not
- * check for consistence, including source and target node)
- */
+/* append edge, check for integrity */;
 void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
+/* append sequence and gap (please note that this function does not
+ * check for consistence, including source and target node)
+ */
+void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap);
+/* clean local data */
+void asm_clean_edge_seq(struct asm_edge_t *e);
+/* only set the link to the edge to -1 */
+void asm_remove_edge(struct asm_graph_t *g, gint_t e);
+/* get the real length of the edge */
+uint32_t get_edge_len(struct asm_edge_t *e);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/

@@ -22,6 +22,10 @@ $(EXEC): $(OBJ)
 %.d: %.c
 	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
+.PHONY: debug
+debug: LIBS += -fsanitize=undefined,address
+debug: $(EXEC)
+
 .PHONY: clean
 clean:
 	rm -rf $(OBJ) $(EXEC)

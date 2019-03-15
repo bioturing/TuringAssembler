@@ -91,7 +91,7 @@ float get_genome_coverage(struct asm_graph_t *g)
 	return ret_cov;
 }
 
-void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
+gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 {
 	uint32_t i, j, k, len = e->seq_len;
 	for (i = 0; i < e->n_holes; ++i)
@@ -111,7 +111,8 @@ void dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 			++j;
 		}
 	}
-	(*seq)[k++] = '\0';
+	(*seq)[k] = '\0';
+	return (gint_t)k;
 }
 
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
@@ -149,10 +150,9 @@ void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	}
 }
 
-void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
+void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap)
 {
-	dst->count += src->count;
 	/* append the bin seq */
 	uint32_t seq_len, new_m, m;
 	seq_len = dst->seq_len + src->seq_len - overlap;
@@ -180,6 +180,44 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 		dst->n_holes = n_holes;
 	}
 	dst->seq_len = seq_len;
+}
+
+void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap)
+{
+	if (dst->target != src->source)
+		__VERBOSE_INFO("WARING", "Append edge not consecutive\n");
+	asm_append_edge_seq(dst, src, overlap);
+	dst->count += src->count;
+	dst->target = src->target;
+}
+
+void asm_clean_edge_seq(struct asm_edge_t *e)
+{
+	free(e->seq);
+	free(e->l_holes);
+	free(e->p_holes);
+	e->seq = NULL;
+	e->l_holes = NULL;
+	e->p_holes = NULL;
+}
+
+void asm_remove_edge(struct asm_graph_t *g, gint_t e)
+{
+	asm_clean_edge_seq(g->edges + e);
+	gint_t u = g->edges[e].source;
+	gint_t j = find_adj_idx(g->nodes[u].adj, g->nodes[u].deg, e);
+	if (j >= 0)
+		g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
+	g->edges[e].source = g->edges[e].target = -1;
+}
+
+uint32_t get_edge_len(struct asm_edge_t *e)
+{
+	uint32_t ret = e->seq_len, i;
+	for (i = 0; i < e->n_holes; ++i)
+		ret += e->l_holes[i];
+	return ret;
 }
 
 static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_size)
@@ -268,13 +306,12 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
 			g->edges[e].seq_len < MIN_CONTIG_LEN)
 			continue;
-		dump_edge_seq(&seq, &seq_len, g->edges + e);
+		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_length_%lld_count_%llu\n", (long long)e,
-						(long long)g->edges[e].seq_len,
-					(long long unsigned)g->edges[e].count);
+			(long long)len, (long long unsigned)g->edges[e].count);
 		gint_t k = 0;
-		while (k < g->edges[e].seq_len) {
-			gint_t l = __min(80, g->edges[e].seq_len - k);
+		while (k < len) {
+			gint_t l = __min(80, len - k);
 			memcpy(buf, seq + k, l);
 			buf[l] = '\0';
 			fprintf(fp, "%s\n", buf);
@@ -547,8 +584,9 @@ void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
 		gint_t e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
-		gint_t n, k;
-		n = (g->edges[e].seq_len + g->bin_size - 1) / g->bin_size;
+		gint_t n, k, len;
+		len = get_edge_len(g->edges + e);
+		n = (len + g->bin_size - 1) / g->bin_size;
 		for (k = 0; k < n; ++k) {
 			struct barcode_hash_t *h = g->edges[e].bucks + k;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
@@ -610,7 +648,8 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 			continue;
 		}
 		gint_t n, k;
-		n = (g->edges[e].seq_len + g->bin_size - 1) / g->bin_size;
+		gint_t len = get_edge_len(g->edges + e);
+		n = (len + g->bin_size - 1) / g->bin_size;
 		g->edges[e].bucks = calloc(n, sizeof(struct barcode_hash_t));
 		for (k = 0; k < n; ++k) {
 			struct barcode_hash_t *h = g->edges[e].bucks + k;
