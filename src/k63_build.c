@@ -20,8 +20,6 @@ struct edgecount_bundle_t {
 
 #define __bin_only4(e) ((((e) >> 1) & 1) * 1 + (((e) >> 2) & 1) * 2 + (((e) >> 3) & 1) * 3)
 
-#define __bin_seq_get_char(seq, l) (((seq)[(l) >> 4] >> (((l) & 15) << 1)) & (uint32_t)0x3)
-
 static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 {
 	k63key_t tmp;
@@ -38,10 +36,10 @@ static inline uint32_t *k63_init_binseq(k63key_t key, int l)
 	return ret;
 }
 
-static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, gint_t len)
+static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t len)
 {
 	char *seq;
-	int i;
+	uint32_t i;
 	seq = malloc(len + 1);
 	for (i = 0; i < len; ++i) {
 		seq[i] = nt4_char[(bin[i >> 4] >> ((i & 15) << 1)) & (uint32_t)0x3];
@@ -78,6 +76,22 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 	k63_idhash_clean(ndict);
 	free(edict);
 	free(ndict);
+}
+
+static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
+						uint32_t *seq2, uint32_t l2)
+{
+	if (l1 != l2)
+		return 0;
+	uint32_t c1, c2, i, k;
+	for (i = 0; i < l1; ++i) {
+		k = l1 - i - 1;
+		c1 = __binseq_get(seq1, i);
+		c2 = __binseq_get(seq2, k);
+		if (c1 != (c2 ^ 3))
+			return 0;
+	}
+	return 1;
 }
 
 static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
@@ -119,7 +133,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		gint_t id_fw, id_rv;
 		int c, cur_c;
 		uint32_t *e_seq;
-		gint_t e_len;
+		uint32_t e_len;
 
 		node_knum = IDHASH_KEY(ndict, i);
 		__k63_revc_num(node_knum, node_krev, ksize, kmask);
@@ -267,7 +281,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		for (k = 0; k < nodes[v_rc].deg; ++k) {
 			e_rc = nodes[v_rc].adj[k];
 			if (edges[e_rc].target == nodes[edges[e].source].rc_id
-				&& asm_is_edge_rc(edges[e].seq, edges[e].seq_len,
+				&& is_seq_rc(edges[e].seq, edges[e].seq_len,
 					edges[e_rc].seq, edges[e_rc].seq_len)) {
 				edges[e].rc_id = e_rc;
 				edges[e_rc].rc_id = e;
@@ -306,7 +320,7 @@ static inline gint_t asm_find_edge(struct asm_edge_t *edges, gint_t *adj, int l,
 	ret = -1;
 	for (i = 0; i < deg; ++i) {
 		e_id = adj[i];
-		cur_c = __bin_seq_get_char(edges[e_id].seq, l);
+		cur_c = __binseq_get(edges[e_id].seq, l);
 		if (cur_c == c) {
 			if (ret != -1)
 				return -2;

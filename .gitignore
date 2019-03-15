@@ -7,5 +7,9 @@
 !/src/*.c
 !/src/*.h
 
+!/src/execute
+/src/execute/**
+!/src/execute/*.c
+
 !Makefile
 !README.md

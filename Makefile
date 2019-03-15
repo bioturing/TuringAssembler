@@ -1,44 +1,35 @@
-GCC = gcc
+CC = gcc
 
-AR = ar
+CPP = cpp
 
 LIBS = -pthread -flto -lm -lz
-# -fsanitize=undefined,address
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -fPIC -std=gnu99 -O2 -g
+CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function -fPIC -std=gnu99 -g
 
 EXEC = skipping
 
-SRC = 						\
-      src/assembly_graph.c 			\
-      src/barcode_retriever.c 			\
-      src/dqueue.c 				\
-      src/fastq_producer.c 			\
-      src/get_buffer.c 				\
-      src/io_utils.c 				\
-      src/k63_build.c 				\
-      src/k63_count.c 				\
-      src/k63hash.c 				\
-      src/k31_build.c 				\
-      src/k31_count.c 				\
-      src/k31hash.c 				\
-      src/pthread_barrier.c 			\
-      src/semaphore_wrapper.c 			\
-      src/time_utils.c 				\
-      src/utils.c 				\
-      src/verbose.c 				\
-      src/test_hash_count.c 			\
-      src/main.c
+SRC = $(wildcard src/*.c)
 
-$(EXEC):
-	$(CC) -o $(EXEC) $(CFLAGS) $(SRC) $(LIBS)
+OBJ = $(SRC:.c=.o)
 
-all: $(EXEC)
+DEP = $(OBJ:.o=.d)
 
-time: $(EXEC)
+$(EXEC): $(OBJ)
+	$(CC) -o $@ $^ $(LIBS)
 
-mem: CFLAGS += -DUSE_BINARY_SEARCH
-mem: $(EXEC)
+-include $(DEP)
 
+%.d: %.c
+	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
+
+.PHONY: clean
 clean:
-	rm -f $(EXEC)
+	rm -rf $(OBJ) $(EXEC)
+
+.PHONY: cleandep
+cleandep:
+	rm -f $(DEP)
+
+.PHONY: cleanall
+cleanall:
+	rm -rf $(OBJ) $(EXEC) $(DEP)
