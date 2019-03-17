@@ -101,8 +101,7 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
  */
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
-void asm_append_edge_seq2(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap);
+void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* clean local data */
 void asm_clean_edge_seq(struct asm_edge_t *e);
 /* only set the link to the edge to -1 */

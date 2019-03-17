@@ -173,14 +173,8 @@ void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	asm_append_edge_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
 
 	if (e1 <= e_rc1) {
-	}
-}
 
-void asm_append_edge_seq2(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap)
-{
-	asm_append_edge_seq(dst, src, overlap);
-	
+	}
 }
 
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
@@ -617,8 +611,8 @@ void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t e_rc = g->edges[e].rc_id;
-		if (e > e_rc)
-			continue;
+		// if (e > e_rc)
+		// 	continue;
 		gint_t n, k, len;
 		len = get_edge_len(g->edges + e);
 		n = (len + g->bin_size - 1) / g->bin_size;
@@ -678,10 +672,10 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t e_rc = g->edges[e].rc_id;
-		if (e > e_rc) {
-			g->edges[e].bucks = g->edges[e_rc].bucks;
-			continue;
-		}
+		// if (e > e_rc) {
+		// 	g->edges[e].bucks = g->edges[e_rc].bucks;
+		// 	continue;
+		// }
 		gint_t n, k;
 		gint_t len = get_edge_len(g->edges + e);
 		n = (len + g->bin_size - 1) / g->bin_size;
