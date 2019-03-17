@@ -76,6 +76,20 @@ static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 	return 1;
 }
 
+gint_t get_longest_edge(struct asm_graph_t *g)
+{
+	gint_t e, ret = -1;
+	uint32_t max_len = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		uint32_t len = get_edge_len(g->edges + e);
+		if (len > max_len) {
+			max_len = len;
+			ret = e;
+		}
+	}
+	return ret;
+}
+
 float get_genome_coverage(struct asm_graph_t *g)
 {
 	/* Using the coverage of the longest contigs */
@@ -148,6 +162,25 @@ void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 		dst->p_holes[i] = dst->seq_len - 1
 			- (dst->p_holes[dst->n_holes - i - 1] + 1);
 	}
+}
+
+void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	gint_t e_rc1, e_rc2;
+	e_rc1 = g->edges[e2].rc_id;
+	e_rc2 = g->edges[e1].rc_id;
+	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
+	asm_append_edge_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
+
+	if (e1 <= e_rc1) {
+	}
+}
+
+void asm_append_edge_seq2(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap)
+{
+	asm_append_edge_seq(dst, src, overlap);
+	
 }
 
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
@@ -418,6 +451,8 @@ void test2_asm_graph(struct asm_graph_t *g)
 
 void test_asm_graph(struct asm_graph_t *g)
 {
+	gint_t le_idx = get_longest_edge(g);
+	__VERBOSE("Longest edge index: %ld_%ld\n", le_idx, g->edges[le_idx].rc_id);
 	gint_t u, e;
 	for (u = 0; u < g->n_v; ++u) {
 		gint_t j;

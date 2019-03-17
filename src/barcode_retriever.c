@@ -34,8 +34,7 @@ static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 					khash_t(k63_dict) *dict);
 
-gint_t get_barcode_intersect(struct barcode_hash_t *t1,
-					struct barcode_hash_t *t2)
+gint_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 {
 	gint_t ret = 0;
 	gint_t i, k;
@@ -49,19 +48,76 @@ gint_t get_barcode_intersect(struct barcode_hash_t *t1,
 	return ret;
 }
 
+static inline void desc_sort(int *b, int *e)
+{
+	int *i, *j, t;
+	for (i = b + 1; i < e; ++i) {
+		if (*i > *(i - 1)) {
+			t = *i;
+			for (j = i; j > b && t < *(j - 1); --j)
+				*j = *(j - 1);
+			*j = t;
+		}
+	}
+}
+
+static inline int get_n90(int *a, int n)
+{
+	int s, sum, i;
+	s = sum = 0;
+	for (i = 0; i < n; ++i)
+		sum += a[i];
+	for (i = 0; i < n && s * 100 < sum * 90; ++i)
+		s += a[i];
+	return i;
+}
+
+int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	gint_t h, n1, n2, len1, len2, e_rc1, e_rc2;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	if (len1 < 1500 || len2 < 1500)
+		return -1;
+	n1 = (len1 + g->bin_size - 1) / g->bin_size;
+	n2 = (len2 + g->bin_size - 1) / g->bin_size;
+	h = __min(n1, 20) * __min(n2, 20);
+	/* length is too short for barcoding */
+	if (h < 10)
+		return -1;
+	e_rc1 = g->edges[e1].rc_id;
+	e_rc2 = g->edges[e2].rc_id;
+	int *s = calloc(n1 * n2, sizeof(int));
+	gint_t i, k;
+	for (i = 0; i < __min(n1, 20); ++i) {
+		gint_t p1, p2;
+		p1 = e1 <= e_rc1 ? i : n1 - i - 1;
+		for (k = 0; k < __min(n2, 20); ++k) {
+			p2 = e2 <= e_rc2 ? k : n2 - k - 1;
+			s[i * n2 + k] = count_shared_bc(g->edges[e1].bucks + p1,
+					g->edges[e2].bucks + p2);
+		}
+	}
+	desc_sort(s, s + h);
+	k = get_n90(s, h);
+	return k * 100 > h * 60 && s[k - 1] >= 3 ? 1 : 0;
+}
+
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	assert(e1 < g->n_e && e2 < g->n_e);
 	fprintf(stdout, "Print table (%ld <-> %ld)\n", e1, e2);
-	gint_t n1, n2, e_rc1, e_rc2;
+	gint_t n1, n2, e_rc1, e_rc2, len1, len2;
 	e_rc1 = g->edges[e1].rc_id;
 	e_rc2 = g->edges[e2].rc_id;
-	n1 = (g->edges[e1].seq_len + g->bin_size - 1) / g->bin_size;
-	n2 = (g->edges[e2].seq_len + g->bin_size - 1) / g->bin_size;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	n1 = (len1 + g->bin_size - 1) / g->bin_size;
+	n2 = (len2 + g->bin_size - 1) / g->bin_size;
 	gint_t i, k;
 	for (i = 0; i < n1; ++i) {
 		for (k = 0; k < n2; ++k) {
-			gint_t s = get_barcode_intersect(g->edges[e1].bucks + (e1 <= e_rc1 ? i : n1 - i - 1),
+			gint_t s = count_shared_bc(g->edges[e1].bucks + (e1 <= e_rc1 ? i : n1 - i - 1),
 					g->edges[e2].bucks + (e2 <= e_rc2 ? k : n2 - k - 1));
 			fprintf(stdout, k + 1 == n2 ? "%ld\n" : "%ld,", s);
 		}

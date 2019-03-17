@@ -59,6 +59,14 @@ void k63_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0);
 void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
+/*************************** Barcoding ultilities *****************************/
+/******************************************************************************/
+
+/* Test if 2 edges share enough barcode */
+int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2);
+/* print matrix of shared barcodes */
+void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
+
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
 
@@ -93,12 +101,16 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
  */
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
+void asm_append_edge_seq2(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap);
 /* clean local data */
 void asm_clean_edge_seq(struct asm_edge_t *e);
 /* only set the link to the edge to -1 */
 void asm_remove_edge(struct asm_graph_t *g, gint_t e);
 /* get the real length of the edge */
 uint32_t get_edge_len(struct asm_edge_t *e);
+/* get the index of the longest edge */
+gint_t get_longest_edge(struct asm_graph_t *g);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/
