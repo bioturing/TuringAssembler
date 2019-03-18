@@ -936,26 +936,47 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t k;
-	pthread_mutex_lock(h->lock);
+	// pthread_mutex_lock(h->lock);
 	k = internal_barcode_hash_put(h, key);
 	while (k == BARCODE_HASH_END(h)) {
 		barcode_hash_resize(h);
 		k = internal_barcode_hash_put(h, key);
 	}
-	pthread_mutex_unlock(h->lock);
+	// pthread_mutex_unlock(h->lock);
 	return k;
 }
 
 uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t k;
-	pthread_mutex_lock(h->lock);
+	// pthread_mutex_lock(h->lock);
 	k = internal_barcode_hash_put(h, key);
 	while (k == BARCODE_HASH_END(h)) {
 		barcode_hash_resize(h);
 		k = internal_barcode_hash_put(h, key);
 	}
 	++h->cnts[k];
-	pthread_mutex_unlock(h->lock);
+	// pthread_mutex_unlock(h->lock);
 	return k;
+}
+
+void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+{
+	uint32_t k, j;
+	for (k = 0; k < src->size; ++k) {
+		if (src->keys[k] == K31_NULL)
+			continue;
+		j = barcode_hash_put(dst, src->keys[k]);
+		dst->cnts[j] += src->cnts[k];
+	}
+}
+
+void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+{
+	dst->size = src->size;
+	dst->n_item = src->n_item;
+	dst->keys = malloc(dst->size * sizeof(uint64_t));
+	dst->cnts = malloc(dst->size * sizeof(uint32_t));
+	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
+	memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
 }

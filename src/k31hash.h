@@ -120,7 +120,6 @@ struct barcode_hash_t {
 
 	uint64_t *keys;
 	uint32_t *cnts;
-	pthread_mutex_t *lock;
 };
 
 void barcode_hash_init(struct barcode_hash_t *h, uint32_t size);
@@ -132,5 +131,9 @@ uint32_t barcode_hash_get(struct barcode_hash_t *h, uint64_t key);
 uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key);
 
 uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key);
+
+void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src);
+
+void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src);
 
 #endif

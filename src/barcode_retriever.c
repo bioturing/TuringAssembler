@@ -165,7 +165,7 @@ void init_barcode_map(struct asm_graph_t *g, int buck_len)
 		g->edges[e].bucks = calloc(n_bucks, sizeof(struct barcode_hash_t));
 		for (i = 0; i < n_bucks; ++i) {
 			barcode_hash_init(g->edges[e].bucks + i, 4);
-			g->edges[e].bucks[i].lock = &(g->edges[e].lock);
+			// g->edges[e].bucks[i].lock = &(g->edges[e].lock);
 		}
 	}
 }
@@ -358,7 +358,9 @@ static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
 					e = coor->idx;
 					pos = coor->pos;
 					bin_pos = pos / g->bin_size;
+					pthread_mutex_lock(&(g->edges[e].lock));
 					barcode_hash_inc_count(g->edges[e].bucks + bin_pos, barcode);
+					pthread_mutex_unlock(&(g->edges[e].lock));
 					coor = coor->next;
 				}
 			}
@@ -519,7 +521,9 @@ static void k63_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
 					e = coor->idx;
 					pos = coor->pos;
 					bin_pos = pos / g->bin_size;
+					pthread_mutex_lock(&(g->edges[e].lock));
 					barcode_hash_inc_count(g->edges[e].bucks + bin_pos, barcode);
+					pthread_mutex_unlock(&(g->edges[e].lock));
 					coor = coor->next;
 				}
 			}

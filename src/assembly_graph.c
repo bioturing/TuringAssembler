@@ -166,14 +166,44 @@ void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 
 void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	gint_t e_rc1, e_rc2;
-	e_rc1 = g->edges[e2].rc_id;
-	e_rc2 = g->edges[e1].rc_id;
+	gint_t slen, slen1, slen2, nbin, nbin1, nbin2;
+	/* append the bucket */
+	slen1 = get_edge_len(g->edges + e1);
+	slen2 = get_edge_len(g->edges + e2);
+	nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
+	nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
 	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
-	asm_append_edge_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
-
-	if (e1 <= e_rc1) {
-
+	slen = get_edge_len(g->edges + e1);
+	nbin = (slen + g->bin_size - 1) / g->bin_size;
+	g->edges[e1].bucks = realloc(g->edges[e1].bucks,
+					nbin * sizeof(struct barcode_hash_t));
+	gint_t i;
+	if (nbin == nbin1 + nbin2) {
+		/* just concat 2 bucks */
+		for (i = 0; i < nbin2; ++i)
+			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i,
+				g->edges[e2].bucks + i);
+		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks,
+		// 			nbin2 * sizeof(struct barcode_hash_t));
+	} else if (nbin + 1 == nbin1 + nbin2) {
+		/* merge the first bucket of e2 to last bucket of e1 */
+		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
+							g->edges[e2].bucks);
+		for (i = 1; i < nbin2; ++i)
+			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
+				g->edges[e2].bucks + i);
+		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks + 1,
+		// 		(nbin2 - 1) * sizeof(struct barcode_hash_t));
+	} else if (nbin + 2 == nbin1 + nbin2) {
+		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
+							g->edges[e2].bucks);
+		for (i = 1; i + 1 < nbin2; ++i)
+			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
+				g->edges[e2].bucks + i);
+		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks + 1,
+		// 		(nbin2 - 2) * sizeof(struct barcode_hash_t));
+	} else {
+		assert(0 && "wrong barcode list merge");
 	}
 }
 

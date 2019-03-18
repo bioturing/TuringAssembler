@@ -18,6 +18,7 @@ static inline int test_bridge(struct asm_graph_t *g, gint_t e)
 	e_rc = g->edges[e].rc_id;
 	u = g->edges[e_rc].target;
 	v = g->edges[e].target;
+	assert(u != -1 && v != -1);
 	u_rc = g->nodes[u].rc_id;
 	v_rc = g->nodes[v].rc_id;
 	if (g->nodes[u].deg != 2 || g->nodes[v].deg != 2 ||
@@ -91,41 +92,49 @@ static inline int test_bridge(struct asm_graph_t *g, gint_t e)
 		return 0;
 
 	fprintf(stderr, "joining edge %ld->%ld->%ld\n", el1, e, er1);
-	// asm_append_edge_seq(g->edges + el1, g->edges + e, g->ksize);
-	// asm_append_edge_seq(g->edges + el1, g->edges + er1, g->ksize);
-	// g->edges[el1].count += g->edges[er1].count;
-	// g->edges[el1].target = g->edges[er1].target;
-	// asm_append_edge_seq(g->edges + er_rc1, g->edges + e_rc, g->ksize);
-	// asm_append_edge_seq(g->edges + er_rc1, g->edges + el_rc1, g->ksize);
-	// g->edges[er_rc1].count += g->edges[el_rc1].count;
-	// g->edges[er_rc1].target += g->edges[el_rc1].target;
-	// g->edges[el1].rc_id = er_rc1;
-	// g->edges[er_rc1].rc_id = el1;
+	// asm_append_edge_seq2(g->edges + el1, g->edges + e, g->ksize);
+	// asm_append_edge_seq2(g->edges + el1, g->edges + er1, g->ksize);
+	asm_append_edge_seq2(g, el1, e);
+	asm_append_edge_seq2(g, el1, er1);
+	g->edges[el1].count += g->edges[er1].count;
+	g->edges[el1].target = g->edges[er1].target;
+	// asm_append_edge_seq2(g->edges + er_rc1, g->edges + e_rc, g->ksize);
+	// asm_append_edge_seq2(g->edges + er_rc1, g->edges + el_rc1, g->ksize);
+	asm_append_edge_seq2(g, er_rc1, e_rc);
+	asm_append_edge_seq2(g, er_rc1, el_rc1);
+	g->edges[er_rc1].count += g->edges[el_rc1].count;
+	g->edges[er_rc1].target = g->edges[el_rc1].target;
+	g->edges[el1].rc_id = er_rc1;
+	g->edges[er_rc1].rc_id = el1;
 
 	fprintf(stderr, "joining edge %ld->%ld->%ld\n", el2, e, er2);
-	// asm_append_edge_seq(g->edges + el2, g->edges + e, g->ksize);
-	// asm_append_edge_seq(g->edges + el2, g->edges + er2, g->ksize);
-	// g->edges[el2].count += g->edges[er2].count;
-	// g->edges[el2].target = g->edges[er2].target;
-	// asm_append_edge_seq(g->edges + er_rc2, g->edges + e_rc, g->ksize);
-	// asm_append_edge_seq(g->edges + er_rc2, g->edges + el_rc2, g->ksize);
-	// g->edges[er_rc2].count += g->edges[el_rc2].count;
-	// g->edges[er_rc2].target = g->edges[el_rc2].target;
-	// g->edges[el2].rc_id = er_rc2;
-	// g->edges[er_rc2].rc_id = el2;
+	// asm_append_edge_seq2(g->edges + el2, g->edges + e, g->ksize);
+	// asm_append_edge_seq2(g->edges + el2, g->edges + er2, g->ksize);
+	asm_append_edge_seq2(g, el2, e);
+	asm_append_edge_seq2(g, el2, er2);
+	g->edges[el2].count += g->edges[er2].count;
+	g->edges[el2].target = g->edges[er2].target;
+	// asm_append_edge_seq2(g->edges + er_rc2, g->edges + e_rc, g->ksize);
+	// asm_append_edge_seq2(g->edges + er_rc2, g->edges + el_rc2, g->ksize);
+	asm_append_edge_seq2(g, er_rc2, e_rc);
+	asm_append_edge_seq2(g, er_rc2, el_rc2);
+	g->edges[er_rc2].count += g->edges[el_rc2].count;
+	g->edges[er_rc2].target = g->edges[el_rc2].target;
+	g->edges[el2].rc_id = er_rc2;
+	g->edges[er_rc2].rc_id = el2;
 
-	// uint64_t c = g->edges[e].count * cov1 / (cov1 + cov2);
-	// g->edges[el1].count += c;
-	// g->edges[er_rc1].count += c;
-	// g->edges[el2].count += (g->edges[e].count - c);
-	// g->edges[er_rc2].count += (g->edges[e].count - c);
+	uint64_t c = g->edges[e].count * cov1 / (cov1 + cov2);
+	g->edges[el1].count += c;
+	g->edges[er_rc1].count += c;
+	g->edges[el2].count += (g->edges[e].count - c);
+	g->edges[er_rc2].count += (g->edges[e].count - c);
 
-	// asm_remove_edge(g, e);
-	// asm_remove_edge(g, e_rc);
-	// asm_remove_edge(g, er1);
-	// asm_remove_edge(g, er2);
-	// asm_remove_edge(g, el_rc1);
-	// asm_remove_edge(g, el_rc2);
+	asm_remove_edge(g, e);
+	asm_remove_edge(g, e_rc);
+	asm_remove_edge(g, er1);
+	asm_remove_edge(g, er2);
+	asm_remove_edge(g, el_rc1);
+	asm_remove_edge(g, el_rc2);
 
 	return 1;
 }
