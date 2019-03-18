@@ -227,76 +227,27 @@ int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(
 	return 1;
 }
 
-int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
-			khash_t(khInt) *comp_set, float gcov)
-{
-	uint32_t gap_size = 0;
-	khiter_t k;
-	for (k = kh_begin(comp_set); k != kh_end(comp_set); ++k) {
-		if (!kh_exist(comp_set, k))
-			continue;
-		gint_t e = kh_key(comp_set, k);
-		if (g->edges[e].source == -1)
-			continue;
-		gint_t len = get_edge_len(g->edges + e);
-		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
-		gap_size += cov * (len - g->ksize);
-		gint_t e_rc = g->edges[e].rc_id;
-		asm_remove_edge(g, e);
-		asm_remove_edge(g, e_rc);
-		fprintf(stderr, "Remove edge %ld-%ld\n", e, e_rc);
-	}
-	gint_t *tmp = alloca(10 * sizeof(gint_t));
-	int j = 0, i;
-	for (k = kh_begin(h); k != kh_end(h); ++k) {
-		if (kh_exist(h, k))
-			tmp[j++] = kh_key(h, k);
-	}
-	assert(j == 4);
-	for (j = 0; j < 4; ++j) {
-		for (i = j + 1; i < 4; ++i) {
-			int ret = test_edge_barcode(g, tmp[j], tmp[i]);
-			__VERBOSE(KRED "Test connection %ld <-> %ld: %d\n" RESET,
-				tmp[j], tmp[i], ret);
-			print_test_barcode_edge(g, tmp[j], tmp[i]);
-		}
-	}
-	// gint_t e1, e2, e_rc1, e_rc2;
-	// e2 = tmp[1];
-	// e_rc2 = g->edges[e2].rc_id;
-	// e_rc1 = tmp[0];
-	// e1 = g->edges[e_rc1].rc_id;
-	// if (g->edges[e1].source == -1 || e1 == e2 || e1 == e_rc2)
-	// 	return 0;
-	// g->edges[e1].l_holes = realloc(g->edges[e1].l_holes,
-	// 			(g->edges[e1].n_holes + 1) * sizeof(uint32_t));
-	// g->edges[e1].p_holes = realloc(g->edges[e1].p_holes,
-	// 			(g->edges[e1].n_holes + 1) * sizeof(uint32_t));
-	// g->edges[e1].l_holes[g->edges[e1].n_holes] = gap_size;
-	// g->edges[e1].p_holes[g->edges[e1].n_holes] = g->edges[e1].seq_len;
-	// ++g->edges[e1].n_holes;
-	// asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
-	// g->edges[e1].count += g->edges[e2].count;
-	// g->edges[e1].target = g->edges[e2].target;
+#define glue_seq_process(g, e1, e2) \
+	g->edges[e1].l_holes = realloc(g->edges[e1].l_holes,	/* one more for gap */ \
+				(g->edges[e1].n_holes + 1) * sizeof(uint32_t)); \
+	g->edges[e1].p_holes = realloc(g->edges[e1].p_holes,	/* one more for gap */ \
+				(g->edges[e1].n_holes + 1) * sizeof(uint32_t)); \
+	g->edges[e1].l_holes[g->edges[e1].n_holes] = gap_size; \
+	g->edges[e1].p_holes[g->edges[e1].n_holes] = g->edges[e1].seq_len; \
+	++g->edges[e1].n_holes; \
+\
+	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize); \
+	g->edges[e1].count += g->edges[e2].count; \
+	g->edges[e1].target = g->edges[e2].target;
 
-	// g->edges[e_rc2].l_holes = realloc(g->edges[e_rc2].l_holes,
-	// 		(g->edges[e_rc2].n_holes + 1) * sizeof(uint32_t));
-	// g->edges[e_rc2].p_holes = realloc(g->edges[e_rc2].p_holes,
-	// 		(g->edges[e_rc2].n_holes + 1) * sizeof(uint32_t));
-	// g->edges[e_rc2].l_holes[g->edges[e_rc2].n_holes] = gap_size;
-	// g->edges[e_rc2].p_holes[g->edges[e_rc2].n_holes] = g->edges[e_rc2].seq_len;
-	// ++g->edges[e_rc2].n_holes;
-	// asm_append_edge_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
-	// g->edges[e_rc2].count += g->edges[e_rc1].count;
-	// g->edges[e_rc2].target = g->edges[e_rc1].target;
-
-	// g->edges[e1].rc_id = e_rc2;
-	// g->edges[e_rc2].rc_id = e1;
-	// asm_remove_edge(g, e_rc1);
-	// asm_remove_edge(g, e2);
-	// fprintf(stderr, "Merge edges %ld - %ld\n", e1, e2);
-	return 1;
-}
+#define glue_2seq_procedure(g, e1, e2, e_rc1, e_rc2) \
+	glue_seq_process(g, e1, e2); \
+	glue_seq_process(g, e_rc2, e_rc1); \
+	\
+	g->edges[e1].rc_id = e_rc2; \
+	g->edges[e_rc2].rc_id = e1; \
+	asm_remove_edge(g, e_rc1); \
+	asm_remove_edge(g, e2);
 
 int resolve_jungle(struct asm_graph_t *g, khash_t(khInt) *h,
 			khash_t(khInt) *comp_set, float gcov)
@@ -313,6 +264,7 @@ int resolve_jungle(struct asm_graph_t *g, khash_t(khInt) *h,
 		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
 		gap_size += cov * (len - g->ksize);
 		gint_t e_rc = g->edges[e].rc_id;
+		/* Remove edges , e.i isolate the nodes */
 		asm_remove_edge(g, e);
 		asm_remove_edge(g, e_rc);
 		fprintf(stderr, "Remove edge %ld-%ld\n", e, e_rc);
@@ -329,35 +281,86 @@ int resolve_jungle(struct asm_graph_t *g, khash_t(khInt) *h,
 	e_rc2 = g->edges[e2].rc_id;
 	e_rc1 = tmp[0];
 	e1 = g->edges[e_rc1].rc_id;
+
 	if (g->edges[e1].source == -1 || e1 == e2 || e1 == e_rc2)
 		return 0;
-	g->edges[e1].l_holes = realloc(g->edges[e1].l_holes,
-				(g->edges[e1].n_holes + 1) * sizeof(uint32_t));
-	g->edges[e1].p_holes = realloc(g->edges[e1].p_holes,
-				(g->edges[e1].n_holes + 1) * sizeof(uint32_t));
-	g->edges[e1].l_holes[g->edges[e1].n_holes] = gap_size;
-	g->edges[e1].p_holes[g->edges[e1].n_holes] = g->edges[e1].seq_len;
-	++g->edges[e1].n_holes;
-	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
-	g->edges[e1].count += g->edges[e2].count;
-	g->edges[e1].target = g->edges[e2].target;
-
-	g->edges[e_rc2].l_holes = realloc(g->edges[e_rc2].l_holes,
-			(g->edges[e_rc2].n_holes + 1) * sizeof(uint32_t));
-	g->edges[e_rc2].p_holes = realloc(g->edges[e_rc2].p_holes,
-			(g->edges[e_rc2].n_holes + 1) * sizeof(uint32_t));
-	g->edges[e_rc2].l_holes[g->edges[e_rc2].n_holes] = gap_size;
-	g->edges[e_rc2].p_holes[g->edges[e_rc2].n_holes] = g->edges[e_rc2].seq_len;
-	++g->edges[e_rc2].n_holes;
-	asm_append_edge_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
-	g->edges[e_rc2].count += g->edges[e_rc1].count;
-	g->edges[e_rc2].target = g->edges[e_rc1].target;
-
-	g->edges[e1].rc_id = e_rc2;
-	g->edges[e_rc2].rc_id = e1;
-	asm_remove_edge(g, e_rc1);
-	asm_remove_edge(g, e2);
+	
+	glue_2seq_procedure(g, e1, e2, e_rc1, e_rc2);
+	
 	fprintf(stderr, "Merge edges %ld - %ld\n", e1, e2);
+	return 1;
+}
+
+int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
+			khash_t(khInt) *comp_set, float gcov)
+{
+	uint32_t gap_size = 0;
+	khiter_t k;
+
+	/* Get the big legs */
+	gint_t *tmp = alloca(10 * sizeof(gint_t));
+	int j = 0, i;
+	for (k = kh_begin(h); k != kh_end(h); ++k) {
+		if (kh_exist(h, k))
+			tmp[j++] = kh_key(h, k);
+	}
+	assert(j == 4); // Must be 4 legs
+	/* Testing for the significant of barcode */
+	int cnt = 0;
+	int x, y;
+	for (j = 0; j < 4; ++j) {
+		for (i = j + 1; i < 4; ++i) {
+			int ret = test_edge_barcode(g, tmp[j], tmp[i]);
+			__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET,
+				tmp[j], tmp[i], ret == 1?KGRN:KRED, ret);
+			//print_test_barcode_edge(g, tmp[j], tmp[i]);
+			if (ret == 1) {
+				x = i;
+				y = j;
+				++cnt;
+			}
+		}
+	}
+
+	/* Must be two ins and two outs */
+	if (cnt != 2)
+		return 0;
+
+	/* Clean the complex */
+	for (k = kh_begin(comp_set); k != kh_end(comp_set); ++k) {
+		if (!kh_exist(comp_set, k))
+			continue;
+		gint_t e = kh_key(comp_set, k);
+		if (g->edges[e].source == -1)
+			continue;
+		gint_t len = get_edge_len(g->edges + e);
+		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
+		gap_size += cov * (len - g->ksize);
+		gint_t e_rc = g->edges[e].rc_id;
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
+		fprintf(stderr, "Remove edge %ld-%ld\n", e, e_rc);
+	}
+
+		
+	/* Glue process */
+	gint_t e1, e2, e_rc1, e_rc2;
+	int n_iter = 0;
+
+	do {
+		e2 = tmp[x];
+		e_rc2 = g->edges[e2].rc_id;
+		e_rc1 = tmp[y];
+		e1 = g->edges[e_rc1].rc_id;
+		
+		if (g->edges[e1].source == -1 || e1 == e2 || e1 == e_rc2)
+			return 0;
+		
+		glue_2seq_procedure(g, e1, e2, e_rc1, e_rc2);
+		x = 3 - x;
+		y = 3 - y;
+		++n_iter;
+	} while (n_iter < 2);
 	return 1;
 }
 
@@ -390,8 +393,10 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 				__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
 				__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
 				__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
-				if (is_large_loop(g0, lg, comp_set))
+				if (is_large_loop(g0, lg, comp_set)){
 					__VERBOSE(KRED "Is a self loop complex\n" RESET);
+					continue;
+				}
 				/* resolve 1-1 complex */
 				if (kh_size(lg) == 2)
 					cnt += resolve_jungle(g0, lg, comp_set, gcov);
