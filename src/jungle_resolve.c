@@ -29,6 +29,9 @@
 #define MIN_COMPLEX_REGION 10000
 #define MIN_ITER_RESOLVE 100
 #define MAX_NUMBER_LEGS 9
+#define UNIT_GENOME_COV_LOW 0.51
+#define UNIT_GENOME_COV_HIGH 1.51
+
 
 KHASH_SET_INIT_INT(khInt)
 
@@ -364,6 +367,55 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 	return 1;
 }
 
+static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
+{
+	gint_t i, ret;
+	ret = -1;
+	for (i = 0; i < deg; ++i) {
+		if (adj[i] == id)
+			ret = i;
+	}
+	return ret;
+}
+static void resolve_baby_flow(struct asm_graph_t *g, gint_t e, float gcov) 
+{
+	gint_t src = g->edges[e].source;
+	gint_t ei_rc = g->nodes[g->nodes[src].rc_id].adj[0];
+	int cov_i = (int)(__get_edge_cov(g->edges + ei_rc, g->ksize) / gcov + 0.499999);
+	int j, i = find_adj_idx(g->nodes[src].adj, g->nodes[src].deg, e);
+	assert(i >= 0);
+	for (j = 0; j < g->nodes[src].deg; ++j){
+		int cov_o = (int)(__get_edge_cov(g->edges + g->nodes[src].adj[j], g->ksize) / gcov + 0.499999);
+		if (cov_o == 1 && cov_i == 1){
+			__VERBOSE(KCYN "Remove the baby %d\n " RESET, e);
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, g->edges[e].rc_id);
+			break;
+		}
+	}
+}
+
+int jungle_resolve_flow(struct asm_graph_t *g, khash_t(khInt) *h,
+			khash_t(khInt) *comp_set, float gcov)
+{
+	khiter_t k;
+	/* Find the baby */
+	for (k = kh_begin(comp_set); k != kh_end(comp_set); ++k) {
+		if (!kh_exist(comp_set, k))
+			continue;
+		gint_t e = kh_key(comp_set, k);
+		if (g->edges[e].source == -1) //FIXME: I think we don't need this in this case
+			continue;
+		gint_t len = get_edge_len(g->edges + e);
+		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
+		if (!cov){
+			__VERBOSE(KCYN "Found the baby %d\n " RESET, e);
+			resolve_baby_flow(g, e, gcov);
+		}
+	}
+
+}
+
 void detect_simple_tandem(struct asm_graph_t *g0)
 {
 	float gcov = get_genome_coverage(g0);
@@ -395,6 +447,7 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 				__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
 				if (is_large_loop(g0, lg, comp_set)){
 					__VERBOSE(KRED "Is a self loop complex\n" RESET);
+					jungle_resolve_flow(g0, lg, comp_set, gcov);
 					continue;
 				}
 				/* resolve 1-1 complex */
