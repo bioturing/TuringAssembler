@@ -202,6 +202,8 @@ void graph_query_process(struct opt_build_t *opt)
 		int ret = fscanf(fp, "%ld%ld", &u, &v);
 		if (ret == EOF || ret == 0)
 			break;
+		int qret = test_edge_barcode(g0, u, v);
+		fprintf(stdout, "ret = %d\n", qret);
 		print_test_barcode_edge(g0, u, v);
 	}
 	fclose(fp);

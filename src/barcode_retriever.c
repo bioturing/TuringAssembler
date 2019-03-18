@@ -51,7 +51,7 @@ gint_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 			continue;
 		k = barcode_hash_get(t2, t1->keys[i]);
 		if (k != BARCODE_HASH_END(t2))
-			++ret;
+			ret += __min(t1->cnts[i], t2->cnts[k]) > 3;
 	}
 	return ret;
 }
@@ -62,7 +62,7 @@ static inline void desc_sort(int *b, int *e)
 	for (i = b + 1; i < e; ++i) {
 		if (*i > *(i - 1)) {
 			t = *i;
-			for (j = i; j > b && t < *(j - 1); --j)
+			for (j = i; j > b && t > *(j - 1); --j)
 				*j = *(j - 1);
 			*j = t;
 		}
@@ -91,19 +91,22 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	n2 = (len2 + g->bin_size - 1) / g->bin_size;
 	h = __min(n1, 20) * __min(n2, 20);
 	/* length is too short for barcoding */
-	if (h < 10)
+	if (h < 5)
 		return -1;
 	int *s = calloc(n1 * n2, sizeof(int));
 	gint_t i, k;
 	for (i = 0; i < __min(n1, 20); ++i) {
 		for (k = 0; k < __min(n2, 20); ++k) {
-			s[i * n2 + k] = count_shared_bc(g->edges[e1].bucks + i,
+			s[i * __min(n2, 20) + k] = count_shared_bc(g->edges[e1].bucks + i,
 					g->edges[e2].bucks + k);
 		}
 	}
 	desc_sort(s, s + h);
+	// for (i = 0; i < h; ++i)
+	// 	fprintf(stdout, "%ld\n", s[i]);
 	k = get_n90(s, h);
-	return k * 100 > h * 60 && s[k - 1] >= 3 ? 1 : 0;
+	// fprintf(stdout, "h = %ld; k = %ld; s[k  -1] = %d\n", h, k, s[k - 1]);
+	return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
 }
 
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
@@ -167,6 +170,25 @@ void init_barcode_map(struct asm_graph_t *g, int buck_len)
 	}
 }
 
+void test_bucket(khash_t(k31_dict) *dict)
+{
+	khiter_t it;
+	uint32_t sum = 0;
+	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
+		if (!kh_exist(dict, it))
+			continue;
+		struct edge_coor_t *p;
+		p = kh_value(dict, it);
+		while (p != NULL) {
+			++sum;
+			p = p->next;
+		}
+	}
+	fprintf(stderr, "Number of kmer: %u\n", kh_size(dict));
+	fprintf(stderr, "Number of position: %u\n", sum);
+	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
+}
+
 void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 						khash_t(k31_dict) *dict)
 {
@@ -181,18 +203,20 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 			continue;
 		uint32_t p = 0;
 		gint_t slen = get_edge_len(g->edges + e);
-		for (i = k = last = 0; i < g->edges[e].seq_len; ++i, ++k) {
+		for (i = k = last = 0; i + 1 < g->edges[e].seq_len; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			knum = ((knum << 2) & kmask) | c;
 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
 			++last;
-			if (last >= g->ksize) {
+			if (last >= g->ksize && i >= g->ksize) {
 				khiter_t it;
 				int ret;
 				if (knum <= krev)
 					it = kh_put(k31_dict, dict, knum, &ret);
 				else
 					it = kh_put(k31_dict, dict, krev, &ret);
+				if (ret == 1)
+					kh_value(dict, it) = NULL;
 				struct edge_coor_t *coor = calloc(1, sizeof(struct edge_coor_t));
 				coor->idx = e;
 				coor->pos = k;
@@ -216,6 +240,7 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 			}
 		}
 	}
+	test_bucket(dict);
 }
 
 void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
@@ -247,6 +272,8 @@ void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 					it = kh_put(k63_dict, dict, knum, &ret);
 				else
 					it = kh_put(k63_dict, dict, krev, &ret);
+				if (ret == 1)
+					kh_value(dict, it) = NULL;
 				struct edge_coor_t *coor = calloc(1, sizeof(struct edge_coor_t));
 				coor->idx = e;
 				coor->pos = k;
@@ -491,7 +518,7 @@ static void k63_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
 				while (coor) {
 					e = coor->idx;
 					pos = coor->pos;
-					bin_pos = (pos + g->bin_size - 1) / g->bin_size;
+					bin_pos = pos / g->bin_size;
 					barcode_hash_inc_count(g->edges[e].bucks + bin_pos, barcode);
 					coor = coor->next;
 				}
