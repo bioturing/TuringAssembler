@@ -178,20 +178,23 @@ void build4_5_process(struct opt_build_t *opt)
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Testing jungle\n");
 	detect_simple_tandem(g0);
-	struct asm_graph_t *g1;
+	struct asm_graph_t *g1, *g2;
 	g1 = calloc(1, sizeof(struct asm_graph_t));
+	g2 = calloc(1, sizeof(struct asm_graph_t));
 	asm_condense(g0, g1);
+	resolve_loop_bugle(g1, &g1);
+	asm_condense(g1, g2);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
-							(long long)g1->n_v);
+							(long long)g2->n_v);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
-							(long long)g1->n_e);
-	test_asm_graph(g1);
+							(long long)g2->n_e);
+	test_asm_graph(g2);
 	snprintf(path, 1024, "%s/graph_k_%d_level_5.gfa", opt->out_dir, g0->ksize);
-	write_gfa(g1, path);
+	write_gfa(g2, path);
 	snprintf(path, 1024, "%s/graph_k_%d_level_5.fasta", opt->out_dir, g0->ksize);
-	write_fasta(g1, path);
+	write_fasta(g2, path);
 	snprintf(path, 1024, "%s/graph_k_%d_level_5.bin", opt->out_dir, g0->ksize);
-	save_asm_graph_simple(g1, path);
+	save_asm_graph_simple(g2, path);
 }
 
 void build_barcode_process(struct opt_build_t *opt)
