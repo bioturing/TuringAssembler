@@ -377,6 +377,7 @@ static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 	}
 	return ret;
 }
+
 static void resolve_baby_flow(struct asm_graph_t *g, gint_t e, float gcov) 
 {
 	gint_t src = g->edges[e].source;
@@ -440,11 +441,11 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
 			continue;
 		if (simple_tandem(g0, i, &comp_sz, lg, comp_set)){
-			if (kh_size(lg) <= MAX_NUMBER_LEGS){
 				__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
 				__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
 				__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
 				__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
+			if (kh_size(lg) <= MAX_NUMBER_LEGS){
 				if (is_large_loop(g0, lg, comp_set)){
 					__VERBOSE(KRED "Is a self loop complex\n" RESET);
 					jungle_resolve_flow(g0, lg, comp_set, gcov);
@@ -464,5 +465,3 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	}
 	__VERBOSE("Number of resolved jungle: %d\n", cnt);
 }
-
-
