@@ -209,6 +209,7 @@ void build5_6_process(struct opt_build_t *opt)
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Testing jungle\n");
+	detect_simple_tandem(g0);
 	//__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
 	//						(long long)g2->n_v);
 	//__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,

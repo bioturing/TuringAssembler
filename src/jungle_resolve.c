@@ -144,7 +144,8 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 
 void tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
 			  gint_t u, khash_t(khInt) *set_v, uint32_t *comp_sz,
-			  aqueue_t *q, khash_t(khInt) *lg, int is_first)
+			  aqueue_t *q, khash_t(khInt) *lg,
+			  int is_first)
 {
 	gint_t next_e;
 	int i, missing;
@@ -181,8 +182,9 @@ void tandem_helper(struct asm_edge_t *e, struct asm_node_t *v,
 }
 
 int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(khInt) *lg,
-		khash_t(khInt) *set_v) // for keeping visited nodes
+		khash_t(khInt) *set_v, gint_t *is_visited) // for keeping visited nodes
 {
+	assert(kh_size(set_v) == 0);
 	struct asm_edge_t *e = g->edges;
 	struct asm_node_t *v = g->nodes;
 	int j, i, n_items, cnt = 0;
@@ -193,6 +195,8 @@ int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(
 	khiter_t k;
 	*comp_sz = 0;
 
+	if (e_i == 169629)
+		i = 1;
 	if (e[e_i].seq_len < MIN_BRIDGE_LEG)
 		return 0;
 
@@ -200,12 +204,15 @@ int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(
 	if (e[e_i].seq_len > MIN_BRIDGE_LEG){
 		k = kh_put(khInt, lg, e[e_i].rc_id, &missing);
 	}
+
 	while (1){
 		n_items = q->n;
 		if (n_items == 0)
 			break;
 		for (j = 0; j < n_items; j++) {
 			u = aqueue_pop(q); //u is an edge
+			if (u != e_i && is_visited[u] == 1)
+				return 0;
 			tandem_helper(e, v, u, set_v, &_comp_sz, q, lg, (u == e_i));
 		}
 		if (++cnt > MIN_LAYER) //very complex region, never end
@@ -414,7 +421,20 @@ int jungle_resolve_flow(struct asm_graph_t *g, khash_t(khInt) *h,
 			resolve_baby_flow(g, e, gcov);
 		}
 	}
+}
 
+static void set_visited_edge(struct asm_graph_t *g, gint_t *is_visited, khash_t(khInt) *h)
+{
+	khiter_t k;
+	gint_t key;
+	for (k = kh_begin(h); k != kh_end(h); ++k){
+		if (kh_exist(h, k)){
+			key = kh_key(h, k);
+			assert(key < g->n_e);
+			is_visited[key] = 1;
+			is_visited[g->edges[key].rc_id] = 1;
+		}
+	}
 }
 
 void detect_simple_tandem(struct asm_graph_t *g0)
@@ -432,6 +452,8 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	gint_t cc_id;
 	uint32_t comp_sz;
 	id_edge = malloc(g0->n_e * sizeof(gint_t));
+	gint_t *is_visited = calloc(g0->n_e, sizeof(gint_t));
+	memset(is_visited, 0, g0->n_e * sizeof(gint_t));
 	asm_edge_cc(g0, id_edge, &cc_size);
 
 	int cnt = 0;
@@ -440,28 +462,30 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 		if (cc_size[cc_id] < MIN_COMPONENT || 
 			kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
 			continue;
-		if (simple_tandem(g0, i, &comp_sz, lg, comp_set)){
-				__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
-				__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
-				__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
-				__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
-			if (kh_size(lg) <= MAX_NUMBER_LEGS){
-				if (is_large_loop(g0, lg, comp_set)){
-					__VERBOSE(KRED "Is a self loop complex\n" RESET);
-					jungle_resolve_flow(g0, lg, comp_set, gcov);
-					continue;
-				}
-				/* resolve 1-1 complex */
-				if (kh_size(lg) == 2)
-					cnt += resolve_jungle(g0, lg, comp_set, gcov);
-				else if (kh_size(lg) == 4) {
-					cnt += resolve_jungle4(g0, lg, comp_set, gcov);
-				}
-			}
+
+		if (simple_tandem(g0, i, &comp_sz, lg, comp_set, is_visited)){
+			set_visited_edge(g0, is_visited, comp_set);
+			__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
+			__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
+			__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
+			__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
+			//if (kh_size(lg) <= MAX_NUMBER_LEGS){
+			//	if (is_large_loop(g0, lg, comp_set)){
+			//		__VERBOSE(KRED "Is a self loop complex\n" RESET);
+			//		jungle_resolve_flow(g0, lg, comp_set, gcov);
+			//		continue;
+			//	}
+			//	/* resolve 1-1 complex */
+			//	if (kh_size(lg) == 2)
+			//		cnt += resolve_jungle(g0, lg, comp_set, gcov);
+			//	else if (kh_size(lg) == 4) {
+			//		cnt += resolve_jungle4(g0, lg, comp_set, gcov);
+			//	}
+			//}
 			kh_put(khInt, set_v, i, &ret);
-			kh_clear(khInt, lg);
-			kh_clear(khInt, comp_set);
 		}
+		kh_clear(khInt, lg);
+		kh_clear(khInt, comp_set);
 	}
 	__VERBOSE("Number of resolved jungle: %d\n", cnt);
 }
