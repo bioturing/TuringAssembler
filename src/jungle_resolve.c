@@ -436,6 +436,7 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 	int missing;
 	gint_t best_e;
 	uint32_t max = 0;
+	uint32_t score;
 
 	for (k = kh_begin(comp_set); k != kh_end(comp_set); ++k) {
 		if (!kh_exist(comp_set, k))
@@ -448,15 +449,14 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 		if (key == e_i || key == g->edges[e_i].rc_id)
 			continue;
 
-		ret[0] = test_edge_barcode2(g, e_i, key, bx_bin);
-		set_max(best_e, max, key, ret[0]);
+		ret[0] = test_edge_barcode2(g, e_i, key, bx_bin, &score);
+		set_max(best_e, max, key, score);
 		//if (ret[0] >= 0)
 		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
 		//	e_i, key, ret[0] == 1?KGRN:KRED, ret[0]);
 		//if (key == 474232| key == 474233)
 		//	print_test_barcode_edge(g, e_i, key);
-		ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin);
-		set_max(best_e, max, key, ret[1]);
+		ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin, &score);
 		//if (ret[1] >= 0)
 		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
 		//	e_i, g->edges[key].rc_id , ret[1] == 1?KGRN:KRED, ret[1]);
@@ -464,6 +464,9 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 		//	print_test_barcode_edge(g, e_i, g->edges[key].rc_id);
 		kh_put(khInt, set, key, &missing);
 		kh_put(khInt, set, g->edges[key].rc_id, &missing);
+	}
+	if (e_i == 682233){
+		int a = 1;
 	}
 	if (max >= 7){
 		return best_e;
