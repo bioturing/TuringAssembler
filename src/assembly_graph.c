@@ -249,6 +249,14 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 	dst->target = src->target;
 }
 
+void asm_append_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
+{
+	if (g->edges[dst].target != g->edges[src].source)
+		__VERBOSE_INFO("WARING", "Append edge not consecutive\n");
+	asm_append_edge_seq2(g, dst, src);
+	g->edges[dst].count += g->edges[src].count;
+	g->edges[dst].target = g->edges[src].target;
+}
 void asm_clean_edge_seq(struct asm_edge_t *e)
 {
 	free(e->seq);

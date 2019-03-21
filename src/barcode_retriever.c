@@ -80,6 +80,14 @@ static inline int get_n90(int *a, int n)
 	return i;
 }
 
+void barcode_bin_profiling(struct asm_graph_t *g, gint_t *bx_bin)
+{
+	for (int i = 0; i < g->n_e; ++i){
+		gint_t len1 = get_edge_len(g->edges + i);
+		bx_bin[i] = (len1 + g->bin_size - 1) / g->bin_size;
+	}
+}
+
 int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	gint_t h, n1, n2, len1, len2;
@@ -106,7 +114,47 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	// 	fprintf(stdout, "%ld\n", s[i]);
 	k = get_n90(s, h);
 	// fprintf(stdout, "h = %ld; k = %ld; s[k  -1] = %d\n", h, k, s[k - 1]);
-	return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
+	//return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
+	if (s[k - 1] >= 5){
+		__VERBOSE("N90 Pos: %d\n" , k);
+		__VERBOSE("Value at N90: %d\n" , s[k - 1]);
+	}
+	return s[k - 1] >= 5 ? 1 : 0;
+}
+
+int test_edge_barcode2(struct asm_graph_t *g, gint_t e1, gint_t e2, 
+			gint_t *bx_bin)
+{
+	gint_t h, len1, len2, n1, n2;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	n1 = bx_bin[e1];
+	n2 = bx_bin[e2];
+	if (len1 < 1500 || len2 < 1500)
+		return -1;
+	h = __min(n1, 20) * __min(n2, 20);
+	/* length is too short for barcoding */
+	if (h < 5)
+		return -1;
+	int *s = calloc(n1 * n2, sizeof(int));
+	gint_t i, k;
+	for (i = 0; i < __min(n1, 20); ++i) {
+		for (k = 0; k < __min(n2, 20); ++k) {
+			s[i * __min(n2, 20) + k] = count_shared_bc(g->edges[e1].bucks + i,
+					g->edges[e2].bucks + k);
+		}
+	}
+	desc_sort(s, s + h);
+	// for (i = 0; i < h; ++i)
+	// 	fprintf(stdout, "%ld\n", s[i]);
+	k = get_n90(s, h);
+	// fprintf(stdout, "h = %ld; k = %ld; s[k  -1] = %d\n", h, k, s[k - 1]);
+	//return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
+	if (s[k - 1] >= 5){
+		__VERBOSE("N90 Pos: %d\n" , k);
+		__VERBOSE("Value at N90: %d\n" , s[k - 1]);
+	}
+	return s[k - 1] >= 5 ? 1 : 0;
 }
 
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
@@ -128,6 +176,25 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	}
 }
 
+void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2, 
+				gint_t *bx_bin)
+{
+	assert(e1 < g->n_e && e2 < g->n_e);
+	fprintf(stdout, "Print table (%ld <-> %ld)\n", e1, e2);
+	gint_t n1, n2, len1, len2;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	n1 = bx_bin[e1];
+	n2 = bx_bin[e2];
+	gint_t i, k;
+	for (i = 0; i < n1; ++i) {
+		for (k = 0; k < n2; ++k) {
+			gint_t s = count_shared_bc(g->edges[e1].bucks + i,
+					g->edges[e2].bucks + k);
+			fprintf(stdout, k + 1 == n2 ? "%ld\n" : "%ld,", s);
+		}
+	}
+}
 void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt)
 {
 	init_barcode_map(g, opt->split_len);

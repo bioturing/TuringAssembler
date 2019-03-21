@@ -202,25 +202,32 @@ void build5_6_process(struct opt_build_t *opt)
 	char path[1024];
 	init_clock();
 
-	struct asm_graph_t *g0;
+	struct asm_graph_t *g0, *g1;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
+	g1 = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g0, opt->in_path);
 	test_asm_graph(g0);
+	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g0->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
+							(long long)g0->n_e);
+
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Testing jungle\n");
 	detect_simple_tandem(g0);
-	//__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
-	//						(long long)g2->n_v);
-	//__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
-	//						(long long)g2->n_e);
-	//test_asm_graph(g2);
-	//snprintf(path, 1024, "%s/graph_k_%d_level_5.gfa", opt->out_dir, g0->ksize);
-	//write_gfa(g2, path);
-	//snprintf(path, 1024, "%s/graph_k_%d_level_5.fasta", opt->out_dir, g0->ksize);
-	//write_fasta(g2, path);
-	//snprintf(path, 1024, "%s/graph_k_%d_level_5.bin", opt->out_dir, g0->ksize);
-	//save_asm_graph_simple(g2, path);
+	asm_condense(g0, g1);
+	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
+							(long long)g1->n_v);
+	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
+							(long long)g1->n_e);
+	test_asm_graph(g1);
+	snprintf(path, 1024, "%s/graph_k_%d_level_5.gfa", opt->out_dir, g0->ksize);
+	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_5.fasta", opt->out_dir, g0->ksize);
+	write_fasta(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_5.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_simple(g1, path);
 }
 
 void clean_process(struct opt_build_t *opt)
