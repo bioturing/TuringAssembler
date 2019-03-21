@@ -450,13 +450,15 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 			continue;
 
 		ret[0] = test_edge_barcode2(g, e_i, key, bx_bin, &score);
-		set_max(best_e, max, key, score);
+		if (ret[0])
+			set_max(best_e, max, key, score);
 		//if (ret[0] >= 0)
 		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
 		//	e_i, key, ret[0] == 1?KGRN:KRED, ret[0]);
 		//if (key == 474232| key == 474233)
 		//	print_test_barcode_edge(g, e_i, key);
-		ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin, &score);
+		if (ret[1])
+			ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin, &score);
 		//if (ret[1] >= 0)
 		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
 		//	e_i, g->edges[key].rc_id , ret[1] == 1?KGRN:KRED, ret[1]);
@@ -465,10 +467,8 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 		kh_put(khInt, set, key, &missing);
 		kh_put(khInt, set, g->edges[key].rc_id, &missing);
 	}
-	if (e_i == 682233){
-		int a = 1;
-	}
 	if (max >= 7){
+		__VERBOSE(KGRN "Best edge %d\n" RESET, best_e);
 		return best_e;
 	} else{
 		return -1;
@@ -479,10 +479,12 @@ static void asm_append_pair(struct asm_graph_t *g0, gint_t e2, gint_t e3)
 {
 	asm_append_edge2(g0, e2, e3);
 	asm_append_edge2(g0, g0->edges[e3].rc_id, g0->edges[e2].rc_id);
-	g0->edges[e2].rc_id = g0->edges[e3].rc_id;
-	g0->edges[g0->edges[e3].rc_id].rc_id = e2;
 	asm_remove_edge(g0, e3);
 	asm_remove_edge(g0, g0->edges[e2].rc_id);
+	g0->edges[e2].rc_id = g0->edges[e3].rc_id;
+	g0->edges[g0->edges[e3].rc_id].rc_id = e2;
+	assert(g0->edges[e2].seq != NULL);
+	assert(g0->edges[g0->edges[e3].rc_id].seq != NULL);
 }
 
 static void asm_append_triple(struct asm_graph_t *g0, gint_t e1, gint_t e2, gint_t e3)
@@ -525,12 +527,17 @@ static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint
 		if (kh_exist(lg, k)){
 			key = kh_key(lg, k);
 			ret = share_barcode_profile(g0, key, lg, bx_bin);
-			if (ret != -1)
+			if (ret != -1){
 				asm_append_pair(g0, key, ret);
+				__VERBOSE("Concat two edges %d - %d\n", key, ret);
+			}
 			__VERBOSE(KRED "REVERSE COMPLEMENT\n" RESET);
 			ret = share_barcode_profile(g0, g0->edges[key].rc_id, lg, bx_bin);
-			if (ret != -1)
+			if (ret != -1){
 				asm_append_pair(g0, ret, g0->edges[key].rc_id);
+				__VERBOSE("Concat two edges %d - %d\n", ret, 
+						g0->edges[key].rc_id);
+			}
 		}
 	}
 }
