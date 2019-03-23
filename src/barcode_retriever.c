@@ -20,6 +20,7 @@ struct edge_coor_t {
 };
 
 #define __not_null(x) ((x).idx != -1)
+#define MIN_HEAD_LEN 5
 
 KHASH_INIT(k63_dict, k63key_t, struct edge_coor_t *, 1, __hash_k63, __k63_equal)
 
@@ -132,31 +133,26 @@ int test_edge_barcode2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	n2 = bx_bin[e2];
 	if (len1 < 1500 || len2 < 1500)
 		return -1;
-	h = __min(n1, 20) * __min(n2, 20);
+	h = __min(n1, MIN_HEAD_LEN) * __min(n2, MIN_HEAD_LEN);
 	/* length is too short for barcoding */
 	if (h < 5)
 		return -1;
 	int *s = calloc(n1 * n2, sizeof(int));
+	uint32_t sum = 0;
 	gint_t i, k;
-	for (i = 0; i < __min(n1, 20); ++i) {
-		for (k = 0; k < __min(n2, 20); ++k) {
-			s[i * __min(n2, 20) + k] = count_shared_bc(g->edges[e1].bucks + i,
+	for (i = 0; i < __min(n1, MIN_HEAD_LEN); ++i) {
+		for (k = 0; k < __min(n2, MIN_HEAD_LEN); ++k) {
+			s[i * __min(n2, MIN_HEAD_LEN) + k] = count_shared_bc(g->edges[e1].bucks + i,
 					g->edges[e2].bucks + k);
+			sum += s[i * __min(n2, MIN_HEAD_LEN) + k];
 		}
 	}
 	desc_sort(s, s + h);
-	// for (i = 0; i < h; ++i)
-	// 	fprintf(stdout, "%ld\n", s[i]);
 	k = get_n90(s, h);
-	// fprintf(stdout, "h = %ld; k = %ld; s[k  -1] = %d\n", h, k, s[k - 1]);
-	//return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
-	if (s[k - 1] >= 5){
-		__VERBOSE("%d - %d\n", e1, e2);
-		__VERBOSE("N90 Pos: %d\n" , k);
-		__VERBOSE("Value at N90: %d\n" , s[k - 1]);
-		*score = s[k - 1];
+	if (s[k - 1] >= 7){
+		*score = sum;
 	}
-	return s[k - 1] >= 5 ? 1 : 0;
+	return s[k - 1] >= 7 ? 1 : 0;
 }
 
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)

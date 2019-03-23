@@ -452,31 +452,22 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 		ret[0] = test_edge_barcode2(g, e_i, key, bx_bin, &score);
 		if (ret[0])
 			set_max(best_e, max, key, score);
-		//if (ret[0] >= 0)
-		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
-		//	e_i, key, ret[0] == 1?KGRN:KRED, ret[0]);
-		//if (key == 474232| key == 474233)
-		//	print_test_barcode_edge(g, e_i, key);
+		ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin, &score);
 		if (ret[1])
-			ret[1] = test_edge_barcode2(g, e_i, g->edges[key].rc_id, bx_bin, &score);
-		//if (ret[1] >= 0)
-		//	__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET, 
-		//	e_i, g->edges[key].rc_id , ret[1] == 1?KGRN:KRED, ret[1]);
-		//if (g->edges[key].rc_id == 474232| g->edges[key].rc_id == 474233)
-		//	print_test_barcode_edge(g, e_i, g->edges[key].rc_id);
+			set_max(best_e, max, g->edges[key].rc_id, score);
 		kh_put(khInt, set, key, &missing);
 		kh_put(khInt, set, g->edges[key].rc_id, &missing);
 	}
 	if (max >= 7){
-		__VERBOSE(KGRN "Best edge %d\n" RESET, best_e);
 		return best_e;
 	} else{
 		return -1;
 	}
 }
 
-static void asm_append_pair(struct asm_graph_t *g0, gint_t e2, gint_t e3)
+static int asm_append_pair(struct asm_graph_t *g0, gint_t e2, gint_t e3)
 {
+	int i;
 	asm_append_edge2(g0, e2, e3);
 	asm_append_edge2(g0, g0->edges[e3].rc_id, g0->edges[e2].rc_id);
 	asm_remove_edge(g0, e3);
@@ -522,24 +513,58 @@ static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint
 {
 	khiter_t k;
 	gint_t key;
-	int ret;
+	int ret, i;
+	int flag;
+	gint_t *fw_link = calloc(g0->n_e, sizeof(gint_t));
+	gint_t *rv_link = calloc(g0->n_e, sizeof(gint_t));
+	memset(fw_link, 0, sizeof(gint_t) * g0->n_e);
+	memset(rv_link, 0, sizeof(gint_t) * g0->n_e);
+
 	for (k = kh_begin(lg); k != kh_end(lg); ++k){
 		if (kh_exist(lg, k)){
 			key = kh_key(lg, k);
 			ret = share_barcode_profile(g0, key, lg, bx_bin);
 			if (ret != -1){
-				asm_append_pair(g0, key, ret);
-				__VERBOSE("Concat two edges %d - %d\n", key, ret);
-			}
-			__VERBOSE(KRED "REVERSE COMPLEMENT\n" RESET);
-			ret = share_barcode_profile(g0, g0->edges[key].rc_id, lg, bx_bin);
-			if (ret != -1){
-				asm_append_pair(g0, ret, g0->edges[key].rc_id);
-				__VERBOSE("Concat two edges %d - %d\n", ret, 
-						g0->edges[key].rc_id);
+				flag = kh_get(khInt, lg, ret) != kh_end(lg);
+				printf("%d-%d\n", g0->edges[key].rc_id, ret);
+				__VERBOSE("Concat two edges %d - %d%sis_out\n" RESET, g0->edges[key].rc_id, ret, flag?KGRN:KRED);
+				fw_link[g0->edges[key].rc_id] = ret;
+				rv_link[ret] = g0->edges[key].rc_id;
+				//asm_append_pair(g0, key, ret);
 			}
 		}
 	}
+
+	for (i = 0; i < g0->n_e; ++i){
+		if (fw_link[g0->edges[fw_link[i]].rc_id] == g0->edges[i].rc_id){
+			__VERBOSE(KCYN "Found %d-%d\n" RESET, i, fw_link[i]);
+			fw_link[g0->edges[fw_link[i]].rc_id] = 0;
+		}
+	}
+
+	for (i = 0; i < g0->n_e; ++i){
+		if (fw_link[i] == fw_link[g0->edges[i].rc_id] || fw_link[i] == 0)
+			continue;
+		int flag = (g0->edges[i].source == -1) + 
+			(g0->edges[fw_link[i]].source == -1);
+		assert(flag < 2 && "Two edges were deleted!");
+		gint_t e1 = i;
+		gint_t e2 = fw_link[i];
+		gint_t e1_rev = g0->edges[e1].rc_id;
+		gint_t e2_rev = g0->edges[e2].rc_id;
+		if (flag == 1){
+			e1 = g0->edges[fw_link[i]].rc_id;
+			e2 = g0->edges[i].rc_id;
+		}
+		if (e1 == 232456)
+			ret = 1;
+		__VERBOSE(KBLU "Connect %d-%d\n" RESET, e1, e2);
+		asm_append_pair(g0, e1, e2);
+		fw_link[g0->edges[e1].rc_id] = fw_link[e1_rev];
+		fw_link[e1_rev] = 0;
+	}
+
+
 }
 
 void detect_simple_tandem(struct asm_graph_t *g0)
@@ -594,6 +619,7 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			//	}
 			//}
 			resolve_one_complex(g0, lg, bx_bin);
+			break;
 			kh_put(khInt, set_v, i, &missing);
 		}
 		kh_clear(khInt, lg);
