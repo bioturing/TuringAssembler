@@ -556,11 +556,11 @@ static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint
 			e1 = g0->edges[fw_link[i]].rc_id;
 			e2 = g0->edges[i].rc_id;
 		}
-		if (e1 == 232456)
+		if (e1 == 692521)
 			ret = 1;
 		__VERBOSE(KBLU "Connect %d-%d\n" RESET, e1, e2);
 		asm_append_pair(g0, e1, e2);
-		fw_link[g0->edges[e1].rc_id] = fw_link[e1_rev];
+		fw_link[g0->edges[g0->edges[e1].rc_id].rc_id] = fw_link[e1_rev];
 		fw_link[e1_rev] = 0;
 	}
 
@@ -619,7 +619,6 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			//	}
 			//}
 			resolve_one_complex(g0, lg, bx_bin);
-			break;
 			kh_put(khInt, set_v, i, &missing);
 		}
 		kh_clear(khInt, lg);
