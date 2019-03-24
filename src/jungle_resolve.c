@@ -465,17 +465,16 @@ static gint_t share_barcode_profile(struct asm_graph_t *g, gint_t e_i, khash_t(k
 	}
 }
 
-static int asm_append_pair(struct asm_graph_t *g0, gint_t e2, gint_t e3)
+static int asm_append_pair(struct asm_graph_t *g0, gint_t e1, gint_t e2)
 {
-	int i;
-	asm_append_edge2(g0, e2, e3);
-	asm_append_edge2(g0, g0->edges[e3].rc_id, g0->edges[e2].rc_id);
-	asm_remove_edge(g0, e3);
+	asm_append_edge2(g0, e1, g0->edges[e2].rc_id);
+	asm_append_edge2(g0, e2, g0->edges[e1].rc_id);
 	asm_remove_edge(g0, g0->edges[e2].rc_id);
-	g0->edges[e2].rc_id = g0->edges[e3].rc_id;
-	g0->edges[g0->edges[e3].rc_id].rc_id = e2;
+	asm_remove_edge(g0, g0->edges[e1].rc_id);
+	g0->edges[e1].rc_id = e2;
+	g0->edges[e2].rc_id = e1;
+	assert(g0->edges[e1].seq != NULL);
 	assert(g0->edges[e2].seq != NULL);
-	assert(g0->edges[g0->edges[e3].rc_id].seq != NULL);
 }
 
 static void asm_append_triple(struct asm_graph_t *g0, gint_t e1, gint_t e2, gint_t e3)
@@ -509,8 +508,29 @@ static void set_visited_edge(struct asm_graph_t *g, gint_t *is_visited, khash_t(
 	}
 }
 
+static void polish_link(struct asm_graph_t *g0, gint_t *fw_link, gint_t *rv_link)
+{
+	int i;
+	gint_t tmp;
+	for (i = 0; i < g0->n_e; ++i){
+		if (fw_link[i] == fw_link[g0->edges[i].rc_id] && fw_link[i] != 0){
+			__VERBOSE(KGRN "Duplicated %d - %d - %d\n" RESET, i, g0->edges[i].rc_id,
+					fw_link[i]);
+			if (fw_link[fw_link[i]] == i){
+				// i is more confident than rev(i)
+				// so find which node is linked to rev(i), then assign for the foward link of rev(i)
+				fw_link[g0->edges[i].rc_id] = rv_link[g0->edges[i].rc_id];
+			}
+			if (fw_link[fw_link[i]] == g0->edges[i].rc_id){
+				// the same as above
+				fw_link[i] = rv_link[i];
+			}
+		}
+	}
+}
+
 static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint_t *bx_bin,
-		gint_t *fw_link)
+		gint_t *fw_link, gint_t *rv_link)
 {
 	khiter_t k;
 	gint_t key;
@@ -521,49 +541,46 @@ static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint
 		if (kh_exist(lg, k)){
 			key = kh_key(lg, k);
 			ret = share_barcode_profile(g0, key, lg, bx_bin);
-			if (ret != -1)
-				fw_link[g0->edges[key].rc_id] = ret;
+			if (ret != -1){
+				fw_link[key] = ret; // WARN: cannot to be link here
+				rv_link[ret] = key; // WARN: cannot to be link here
+			}
 		}
 	}
 }
 
-static void construct_scaffolds(struct asm_graph_t *g0, gint_t *fw_link)
+static void scaffold_one_step(struct asm_graph_t *g0, gint_t *fw_link, 
+		gint_t ei, khash_t(khInt) *set)
 {
-	int i, flag;
-	gint_t e1, e2, e1_rev, e2_rev;
-	for (i = 0; i < g0->n_e; ++i){
-		if (fw_link[i] == fw_link[g0->edges[i].rc_id] || fw_link[i] == 0)
-			continue;
-		int flag = (g0->edges[i].source == -1) + 
-			(g0->edges[fw_link[i]].source == -1);
-		assert(flag < 2 && "Two edges were deleted!");
-		e1 = i;
-		e2 = fw_link[i];
-		e1_rev = g0->edges[e1].rc_id;
-		e2_rev = g0->edges[e2].rc_id;
-		if (flag == 1){
-			e1 = g0->edges[fw_link[i]].rc_id;
-			e2 = g0->edges[i].rc_id;
-		}
-		__VERBOSE(KBLU "Connect %d-%d\n" RESET, e1, e2);
-		asm_append_pair(g0, e1, e2);
-		fw_link[g0->edges[g0->edges[e1].rc_id].rc_id] = fw_link[e1_rev];
-		fw_link[e1_rev] = 0;
-	}
-}
-
-static void test_scaffolds(struct asm_graph_t *g0, gint_t *fw_link, gint_t ei)
-{
-	int i;
+	int i, ret;
 	gint_t e_it = fw_link[ei];
+	gint_t tmp;
 	printf("%d-", ei);
+	kh_put(khInt, set, ei, &ret);
 	while (e_it != 0) {
 		printf("%d-", e_it);
 		__VERBOSE(KCYN "%d - %d\n" RESET, ei, e_it);
-		asm_append_pair(g0, ei, e_it);
-		e_it = fw_link[e_it];
+		tmp = fw_link[g0->edges[e_it].rc_id];
+		asm_append_pair(g0, ei, g0->edges[e_it].rc_id);
+		e_it = tmp;
+		kh_put(khInt, set, e_it, &ret);
 	}
 	printf("\n");
+}
+
+static void iterative_scaffolding(struct asm_graph_t *g0, gint_t *fw_link)
+{
+	khash_t(khInt) *set;
+	set = kh_init(khInt);
+	int i;
+	for (i = 0; i < g0->n_e; ++i){
+		if (fw_link[i] == 0 && fw_link[g0->edges[i].rc_id] != 0){
+			__VERBOSE(KCYN "Found %d\n" RESET, i);
+			if (kh_get(khInt, set, g0->edges[i].rc_id) == kh_end(set)){
+				scaffold_one_step(g0, fw_link, g0->edges[i].rc_id, set);
+			}
+		}
+	}
 }
 
 void detect_simple_tandem(struct asm_graph_t *g0)
@@ -592,6 +609,8 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 
 	gint_t *fw_link = calloc(g0->n_e, sizeof(gint_t));
 	memset(fw_link, 0, sizeof(gint_t) * g0->n_e);
+	gint_t *rv_link = calloc(g0->n_e, sizeof(gint_t));
+	memset(rv_link, 0, sizeof(gint_t) * g0->n_e);
 
 	int cnt = 0;
 	
@@ -620,13 +639,13 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			//		cnt += resolve_jungle4(g0, lg, comp_set, gcov, bx_bin);
 			//	}
 			//}
-			resolve_one_complex(g0, lg, bx_bin, fw_link);
+			resolve_one_complex(g0, lg, bx_bin, fw_link, rv_link);
 			kh_put(khInt, set_v, i, &missing);
 		}
 		kh_clear(khInt, lg);
 		kh_clear(khInt, comp_set);
 	}
-	test_scaffolds(g0, fw_link, 681896);
-	//construct_scaffolds(g0, fw_link);
+	polish_link(g0, fw_link, rv_link);
+	iterative_scaffolding(g0, fw_link);
 	__VERBOSE("Number of resolved jungle: %d\n", cnt);
 }
