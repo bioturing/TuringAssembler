@@ -509,62 +509,61 @@ static void set_visited_edge(struct asm_graph_t *g, gint_t *is_visited, khash_t(
 	}
 }
 
-static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint_t *bx_bin)
+static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint_t *bx_bin,
+		gint_t *fw_link)
 {
 	khiter_t k;
 	gint_t key;
 	int ret, i;
 	int flag;
-	gint_t *fw_link = calloc(g0->n_e, sizeof(gint_t));
-	gint_t *rv_link = calloc(g0->n_e, sizeof(gint_t));
-	memset(fw_link, 0, sizeof(gint_t) * g0->n_e);
-	memset(rv_link, 0, sizeof(gint_t) * g0->n_e);
 
 	for (k = kh_begin(lg); k != kh_end(lg); ++k){
 		if (kh_exist(lg, k)){
 			key = kh_key(lg, k);
 			ret = share_barcode_profile(g0, key, lg, bx_bin);
-			if (ret != -1){
-				flag = kh_get(khInt, lg, ret) != kh_end(lg);
-				printf("%d-%d\n", g0->edges[key].rc_id, ret);
-				__VERBOSE("Concat two edges %d - %d%sis_out\n" RESET, g0->edges[key].rc_id, ret, flag?KGRN:KRED);
+			if (ret != -1)
 				fw_link[g0->edges[key].rc_id] = ret;
-				rv_link[ret] = g0->edges[key].rc_id;
-				//asm_append_pair(g0, key, ret);
-			}
 		}
 	}
+}
 
-	for (i = 0; i < g0->n_e; ++i){
-		if (fw_link[g0->edges[fw_link[i]].rc_id] == g0->edges[i].rc_id){
-			__VERBOSE(KCYN "Found %d-%d\n" RESET, i, fw_link[i]);
-			fw_link[g0->edges[fw_link[i]].rc_id] = 0;
-		}
-	}
-
+static void construct_scaffolds(struct asm_graph_t *g0, gint_t *fw_link)
+{
+	int i, flag;
+	gint_t e1, e2, e1_rev, e2_rev;
 	for (i = 0; i < g0->n_e; ++i){
 		if (fw_link[i] == fw_link[g0->edges[i].rc_id] || fw_link[i] == 0)
 			continue;
 		int flag = (g0->edges[i].source == -1) + 
 			(g0->edges[fw_link[i]].source == -1);
 		assert(flag < 2 && "Two edges were deleted!");
-		gint_t e1 = i;
-		gint_t e2 = fw_link[i];
-		gint_t e1_rev = g0->edges[e1].rc_id;
-		gint_t e2_rev = g0->edges[e2].rc_id;
+		e1 = i;
+		e2 = fw_link[i];
+		e1_rev = g0->edges[e1].rc_id;
+		e2_rev = g0->edges[e2].rc_id;
 		if (flag == 1){
 			e1 = g0->edges[fw_link[i]].rc_id;
 			e2 = g0->edges[i].rc_id;
 		}
-		if (e1 == 692521)
-			ret = 1;
 		__VERBOSE(KBLU "Connect %d-%d\n" RESET, e1, e2);
 		asm_append_pair(g0, e1, e2);
 		fw_link[g0->edges[g0->edges[e1].rc_id].rc_id] = fw_link[e1_rev];
 		fw_link[e1_rev] = 0;
 	}
+}
 
-
+static void test_scaffolds(struct asm_graph_t *g0, gint_t *fw_link, gint_t ei)
+{
+	int i;
+	gint_t e_it = fw_link[ei];
+	printf("%d-", ei);
+	while (e_it != 0) {
+		printf("%d-", e_it);
+		__VERBOSE(KCYN "%d - %d\n" RESET, ei, e_it);
+		asm_append_pair(g0, ei, e_it);
+		e_it = fw_link[e_it];
+	}
+	printf("\n");
 }
 
 void detect_simple_tandem(struct asm_graph_t *g0)
@@ -590,6 +589,9 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	memset(bx_bin, 0, g0->n_e * sizeof(gint_t));
 	barcode_bin_profiling(g0, bx_bin);
 	asm_edge_cc(g0, id_edge, &cc_size);
+
+	gint_t *fw_link = calloc(g0->n_e, sizeof(gint_t));
+	memset(fw_link, 0, sizeof(gint_t) * g0->n_e);
 
 	int cnt = 0;
 	
@@ -618,11 +620,13 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			//		cnt += resolve_jungle4(g0, lg, comp_set, gcov, bx_bin);
 			//	}
 			//}
-			resolve_one_complex(g0, lg, bx_bin);
+			resolve_one_complex(g0, lg, bx_bin, fw_link);
 			kh_put(khInt, set_v, i, &missing);
 		}
 		kh_clear(khInt, lg);
 		kh_clear(khInt, comp_set);
 	}
-		__VERBOSE("Number of resolved jungle: %d\n", cnt);
+	test_scaffolds(g0, fw_link, 681896);
+	//construct_scaffolds(g0, fw_link);
+	__VERBOSE("Number of resolved jungle: %d\n", cnt);
 }
