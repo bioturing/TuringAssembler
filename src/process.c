@@ -247,6 +247,10 @@ void clean_process(struct opt_build_t *opt)
 	test_asm_graph(g1);
 	snprintf(path, 1024, "%s/graph_k_%d_level_5.gfa", opt->out_dir, g1->ksize);
 	write_gfa(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_5.bin", opt->out_dir, g0->ksize);
+	save_asm_graph_simple(g1, path);
+	snprintf(path, 1024, "%s/graph_k_%d_level_5.fasta", opt->out_dir, g0->ksize);
+	write_fasta(g1, path);
 
 }
 
