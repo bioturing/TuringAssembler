@@ -195,8 +195,6 @@ int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(
 	khiter_t k;
 	*comp_sz = 0;
 
-	if (e_i == 169629)
-		i = 1;
 	if (e[e_i].seq_len < MIN_BRIDGE_LEG)
 		return 0;
 
@@ -319,22 +317,27 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 	/* Testing for the significant of barcode */
 	int cnt = 0;
 	int x, y;
+	uint32_t max = 0, score;
+
 	for (j = 0; j < 4; ++j) {
 		for (i = j + 1; i < 4; ++i) {
-			int ret = test_edge_barcode(g, tmp[j], tmp[i]);
+			int ret = test_edge_barcode2(g, tmp[j], tmp[i], bx_bin, &score);
 			__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET,
 				tmp[j], tmp[i], ret == 1?KGRN:KRED, ret);
 			//print_test_barcode_edge(g, tmp[j], tmp[i]);
 			if (ret == 1) {
-				x = i;
-				y = j;
+				if (score > max) {
+					x = i;
+					y = j;
+					max = score;
+				}
 				++cnt;
 			}
 		}
 	}
 
 	/* Must be two ins and two outs */
-	if (cnt != 2)
+	if (cnt == 0)
 		return 0;
 
 	/* Clean the complex */
@@ -364,12 +367,19 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 		e_rc1 = tmp[y];
 		e1 = g->edges[e_rc1].rc_id;
 		
+		__VERBOSE(KCYN "One pair %d - %d\n" RESET, e1, e2);
 		if (g->edges[e1].source == -1 || e1 == e2 || e1 == e_rc2)
 			return 0;
 		
 		glue_2seq_procedure(g, e1, e2, e_rc1, e_rc2);
-		x = 3 - x;
-		y = 3 - y;
+
+		if ((x + y) == 3) {
+			x ^= 1;
+			y ^= 1;
+		} else {
+			x = 3 - x;
+			y = 3 - y;
+		}
 		++n_iter;
 	} while (n_iter < 2);
 	return 1;
@@ -540,6 +550,8 @@ static void resolve_one_complex(struct asm_graph_t *g0, khash_t(khInt) *lg, gint
 	for (k = kh_begin(lg); k != kh_end(lg); ++k){
 		if (kh_exist(lg, k)){
 			key = kh_key(lg, k);
+			if (key == 111310 || key == 111311)
+				flag = 1;
 			ret = share_barcode_profile(g0, key, lg, bx_bin);
 			if (ret != -1){
 				fw_link[key] = ret; // WARN: cannot to be link here
@@ -561,7 +573,7 @@ static void scaffold_one_step(struct asm_graph_t *g0, gint_t *fw_link,
 		printf("%d-", e_it);
 		__VERBOSE(KCYN "%d - %d\n" RESET, ei, e_it);
 		tmp = fw_link[g0->edges[e_it].rc_id];
-		asm_append_pair(g0, ei, g0->edges[e_it].rc_id);
+		//asm_append_pair(g0, ei, g0->edges[e_it].rc_id);
 		e_it = tmp;
 		kh_put(khInt, set, e_it, &ret);
 	}
@@ -600,7 +612,6 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	uint32_t comp_sz;
 	id_edge = malloc(g0->n_e * sizeof(gint_t));
 	gint_t *is_visited = calloc(g0->n_e, sizeof(gint_t));
-	memset(is_visited, 0, g0->n_e * sizeof(gint_t));
 	bx_bin = calloc(g0->n_e, sizeof(gint_t));
 	memset(is_visited, 0, g0->n_e * sizeof(gint_t));
 	memset(bx_bin, 0, g0->n_e * sizeof(gint_t));
@@ -615,6 +626,8 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	int cnt = 0;
 	
 	for (i = 0; i < g0->n_e; ++i){
+		kh_clear(khInt, lg);
+		kh_clear(khInt, comp_set);
 		cc_id = id_edge[i];
 		if (cc_size[cc_id] < MIN_COMPONENT || 
 			kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
@@ -626,24 +639,41 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 			__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
 			__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
 			__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
-			//if (kh_size(lg) <= MAX_NUMBER_LEGS){
-			//	if (is_large_loop(g0, lg, comp_set)){
-			//		__VERBOSE(KRED "Is a self loop complex\n" RESET);
-			//		jungle_resolve_flow(g0, lg, comp_set, gcov);
-			//		continue;
-			//	}
-			//	/* resolve 1-1 complex */
-			//	if (kh_size(lg) == 2)
-			//		cnt += resolve_jungle(g0, lg, comp_set, gcov);
-			//	else if (kh_size(lg) == 4) {
-			//		cnt += resolve_jungle4(g0, lg, comp_set, gcov, bx_bin);
-			//	}
-			//}
+			if (kh_size(lg) <= MAX_NUMBER_LEGS){
+				if (is_large_loop(g0, lg, comp_set)){
+					__VERBOSE(KRED "Is a self loop complex\n" RESET);
+					jungle_resolve_flow(g0, lg, comp_set, gcov);
+				}
+				/* resolve 1-1 complex */
+				if (kh_size(lg) == 2)
+					cnt += resolve_jungle(g0, lg, comp_set, gcov);
+				else if (kh_size(lg) == 4) {
+					cnt += resolve_jungle4(g0, lg, comp_set, gcov, bx_bin);
+				}
+			}
+			kh_put(khInt, set_v, i, &missing);
+		}
+	}
+
+	kh_clear(khInt, set_v);
+	memset(is_visited, 0, g0->n_e * sizeof(gint_t));
+	for (i = 0; i < g0->n_e; ++i){
+		kh_clear(khInt, lg);
+		kh_clear(khInt, comp_set);
+		cc_id = id_edge[i];
+		if (cc_size[cc_id] < MIN_COMPONENT || 
+			kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
+			continue;
+
+		if (simple_tandem(g0, i, &comp_sz, lg, comp_set, is_visited)){
+			set_visited_edge(g0, is_visited, comp_set);
+			__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
+			__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
+			__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
+			__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
 			resolve_one_complex(g0, lg, bx_bin, fw_link, rv_link);
 			kh_put(khInt, set_v, i, &missing);
 		}
-		kh_clear(khInt, lg);
-		kh_clear(khInt, comp_set);
 	}
 	polish_link(g0, fw_link, rv_link);
 	iterative_scaffolding(g0, fw_link);
