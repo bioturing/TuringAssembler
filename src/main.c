@@ -276,6 +276,19 @@ void print_opt_count_info(struct opt_count_t *opt, int argc, char *argv[])
 	}
 }
 
+void print_opt_build_info(struct opt_build_t *opt, int argc, char *argv[])
+{
+	int cmd_len = 0, i;
+	for (i = 0; i < argc; ++i)
+		cmd_len += strlen(argv[i]) + 1;
+	char *cmd = malloc(cmd_len);
+	cmd_len = 0;
+	for (i = 0; i < argc; ++i)
+		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
+	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
+	free(cmd);
+}
+
 void assembly_opt_process63(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
@@ -364,6 +377,20 @@ void test31_opt_process(int argc, char *argv[])
 	init_log(tmp_dir);
 	print_opt_count_info(opt, argc, argv);
 	k31_test_process(opt);
+}
+
+void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_build_t *))
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	print_opt_build_info(opt, argc, argv);
+	build_process(opt);
 }
 
 void build0_1_opt_process(int argc, char *argv[])
@@ -464,6 +491,20 @@ void build5_6_opt_process(int argc, char *argv[])
 	build5_6_process(opt);
 }
 
+void clean_opt_process(int argc, char *argv[])
+{
+	struct opt_build_t *opt;
+	opt = parse_build_option(argc - 2, argv + 2);
+	if (opt == NULL) {
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	init_log(tmp_dir);
+	clean_process(opt);
+}
+
 void build0_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
@@ -543,25 +584,35 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "build0"))
 		build0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
-		build_barcode_opt_process(argc, argv);
+		// build_barcode_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build_barcode_process);
 	else if (!strcmp(argv[1], "build_0_1"))
-		build0_1_opt_process(argc, argv);
+		// build0_1_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))
-		build1_2_opt_process(argc, argv);
+		// build1_2_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build1_2_process);
 	else if (!strcmp(argv[1], "build_2_3"))
-		build2_3_opt_process(argc, argv);
+		// build2_3_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build2_3_process);
 	else if (!strcmp(argv[1], "build_2_3a"))
-		build2_3a_opt_process(argc, argv);
+		// build2_3a_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build2_3a_process);
 	else if (!strcmp(argv[1], "build_3_4"))
-		build3_4_opt_process(argc, argv);
+		// build3_4_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build3_4_process);
 	else if (!strcmp(argv[1], "build_4_5"))
-		build4_5_opt_process(argc, argv);
+		// build4_5_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build4_5_process);
 	else if (!strcmp(argv[1], "build_5_6"))
-		build5_6_opt_process(argc, argv);
+		// build5_6_opt_process(argc, argv);
+		build_opt_process(argc, argv, &build5_6_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "clean"))
+		clean_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 

@@ -104,6 +104,9 @@ uint32_t get_genome_cov(struct asm_graph_t *g0)
 
 int is_trivial_loop(struct asm_edge_t *e, struct asm_node_t *v, gint_t i)
 {
+	if (e[i].seq == NULL)
+		return 0;
+
 	gint_t src = e[i].source;
 	gint_t dest = e[i].target;
 	gint_t r_src = v[src].rc_id;
@@ -299,17 +302,18 @@ int resolve_loop(struct asm_graph_t *g, gint_t u,
 	rc_src = v[e[u].source].rc_id;
 
 	t = HAS_LOOP(e, u, v[dest].adj[0]) ? v[dest].adj[0] : v[dest].adj[1];
-	e[u].count += e[t].count;
 
 	__VERBOSE("Concat the loop and the shared\n");
 
-	concat_3_seq(e[u], e[t], e[u], ksize, &len, &e[u].seq);
+	concat_3_seq(e[u], e[t], e[u], ksize, &len, &seq);
+	e[u].count += e[t].count + e[u].count;
 	e[u].seq_len = len;
+	free(e[u].seq);
+	e[u].seq = seq;
  
 	clone_edge_rev(e + e[u].rc_id, e + u);
 	asm_remove_edge(g, t);
 	asm_remove_edge(g, e[t].rc_id);
-
 }
 /*
 static void find_forest(struct asm_graph_t *g0)

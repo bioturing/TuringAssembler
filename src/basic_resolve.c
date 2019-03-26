@@ -3,10 +3,13 @@
 
 #include "assembly_graph.h"
 #include "io_utils.h"
+#include "khash.h"
 #include "resolve.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+
+KHASH_SET_INIT_INT64(gint);
 
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
@@ -17,6 +20,134 @@ static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 			ret = i;
 	}
 	return ret;
+}
+
+void asm_condense2(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	gint_t *node_id;
+	gint_t n_v, n_e, m_e;
+	node_id = malloc(g0->n_v * sizeof(gint_t));
+	memset(node_id, 255, g0->n_v * sizeof(gint_t));
+
+	/* remove unused links */
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t c, deg;
+		deg = g0->nodes[u].deg;
+		g0->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g0->nodes[u].adj[c];
+			if (e_id != -1)
+				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
+		}
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
+					g0->nodes[u].deg * sizeof(gint_t));
+	}
+	/* nodes on new graph only consist of branching nodes on old graph */
+	n_v = 0;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t deg_fw = g0->nodes[u].deg;
+		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
+		/* non-branching node */
+		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0)
+			continue;
+		fprintf(stdout, "NODE: [%ld] -> [%ld]\n", u, n_v);
+		node_id[u] = n_v++;
+	}
+	struct asm_node_t *nodes = calloc(n_v, sizeof(struct asm_node_t));
+	/* set reverse complement link between nodes */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, x_rc, u_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		u_rc = g0->nodes[u].rc_id;
+		x_rc = node_id[u_rc];
+		assert(x_rc != -1);
+		nodes[x].rc_id = x_rc;
+		nodes[x_rc].rc_id = x;
+		nodes[x].adj = NULL;
+		nodes[x].deg = 0;
+	}
+	n_e = 0;
+	m_e = 0x10000;
+	struct asm_edge_t *edges = calloc(m_e, sizeof(struct asm_edge_t));
+	/* construct new edges */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, y_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		gint_t c;
+		for (c = 0; c < g0->nodes[u].deg; ++c) {
+			if (n_e + 2 > m_e) {
+				edges = realloc(edges, (m_e << 1) * sizeof(struct asm_edge_t));
+				memset(edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
+				m_e <<= 1;
+			}
+			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
+			if (e == -1)
+				continue;
+			p = n_e; q = n_e + 1;
+			edges[p].rc_id = q;
+			edges[q].rc_id = p;
+			asm_clone_edge(edges + p, g0->edges + e);
+			gint_t *ea = NULL;
+			gint_t n_ea = 0;
+
+			do {
+				ea = realloc(ea, (n_ea + 1) * sizeof(gint_t));
+				ea[n_ea++] = e;
+				v = g0->edges[e].target;
+				if (node_id[v] == -1) { /* middle node */
+					assert(g0->nodes[v].deg == 1);
+					e = g0->nodes[v].adj[0];
+					assert(e != -1);
+					asm_append_edge_seq(edges + p,
+						g0->edges + e, g0->ksize);
+					edges[p].count += g0->edges[e].count;
+				} else {
+					break;
+				}
+			} while (1);
+			edges[p].source = x;
+			edges[p].target = node_id[v];
+			asm_clone_reverse(edges + q, edges + p);
+			v_rc = g0->nodes[v].rc_id;
+			e_rc = g0->edges[e].rc_id;
+			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
+						g0->nodes[v_rc].deg, e_rc);
+			assert(j >= 0);
+			g0->nodes[v_rc].adj[j] = -1;
+			y_rc = node_id[v_rc];
+			edges[q].source = y_rc;
+			edges[q].target = nodes[x].rc_id;
+
+			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
+			nodes[x].adj[nodes[x].deg++] = p;
+			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
+					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
+			n_e += 2;
+			fprintf(stdout, "EDGE: [%ld] -> ", p);
+			for (j = 0; j < n_ea; ++j)
+				fprintf(stdout, j + 1 == n_ea ?
+						"[%ld]\n" : "[%ld], ", ea[j]);
+			fprintf(stdout, "EDGE: [%ld] -> ", q);
+			for (j = 0; j < n_ea; ++j)
+				fprintf(stdout, j + 1 == n_ea ?
+						"[%ld]\n" : "[%ld], ",
+						g0->edges[ea[j]].rc_id);
+			free(ea);
+		}
+	}
+	free(node_id);
+	edges = realloc(edges, n_e * sizeof(struct asm_edge_t));
+	g->ksize = g0->ksize;
+	g->n_v = n_v;
+	g->n_e = n_e;
+	g->nodes = nodes;
+	g->edges = edges;
 }
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
@@ -378,7 +509,7 @@ void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
 	unroll_simple_loop(g0);
 	// remove_self_loop(g0);
 	remove_bubble_simple(g0, uni_cov);
-	asm_condense(g0, g);
+	asm_condense2(g0, g);
 	// print_debug_info(g);
 }
 
@@ -629,130 +760,173 @@ void graph_expanding(struct asm_graph_t *g)
 	__VERBOSE("Number of edges cannot expand: %d\n", cnt_fp);
 }
 
-void find_region(struct asm_graph_t *g, gint_t se)
+static inline int cb_add(khash_t(gint) *h, gint_t k)
 {
-	q[0] = se;
+	int ret;
+	kh_put(gint, h, k, &ret);
+	return ret;
+}
+
+void find_region(struct asm_graph_t *g, gint_t se, uint32_t min_contig_len,
+		uint32_t max_edge_count, khash_t(gint) *set_v, khash_t(gint) *set_e)
+{
+	gint_t *q = malloc(max_edge_count * sizeof(gint_t));
+	int l, r;
 	l = r = 0;
+	uint32_t edge_count = 1;
+	q[0] = se;
 	while (l <= r) {
+		gint_t e, u, u_rc, v, j;
 		e = q[l++];
 		v = g->edges[e].target;
 		for (j = 0; j < g->nodes[v].deg; ++j) {
-			ne = g->nodes[v].adj[j];
-			len = get_edge_len(g->edges + ne);
+			gint_t ne = g->nodes[v].adj[j];
+			uint32_t len = get_edge_len(g->edges + ne);
 			if (len < min_contig_len) {
-				if (cb_add_edge(g, set_e, ne) == 0)
+				if (cb_add(set_e, ne) == 1) {
+					if (edge_count == max_edge_count)
+						goto clean_up;
 					q[++r] = ne;
-				cb_add_node(g, set_v, g->nodes[ne].target);
+				}
+				cb_add(set_v, g->edges[ne].target);
 			} else {
-				cb_add_edge(g, set_e, ne);
-				cb_add_node(g, set_v, g->nodes[ne].target);
+				cb_add(set_e, ne);
+				cb_add(set_v, g->edges[ne].target);
 			}
 		}
 		u = g->edges[e].source;
 		u_rc = g->nodes[u].rc_id;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-			ne = g->nodes[u_rc].adj[j];
-			len = get_edge_len(g->edges + ne);
+			gint_t ne = g->nodes[u_rc].adj[j];
+			uint32_t len = get_edge_len(g->edges + ne);
 			if (len < min_contig_len) {
-				if (cb_add_edge(g, set_e, ne) == 0)
+				if (cb_add(set_e, ne) == 1) {
+					if (edge_count == max_edge_count)
+						goto clean_up;
 					q[++r] = ne;
-				cb_add_node(g, set_v, g->nodes[ne].target);
+				}
+				cb_add(set_v, g->edges[ne].target);
 			} else {
-				cb_add_edge(g, set_e, ne);
-				cb_add_node(g, set_v, g->nodes[ne].target);
+				cb_add(set_e, ne);
+				cb_add(set_v, g->edges[ne].target);
 			}
 		}
 	}
+clean_up:
+	free(q);
 }
 
-struct dfs_info_t {
-	gint_t num;
-	gint_t low;
-	gint_t parent;
-};
+// struct dfs_info_t {
+// 	gint_t num;
+// 	gint_t low;
+// 	gint_t parent;
+// };
 
-static void rm_edge(struct asm_graph_t *g, gint_t e, khash_t(gint) *set_e)
-{
-	gint_t e_rc = g->nodes[e].rc_id;
-	if (e > e_rc)
-		kh_del(gint, set_e, e_rc);
-	else
-		kh_del(gint, set_e, e);
-}
+// static void rm_edge(struct asm_graph_t *g, gint_t e, khash_t(gint) *set_e)
+// {
+// 	gint_t e_rc = g->nodes[e].rc_id;
+// 	if (e > e_rc)
+// 		kh_del(gint, set_e, e_rc);
+// 	else
+// 		kh_del(gint, set_e, e);
+// }
 
-static struct dfs_info_t *add_node(struct asm_graph_t *g, gint_t u,
-							khash_t(dfs) *nodes)
+// static struct dfs_info_t *add_node(struct asm_graph_t *g, gint_t u,
+// 							khash_t(dfs) *nodes)
+// {
+// 	khiter_t k;
+// 	int ret;
+// 	gint_t u_rc = g->nodes[u].rc_id;
+// 	if (u > u_rc)
+// 		k = kh_put(dfs, nodes, u_rc, &ret);
+// 	else
+// 		k = kh_put(dfs, nodes, u, &ret);
+// 	if (ret == 1)
+// 		kh_value(nodes, k).parent = -1;
+// 	return &(kh_value(nodes, k));
+// }
+
+// void dfs_bridge(struct asm_graph_t *g, gint_t u, gint_t *cnt,
+// 		khash_t(dfs) *nodes, khash_t(gint) *set_e, khash_t(gint) *leg)
+// {
+// 	struct dfs_info_t *it_u, *it_v;
+// 	it_u = add_node(g, u, nodes);
+// 	it_u->num = cnt;
+// 	it_u->low = cnt;
+// 	++*cnt;
+// 	u_rc = u;
+// 	for (j = 0; j < g->nodes[u].deg; ++j) {
+// 		e = g->nodes[u].adj[j];
+// 		/* edges not present on graph */
+// 		if (kh_get(gint, set_e, e) == kh_end(set_e))
+// 			continue;
+// 		v = g->nodes[e].target;
+// 		it_v = add_node(g, v, nodes);
+// 		if (it_v->parent == -1) {
+// 			it_v->parent = u;
+// 			dfs_bridge(g, v, cnt, nodes, set_e, leg);
+// 			it_u->low = __min(it_u->low, it_v->low);
+// 		} else {
+// 			it_u->low  __min(it_u->low, it_v->num);
+// 		}
+// 		if (it_v->low > it_u->num)
+// 			kh_put(gint, leg, e, &ret);
+// 		rm_edge(g, e, set_e);
+// 	}
+
+// 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+// 		e = g->nodes[u_rc].adj[j];
+// 		if (kh_get(gint, set_e, e) == kh_end(set_e))
+// 			continue;
+// 		v = g->nodes[e].target;
+// 		it_v = add_node(g, v, nodes);
+// 		if (it_v->parent == -1) {
+// 			it_v->parent = u;
+// 			dfs_bridge(g, v, cnt, nodes, set_e, leg);
+// 			it_u->low = __min(it_u->low, it_v->low);
+// 		} else {
+// 			it_u->low = __min(it_u->low, it_v->num);
+// 		}
+// 		if (it_v->low > it_u->num)
+// 			kh_put(gint, leg, e, &ret);
+// 		rm_edge(g, e, set_e);
+// 	}
+// }
+
+// void calibrate_leg(struct asm_graph_t *g, gint_t se, khash_t(gint) *set_v,
+// 	khash_t(gint) *set_e, khash_t(gint) *leg, , int min_contig_len)
+// {
+// 	gint_t cnt;
+// }
+
+void kh_merge_set(khash_t(gint) *dst, khash_t(gint) *src)
 {
 	khiter_t k;
 	int ret;
-	gint_t u_rc = g->nodes[u].rc_id;
-	if (u > u_rc)
-		k = kh_put(dfs, nodes, u_rc, &ret);
-	else
-		k = kh_put(dfs, nodes, u, &ret);
-	if (ret == 1)
-		kh_value(nodes, k).parent = -1;
-	return &(kh_value(nodes, k));
-}
-
-void dfs_bridge(struct asm_graph_t *g, gint_t u, gint_t *cnt,
-		khash_t(dfs) *nodes, khash_t(gint) *set_e, khash_t(gint) *leg)
-{
-	struct dfs_info_t *it_u, *it_v;
-	it_u = add_node(g, u, nodes);
-	it_u->num = cnt;
-	it_u->low = cnt;
-	++*cnt;
-	u_rc = u;
-	for (j = 0; j < g->nodes[u].deg; ++j) {
-		e = g->nodes[u].adj[j];
-		/* edges not present on graph */
-		if (kh_get(gint, set_e, e) == kh_end(set_e))
+	for (k = kh_begin(src); k != kh_end(src); ++k) {
+		if (!kh_exist(src, k))
 			continue;
-		v = g->nodes[e].target;
-		it_v = add_node(g, v, nodes);
-		if (it_v->parent == -1) {
-			it_v->parent = u;
-			dfs_bridge(g, v, cnt, nodes, set_e, leg);
-			it_u->low = __min(it_u->low, it_v->low);
-		} else {
-			it_u->low  __min(it_u->low, it_v->num);
-		}
-		if (it_v->low > it_u->num)
-			kh_put(gint, leg, e, &ret);
-		rm_edge(g, e, set_e);
-	}
-
-	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-		e = g->nodes[u_rc].adj[j];
-		if (kh_get(gint, set_e, e) == kh_end(set_e))
-			continue;
-		v = g->nodes[e].target;
-		it_v = add_node(g, v, nodes);
-		if (it_v->parent == -1) {
-			it_v->parent = u;
-			dfs_bridge(g, v, cnt, nodes, set_e, leg);
-			it_u->low = __min(it_u->low, it_v->low);
-		} else {
-			it_u->low = __min(it_u->low, it_v->num);
-		}
-		if (it_v->low > it_u->num)
-			kh_put(gint, leg, e, &ret);
-		rm_edge(g, e, set_e);
+		kh_put(gint, dst, kh_key(src, k), &ret);
 	}
 }
 
-void calibrate_leg(struct asm_graph_t *g, gint_t se, khash_t(gint) *set_v,
-	khash_t(gint) *set_e, khash_t(gint) *leg, , int min_contig_len)
+void detect_complex(struct asm_graph_t *g, uint32_t min_contig_size, uint32_t max_edge_count)
 {
-	gint_t cnt;
-}
-
-void detect_complex(struct asm_graph_t *g, gint_t bridge_len_thres, gint_t max_edge)
-{
+	khash_t(gint) *visited, *set_e, *set_v;
+	visited = kh_init(gint);
+	set_e = kh_init(gint);
+	set_v = kh_init(gint);
+	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
 		if (kh_get(gint, visited, g->edges[e].target) != kh_end(visited))
 			continue;
-		calibrate_bubble(g, g->edges[e].target);
+		find_region(g, e, min_contig_size, max_edge_count, set_v, set_e);
+		if (kh_size(set_e) < max_edge_count) {
+			kh_merge_set(visited, set_v);
+			__VERBOSE("Edge: %ld; Edge count in region: %u\n", e,
+				kh_size(set_e));
+		}
+		kh_clear(gint, set_e);
+		kh_clear(gint, set_v);
 	}
 }

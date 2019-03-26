@@ -304,6 +304,55 @@ static int detect_bugle(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
 	return 0;
 }
 
+static int detect_bugle_2(struct asm_edge_t *e, struct asm_node_t *v, gint_t e_i)
+{
+	int i;
+	gint_t src = e[e_i].source;
+	gint_t dst = e[e_i].target;
+	gint_t r_src = e[e[e_i].rc_id].source;
+	gint_t r_dst = e[e[e_i].rc_id].target;
+
+	if (v[src].deg != 2 && v[r_src].deg != 2)
+		return 0;
+
+	/* Check whether one source and one target has multiple edges */
+	for (i = 0; i < v[src].deg; ++i){
+		if (e[v[src].adj[i]].target != dst)
+			return 0;
+	}
+	/* Check whether one source and one target has multiple edges 
+	 * For the reverse complement of e_i 
+	 **/
+	for (i = 0; i < v[r_src].deg; ++i){
+		if (e[v[r_src].adj[i]].target != r_dst)
+		return 0;
+	}
+	return 1;
+}
+
+static int resolve_bulge_2(struct asm_graph_t *g, gint_t e_i)
+{
+	int i = 0;
+
+	gint_t src = g->edges[e_i].source;
+	for (i = 1; i < g->nodes[src].deg; ++i){
+		asm_remove_edge(g, g->nodes[src].adj[i]);
+	}
+	gint_t rev_i = g->edges[g->nodes[src].adj[0]].rc_id;
+	src = g->edges[rev_i].source;
+
+	if (g->edges[rev_i].source == -1){
+		asm_remove_edge(g, g->edges[rev_i].rc_id);
+		return 1;
+	}
+
+	for (i = 0; i < g->nodes[src].deg; ++i){
+		if (g->nodes[src].adj[i] != rev_i)
+			asm_remove_edge(g, g->nodes[src].adj[i]);
+	}
+	g->nodes[src].adj[0] = rev_i;
+}
+
 static int resolve_loop_wrapper(struct asm_graph_t *g, gint_t *id_edge, 
 			gint_t *cc_size, khash_t(khInt) *set_v, struct asm_graph_t **g_ret)
 {
@@ -334,6 +383,8 @@ static int resolve_loop_wrapper(struct asm_graph_t *g, gint_t *id_edge,
 				flag = 0;
 				cnt++;
 				__VERBOSE("Edge %d - %d\n - loop\n", i, e[i].rc_id);
+				if (i == 110356)
+					flag = 0;
 				resolve_loop(g, i, g0->ksize);
 				kh_put(khInt, set_v, i, &ret);
 			}
@@ -342,7 +393,7 @@ static int resolve_loop_wrapper(struct asm_graph_t *g, gint_t *id_edge,
 			asm_condense(g0, g1);
 		g0 = g1;
 		free(cc_size);
-		__VERBOSE("Number of resolved loop in " KGRN "%d iteration" KGRN " %d\n" RESET, ++iter, cnt);
+		__VERBOSE("Number of resolved loop in " KGRN "iteration" KGRN " %d:%d\n" RESET, ++iter, cnt);
 	} while(cnt > 0);
 	*g_ret = g1;
 	return flag;
@@ -374,18 +425,26 @@ static int resolve_bugle_wrapper(struct asm_graph_t *g, gint_t *id_edge,
 			if (cc_size[cc_id] < MIN_COMPONENT || 
 				kh_get(khInt, set_v, i) != kh_end(set_v)) //must came from large component and not be found
 				continue;
-			if (detect_bugle(e, v, i)){
+			if (detect_bugle_2(e, v, i)){
+				__VERBOSE(KRED "Bulge 2 %d\n" RESET, i);
+				resolve_bulge_2(g0, i);
 				cnt++;
 				flag = 0;
-				__VERBOSE(KGRN "Bulge %d\n" RESET, i);
 				kh_put(khInt, set_v, i, &ret);
 			}
-		}
+
+			//if (detect_bugle(e, v, i)){
+			//	cnt++;
+			//	flag = 0;
+			//	__VERBOSE(KGRN "Bulge %d\n" RESET, i);
+			//}
+	}
 		if (cnt > 0)
 			asm_condense(g0, g1);
 		g0 = g1;
 		free(cc_size);
-		__VERBOSE("Number of bulge in " KGRN "%d iteration" KGRN " %d\n" RESET, ++iter, cnt);
+		__VERBOSE("Number of bulge in " KGRN "iteration" KGRN " %d: %d\n" RESET, ++iter, cnt);
+		check_any_short(g0);
 	} while(cnt > 0);
 	*g_ret = g1;
 	return flag;
@@ -484,6 +543,14 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 	free(q);
 }
 
+void check_any_short(struct asm_graph_t *g0)
+{
+	__VERBOSE("Kmer size " KGRN "%d\n" RESET, g0->ksize);
+	for (int i = 0; i < g0->n_e ; ++i){
+		if (g0->edges[i].seq_len < g0->ksize)
+			__VERBOSE(KRED "Found one short %d\n" RESET, i);
+	}
+}
 //int main(int argc, char *argv[])
 //{
 //	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
