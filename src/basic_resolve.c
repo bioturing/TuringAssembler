@@ -542,4 +542,217 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 	asm_condense(g0, g);
 }
 
+int test_split(struct asm_graph_t *g, gint_t e)
+{
+	gint_t u, v, u_rc, v_rc, e_rc;
+	u = g->edges[e].source;
+	v = g->edges[e].target;
+	e_rc = g->edges[e].rc_id;
+	u_rc = g->nodes[u].rc_id;
+	v_rc = g->nodes[v].rc_id;
+	if (g->nodes[u_rc].deg < 1 || g->nodes[u].deg != 1)
+		return 0;
+	float sum_cov, e_cov;
+	e_cov = __get_edge_cov(g->edges + e, g->ksize);
+	sum_cov = 0;
+	gint_t j;
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		gint_t n, n_rc;
+		n_rc = g->nodes[u_rc].adj[j];
+		n = g->nodes[n_rc].rc_id;
+		sum_cov += __get_edge_cov(g->edges + n, g->ksize);
+	}
+	fprintf(stderr, "consider edge %ld: cov = %.3f, sum sattelite cov = %.3f\n",
+		e, e_cov, sum_cov);
+	if ((int)(e_cov / sum_cov + 0.1111111) < 1)
+		return -1;
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		gint_t n, n_rc;
+		n_rc = g->nodes[u_rc].adj[j];
+		n = g->nodes[n_rc].rc_id;
+		if (n == e || n_rc == e)
+			return -1;
+	}
+	g->nodes[v_rc].adj = realloc(g->nodes[v_rc].adj,
+		(g->nodes[v_rc].deg + g->nodes[u_rc].deg) * sizeof(gint_t));
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		gint_t n, n_rc;
+		n_rc = g->nodes[u_rc].adj[j];
+		n = g->nodes[n_rc].rc_id;
+		fprintf(stderr, "concat edge: (%ld %ld) -> (%ld %ld); (%ld %ld) -> (%ld %ld)\n",
+			g->edges[n].source, g->edges[n].target,
+			g->edges[e].source, g->edges[e].target,
+			g->edges[e_rc].source, g->edges[e_rc].target,
+			g->edges[n_rc].source, g->edges[n_rc].target);
+		float cov = __get_edge_cov(g->edges + n, g->ksize);
+		uint64_t split_count = (uint64_t)(cov / sum_cov * g->edges[e].count);
+		asm_append_edge_seq(g->edges + n, g->edges + e, g->ksize);
+		g->edges[n].count += split_count;
+		g->edges[n].target = v;
+		struct asm_edge_t tmp;
+		asm_clone_edge(&tmp, g->edges + e_rc);
+		tmp.count = g->edges[n_rc].count + split_count;
+		asm_append_edge_seq(&tmp, g->edges + n_rc, g->ksize);
+		tmp.source = v_rc;
+		tmp.target = g->edges[n_rc].target;
+		asm_clean_edge_seq(g->edges + n_rc);
+		g->edges[n_rc] = tmp;
+		g->nodes[v_rc].adj[g->nodes[v_rc].deg++] = n_rc;
+		g->edges[n].rc_id = n_rc;
+		g->edges[n_rc].rc_id = n;
+		assert(g->edges[n].source == g->nodes[g->edges[n_rc].target].rc_id);
+		assert(g->edges[n].target == g->nodes[g->edges[n_rc].source].rc_id);
+	}
+	asm_remove_edge(g, e);
+	asm_remove_edge(g, e_rc);
+	free(g->nodes[u_rc].adj);
+	g->nodes[u_rc].adj = NULL;
+	g->nodes[u_rc].deg = 0;
+	return 1;
+}
 
+void graph_expanding(struct asm_graph_t *g)
+{
+	int cnt, cnt_fp;
+	cnt = cnt_fp = 0;
+	gint_t e;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		int ret = test_split(g, e);
+		if (ret == -1)
+			++cnt_fp;
+		else if (ret == 1)
+			++cnt;
+	}
+	__VERBOSE("Number of expanding edges: %d\n", cnt);
+	__VERBOSE("Number of edges cannot expand: %d\n", cnt_fp);
+}
+
+void find_region(struct asm_graph_t *g, gint_t se)
+{
+	q[0] = se;
+	l = r = 0;
+	while (l <= r) {
+		e = q[l++];
+		v = g->edges[e].target;
+		for (j = 0; j < g->nodes[v].deg; ++j) {
+			ne = g->nodes[v].adj[j];
+			len = get_edge_len(g->edges + ne);
+			if (len < min_contig_len) {
+				if (cb_add_edge(g, set_e, ne) == 0)
+					q[++r] = ne;
+				cb_add_node(g, set_v, g->nodes[ne].target);
+			} else {
+				cb_add_edge(g, set_e, ne);
+				cb_add_node(g, set_v, g->nodes[ne].target);
+			}
+		}
+		u = g->edges[e].source;
+		u_rc = g->nodes[u].rc_id;
+		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+			ne = g->nodes[u_rc].adj[j];
+			len = get_edge_len(g->edges + ne);
+			if (len < min_contig_len) {
+				if (cb_add_edge(g, set_e, ne) == 0)
+					q[++r] = ne;
+				cb_add_node(g, set_v, g->nodes[ne].target);
+			} else {
+				cb_add_edge(g, set_e, ne);
+				cb_add_node(g, set_v, g->nodes[ne].target);
+			}
+		}
+	}
+}
+
+struct dfs_info_t {
+	gint_t num;
+	gint_t low;
+	gint_t parent;
+};
+
+static void rm_edge(struct asm_graph_t *g, gint_t e, khash_t(gint) *set_e)
+{
+	gint_t e_rc = g->nodes[e].rc_id;
+	if (e > e_rc)
+		kh_del(gint, set_e, e_rc);
+	else
+		kh_del(gint, set_e, e);
+}
+
+static struct dfs_info_t *add_node(struct asm_graph_t *g, gint_t u,
+							khash_t(dfs) *nodes)
+{
+	khiter_t k;
+	int ret;
+	gint_t u_rc = g->nodes[u].rc_id;
+	if (u > u_rc)
+		k = kh_put(dfs, nodes, u_rc, &ret);
+	else
+		k = kh_put(dfs, nodes, u, &ret);
+	if (ret == 1)
+		kh_value(nodes, k).parent = -1;
+	return &(kh_value(nodes, k));
+}
+
+void dfs_bridge(struct asm_graph_t *g, gint_t u, gint_t *cnt,
+		khash_t(dfs) *nodes, khash_t(gint) *set_e, khash_t(gint) *leg)
+{
+	struct dfs_info_t *it_u, *it_v;
+	it_u = add_node(g, u, nodes);
+	it_u->num = cnt;
+	it_u->low = cnt;
+	++*cnt;
+	u_rc = u;
+	for (j = 0; j < g->nodes[u].deg; ++j) {
+		e = g->nodes[u].adj[j];
+		/* edges not present on graph */
+		if (kh_get(gint, set_e, e) == kh_end(set_e))
+			continue;
+		v = g->nodes[e].target;
+		it_v = add_node(g, v, nodes);
+		if (it_v->parent == -1) {
+			it_v->parent = u;
+			dfs_bridge(g, v, cnt, nodes, set_e, leg);
+			it_u->low = __min(it_u->low, it_v->low);
+		} else {
+			it_u->low  __min(it_u->low, it_v->num);
+		}
+		if (it_v->low > it_u->num)
+			kh_put(gint, leg, e, &ret);
+		rm_edge(g, e, set_e);
+	}
+
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		e = g->nodes[u_rc].adj[j];
+		if (kh_get(gint, set_e, e) == kh_end(set_e))
+			continue;
+		v = g->nodes[e].target;
+		it_v = add_node(g, v, nodes);
+		if (it_v->parent == -1) {
+			it_v->parent = u;
+			dfs_bridge(g, v, cnt, nodes, set_e, leg);
+			it_u->low = __min(it_u->low, it_v->low);
+		} else {
+			it_u->low = __min(it_u->low, it_v->num);
+		}
+		if (it_v->low > it_u->num)
+			kh_put(gint, leg, e, &ret);
+		rm_edge(g, e, set_e);
+	}
+}
+
+void calibrate_leg(struct asm_graph_t *g, gint_t se, khash_t(gint) *set_v,
+	khash_t(gint) *set_e, khash_t(gint) *leg, , int min_contig_len)
+{
+	gint_t cnt;
+}
+
+void detect_complex(struct asm_graph_t *g, gint_t bridge_len_thres, gint_t max_edge)
+{
+	for (e = 0; e < g->n_e; ++e) {
+		if (kh_get(gint, visited, g->edges[e].target) != kh_end(visited))
+			continue;
+		calibrate_bubble(g, g->edges[e].target);
+	}
+}
