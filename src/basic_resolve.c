@@ -19,6 +19,134 @@ static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 	return ret;
 }
 
+void asm_condense2(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	gint_t *node_id;
+	gint_t n_v, n_e, m_e;
+	node_id = malloc(g0->n_v * sizeof(gint_t));
+	memset(node_id, 255, g0->n_v * sizeof(gint_t));
+
+	/* remove unused links */
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t c, deg;
+		deg = g0->nodes[u].deg;
+		g0->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g0->nodes[u].adj[c];
+			if (e_id != -1)
+				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
+		}
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
+					g0->nodes[u].deg * sizeof(gint_t));
+	}
+	/* nodes on new graph only consist of branching nodes on old graph */
+	n_v = 0;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t deg_fw = g0->nodes[u].deg;
+		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
+		/* non-branching node */
+		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0)
+			continue;
+		fprintf(stdout, "NODE: [%ld] -> [%ld]\n", u, n_v);
+		node_id[u] = n_v++;
+	}
+	struct asm_node_t *nodes = calloc(n_v, sizeof(struct asm_node_t));
+	/* set reverse complement link between nodes */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, x_rc, u_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		u_rc = g0->nodes[u].rc_id;
+		x_rc = node_id[u_rc];
+		assert(x_rc != -1);
+		nodes[x].rc_id = x_rc;
+		nodes[x_rc].rc_id = x;
+		nodes[x].adj = NULL;
+		nodes[x].deg = 0;
+	}
+	n_e = 0;
+	m_e = 0x10000;
+	struct asm_edge_t *edges = calloc(m_e, sizeof(struct asm_edge_t));
+	/* construct new edges */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, y_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		gint_t c;
+		for (c = 0; c < g0->nodes[u].deg; ++c) {
+			if (n_e + 2 > m_e) {
+				edges = realloc(edges, (m_e << 1) * sizeof(struct asm_edge_t));
+				memset(edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
+				m_e <<= 1;
+			}
+			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
+			if (e == -1)
+				continue;
+			p = n_e; q = n_e + 1;
+			edges[p].rc_id = q;
+			edges[q].rc_id = p;
+			asm_clone_edge(edges + p, g0->edges + e);
+			gint_t *ea = NULL;
+			gint_t n_ea = 0;
+
+			do {
+				ea = realloc(ea, (n_ea + 1) * sizeof(gint_t));
+				ea[n_ea++] = e;
+				v = g0->edges[e].target;
+				if (node_id[v] == -1) { /* middle node */
+					assert(g0->nodes[v].deg == 1);
+					e = g0->nodes[v].adj[0];
+					assert(e != -1);
+					asm_append_edge_seq(edges + p,
+						g0->edges + e, g0->ksize);
+					edges[p].count += g0->edges[e].count;
+				} else {
+					break;
+				}
+			} while (1);
+			edges[p].source = x;
+			edges[p].target = node_id[v];
+			asm_clone_reverse(edges + q, edges + p);
+			v_rc = g0->nodes[v].rc_id;
+			e_rc = g0->edges[e].rc_id;
+			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
+						g0->nodes[v_rc].deg, e_rc);
+			assert(j >= 0);
+			g0->nodes[v_rc].adj[j] = -1;
+			y_rc = node_id[v_rc];
+			edges[q].source = y_rc;
+			edges[q].target = nodes[x].rc_id;
+
+			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
+			nodes[x].adj[nodes[x].deg++] = p;
+			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
+					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
+			n_e += 2;
+			fprintf(stdout, "EDGE: [%ld] -> ", p);
+			for (j = 0; j < n_ea; ++j)
+				fprintf(stdout, j + 1 == n_ea ?
+						"[%ld]\n" : "[%ld], ", ea[j]);
+			fprintf(stdout, "EDGE: [%ld] -> ", q);
+			for (j = 0; j < n_ea; ++j)
+				fprintf(stdout, j + 1 == n_ea ?
+						"[%ld]\n" : "[%ld], ",
+						g0->edges[ea[j]].rc_id);
+			free(ea);
+		}
+	}
+	free(node_id);
+	edges = realloc(edges, n_e * sizeof(struct asm_edge_t));
+	g->ksize = g0->ksize;
+	g->n_v = n_v;
+	g->n_e = n_e;
+	g->nodes = nodes;
+	g->edges = edges;
+}
+
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t *node_id;
@@ -378,7 +506,7 @@ void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
 	unroll_simple_loop(g0);
 	// remove_self_loop(g0);
 	remove_bubble_simple(g0, uni_cov);
-	asm_condense(g0, g);
+	asm_condense2(g0, g);
 	// print_debug_info(g);
 }
 
