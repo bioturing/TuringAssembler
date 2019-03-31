@@ -607,6 +607,8 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "build_5_6"))
 		// build5_6_opt_process(argc, argv);
 		build_opt_process(argc, argv, &build5_6_process);
+	else if (!strcmp(argv[1], "build_6_7"))
+		build_opt_process(argc, argv, &build6_7_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))

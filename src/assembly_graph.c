@@ -235,8 +235,10 @@ void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 		uint32_t n_holes = dst->n_holes + src->n_holes;
 		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
 		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
-		for (i = 0; i < src->n_holes; ++i)
-			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len;
+		for (i = 0; i < src->n_holes; ++i) {
+			fprintf(stderr, "p_holes = %u\n", src->p_holes[i]);
+			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len - overlap;
+		}
 		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
 		dst->n_holes = n_holes;
 	}
@@ -355,6 +357,17 @@ static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
 	return (uint64_t)(cov * len);
 }
 
+static void print_debug(struct asm_edge_t *e)
+{
+	__DEBUG("seq_len = %u\n", e->seq_len);
+	__DEBUG("n_holes = %u\n", e->n_holes);
+	uint32_t i;
+	for (i = 0; i < e->n_holes; ++i) {
+		__DEBUG("p_holes = %u; l_holes = %u\n",
+				e->p_holes[i], e->l_holes[i]);
+	}
+}
+
 void write_fasta(struct asm_graph_t *g, const char *path)
 {
 	gint_t *id_edge, *cc_size;
@@ -375,6 +388,9 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
 			g->edges[e].seq_len < MIN_CONTIG_LEN)
 			continue;
+		if (e == 1300586)
+		// if (e == 74)
+			print_debug(g->edges + e);
 		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_length_%lld_count_%llu\n", (long long)e,
 			(long long)len, (long long unsigned)g->edges[e].count);
@@ -485,125 +501,177 @@ void test2_asm_graph(struct asm_graph_t *g)
 	}
 }
 
+static void debug_dump_adj(struct asm_graph_t *g, gint_t u)
+{
+	gint_t k, e;
+	char *seq = NULL;
+	uint32_t lseq = 0;
+	for (k = 0; k < g->nodes[u].deg; ++k) {
+		e = g->nodes[u].adj[k];
+		dump_edge_seq(&seq, &lseq, g->edges + e);
+		__VERBOSE("e = %ld: %s\n", e, seq);
+	}
+	free(seq);
+}
+
+static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
+{
+	if (e1->n_holes != e2->n_holes)
+		return 0;
+	uint32_t i, len;
+	len = e1->seq_len;
+	for (i = 0; i < e1->n_holes; ++i) {
+		if (e1->l_holes[i] != e2->l_holes[i])
+			return 0;
+		if (e1->p_holes[i] != len - e2->p_holes[i] - 2)
+			return 0;
+	}
+	return 1;
+}
+
 void test_asm_graph(struct asm_graph_t *g)
 {
 	gint_t le_idx = get_longest_edge(g);
-	__VERBOSE("Longest edge index: %ld_%ld\n", le_idx, g->edges[le_idx].rc_id);
-	gint_t u, e;
+	__VERBOSE("Longest edge %ld_%ld, length %u\n",
+		le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
+
+	gint_t u, e, j, k;
 	for (u = 0; u < g->n_v; ++u) {
-		gint_t j;
+		/* Test 1: consistency of node's adj and edge's source */
 		for (j = 0; j < g->nodes[u].deg; ++j) {
-			gint_t e_id = g->nodes[u].adj[j];
-			if (g->edges[e_id].source != u) {
-				fprintf(stderr, "node = %ld; edges = (%ld -> %ld)\n",
-					u, g->edges[e_id].source, g->edges[e_id].target);
-				assert(0 && "Fail node reverse complement id");
+			e = g->nodes[u].adj[j];
+			if (g->edges[e].source != u) {
+				__VERBOSE("node = %ld; edge = [%ld](%ld->%ld)\n",
+					u, e,
+					g->edges[e].source, g->edges[e].target);
+				assert(0 && "Node's adjs are node consistent with edges's source");
 			}
 		}
-	}
-	for (e = 0; e < g->n_e; ++e) {
-		gint_t e_rc = g->edges[e].rc_id;
-		// if (e == 12584 || e_rc == 12584)
-		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
-		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
-		// if (e == 12586 || e_rc == 12586)
-		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
-		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
-		// if (e == 86376 || e_rc == 86376)
-		// 	fprintf(stderr, "e = %ld; e_rc = %ld; source = %ld; target = %ld\n",
-		// 		e, e_rc, g->edges[e].source, g->edges[e].target);
-
-		if (e != g->edges[e_rc].rc_id) {
-			fprintf(stderr, "edge = (%ld -> %ld)\n",
-				g->edges[e].source, g->edges[e].target);
-			fprintf(stderr, "edge_rc = (%ld -> %ld)\n",
-				g->edges[e_rc].source, g->edges[e_rc].target);
-			assert(0 && "Fail edge reverse complement id");
-		}
-	}
-	for (u = 0; u < g->n_v; ++u) {
+		/* Test 2: consistency of sequence of edges from one node */
 		int c;
 		for (c = 0; c < g->ksize; ++c) {
-			int prev_c = -1;
-			gint_t k;
+			int prev_nu = -1;
 			for (k = 0; k < g->nodes[u].deg; ++k) {
-				gint_t e = g->nodes[u].adj[k];
-				int ck = __binseq_get(g->edges[e].seq, c);
-				if (ck != prev_c && prev_c != -1) {
-					for (k = 0; k < g->nodes[u].deg; ++k) {
-						gint_t e = g->nodes[u].adj[k];
-						char *seq = NULL;
-						uint32_t lseq = 0;
-						dump_edge_seq(&seq, &lseq,
-								g->edges + e);
-						fprintf(stderr, "e = %ld; seq = %s\n",
-							e, seq);
-					}
-					assert(0 && "Mistake in sequence extract");
+				e = g->nodes[u].adj[k];
+				int nu = __binseq_get(g->edges[e].seq, c);
+				if (nu != prev_nu && prev_nu != -1) {
+					debug_dump_adj(g, u);
+					assert(0 && "Edges from same node not have same k-prefix");
 				}
-				prev_c = ck;
+				prev_nu = nu;
 			}
 		}
-	}
-	for (u = 0; u < g->n_v; ++u) {
-		gint_t j, k;
+		/* Test 3: Edge id within [0, g->n_e) */
 		for (j = 0; j < g->nodes[u].deg; ++j) {
-			gint_t e_id = g->nodes[u].adj[j];
-			gint_t v = g->edges[e_id].target;
-			gint_t v_rc = g->nodes[v].rc_id;
-			int found = 0;
-			for (k = 0; k < g->nodes[v_rc].deg; ++k) {
-				gint_t ek = g->nodes[v_rc].adj[k];
-				if (g->edges[ek].target == g->nodes[u].rc_id) {
-					found = 1;
-					break;
-				}
+			e = g->nodes[u].adj[j];
+			if (e < 0 || e >= g->n_e) {
+				__VERBOSE("node = %ld; edge = %ld\n", u, e);
+				assert(0 && "Node has undefined edges");
 			}
-			if (!found) {
-				fprintf(stderr, "Corrupt node: %ld; u_rc = %ld\n", u, g->nodes[u].rc_id);
-				fprintf(stderr, "Corrupt at edge number: %ld; Info (%ld -> %ld) %ld\n",
-					e_id, g->edges[e_id].source, g->edges[e_id].target, g->edges[e_id].rc_id);
-				fprintf(stderr, "v_rc = %ld\n", v_rc);
-				for (k = 0; k < g->nodes[v_rc].deg; ++k) {
-					gint_t ek = g->nodes[v_rc].adj[k];
-					fprintf(stderr, "\tedges: %ld; Info (%ld -> %ld) %ld\n",
-						ek, g->edges[ek].source, g->edges[ek].target, g->edges[ek].rc_id);
-				}
-				assert(0);
-			}
+		}
+		/* Test 4: Node reverse complement id within [0, g->n_v) */
+		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
+			__VERBOSE("node = %ld; rc_id = %ld\n", u, g->nodes[u].rc_id);
+			assert(0 && "Node has undefined reverse complement");
 		}
 	}
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1) /* edge was removed */
+			continue;
 		gint_t e_rc = g->edges[e].rc_id;
+		/* Test 1: Check correct reverse complement edge id */
+		if (e_rc < 0 || e_rc >= g->n_e) {
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
+			assert(0 && "Edge has undefined reverse complement");
+		}
+		if (e != g->edges[e_rc].rc_id) {
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e_rc].source, g->edges[e_rc].target,
+				g->edges[e_rc].rc_id);
+			assert(0 && "Edge reverse complement link is not 2-way");
+		}
+		/* Test 2: source and target within [0, g->n_e) */
+		if (g->edges[e].source < 0 || g->edges[e].target >= g->n_v ||
+			g->edges[e_rc].source < 0 || g->edges[e_rc].target >= g->n_v) {
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e_rc].source, g->edges[e_rc].target,
+				g->edges[e_rc].rc_id);
+			assert(0 && "Edge source and target node are undefined");
+		}
+		gint_t src, dst, src_rc, dst_rc;
+		src = g->edges[e].source;
+		dst = g->edges[e].target;
+		/* Test 3: Edge must be in source's adj */
+		gint_t idx = find_adj_idx(g->nodes[src].adj,
+						g->nodes[src].deg, e);
+		if (idx == -1) {
+			__VERBOSE("node [%ld]; edge [%ld](%ld->%ld)\n",
+				src, e, src, dst);
+			assert(0 && "Edge not in source's adj");
+		}
+		src_rc = g->edges[e_rc].source;
+		dst_rc = g->edges[e_rc].target;
+		/* Test 4: Edge and its reverse complement must link reverse
+		 * complemented nodes
+		 */
+		if (src != g->nodes[dst_rc].rc_id || dst != g->nodes[src_rc].rc_id) {
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e_rc].source, g->edges[e_rc].target,
+				g->edges[e_rc].rc_id);
+			assert(0 && "Edge and reverse complement not link between reverse complemented nodes");
+		}
+		/* Test 5: Sequence reverse complement */
 		if (!is_seq_rc(g->edges[e].seq, g->edges[e].seq_len,
 				g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
-			fprintf(stderr, "seq_len = %u; rc_seq_len = %u\n",
-				g->edges[e].seq_len, g->edges[e_rc].seq_len);
-			assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
 			char *seq = NULL;
 			uint32_t lseq = 0;
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
 			dump_edge_seq(&seq, &lseq, g->edges + e);
-			fprintf(stderr, "seq    = %s\n", seq);
+			__VERBOSE("%s\n", seq);
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e_rc].source, g->edges[e_rc].target,
+				g->edges[e_rc].rc_id);
 			dump_edge_seq(&seq, &lseq, g->edges + e_rc);
-			fprintf(stderr, "seq_rc = %s\n", seq);
-			assert(0 && "Stupid error");
+			__VERBOSE("%s\n", seq);
+			assert(0 && "Edge and rc sequence is not reverse complemented");
 		}
-		assert(e_rc != -1);
-		gint_t src, tgt, src_rc, tgt_rc;
-		src = g->edges[e].source;
-		tgt = g->edges[e].target;
-		src_rc = g->edges[e_rc].source;
-		tgt_rc = g->edges[e_rc].target;
-		if (!(src == g->nodes[tgt_rc].rc_id && g->nodes[src].rc_id == tgt_rc
-				&& tgt == g->nodes[src_rc].rc_id && g->nodes[tgt].rc_id == src_rc)) {
-			fprintf(stderr, "source = %ld; target = %ld; rc[source] = %ld; rc[target] = %ld\n",
-				src, tgt, g->nodes[src].rc_id, g->nodes[tgt].rc_id);
-			fprintf(stderr, "source_rc = %ld; target_rc = %ld; rc[source_rc] = %ld; rc[target_rc] = %ld\n",
-				src_rc, tgt_rc, g->nodes[src_rc].rc_id, g->nodes[tgt_rc].rc_id);
-			assert(0);
+		if (!is_hole_rc(g->edges + e, g->edges + e_rc)) {
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e].source, g->edges[e].target,
+				g->edges[e].rc_id);
+			__VERBOSE("n_holes = %u; seq_len = %u",
+				g->edges[e].n_holes, g->edges[e].seq_len);
+			uint32_t j;
+			for (j = 0; j < g->edges[e].n_holes; ++j)
+				__VERBOSE("(p=%u, l=%u) ",
+					g->edges[e].p_holes[j],
+					g->edges[e].l_holes[j]);
+			__VERBOSE("\n");
+			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+				e, g->edges[e_rc].source, g->edges[e_rc].target,
+				g->edges[e_rc].rc_id);
+			__VERBOSE("n_holes = %u; seq_len = %u",
+				g->edges[e_rc].n_holes, g->edges[e_rc].seq_len);
+			for (j = 0; j < g->edges[e_rc].n_holes; ++j)
+				__VERBOSE("(p=%u, l=%u) ",
+					g->edges[e_rc].p_holes[j],
+					g->edges[e_rc].l_holes[j]);
+			__VERBOSE("\n");
+			assert(0 && "Edge and rc holes is not symmetric");
 		}
-		assert(src == g->nodes[tgt_rc].rc_id && g->nodes[src].rc_id == tgt_rc);
-		assert(tgt == g->nodes[src_rc].rc_id && g->nodes[tgt].rc_id == src_rc);
 	}
 }
 
@@ -652,9 +720,6 @@ void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
 	xfwrite(&g->bin_size, sizeof(int), 1, fp);
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
-		gint_t e_rc = g->edges[e].rc_id;
-		// if (e > e_rc)
-		// 	continue;
 		gint_t n, k, len;
 		len = get_edge_len(g->edges + e);
 		n = (len + g->bin_size - 1) / g->bin_size;
@@ -713,11 +778,6 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	xfread(&g->bin_size, sizeof(int), 1, fp);
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
-		gint_t e_rc = g->edges[e].rc_id;
-		// if (e > e_rc) {
-		// 	g->edges[e].bucks = g->edges[e_rc].bucks;
-		// 	continue;
-		// }
 		gint_t n, k;
 		gint_t len = get_edge_len(g->edges + e);
 		n = (len + g->bin_size - 1) / g->bin_size;

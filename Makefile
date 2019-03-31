@@ -8,7 +8,30 @@ CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function -fPIC -std=gnu99 -g
 
 EXEC = skipping
 
-SRC = $(wildcard src/*.c)
+# SRC = $(wildcard src/*.c)
+
+SRC = src/assembly_graph.c 				\
+      src/barcode_resolve.c 				\
+      src/barcode_retriever.c 				\
+      src/basic_resolve.c 				\
+      src/dqueue.c 					\
+      src/fastq_producer.c 				\
+      src/get_buffer.c 					\
+      src/io_utils.c 					\
+      src/k31_build.c 					\
+      src/k31_count.c 					\
+      src/k31hash.c 					\
+      src/k63_build.c 					\
+      src/k63_count.c 					\
+      src/k63hash.c 					\
+      src/process.c 					\
+      src/pthread_barrier.c 				\
+      src/semaphore_wrapper.c 				\
+      src/test_hash_count.c 				\
+      src/time_utils.c 					\
+      src/utils.c 					\
+      src/verbose.c 					\
+      src/main.c
 
 OBJ = $(SRC:.c=.o)
 

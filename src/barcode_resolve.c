@@ -151,3 +151,29 @@ void resolve_bridge(struct asm_graph_t *g)
 	}
 	fprintf(stderr, "Number of possible bridge to resolve: %d\n", cnt);
 }
+
+int test_bridge_complex(struct asm_graph_t *g, gint_t e)
+{
+	gint_t u, v, u_rc, v_rc;
+	u = g->edges[e].source;
+	v = g->edges[e].target;
+	u_rc = g->nodes[u].rc_id;
+	v_rc = g->nodes[v].rc_id;
+	if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1)
+		return 0;
+	__VERBOSE("Complex bridge on edge [%ld]: %ld <-> %ld\n",
+			e, g->nodes[u_rc].deg, g->nodes[v].deg);
+	return 1;
+}
+
+void resolve_bridge_complex(struct asm_graph_t *g0, struct asm_graph_t *g1)
+{
+	gint_t e;
+	int cnt = 0;
+	for (e = 0; e < g0->n_e; ++e) {
+		if (g0->edges[e].source == -1)
+			continue;
+		cnt += test_bridge_complex(g0, e);
+	}
+	__VERBOSE("Number of bridges: %d\n", cnt);
+}
