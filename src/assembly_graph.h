@@ -92,6 +92,7 @@ gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 float get_genome_coverage(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
+void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src);
 /* Copy edge and do reversing complement */
 void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
 /* append edge, check for integrity */;

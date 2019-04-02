@@ -144,20 +144,21 @@ gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	return (gint_t)k;
 }
 
-// void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
-// {
-// 	asm_clone_edge(g->edges + dst, g->edges + src);
-// 	g->edges[dst].source = g->edges[src].source;
-// 	g->edges[dst].target = g->edges[src].target;
-// 	/* clone the bucks */
-// 	slen = get_edge_len(g->edges + dst);
-// 	nbin = (slen + g->bin_size - 1) / g->bin_size;
-// 	g->edges[dst].bucks = malloc(nbin * sizeof(struct barcode_hash_t));
-// 	gint_t i;
-// 	for (i = 0; i < nbin; ++i)
-// 		barcode_hash_clean(g->edges[dst].bucks + i,
-// 						g->edges[src].bucks + i);
-// }
+void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
+{
+	asm_clone_edge(g->edges + dst, g->edges + src);
+	g->edges[dst].source = g->edges[src].source;
+	g->edges[dst].target = g->edges[src].target;
+	/* clone the bucks */
+	gint_t slen, nbin;
+	slen = get_edge_len(g->edges + dst);
+	nbin = (slen + g->bin_size - 1) / g->bin_size;
+	g->edges[dst].bucks = malloc(nbin * sizeof(struct barcode_hash_t));
+	gint_t i;
+	for (i = 0; i < nbin; ++i)
+		barcode_hash_clone(g->edges[dst].bucks + i,
+						g->edges[src].bucks + i);
+}
 
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
 {

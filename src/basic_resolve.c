@@ -13,7 +13,7 @@ KHASH_SET_INIT_INT64(gint);
 
 #define __positive_ratio(r)		((r) + (1e-6) >= 0.05)
 #define LEN_VAR				1
-#define MIN_CONTIG_LEN			3000
+#define MIN_SCAFFOLD_LEN			3000
 #define MAX_EDGE_COUNT			1000
 
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
@@ -308,7 +308,7 @@ static inline int check_self_loop(struct asm_graph_t *g, gint_t e, double uni_co
 static inline int check_double_loop(struct asm_graph_t *g, gint_t ef, double uni_cov)
 {
 	gint_t ef_rc, u, v, u_rc, v_rc, er, er_rc, e1, e2;
-	ef_rc == g->edges[ef].rc_id;
+	ef_rc = g->edges[ef].rc_id;
 	u = g->edges[ef].source;
 	v = g->edges[ef].target;
 	u_rc = g->nodes[u].rc_id;
@@ -1235,6 +1235,12 @@ gint_t bc_find_best_pair(struct asm_graph_t *g, gint_t se,
 	return -1;
 }
 
+static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
+{
+	g->nodes[u].adj = realloc(g->nodes[u].adj, (g->nodes[u].deg + 1) * sizeof(gint_t));
+	g->nodes[u].adj[g->nodes[u].deg++] = e;
+}
+
 void check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
 	gint_t u, v, v_rc, u_rc, e1, e2, e_rc;
@@ -1291,17 +1297,19 @@ void check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 					e2, g->edges[e2].rc_id, e_uni_count * cov1);
 				ecov -= cov1;
 			} else if (cov2 > 1) {
-				// g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
-				// g->n_e += 2;
-				// asm_clone_edge2(g, g->n_e - 2, e2);
-				// asm_clone_edge2(g, g->n_e - 1, g->edges[e2].rc_id);
-				// g->edges[g->n_e - 2].rc_id = g->n_e - 1;
-				// g->edges[g->n_e - 1].rc_id = g->n_e - 2;
-				// g->edges[g->n_e - 2].count = g->edges[g->n_e - 1].count = g->edges[e2].count / cov2;
-				// g->edges[e2].count = g->edges[g->edges[e2].rc_id].count = g->edges[e2].count / cov2 * (cov2 - 1);
-				// asm_add_node_adj(g, g->edges[g->n_e - 2].source, g->n_e - 2);
-				// asm_add_node_adj(g
-				// asm_join_edge3(g, g->edges[e1].rc_id,
+				g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+				g->n_e += 2;
+				asm_clone_edge2(g, g->n_e - 2, e2);
+				asm_clone_edge2(g, g->n_e - 1, g->edges[e2].rc_id);
+				g->edges[g->n_e - 2].rc_id = g->n_e - 1;
+				g->edges[g->n_e - 1].rc_id = g->n_e - 2;
+				g->edges[g->n_e - 2].count = g->edges[g->n_e - 1].count = g->edges[e2].count / cov2;
+				g->edges[e2].count = g->edges[g->edges[e2].rc_id].count = g->edges[e2].count / cov2 * (cov2 - 1);
+				asm_add_node_adj(g, g->edges[g->n_e - 2].source, g->n_e - 2);
+				asm_add_node_adj(g, g->edges[g->n_e - 1].source, g->n_e - 1);
+				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
+					g->n_e - 2, g->n_e - 1, e_uni_count * cov1);
+				ecov -= cov1;
 			} else {
 				/* cov2 == 0 */
 				continue;
@@ -1549,9 +1557,9 @@ void collapse_2_2_jungle(struct asm_graph_t *g)
 			continue;
 		uint32_t len = get_edge_len(g->edges + e);
 		if (kh_get(gint, visited, g->edges[e].target) != kh_end(visited) ||
-			len < MIN_CONTIG_LEN || g->edges[e].source == -1)
+			len < MIN_SCAFFOLD_LEN || g->edges[e].source == -1)
 			continue;
-		find_region(g, e, MIN_CONTIG_LEN, MAX_EDGE_COUNT, set_v, set_e);
+		find_region(g, e, MIN_SCAFFOLD_LEN, MAX_EDGE_COUNT, set_v, set_e);
 		if (kh_size(set_e) < MAX_EDGE_COUNT) {
 			kh_merge_set(visited, set_v);
 			detect_leg(g, set_v, set_e, set_leg);
@@ -1583,7 +1591,7 @@ void collapse_n_m_bridge(struct asm_graph_t *g)
 	}
 }
 
-void collapse_n_n_jungle(struct asm_graph_t *g0, struct asm_graph_t *g1)
+void collapse_n_m_jungle(struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
 	collapse_2_2_jungle(g0);
 	collapse_n_m_bridge(g0);

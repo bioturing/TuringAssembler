@@ -206,7 +206,7 @@ void build4_5_process(struct opt_build_t *opt)
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Resolving 2-2, n-n bridge\n");
 	// detect_simple_tandem(g0);
-	collapse_n_n_jungle(g0, g1);
+	collapse_n_m_jungle(g0, g1);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
 							(long long)g1->n_v);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
@@ -270,7 +270,7 @@ void build6_7_process(struct opt_build_t *opt)
 	__VERBOSE("Resolving bridge complex\n");
 	// graph_expanding(g0);
 	// resolve_chain(g0, g1);
-	resolve_bridge_complex(g0, g1);
+	// resolve_bridge_complex(g0, g1);
 	// detect_simple_tandem(g0);
 	// struct asm_graph_t *g1, *g2;
 	// g1 = calloc(1, sizeof(struct asm_graph_t));

@@ -160,7 +160,7 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	// fprintf(stdout, "h = %ld; k = %ld; s[k  -1] = %d\n", h, k, s[k - 1]);
 	//return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
 	if ( k * 2 > h && s[k - 1] >= 5){
-		__VERBOSE("N90 Pos: %d\n" , k);
+		__VERBOSE("N90 Pos: %ld\n" , k);
 		__VERBOSE("Value at N90: %d\n" , s[k - 1]);
 	}
 	return k * 2 > h && s[k - 1] >= 5 ? 1 : 0;
@@ -215,12 +215,12 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 		return;
 	fprintf(stdout, "bin e1: ");
 	for (i = 0; i < n1; ++i) {
-		fprintf(stdout, i + 1 == n1 ? "%u\n" : "%u ",
+		fprintf(stdout, i + 1 == n1 ? "%ld\n" : "%ld ",
 			count_bc(g->edges[e1].bucks + i));
 	}
 	fprintf(stdout, "bin e2: ");
 	for (i = 0; i < n2; ++i) {
-		fprintf(stdout, i + 1 == n2 ? "%u\n" : "%u ",
+		fprintf(stdout, i + 1 == n2 ? "%ld\n" : "%ld ",
 			count_bc(g->edges[e2].bucks + i));
 	}
 	for (i = 0; i < n1; ++i) {

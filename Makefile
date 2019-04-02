@@ -4,14 +4,14 @@ CPP = cpp
 
 LIBS = -pthread -flto -lm -lz
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function -fPIC -std=gnu99 -g
+CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function \
+	-Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -fPIC -std=gnu99 -g
 
 EXEC = skipping
 
 # SRC = $(wildcard src/*.c)
 
 SRC = src/assembly_graph.c 				\
-      src/barcode_resolve.c 				\
       src/barcode_retriever.c 				\
       src/basic_resolve.c 				\
       src/dqueue.c 					\
