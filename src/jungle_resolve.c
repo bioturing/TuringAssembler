@@ -679,3 +679,4 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 	iterative_scaffolding(g0, fw_link);
 	__VERBOSE("Number of resolved jungle: %d\n", cnt);
 }
+

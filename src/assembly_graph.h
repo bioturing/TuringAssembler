@@ -66,6 +66,7 @@ void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
 int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* print matrix of shared barcodes */
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
+double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
@@ -102,6 +103,12 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
 void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2);
+void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+		gint_t e2, gint_t e_rc2, uint32_t gap_size, uint64_t gap_count);
+void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count);
+void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t gap_size);
 /* clean local data */
 void asm_clean_edge_seq(struct asm_edge_t *e);
 /* only set the link to the edge to -1 */

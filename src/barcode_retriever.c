@@ -43,6 +43,18 @@ static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
 					khash_t(k63_dict) *dict);
 
+gint_t count_bc(struct barcode_hash_t *t)
+{
+	gint_t ret = 0;
+	kmint_t i;
+	for (i = 0; i < t->size; ++i) {
+		if (t->keys[i] == (uint64_t)-1)
+			continue;
+		ret += t->cnts[i] > 30;
+	}
+	return ret;
+}
+
 gint_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 {
 	gint_t ret = 0;
@@ -52,7 +64,7 @@ gint_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 			continue;
 		k = barcode_hash_get(t2, t1->keys[i]);
 		if (k != BARCODE_HASH_END(t2))
-			ret += __min(t1->cnts[i], t2->cnts[k]) > 3;
+			ret += __min(t1->cnts[i], t2->cnts[k]) > 30;
 	}
 	return ret;
 }
@@ -87,6 +99,37 @@ void barcode_bin_profiling(struct asm_graph_t *g, gint_t *bx_bin)
 		gint_t len1 = get_edge_len(g->edges + i);
 		bx_bin[i] = (len1 + g->bin_size - 1) / g->bin_size;
 	}
+}
+
+double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	gint_t len1, len2, n1, n2, i, k;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	if (len1 < 1000 || len2 < 1000)
+		return -1.0;
+	n1 = (len1 + g->bin_size / 10) / g->bin_size;
+	n2 = (len2 + g->bin_size / 10) / g->bin_size;
+	n1 = __min(n1, 5);
+	n2 = __min(n2, 5);
+	if (n1 * n2 < 5)
+		return -1.0;
+	gint_t *s1, *s2;
+	s1 = alloca(n1 * sizeof(gint_t));
+	s2 = alloca(n2 * sizeof(gint_t));
+	for (i = 0; i < n1; ++i)
+		s1[i] = count_bc(g->edges[e1].bucks + i);
+	for (k = 0; k < n2; ++k)
+		s2[k] = count_bc(g->edges[e2].bucks + k);
+	double s = 0;
+	for (i = 0; i < n1; ++i) {
+		for (k = 0; k < n2; ++k) {
+			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
+						g->edges[e2].bucks + k);
+			s += ret * 1.0 / __min(s1[i], s2[k]);
+		}
+	}
+	return (s * 1.0 / (n1 * n2));
 }
 
 int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
@@ -159,12 +202,27 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	assert(e1 < g->n_e && e2 < g->n_e);
 	fprintf(stdout, "Print table (%ld <-> %ld)\n", e1, e2);
-	gint_t n1, n2, len1, len2;
+	gint_t n1, n2, len1, len2, i, k;
 	len1 = get_edge_len(g->edges + e1);
 	len2 = get_edge_len(g->edges + e2);
-	n1 = (len1 + g->bin_size - 1) / g->bin_size;
-	n2 = (len2 + g->bin_size - 1) / g->bin_size;
-	gint_t i, k;
+	if (len1 < 1000 || len2 < 1000)
+		return;
+	n1 = (len1 + g->bin_size / 10) / g->bin_size;
+	n2 = (len2 + g->bin_size / 10) / g->bin_size;
+	n1 = __min(n1, 5);
+	n2 = __min(n2, 5);
+	if (n1 * n2 < 5)
+		return;
+	fprintf(stdout, "bin e1: ");
+	for (i = 0; i < n1; ++i) {
+		fprintf(stdout, i + 1 == n1 ? "%u\n" : "%u ",
+			count_bc(g->edges[e1].bucks + i));
+	}
+	fprintf(stdout, "bin e2: ");
+	for (i = 0; i < n2; ++i) {
+		fprintf(stdout, i + 1 == n2 ? "%u\n" : "%u ",
+			count_bc(g->edges[e2].bucks + i));
+	}
 	for (i = 0; i < n1; ++i) {
 		for (k = 0; k < n2; ++k) {
 			gint_t s = count_shared_bc(g->edges[e1].bucks + i,
@@ -172,6 +230,7 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 			fprintf(stdout, k + 1 == n2 ? "%ld\n" : "%ld,", s);
 		}
 	}
+	fprintf(stdout, "\n");
 }
 
 void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2, 
