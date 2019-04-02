@@ -11,6 +11,7 @@ void build3_4_process(struct opt_build_t *opt);
 void build4_5_process(struct opt_build_t *opt);
 void build5_6_process(struct opt_build_t *opt);
 void build6_7_process(struct opt_build_t *opt);
+void build_huu_process(struct opt_build_t *opt);
 void build_barcode_process(struct opt_build_t *opt);
 void graph_query_process(struct opt_build_t *opt);
 void build2_3a_process(struct opt_build_t *opt);

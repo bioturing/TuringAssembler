@@ -614,7 +614,9 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "clean"))
-		clean_opt_process(argc, argv);
+		clean_opt_process(argc, argv); 
+	else if (!strcmp(argv[1], "build_huu")) 
+		build_opt_process(argc, argv, &build_huu_process); 
 	else
 		print_usage(argv[0]);
 

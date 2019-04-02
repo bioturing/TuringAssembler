@@ -1597,3 +1597,4 @@ void collapse_n_m_jungle(struct asm_graph_t *g0, struct asm_graph_t *g1)
 	collapse_n_m_bridge(g0);
 	asm_condense(g0, g1);
 }
+
