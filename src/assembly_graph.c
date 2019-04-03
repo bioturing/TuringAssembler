@@ -202,13 +202,13 @@ void asm_append_seq_with_gap2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	/* append the bucket */
 	slen1 = get_edge_len(g->edges + e1);
 	slen2 = get_edge_len(g->edges + e2);
-	nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
-	nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
 	asm_append_seq_with_gap(g->edges + e1, g->edges + e2, gap_size);
 	if (g->edges[e1].bucks == NULL)
 		return;
 	slen = get_edge_len(g->edges + e1);
 	nbin = (slen + g->bin_size - 1) / g->bin_size;
+	nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
+	nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
 	g->edges[e1].bucks = realloc(g->edges[e1].bucks,
 					nbin * sizeof(struct barcode_hash_t));
 	gint_t i;
@@ -290,30 +290,12 @@ void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 		gint_t e2, gint_t e_rc2, uint32_t gap_size, uint64_t gap_count)
 {
-	if (!is_hole_rc(g->edges + e1, g->edges + e_rc1))
-		__ERROR("Error from start e1");
-	if (!is_hole_rc(g->edges + e2, g->edges + e_rc2))
-		__ERROR("Error from start e2");
+	double cov, cov1, cov2;
+	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	__VERBOSE("Join with gap [%u] %ld(~%.3lf) -> %ld(~%.3lf). ",
+		gap_size, e1, cov1, e2, cov2);
 	uint32_t j;
-	fprintf(stderr, "e = %ld; n_holes = %u\n",
-		e1, g->edges[e1].n_holes);
-	if (g->edges[e1].n_holes == 0) {
-		assert(g->edges[e1].p_holes == NULL);
-		assert(g->edges[e1].l_holes == NULL);
-	}
-	for (j = 0; j < g->edges[e1].n_holes; ++j)
-		fprintf(stderr, "p=%u; l=%u\n", g->edges[e1].p_holes[j],
-			g->edges[e1].l_holes[j]);
-	if (g->edges[e_rc2].n_holes == 0) {
-		assert(g->edges[e_rc2].p_holes == NULL);
-		assert(g->edges[e_rc2].l_holes == NULL);
-	}
-	fprintf(stderr, "e = %ld; n_holes = %u\n",
-		e_rc2, g->edges[e_rc2].n_holes);
-	for (j = 0; j < g->edges[e_rc2].n_holes; ++j)
-		fprintf(stderr, "p=%u; l=%u\n", g->edges[e_rc2].p_holes[j],
-			g->edges[e_rc2].l_holes[j]);
-
 	asm_append_seq_with_gap2(g, e1, e2, gap_size);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count + gap_count;
@@ -324,29 +306,46 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	g->edges[e1].rc_id = e_rc2;
 	g->edges[e_rc2].rc_id = e1;
-	if (!is_hole_rc(g->edges + e1, g->edges + e_rc2)) {
-		uint32_t j;
-		fprintf(stderr, "e = %ld; n_holes = %u; seq_len = %u\n",
-			e1, g->edges[e1].n_holes, g->edges[e1].seq_len);
-		for (j = 0; j < g->edges[e1].n_holes; ++j)
-			fprintf(stderr, "p=%u; l=%u\n", g->edges[e1].p_holes[j],
-				g->edges[e1].l_holes[j]);
-		fprintf(stderr, "e = %ld; n_holes = %u; seq_len = %u\n",
-			e_rc2, g->edges[e_rc2].n_holes, g->edges[e_rc2].seq_len);
-		for (j = 0; j < g->edges[e_rc2].n_holes; ++j)
-			fprintf(stderr, "p=%u; l=%u\n", g->edges[e_rc2].p_holes[j],
-				g->edges[e_rc2].l_holes[j]);
-		__ERROR("Join edge with gap failed %ld_%ld %ld_%ld\n",
-			e1, e_rc1, e2, e_rc2);
-	}
 
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
+	cov = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("New cov: %.3f\n", cov);
+}
+
+void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+					gint_t e2, gint_t e_rc2)
+{
+	double cov, cov1, cov2;
+	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	__VERBOSE("Join %ld(~%.3lf) -> %ld(~%.3lf). ",
+		e1, cov1, e2, cov2);
+	asm_append_edge_seq2(g, e1, e2);
+	g->edges[e1].target = g->edges[e2].target;
+	g->edges[e1].count += g->edges[e2].count;
+	asm_append_edge_seq2(g, e_rc2, e_rc1);
+	g->edges[e_rc2].target = g->edges[e_rc1].target;
+	g->edges[e_rc2].count += g->edges[e_rc1].count;
+
+	g->edges[e1].rc_id = e_rc2;
+	g->edges[e_rc2].rc_id = e1;
+
+	asm_remove_edge(g, e2);
+	asm_remove_edge(g, e_rc1);
+	cov = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count)
 {
+	double cov, cov1, cov2;
+	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	cov2 = __get_edge_cov(g->edges + e3, g->ksize);
+	__VERBOSE("Join %ld(~%.3lf) -> %ld -> %ld(~%.3lf). ",
+		e1, cov1, e2, e3, cov2);
+
 	asm_append_edge_seq2(g, e1, e2);
 	asm_append_edge_seq2(g, e1, e3);
 	g->edges[e1].target = g->edges[e3].target;
@@ -362,6 +361,8 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	asm_remove_edge(g, e3);
 	asm_remove_edge(g, e_rc1);
+	cov = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
