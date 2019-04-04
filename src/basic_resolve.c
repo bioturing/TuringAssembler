@@ -14,7 +14,7 @@ KHASH_SET_INIT_INT64(gint);
 #define __positive_ratio(r)		((r) + (1e-6) >= 0.01)
 #define LEN_VAR				2
 #define MIN_SCAFFOLD_LEN		3000
-#define MAX_EDGE_COUNT			1000
+#define MAX_EDGE_COUNT			5000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
 	(uni_cov) + 0.499999999)
