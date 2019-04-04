@@ -122,14 +122,14 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	for (k = 0; k < n2; ++k)
 		s2[k] = count_bc(g->edges[e2].bucks + k);
 	double s = 0;
-	for (i = 0; i < n1; ++i) {
-		for (k = 0; k < n2; ++k) {
+	for (i = 1; i < n1; ++i) {
+		for (k = 1; k < n2; ++k) {
 			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
 						g->edges[e2].bucks + k);
 			s += ret * 1.0 / (s1[i] + s2[k]);
 		}
 	}
-	return (s * 1.0 / (n1 * n2));
+	return (s * 1.0 / ((n1 - 1) * (n2 - 1)));
 }
 
 int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
