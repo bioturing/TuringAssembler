@@ -144,6 +144,17 @@ gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	return (gint_t)k;
 }
 
+gint_t asm_create_node(struct asm_graph_t *g)
+{
+	g->nodes = realloc(g->nodes, (g->n_v + 2) * sizeof(struct asm_node_t));
+	g->nodes[g->n_v].rc_id = g->n_v + 1;
+	g->nodes[g->n_v + 1].rc_id = g->n_v;
+	g->nodes[g->n_v].adj = g->nodes[g->n_v + 1].adj = NULL;
+	g->nodes[g->n_v].deg = g->nodes[g->n_v + 1].deg = 0;
+	g->n_v += 2;
+	return g->n_v - 2;
+}
+
 void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
 	asm_clone_edge(g->edges + dst, g->edges + src);
@@ -152,6 +163,8 @@ void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 	/* clone the bucks */
 	gint_t slen, nbin;
 	slen = get_edge_len(g->edges + dst);
+	if (g->bin_size == 0 || g->edges[src].bucks == NULL)
+		return;
 	nbin = (slen + g->bin_size - 1) / g->bin_size;
 	g->edges[dst].bucks = malloc(nbin * sizeof(struct barcode_hash_t));
 	gint_t i;
@@ -288,7 +301,7 @@ void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 }
 
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-		gint_t e2, gint_t e_rc2, uint32_t gap_size, uint64_t gap_count)
+				gint_t e2, gint_t e_rc2, uint32_t gap_size)
 {
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
@@ -298,11 +311,11 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	uint32_t j;
 	asm_append_seq_with_gap2(g, e1, e2, gap_size);
 	g->edges[e1].target = g->edges[e2].target;
-	g->edges[e1].count += g->edges[e2].count + gap_count;
+	g->edges[e1].count += g->edges[e2].count;
 
 	asm_append_seq_with_gap2(g, e_rc2, e_rc1, gap_size);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
-	g->edges[e_rc2].count += g->edges[e_rc1].count + gap_count;
+	g->edges[e_rc2].count += g->edges[e_rc1].count;
 
 	g->edges[e1].rc_id = e_rc2;
 	g->edges[e_rc2].rc_id = e1;
@@ -361,6 +374,35 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	asm_remove_edge(g, e3);
 	asm_remove_edge(g, e_rc1);
+	cov = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("New cov: %.3f\n", cov);
+}
+
+void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+			gint_t e2, gint_t e_rc2, uint64_t added_count)
+{
+	double cov, cov1, cov2;
+	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	__VERBOSE("Join loop %ld(~%.3lf) -> %ld(~%.3lf) -> %ld(~%.3lf). Added count: %lu. ",
+		e1, cov1, e2, cov2, e1, cov1, added_count);
+
+	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	g->n_e += 2;
+	asm_clone_edge2(g, g->n_e - 2, e2);
+	asm_clone_edge2(g, g->n_e - 1, e_rc2);
+	asm_append_edge_seq2(g, g->n_e - 2, e1);
+	asm_append_edge_seq2(g, e1, g->n_e - 2);
+	asm_append_edge_seq2(g, g->n_e - 1, e_rc1);
+	asm_append_edge_seq2(g, e_rc1, g->n_e - 1);
+	g->edges[e1].count += added_count;
+	g->edges[e_rc1].count += added_count;
+	asm_clean_edge_seq(g->edges + g->n_e - 2);
+	asm_clean_edge_seq(g->edges + g->n_e - 1);
+	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
+	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
+	g->n_e -= 2;
+
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
 	__VERBOSE("New cov: %.3f\n", cov);
 }

@@ -103,13 +103,16 @@ void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
  */
 void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap);
+gint_t asm_create_node(struct asm_graph_t *g);
 void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 					gint_t e2, gint_t e_rc2);
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-		gint_t e2, gint_t e_rc2, uint32_t gap_size, uint64_t gap_count);
+				gint_t e2, gint_t e_rc2, uint32_t gap_size);
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count);
+void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+			gint_t e2, gint_t e_rc2, uint64_t added_count);
 void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t gap_size);
 /* clean local data */

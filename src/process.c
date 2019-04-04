@@ -179,7 +179,7 @@ void build3_4_process(struct opt_build_t *opt)
 	__VERBOSE("Collapsing 1-1 jungle\n");
 	// resolve_bridge(g0);
 	// collapse_1_1_jungle(g0, g1);
-	collapse_n_m_jungle(g0, g1);
+	resolve_n_m_bridge(g0, g1);
 	__VERBOSE_LOG("kmer_%d_graph_#4", "Number of nodes: %lld\n", g0->ksize,
 							(long long)g1->n_v);
 	__VERBOSE_LOG("kmer_%d_graph_#4", "Number of edges: %lld\n", g0->ksize,
@@ -207,7 +207,7 @@ void build4_5_process(struct opt_build_t *opt)
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Resolving 2-2, n-n bridge\n");
 	// detect_simple_tandem(g0);
-	collapse_n_m_jungle(g0, g1);
+	resolve_n_m_jungle(g0, g1);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of nodes: %lld\n", g0->ksize,
 							(long long)g1->n_v);
 	__VERBOSE_LOG("kmer_%d_graph_#5", "Number of edges: %lld\n", g0->ksize,
