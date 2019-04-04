@@ -1604,14 +1604,15 @@ void print_debug_2_2_bridge(struct asm_graph_t *g, gint_t e)
 	v = g->edges[e].target;
 	u_rc = g->nodes[u].rc_id;
 	fprintf(stdout, "Test edge ratio %ld\n", e);
-	for (i = 0; i < g->nodes[u_rc].rc_id; ++i) {
-		for (k = 0; k < g->nodes[v].rc_id; ++k) {
+	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
+		for (k = 0; k < g->nodes[v].deg; ++k) {
 			double ratio;
 			ratio = get_barcode_ratio(g, g->nodes[u_rc].adj[i],
 							g->nodes[v].adj[k]);
-			fprintf(stdout, "Pair %ld-%ld, ratio: %.6lf\n",
-				g->nodes[u_rc].adj[i], g->nodes[v].adj[k],
-				ratio);
+			if (ratio > 0)
+				fprintf(stdout, "Pair %ld-%ld, ratio: %.6lf\n",
+					g->nodes[u_rc].adj[i], g->nodes[v].adj[k],
+					ratio);
 		}
 	}
 }
