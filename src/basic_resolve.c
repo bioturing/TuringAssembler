@@ -1597,6 +1597,25 @@ void collapse_small_complex(struct asm_graph_t *g, khash_t(gint) *set_e,
 	}
 }
 
+void print_debug_2_2_bridge(struct asm_graph_t *g, gint_t e)
+{
+	gint_t u, v, u_rc, i, k;
+	u = g->edges[e].source;
+	v = g->edges[e].target;
+	u_rc = g->nodes[u].rc_id;
+	fprintf(stdout, "Test edge ratio %ld\n", e);
+	for (i = 0; i < g->nodes[u_rc].rc_id; ++i) {
+		for (k = 0; k < g->nodes[v].rc_id; ++k) {
+			double ratio;
+			ratio = get_barcode_ratio(g, g->nodes[u_rc].adj[i],
+							g->nodes[v].adj[k]);
+			fprintf(stdout, "Pair %ld-%ld, ratio: %.6lf\n",
+				g->nodes[u_rc].adj[i], g->nodes[v].adj[k],
+				ratio);
+		}
+	}
+}
+
 void collapse_4_leg_complex(struct asm_graph_t *g, khash_t(gint) *set_e,
 				khash_t(gint) *set_leg, double uni_cov)
 {
@@ -1623,6 +1642,7 @@ void collapse_4_leg_complex(struct asm_graph_t *g, khash_t(gint) *set_e,
 				break;
 			}
 		}
+		print_debug_2_2_bridge(g, e);
 		check_n_m_bridge(g, e, uni_cov);
 		return;
 	} else if (kh_size(set_e) == 0) {
