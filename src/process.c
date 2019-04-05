@@ -194,18 +194,31 @@ void build4_5_process(struct opt_build_t *opt)
 
 void build_huu_process(struct opt_build_t *opt)
 {
-	char path[1024];
 	init_clock();
 
-	struct asm_graph_t *g0, *g1;
+	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	g1 = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g0, opt->in_path);
 	test_asm_graph(g0);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("huuuuuuuuuuuuuuuu");
+	__VERBOSE("huuuuuuuuuuuuuuuu\n");
 	listContig(g0);
+}
+
+void build_huu_2_process(struct opt_build_t *opt)
+{
+	init_clock();
+	FILE *fp;
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+
+	load_asm_graph(g0, opt->in_path);
+	if ((fp = fopen(opt->in_file,"r")) == NULL){
+		__VERBOSE("openfile error");
+	}
+	
+	build_graph_2(fp, g0);
 }
 
 void build5_6_process(struct opt_build_t *opt)
