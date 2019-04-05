@@ -15,6 +15,11 @@ uint32_t min(uint32_t a, uint32_t b)
 	else return b;
 }
 
+uint32_t roundint(float x)
+{ 
+	return (x)>=0?(int)((x)+0.5):(int)((x)-0.5);
+}
+
 float getScoreBucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1) 
 {
 	const uint32_t thres_cnt = 30;
@@ -347,7 +352,7 @@ void algo_find_eulerian(uint32_t *E, uint32_t n_e, uint32_t *head, uint32_t *nex
 void dfs_hamiltonian(int x, uint32_t depth, uint32_t *E, int *head, uint32_t *next, uint32_t *mark, uint32_t n_v, 
 		uint32_t *res, uint32_t *best_res, uint32_t *best_n_res)
 {
-	mark[x] = 1;
+	mark[x]--;
 	res[depth-1] = x;
 	if (depth > *best_n_res) {
 		__VERBOSE("Find a path");
@@ -356,17 +361,45 @@ void dfs_hamiltonian(int x, uint32_t depth, uint32_t *E, int *head, uint32_t *ne
 			best_res[i] = res[i];
 		}
 	} 
-	for (int i = head[x]; i != -1; i = next[i]) if (mark[E[i]] == 0) {
+	for (int i = head[x]; i != -1; i = next[i]) if (mark[E[i]] != 0) {
 		dfs_hamiltonian(E[i], depth + 1, E, head, next, mark, n_v, res, best_res, best_n_res);
 	}
-	mark[x] = 0;
+	mark[x]++;
 }
 
-void algo_find_hamiltonian(uint32_t *E, uint32_t n_e, int *head, uint32_t *next, uint32_t n_v, uint32_t *res, uint32_t *n_res, uint32_t *listV)
+void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
+{
+	fprintf(fp, ">SEQ_%lld_length_%lld_count_%llu\n", (long long)index,
+		(long long)len, (long long unsigned)cov);
+	gint_t k = 0;
+	char *buf = alloca(81);
+//	printf("%s\n", seq);
+	while (k < len) {
+		gint_t l = __min(80, len - k);
+		__VERBOSE("%d %d %d\n",l, k, len);
+		memcpy(buf, seq + k, l);
+		buf[l] = '\0';
+		fprintf(fp, "%s\n", buf);
+		k += l;
+	}
+	while (k < len) {
+		gint_t l = __min(80, len - k);
+		__VERBOSE("%d %d %d\n",l, k, len);
+		memcpy(buf, seq + k, l);
+		buf[l] = '\0';
+		fprintf(fp, "%s\n", buf);
+		k += l;
+	}
+}
+
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, uint32_t n_e, int *head, uint32_t *next, uint32_t n_v, uint32_t *res, uint32_t *n_res, uint32_t *listV)
 {
 	uint32_t *mark = calloc(n_v, sizeof(uint32_t));
 	for (uint32_t i = 0; i < n_v; i++) {
-		mark[i] = 0;
+		float cvr = get_genome_coverage(g);
+		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr) ;
+		__VERBOSE ("%f xxx\n", cov_times);
+		mark[i] = roundint(cov_times);
 	}
 	uint32_t *best_res = calloc(n_v, sizeof(uint32_t)), best_n_res = 0 ;
 	for (uint32_t i = 0; i < n_v; i++){
@@ -374,20 +407,34 @@ void algo_find_hamiltonian(uint32_t *E, uint32_t n_e, int *head, uint32_t *next,
 		dfs_hamiltonian(i,  1, E, head, next, mark, n_v, res, best_res, &best_n_res);
 	}
 	__VERBOSE("best length %d\n", best_n_res);
+	char *seq = NULL, *total_seq = NULL, *NNN = NULL;
+	NNN = calloc(1000, sizeof(char));
+	for (uint32_t i = 0; i < 1000; i++) 
+		NNN[i] = 'N';
+	uint32_t seq_len = 0, total_len = 0;
 	for(uint32_t i = 0; i < best_n_res; i++) {
-		__VERBOSE("%d ",listV[best_res[i]]);
+		uint32_t e = listV[best_res[i]];
+		e = g->edges[e].rc_id;
+		uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+		total_seq = realloc(total_seq, (total_len + len) * sizeof(char));
+		memcpy(total_seq+total_len, seq, len);
+		total_len += len;
 	}
-	for (uint32_t i = 0; i < n_v; i++) {
-		if (mark[i] != 0) {
-			__VERBOSE("ERRR mark\n");
+	print_seq(out_file, 0, total_seq, total_len, 1);
+	uint32_t count = 0;
+	for (uint32_t e = 0; e < g->n_e; ++e) {
+		uint32_t len = get_edge_len(&g->edges[e]);
+		if (len < 20000) {
+			count++;
+			seq_len = 0;
+			uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+			print_seq(out_file, count, seq, seq_len, 1); 
 		}
 	}
-	if (*n_res != n_v){
-		__VERBOSE("can not find path");
-	}
+	close(out_file);
 }
 
-void find_hamiltonian_contig_edge(struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e){
+void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e){
 	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
 	for (uint32_t i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE_ori[i];
@@ -444,7 +491,7 @@ void find_hamiltonian_contig_edge(struct asm_graph_t *g, struct contig_edge *lis
 	}
 	__VERBOSE("\n"); 
 	uint32_t *res = calloc(n_v, sizeof(uint32_t)), n_res=0;
-	algo_find_hamiltonian(E, m, head, next, n_v, res, &n_res, listV);
+	algo_find_hamiltonian(out_file, g,E, m, head, next, n_v, res, &n_res, listV);
 	// todo free all pointer
 }
 
@@ -471,7 +518,7 @@ void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, uint32_t
 	}
 }
 
-void build_graph_2(FILE *fp, struct asm_graph_t *g)
+void build_graph_2(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 {
 	for (uint32_t i = 0 ; i < 5; ++i) {
 		uint32_t t = fscanf(fp, "%*[^\n]\n");
@@ -491,12 +538,11 @@ void build_graph_2(FILE *fp, struct asm_graph_t *g)
 	unique_edge(listE, &n_e);
 
 	// finding hamiltonian path
-	find_hamiltonian_contig_edge(g, listE, n_e);
+	find_hamiltonian_contig_edge(out_file, g, listE, n_e);
 
 //	print_gfa_from_E(g, listE, n_e);
 	// print as gfa graph
 //	__VERBOSE("n_v: %d \n",n_v);
 //	__VERBOSE("new_n_v: %d \n",n_v);
-
 }
 
