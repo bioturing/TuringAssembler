@@ -247,8 +247,13 @@ void build_huu_2_process(struct opt_build_t *opt)
 	if ((fp = fopen(opt->in_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
+	char *out_name = calloc(100, 1); 
+	strcat(out_name, opt->out_dir);
+	char *tmp = "/scaffolds.fasta";
+	strcat(out_name , tmp);
+	FILE *out_file = fopen(out_name, "w");
 	
-	build_graph_2(fp, g0);
+	build_graph_2(fp, out_file, g0);
 }
 
 void build5_6_process(struct opt_build_t *opt)
