@@ -27,6 +27,30 @@ static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 	return 1;
 }
 
+static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
+{
+	gint_t i, ret;
+	ret = -1;
+	for (i = 0; i < deg; ++i) {
+		if (adj[i] == id)
+			ret = i;
+	}
+	return ret;
+}
+
+static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
+{
+	g->nodes[u].adj = realloc(g->nodes[u].adj, (g->nodes[u].deg + 1) * sizeof(gint_t));
+	g->nodes[u].adj[g->nodes[u].deg++] = e;
+}
+
+static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
+{
+	gint_t j = find_adj_idx(g->nodes[u].adj, g->nodes[u].deg, e);
+	if (j == -1)
+		return;
+	g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
+}
 
 void k63_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
 {
@@ -62,17 +86,6 @@ void k31_build0(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
 							(long long)g0->n_v);
 	__VERBOSE_LOG("kmer_%d_graph_#0", "Number of edges: %lld\n", ksize,
 							(long long)g0->n_e);
-}
-
-static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
-{
-	gint_t i, ret;
-	ret = -1;
-	for (i = 0; i < deg; ++i) {
-		if (adj[i] == id)
-			ret = i;
-	}
-	return ret;
 }
 
 static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
@@ -142,6 +155,51 @@ gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	}
 	(*seq)[k] = '\0';
 	return (gint_t)k;
+}
+
+void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
+{
+	if (cov == 1)
+		return;
+	double fcov;
+	fcov = __get_edge_cov(g->edges + e, g->ksize);
+	__VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
+				get_edge_len(g->edges + e), fcov, cov);
+
+	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+	asm_clone_edge2(g, g->n_e, e);
+	int n;
+	for (n = 0; n + 1 < cov; ++n)
+		asm_append_edge_seq2(g, e, g->n_e);
+	asm_clean_edge_seq(g->edges + g->n_e);
+
+	fcov = __get_edge_cov(g->edges + e, g->ksize);
+	__VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+			get_edge_len(g->edges + e), fcov);
+}
+
+void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
+{
+	double fcov1, fcov2;
+	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	__VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
+		e1, get_edge_len(g->edges + e1), fcov1,
+		e2, get_edge_len(g->edges + e2), fcov2, cov);
+
+	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+	asm_clone_edge2(g, g->n_e, e1);
+	int n;
+	for (n = 0; n < cov; ++n) {
+		asm_append_edge_seq2(g, e1, e2);
+		asm_append_edge_seq2(g, e1, g->n_e);
+	}
+	g->edges[e1].count += g->edges[e2].count;
+	asm_clean_edge_seq(g->edges + g->n_e);
+
+	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+			get_edge_len(g->edges + e1), fcov1);
 }
 
 gint_t asm_create_node(struct asm_graph_t *g)
@@ -261,10 +319,12 @@ void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	/* append the bucket */
 	slen1 = get_edge_len(g->edges + e1);
 	slen2 = get_edge_len(g->edges + e2);
-	nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
-	nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
+	if (g->bin_size) {
+		nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
+		nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
+	}
 	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
-	if (g->edges[e1].bucks == NULL)
+	if (g->edges[e1].bucks == NULL || g->bin_size == 0)
 		return;
 	slen = get_edge_len(g->edges + e1);
 	nbin = (slen + g->bin_size - 1) / g->bin_size;
@@ -376,6 +436,47 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_remove_edge(g, e_rc1);
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
 	__VERBOSE("New cov: %.3f\n", cov);
+}
+
+void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
+				gint_t e_rc2, gint_t e_rc1)
+{
+	double cov, cov1, cov2;
+	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	__VERBOSE("Join loop reverse %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf)",
+		e1, get_edge_len(g->edges + e1), cov1,
+		e2, get_edge_len(g->edges + e2), cov2,
+		e1, get_edge_len(g->edges + e1), cov1);
+
+	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	g->n_e += 2;
+	asm_clone_edge2(g, g->n_e - 2, e2);
+	asm_clone_edge2(g, g->n_e - 1, e_rc2);
+	asm_append_edge_seq2(g, g->n_e - 2, e_rc1);
+	asm_append_edge_seq2(g, g->n_e - 1, e_rc1);
+
+	asm_remove_edge(g, e_rc1);
+	asm_clone_edge2(g, e_rc1, e1);
+
+	asm_append_edge_seq2(g, e1, g->n_e - 1);
+	asm_append_edge_seq2(g, e_rc1, g->n_e - 2);
+
+	g->edges[e1].count += g->edges[e2].count;
+	g->edges[e_rc1].count = g->edges[e1].count;
+	g->edges[e1].target = g->nodes[g->edges[e1].source].rc_id;
+	asm_add_node_adj(g, g->edges[e_rc1].source, e_rc1);
+	g->edges[e_rc1].target = g->nodes[g->edges[e_rc1].source].rc_id;
+
+	asm_clean_edge_seq(g->edges + g->n_e - 2);
+	asm_clean_edge_seq(g->edges + g->n_e - 1);
+	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
+	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
+	g->n_e -= 2;
+
+	cov = __get_edge_cov(g->edges + e1, g->ksize);
+	__VERBOSE("New cov: %.3f\n", cov);
+
 }
 
 void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -887,13 +988,13 @@ void test_asm_graph(struct asm_graph_t *g)
 		}
 	}
 
-	for (e = 0; e < g->n_e; ++e) {
-		uint32_t len = get_edge_len(g->edges + e);
-		double cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (len > 5000 && cov < 100.0)
-			__VERBOSE("WARNING: Edge %ld has length %u with cov ~ %.6lf\n",
-				e, len, cov);
-	}
+	// for (e = 0; e < g->n_e; ++e) {
+	// 	uint32_t len = get_edge_len(g->edges + e);
+	// 	double cov = __get_edge_cov(g->edges + e, g->ksize);
+	// 	if (len > 5000 && cov < 100.0)
+	// 		__VERBOSE("WARNING: Edge %ld has length %u with cov ~ %.6lf\n",
+	// 			e, len, cov);
+	// }
 }
 
 void save_graph(struct asm_graph_t *g, FILE *fp)

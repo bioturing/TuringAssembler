@@ -75,6 +75,7 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
  * int __int_cov_ratio(float cov1, float cov2);
  */
 #define __int_cov_ratio(cov1, cov2) ((int)((cov1) / (cov2) + 0.49999999))
+#define __binseq_set(seq, k, c) ((seq)[(k) >> 4] |= (c) << (((k) & 15) << 1))
 /* Function signature:
  * uint32_t __binseq_get(uint32_t *seq, uint32_t k);
  * Extract the numberic nucleotide at position k-th on seq
@@ -123,6 +124,10 @@ void asm_remove_edge(struct asm_graph_t *g, gint_t e);
 uint32_t get_edge_len(struct asm_edge_t *e);
 /* get the index of the longest edge */
 gint_t get_longest_edge(struct asm_graph_t *g);
+void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov);
+void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov);
+void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
+				gint_t e_rc2, gint_t e_rc1);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/
