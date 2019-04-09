@@ -15,6 +15,6 @@ void detect_complex(struct asm_graph_t *g, uint32_t min_contig_size, uint32_t ma
 void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1);
 void resolve_1_1_jungle(struct asm_graph_t *g0, struct asm_graph_t *g1);
 void resolve_n_m_jungle(struct asm_graph_t *g0, struct asm_graph_t *g1);
-void resolve_n_m_bridge(struct asm_graph_t *g0, struct asm_graph_t *g1);
+void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1);
 
 #endif /* __RESOLVE_H__ */
