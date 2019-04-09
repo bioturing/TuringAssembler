@@ -1567,6 +1567,8 @@ void collapse_n_m_complex(struct asm_graph_t *g, uint32_t min_contig_size,
 			// e2 = bc_find_2set_strict(g, min_contig_size, set_e, e1,
 			// 	legs, n_leg, self_loops, n_self);
 			e2 = bc_find_pair_check_strict(g, min_contig_size, set_e, e1, legs, n_leg);
+			if (e2 == -1)
+				continue;
 			gint_t gap_size;
 			gap_size = check_path_strict(g, min_contig_size, set_e,
 					g->nodes[g->edges[e1].source].rc_id,
