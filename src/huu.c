@@ -3,6 +3,7 @@
 #include "k31hash.h"
 #include "pthread.h"
 #include "verbose.h"
+#include <string.h>
 
 struct bucks_score {
 	float score;
@@ -110,6 +111,7 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 	}
 	__VERBOSE("n_e: %d\n", n_e);
 	for (uint32_t i = 0; i < n_e; i++) {
+		__VERBOSE("%d\n",i);
 		uint32_t e0 = listE[i];
 		struct bucks_score max_score;
 		max_score.score = -1;
@@ -123,7 +125,8 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 				if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
 					check = 1;
 				}
-			} else{
+			} else if (e0 == g->edges[e1].rc_id) {
+			} else {
 				if (score.bin_distance > 0 ) {
 					check = 1;
 				}
@@ -368,7 +371,7 @@ void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
 //	printf("%s\n", seq);
 	while (k < len) {
 		gint_t l = __min(80, len - k);
-		__VERBOSE("%d %d %d\n",l, k, len);
+		__VERBOSE("%ld %ld %d\n",l, k, len);
 		memcpy(buf, seq + k, l);
 		buf[l] = '\0';
 		fprintf(fp, "%s\n", buf);
@@ -376,7 +379,7 @@ void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
 	}
 	while (k < len) {
 		gint_t l = __min(80, len - k);
-		__VERBOSE("%d %d %d\n",l, k, len);
+		__VERBOSE("%ld %ld %d\n",l, k, len);
 		memcpy(buf, seq + k, l);
 		buf[l] = '\0';
 		fprintf(fp, "%s\n", buf);
@@ -423,7 +426,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 			print_seq(out_file, count, seq, seq_len, 1); 
 		}
 	}
-	close(out_file);
+	fclose(out_file);
 }
 
 void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e){
