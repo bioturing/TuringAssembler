@@ -203,7 +203,13 @@ void build_huu_process(struct opt_build_t *opt)
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("huuuuuuuuuuuuuuuu\n");
-	listContig(g0);
+	FILE *fp;
+	char *out_name = calloc(100, 1);
+	strcat(out_name, opt->out_dir);
+	char *tmp = "/list_contig";
+	strcat(out_name , tmp);
+	fp = fopen(out_name, "w");
+	listContig(g0, fp);
 }
 
 void build_huu_2_process(struct opt_build_t *opt)
