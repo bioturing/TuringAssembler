@@ -54,8 +54,9 @@ uint32_t abssub(uint32_t a, uint32_t b) {
 		return b-a;
 }
 
-struct bucks_score getScore(struct asm_edge_t *e0, struct asm_edge_t *e1, struct asm_graph_t *g) {
+struct bucks_score getScore(uint32_t i0, uint32_t i1, struct asm_graph_t *g) {
 	uint32_t n_bucks = 5;
+	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	uint32_t n0_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
 	uint32_t n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
 	const float thres_score = 0.01;
@@ -69,19 +70,18 @@ struct bucks_score getScore(struct asm_edge_t *e0, struct asm_edge_t *e1, struct
 	float res = 0;
 	float maxtmp =0 ;
 	float sum = 0;
+
+	uint32_t rev_i0 = g->edges[i0].rc_id;
+	struct asm_edge_t *rev_e0 = &g->edges[rev_i0];
 	for (uint32_t i = 0; i < n_bucks; ++i) {
 		for (uint32_t j = 0; j < n_bucks; ++j) {
 			float tmp = 0;
 			if (i!=0 || j!=0) {
-				tmp = getScoreBucks(&e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
+				tmp = getScoreBucks(&rev_e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
 			} else{
-//				__VERBOSE("0 ");
 			}
 			sum += tmp;
 			score2 += tmp*(i+j); 
-//			if (tmp > maxtmp) {
-//				maxtmp = tmp;
-//			}
 			res += tmp;
 		}
 //		__VERBOSE("\n");
@@ -96,7 +96,7 @@ struct bucks_score getScore(struct asm_edge_t *e0, struct asm_edge_t *e1, struct
 	return score;
 }
 
-void listContig(struct asm_graph_t *g) {
+void listContig(struct asm_graph_t *g, FILE *out_file) {
 	const uint32_t thres_len_e = 20000; 
 	uint32_t *listE = NULL;
 	uint32_t n_e=0;
@@ -108,29 +108,22 @@ void listContig(struct asm_graph_t *g) {
 			listE[n_e-1] = e; 
 		}
 	}
+	__VERBOSE("n_e: %d\n", n_e);
 	for (uint32_t i = 0; i < n_e; i++) {
-		uint32_t e = listE[i];
-		uint32_t e0 = g->edges[e].rc_id;
-		uint32_t rr = -1;
+		uint32_t e0 = listE[i];
 		struct bucks_score max_score;
 		max_score.score = -1;
 		uint32_t res_e1 = -1;
 		for (uint32_t i1 = 0; i1 < n_e; i1++) {
 			uint32_t e1 = listE[i1];
-			struct bucks_score score = getScore(&g->edges[e0], &g->edges[e1], g);
-//			if (score > max_score && e != g->edges[e1].rc_id){
-//				max_score = score;
-//				rr = g->edges[e1].rc_id;
-//			}
+			struct bucks_score score = getScore(e0, e1, g);
 			uint32_t check = 0;
-			if (e == e1){
+			if (e0 == e1){
 				float cvr = get_genome_coverage(g);
 				if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
 					check = 1;
 				}
-			} else if (e0 == e1) {
-			}
-			else{
+			} else{
 				if (score.bin_distance > 0 ) {
 					check = 1;
 				}
@@ -142,10 +135,9 @@ void listContig(struct asm_graph_t *g) {
 				}
 			}
 		}
-//		__VERBOSE("coverage %f", __get_edge_cov(&g->edges[e0], g->ksize));
-		__VERBOSE("score: %f center:%f edge: %d %d\n", max_score.score, max_score.bin_distance, e, res_e1); 
-//		__VERBOSE("edge: %f %d %ld\n", max_score, rr, e); 
+		fprintf(out_file, "score: %f center:%f edge: %d %d\n", max_score.score, max_score.bin_distance, e0, res_e1); 
 	}
+	fclose(out_file);
 }
 
 struct contig_edge {
