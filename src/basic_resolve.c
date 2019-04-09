@@ -511,7 +511,7 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 				continue;
 			cov = g0->edges[e_id].count * 1.0 /
 					(g0->edges[e_id].seq_len - g0->ksize);
-			if (cov / max_cov < TIPS_RATIO_THRESHOLD) {
+			if (cov / max_cov < TIPS_RATIO_THRESHOLD && max_cov < 600.0) {
 				gint_t v, v_rc;
 				v = g0->edges[e_id].target;
 				v_rc = g0->nodes[v].rc_id;
