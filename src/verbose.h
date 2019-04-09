@@ -20,6 +20,15 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
+#ifdef huu_debug 
+#define __DEBUG_VERBOSE(fmt, ...) do {					       \
+	fprintf(stderr, fmt, __VA_ARGS__);				       \
+	fflush(stderr);							       \
+} while (0) /* VERBOSE */
+#else
+#define __DEBUG_VERBOSE(fmt, ...) 
+#endif
+
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
 #else
@@ -52,6 +61,15 @@
 	fprintf(stderr, fmt, ##args);					       \
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
+
+#ifdef huu_debug 
+#define __DEBUG_VERBOSE(fmt, args...) do {					       \
+	fprintf(stderr, fmt, ##args);					       \
+	fflush(stderr);							       \
+} while (0) /* VERBOSE */
+#else
+#define __DEBUG_VERBOSE(fmt, ...) 
+#endif
 
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
