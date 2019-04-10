@@ -26,11 +26,6 @@ float getScoreBucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1)
 	const uint32_t thres_cnt = 30;
 	uint32_t cnt0 = 0, cnt1 = 0, res2 = 0;
 
-	for (uint32_t i = 0; i < buck0->size; ++i) {
-		if (buck0->cnts[i] != (uint32_t)(-1) && buck0->cnts[i] >= thres_cnt) {
-			cnt0++;
-		}
-	}
 	for (uint32_t i = 0; i < buck1->size; ++i) {
 		if (buck1->cnts[i] != (uint32_t)(-1) && buck1->cnts[i] >= thres_cnt) {
 			cnt1++;
@@ -39,6 +34,7 @@ float getScoreBucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1)
 
 	for (uint32_t i = 0; i < buck0->size; ++i) {
 		if ((buck0->keys[i]) != (uint64_t)(-1) && buck0->cnts[i] >= thres_cnt) {
+			cnt0++;
 			uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
 			if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= thres_cnt) {
 				res2++;
@@ -60,7 +56,6 @@ struct bucks_score getScore(uint32_t i0, uint32_t i1, struct asm_graph_t *g) {
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	uint32_t n0_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
 	uint32_t n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
-	const float thres_score = 0.01;
 	float score2=0;
 	struct bucks_score score;
 
@@ -88,10 +83,6 @@ struct bucks_score getScore(uint32_t i0, uint32_t i1, struct asm_graph_t *g) {
 //		__VERBOSE("\n");
 	}
 //	__VERBOSE("\n");
-	if (res < thres_score) {
-		score.bin_distance = -1;
-		return score;
-	}
 	score.score = res;
 	score.bin_distance = score2/res;
 	return score;
@@ -99,6 +90,7 @@ struct bucks_score getScore(uint32_t i0, uint32_t i1, struct asm_graph_t *g) {
 
 void listContig(struct asm_graph_t *g, FILE *out_file) {
 	const uint32_t thres_len_e = 20000; 
+	float thres_score = 0.025;
 	uint32_t *listE = NULL;
 	uint32_t n_e=0;
 	for (uint32_t e = 0; e < g->n_e; ++e) {
@@ -113,9 +105,6 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 	for (uint32_t i = 0; i < n_e; i++) {
 		__VERBOSE("%d\n",i);
 		uint32_t e0 = listE[i];
-		struct bucks_score max_score;
-		max_score.score = -1;
-		uint32_t res_e1 = -1;
 		for (uint32_t i1 = 0; i1 < n_e; i1++) {
 			uint32_t e1 = listE[i1];
 			struct bucks_score score = getScore(e0, e1, g);
@@ -132,13 +121,11 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 				}
 			}
 			if (check) {
-				if (score.score > max_score.score) {
-					max_score = score;
-					res_e1 = e1;
+				if (score.score > thres_score) {
+					fprintf(out_file, "score: %f center:%f edge: %d %d\n", score.score, score.bin_distance, e0, e1); 
 				}
 			}
 		}
-		fprintf(out_file, "score: %f center:%f edge: %d %d\n", max_score.score, max_score.bin_distance, e0, res_e1); 
 	}
 	fclose(out_file);
 }
@@ -409,7 +396,6 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	uint32_t seq_len = 0, total_len = 0;
 	for(uint32_t i = 0; i < best_n_res; i++) {
 		uint32_t e = listV[best_res[i]];
-		e = g->edges[e].rc_id;
 		uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
 		total_seq = realloc(total_seq, (total_len + len) * sizeof(char));
 		memcpy(total_seq+total_len, seq, len);
@@ -417,14 +403,18 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	}
 	print_seq(out_file, 0, total_seq, total_len, 1);
 	uint32_t count = 0;
-	for (uint32_t e = 0; e < g->n_e; ++e) {
-		uint32_t len = get_edge_len(&g->edges[e]);
-		if (len < 20000) {
-			count++;
-			seq_len = 0;
-			uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
-			print_seq(out_file, count, seq, seq_len, 1); 
-		}
+//	for (uint32_t e = 0; e < g->n_e; ++e) {
+//		uint32_t len = get_edge_len(&g->edges[e]);
+//		if (len < 20000) {
+//			count++;
+//			seq_len = 0;
+//			uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+//			print_seq(out_file, count, seq, seq_len, 1); 
+//		}
+//	}
+	for(uint32_t i = 0; i < best_n_res; i++) {
+		uint32_t e = listV[best_res[i]];
+		__VERBOSE("%d ", e);
 	}
 	fclose(out_file);
 }
@@ -463,27 +453,16 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 		if (u == -1 || v == -1){
 			__VERBOSE("%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 		}
-		E[m] = u;
-		next[m] = head[v];
-		head[v] = m;
-		m++;
-//		E[m] = v;
-//		next[m] = head[u];
-//		head[u] = m;
+//		E[m] = u;
+//		next[m] = head[v];
+//		head[v] = m;
 //		m++;
+		E[m] = v;
+		next[m] = head[u];
+		head[u] = m;
+		m++;
 	}
 	__VERBOSE("\nE:\n"); 
-	for (uint32_t i = 0; i < m; i++) {
-		__VERBOSE("%d ", E[i]);
-	}
-	__VERBOSE("\nNEXT:\n"); 
-	for (uint32_t i = 0; i < m; i++) {
-		__VERBOSE("%d ", next[i]);
-	}
-	__VERBOSE("\nHEAD:\n"); 
-	for (uint32_t i = 0; i < n_v; i++) {
-		__VERBOSE("%d ", head[i]);
-	}
 	__VERBOSE("\n"); 
 	uint32_t *res = calloc(n_v, sizeof(uint32_t)), n_res=0;
 	algo_find_hamiltonian(out_file, g,E, m, head, next, n_v, res, &n_res, listV);
