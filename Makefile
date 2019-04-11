@@ -2,7 +2,7 @@ CC = gcc
 
 CPP = cpp
 
-LIBS = -pthread -flto -lm -lz
+LIBS = -L/mnt/hdd1/tools/longline/htslib -pthread -flto -lm -lz -lhts
 
 CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function \
 	-Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -fPIC -std=gnu99 -g

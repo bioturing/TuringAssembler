@@ -84,6 +84,7 @@ struct opt_count_t *init_opt_count()
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
+	opt->is10X = 0;
 	return opt;
 }
 
@@ -180,6 +181,9 @@ struct opt_count_t *parse_count_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-k1")) {
 			opt->k1 = atoi(argv[pos + 1]);
 			pos += 2;
+		} else if (!strcmp(argv[pos], "--TENX")) {
+			opt->is10X = 1;
+			pos += 1;
 		} else if (!strcmp(argv[pos], "-k2")) {
 			opt->k2 = atoi(argv[pos + 1]);
 			pos += 2;

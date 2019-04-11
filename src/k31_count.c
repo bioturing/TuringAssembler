@@ -29,6 +29,7 @@ struct maincount_bundle_t {
 	int klarge;
 	int64_t *n_reads;
 	pthread_mutex_t *lock_hash;
+	int is10X;
 };
 
 #define __reverse_bit_order64(x)					       \
@@ -151,6 +152,11 @@ static void *PE_count_lazy_worker(void *data)
 				__ERROR("\nWrong format file\n");
 
 			++n_reads;
+
+			if (bundle->is10X == 1) {
+				read1.seq = read1.seq + BARCODE_LEN_10X + UMI_LEN_10X;
+			}
+
 			count_lazy_from_read(&read1, h, ksize, lock_hash);
 			count_lazy_from_read(&read2, h, ksize, lock_hash);
 
@@ -195,6 +201,7 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ks
 		worker_bundles[i].klarge = ksize;
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].lock_hash = h->locks + i;
+		worker_bundles[i].is10X = opt->is10X;
 	}
 
 	pthread_t *producer_threads, *worker_threads;

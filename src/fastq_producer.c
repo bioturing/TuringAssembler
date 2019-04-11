@@ -3,6 +3,9 @@
 #include "fastq_producer.h"
 #include "utils.h"
 
+#define BARCODE_LEN_10X 16
+#define UMI_LEN_10X 7
+
 struct pair_buffer_t *init_pair_buffer()
 {
 	struct pair_buffer_t *ret = malloc(sizeof(struct pair_buffer_t));
@@ -115,4 +118,9 @@ void free_fastq_PE(struct producer_bundle_t *bundles, int n)
 	free(bundles->lock);
 	free(bundles->barrier);
 	free(bundles);
+}
+
+void trim_10X_barcode(struct read_t *read)
+{
+
 }
