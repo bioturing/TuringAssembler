@@ -234,7 +234,7 @@ void build_huu_process(struct opt_build_t *opt)
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("huuuuuuuuuuuuuuuu\n");
 	FILE *fp;
-	char *out_name = calloc(100, 1);
+	char *out_name = calloc(100, 1); 
 	strcat(out_name, opt->out_dir);
 	char *tmp = "/list_contig";
 	strcat(out_name , tmp);
@@ -260,6 +260,17 @@ void build_huu_2_process(struct opt_build_t *opt)
 	FILE *out_file = fopen(out_name, "w");
 	
 	build_graph_2(fp, out_file, g0);
+}
+
+void build_huu_3_process(struct opt_build_t *opt)
+{
+	init_clock();
+	FILE *fp;
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+
+	load_asm_graph(g0, opt->in_path);
+	check_contig(g0);
 }
 
 void build5_6_process(struct opt_build_t *opt)
