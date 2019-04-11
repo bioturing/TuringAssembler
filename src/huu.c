@@ -5,20 +5,31 @@
 #include "verbose.h"
 #include <string.h>
 #include "algorithm.h"
+#include <assert.h>
 
-const int global_thres_length = 10000;
 const float global_thres_score = 0.015;
-const int global_n_buck = 6;
+const int global_thres_length = 10000;
+const int global_thres_length_min = 5000;
+const int global_thres_n_buck_big_small = 5;
+int const global_n_buck = 6;
 
 struct bucks_score {
 	float score;
 };
 
-uint32_t min(uint32_t a, uint32_t b)
+int min(int a, int b)
 {
 	if (a < b) return a;
 	else return b;
 }
+
+int max(int a, int b)
+{
+	if (a<b)
+		return b;
+	return a;
+}
+
 
 uint32_t roundint(float x)
 { 
@@ -28,36 +39,34 @@ uint32_t roundint(float x)
 float get_score_bucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1) 
 {
 	const uint32_t thres_cnt = 30;
-	uint32_t cnt0 = 0, cnt1 = 0, res2 = 0;
-	__VERBOSE("bucksize %d ", buck1->size);
-	uint32_t O = 0;
+	uint32_t cnt0 = 0, cnt1 = 0, res2 = 0, cntss = 0;
 	
-
 	for (uint32_t i = 0; i < buck1->size; ++i) {
-		if (buck1->cnts[i] != (uint32_t)(-1) && buck1->cnts[i] >= thres_cnt) {
-			cnt1++;
+		cntss++;
+		if (buck1->cnts[i] != (uint32_t)(-1)) {
+			if (buck1->cnts[i] >= thres_cnt) 
+				cnt1++;
 		}
 	}
 
 	for (uint32_t i = 0; i < buck0->size; ++i) {
-		O = 0;
-		if ((buck0->keys[i]) != (uint64_t)(-1) && buck0->cnts[i] >= thres_cnt) {
-			cnt0++;
-			uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
-			if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= thres_cnt) {
-				res2++;
+		cntss++;
+		if ((buck0->keys[i]) != (uint64_t)(-1)){
+			cntss++;
+			if (buck0->cnts[i] >= thres_cnt) {
+				cnt0++;
+				uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
+				if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= thres_cnt) {
+					res2++;
+				}
 			}
 		}
 	}
-//	__VERBOSE("%d ", res2);
+//	__VERBOSE("ssss %d %d %d\n", cntss, cnt0, cnt1);
+	assert(cnt0 + cnt1 > 10 && "zzzzzzzzzzz\n");
+	if (cnt0 + cnt1 == 0)
+		return 0;
 	return 1.0 * res2 / (cnt0 + cnt1);
-}
-
-uint32_t abssub(uint32_t a, uint32_t b) {
-	if (a>b) 
-		return a-b;
-	else 
-		return b-a;
 }
 
 struct matrix_score{
@@ -71,6 +80,10 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 	score = realloc(score, sizeof(struct matrix_score));
 	uint32_t rev_i0 = g->edges[i0].rc_id;
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
+	int n0_bucks = (get_edge_len(rev_e0) + g->bin_size-1) / g->bin_size;
+	int n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
+	assert(n0_bucks > n_bucks);
+	assert(n1_bucks > n_bucks);
 
 	score->n_bucks = n_bucks;
 	score->A = NULL;
@@ -119,10 +132,7 @@ int check_replicate_contig_edge(struct asm_graph_t *g, uint32_t i0, uint32_t i1,
 struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_graph_t *g, const int n_bucks) {
 	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks);
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
-	uint32_t n0_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
-	uint32_t n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
 	float res = 0;
-	__VERBOSE("edges: %d %d\n", i0, i1);
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
 		for (int j = 0; j < mat_score->n_bucks; ++j) {
 			float tmp = mat_score->A[i * n_bucks + j];
@@ -130,19 +140,101 @@ struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_grap
 			} else {
 				tmp = 0;
 			}
-//			__VERBOSE("%f ", tmp);
+			__VERBOSE("%f ", tmp);
 			tmp /= (mat_score->n_bucks * mat_score->n_bucks-1);
 			res += tmp;
 		}
-//		__VERBOSE("\n");
+		__VERBOSE("\n");
 	}
-//	__VERBOSE("\n");
 	struct bucks_score res_score;
 	res_score.score = res;
-//	__VERBOSE("%f\n", res_score.score);
+	__VERBOSE("score %d %d\n", i0, i1); 
 	return res_score;
 }
 
+float abssss(float x)
+{
+	if (x < 0)
+		x = -x;
+	return x;
+}
+
+int get_score_big_small(int i0, int i1, struct asm_graph_t *g) {
+	struct asm_edge_t *e0 = &g->edges[i0];
+	struct asm_edge_t *e1 = &g->edges[i1];
+	int n_bucks = global_thres_n_buck_big_small;
+	int n0_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
+	int n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
+	assert(n0_bucks >= n1_bucks);
+	int score;
+	score = 0;
+
+	assert(n0_bucks >= n_bucks && n1_bucks >= n_bucks);
+	float res = 0;
+	float maxtmp = 0;
+	for (int i = max(0, n0_bucks-20); i < n0_bucks-1; ++i) {
+		float left_value = 0, right_value = 0;
+		for (int j = 0; j < 3; ++j) {
+			float tmp = 0;
+			tmp = get_score_bucks(&e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
+			left_value += tmp;
+		}
+		for (int j = n1_bucks - 4; j < n1_bucks-1; ++j) {
+			float tmp = 0;
+			tmp = get_score_bucks(&e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
+//			__DEBUG_VERBOSE("%f ", tmp);
+			right_value += tmp;
+		}
+		if (abssss(left_value - right_value) > 0.05 * max(left_value, right_value)) {
+			if (left_value > right_value)
+				score++;
+			else 
+				score--;
+		}
+	}
+	return score;
+}
+
+void check_contig(struct asm_graph_t *g) {
+	int cmp(const void *i, const void *j)
+	{
+		uint32_t x = *(uint32_t *)i;
+		uint32_t y = *(uint32_t *)j;
+		return get_edge_len(&g->edges[x]) > get_edge_len(&g->edges[y]);
+	}
+	uint32_t *listE = NULL;
+	uint32_t n_e= g->n_e;
+	listE = realloc(listE, n_e * sizeof(uint32_t));
+	for (uint32_t e = 0; e < n_e; ++e) {
+		listE[e] = e;
+	}
+	qsort(listE, n_e, sizeof(4), cmp);
+//	for (uint32_t i = 0; i < n_e - 4; i++) {
+//		uint32_t e = listE[i];
+//		uint32_t next_e = listE[i+2];
+//		uint32_t next_e_1 = listE[i+3];
+//		__DEBUG_VERBOSE("edges length: %d\n",  get_edge_len(&g->edges[e]));
+//		uint32_t e1 = g->edges[e].rc_id;
+//		struct bucks_score score = getScore(e, e, g);
+//		__DEBUG_VERBOSE("self e: %f \n", score.score);
+//		score = getScore(e, e1, g);
+//		__DEBUG_VERBOSE("reverse e: %f \n", score.score);
+//		score = getScore(e, next_e, g);
+//		__DEBUG_VERBOSE("next e: %f \n", score.score);
+//		score = getScore(e, next_e_1, g);
+//		__DEBUG_VERBOSE("next e 1: %f \n", score.score);
+//	}
+
+	FILE * f = fopen("list_pair.txt","r");
+	uint32_t a, b, asdf;
+	char *s = NULL;
+	s = realloc(s, 100);
+	while (fscanf(f, "%d %d %d\n", &a, &b, &asdf) != EOF) {
+		float score = get_score_big_small(a, b, g);
+		__DEBUG_VERBOSE("%d %d edge length: %d %d score:%f %f\n", a, b, get_edge_len(&g->edges[a]), get_edge_len(&g->edges[b]), score, 0.000000);
+	}
+	fclose(f);
+}
 
 void listContig(struct asm_graph_t *g, FILE *out_file) {
 	const uint32_t thres_len_e = global_thres_length; 
@@ -157,6 +249,11 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 			listE = realloc(listE, n_e*sizeof(uint32_t));
 			listE[n_e-1] = e; 
 		}
+	}
+	fprintf(out_file, "n_v: %d\n", n_e);
+	for (uint32_t i = 0; i < n_e ; i++) {
+		uint32_t e = listE[i];
+		fprintf(out_file, "vertex:%d\n", e);
 	}
 	__VERBOSE("n_e: %d\n", n_e);
 	for (uint32_t i = 0; i < n_e; i++) {
@@ -182,6 +279,7 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 					}
 				}
 			}
+			__VERBOSE("score: %f center:%f edge: %d %d\n", score.score, 0.0000001, e0, e1); 
 		}
 	}
 	fclose(out_file);
@@ -331,16 +429,10 @@ void build_V_from_E(struct contig_edge *listE, uint32_t n_e, uint32_t **listV, u
 		*listV = realloc(*listV, (*n_v)*(sizeof(uint32_t)));
 		(*listV)[(*n_v)-1] = listE[i].des;
 	}
-	for (uint32_t i = 0; i < *n_v; i++) {
-		__VERBOSE("%d ", (*listV)[i]);
-	}
-	__VERBOSE("\n");
 	qsort(*listV, *n_v, sizeof(uint32_t), less_uint32);
 	for (uint32_t i = 0; i < *n_v; i++) {
 		__VERBOSE("%d ", (*listV)[i]);
 	}
-	__VERBOSE("\n");
-	qsort(*listV, *n_v, sizeof(uint32_t), less_uint32);
 	unique_vertex(*listV, n_v);
 //	__VERBOSE("listV %d\n", listV);
 }
@@ -368,7 +460,148 @@ void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
 	}
 }
 
-void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e){
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, uint32_t n_e, int *head, uint32_t *next, uint32_t n_v, uint32_t *res, uint32_t *n_res, uint32_t *listV)
+{
+	void print_contig(int index, uint32_t n_contig, uint32_t *list_contig)
+	{
+		char *seq = NULL, *total_seq = NULL, *NNN = NULL;
+		NNN = calloc(1000, sizeof(char));
+		for (uint32_t i = 0; i < 1000; i++) 
+			NNN[i] = 'N';
+		uint32_t seq_len = 0, total_len = 0;
+		for(uint32_t i = 0; i < n_contig; i++) {
+			uint32_t e = list_contig[i];
+			uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+			total_seq = realloc(total_seq, (total_len + len) * sizeof(char));
+			memcpy(total_seq+total_len, seq, len);
+			total_len += len;
+		}
+		print_seq(out_file, index, total_seq, total_len, 1);
+		for(uint32_t i = 0; i < n_contig; i++) {
+			uint32_t e = list_contig[i];
+			__VERBOSE("%d ", e);
+		}
+	}
+
+	void insert_short_contigs(uint32_t n_big_contigs, uint32_t *big_contigs, uint32_t n_insert, int *arr_insert, 
+			int n_short, int *arr_i_short, int *mark_short)
+	{
+		//todo insert to the beginning
+		for (uint32_t i = 1; i < n_insert - 1; i++) {
+			__VERBOSE("i insert: %d\n", i);
+			int max_score = -1, pos = -1;
+			for (int j = 0; j < n_short; j++) if (mark_short[j] == 0) {
+				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g);
+				int score1 = get_score_big_small(g->edges[big_contigs[i]].rc_id, g->edges[arr_i_short[j]].rc_id, g);
+				int score = score0 + score1;
+				if (score > max_score){
+					max_score = score;
+					pos = j;
+				}
+			}
+			__VERBOSE("max score: %d \n",max_score);
+			//todo check if normal score large enough
+			if (max_score > 15) {
+				arr_insert[i] = arr_i_short[pos];
+				mark_short[pos] = 1;
+			}
+		}
+		//todo insert to the end
+	}
+
+	void add_insert_except_m1(int *n_arr, uint32_t **new_arr, uint32_t ele)
+	{
+		*new_arr = realloc(*new_arr, (*n_arr+1) * sizeof(uint32_t));
+		(*new_arr)[*n_arr] = ele;
+		++(*n_arr);
+	}
+
+	void merge_big_and_small(uint32_t *best_n_res, uint32_t **best_res, uint32_t n_insert, int *arr_insert)
+	{
+		uint32_t *new_arr = NULL;
+		int n_arr = 0;
+		add_insert_except_m1(&n_arr, &new_arr, arr_insert[0]);
+		for (uint32_t i = 0; i < *best_n_res; i++) {
+			add_insert_except_m1(&n_arr, &new_arr, (*best_res)[i]); 
+			add_insert_except_m1(&n_arr, &new_arr, arr_insert[i]); 
+		}
+	}
+
+	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
+
+	int *arr_i_short = NULL, n_arr_short = 0;
+	int *mark_short = NULL;
+	for (uint32_t e = 0; e < g->n_e; ++e) {
+		int len = get_edge_len(&g->edges[e]);
+		if (len < thres_len && len > thres_len_min) {
+			++n_arr_short;
+			arr_i_short = realloc(arr_i_short, n_arr_short * sizeof(uint32_t));
+			mark_short = realloc(mark_short, n_arr_short * sizeof(uint32_t));
+			arr_i_short[n_arr_short-1] = e;
+			mark_short[n_arr_short-1] = 0;
+		}
+	}
+
+	int *mark = calloc(n_v, sizeof(uint32_t));
+	for (uint32_t i = 0; i < n_v; i++) {
+		float cvr = get_genome_coverage(g);
+		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr) ;
+		mark[i] = roundint(cov_times);
+		__VERBOSE("%d " , mark[i]);
+	}
+	uint32_t count = 0;
+	for(uint32_t ii = 0; ii < n_v; ii++){
+		uint32_t *best_res = calloc(n_v, sizeof(uint32_t)), best_n_res = 0 ;
+		for (uint32_t i = 0; i < n_v; i++) if (mark[i] > 0) {
+			__VERBOSE("dfs from %d %d\n", i, mark[i]);
+			dfs_hamiltonian(i,  1, E, head, next, mark, n_v, res, best_res, &best_n_res);
+		}
+		if (best_n_res == 0) 
+			break;
+
+		for (uint32_t i = 0; i < best_n_res; i++) {
+			mark[best_res[i]]--;
+			mark[best_res[i]^1]--;
+			//__VERBOSE("%d %d \n", listV[best_res[i]], mark[listV[best_res[i]]] );
+		}
+		int *arr_insert = NULL, n_insert = best_n_res + 1;
+		arr_insert = realloc(arr_insert, n_insert * sizeof(uint32_t));
+		for (int i = 0; i < n_insert; i++) arr_insert[i] = -1;
+		for (uint32_t i = 0; i < best_n_res; i++) 
+			best_res[i] = listV[best_res[i]];
+		insert_short_contigs(best_n_res, best_res, n_insert, arr_insert, n_arr_short, arr_i_short, mark_short);
+		merge_big_and_small(&best_n_res, &best_res, n_insert, arr_insert);
+
+		print_contig(ii, best_n_res, best_res);
+		__VERBOSE("best n %d\n", best_n_res);
+//		__VERBOSE("\nmark\n");
+		count++;
+	}
+
+	for (int i = 0; i < n_arr_short; i++) if (mark[i] == 0) {
+		uint32_t e = arr_i_short[i]; 
+		uint32_t seq_len = 0;
+		char *seq = NULL;
+		uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+		print_seq(out_file, count, seq, seq_len, 1); 
+		count++;
+	}
+
+	for (int e = 0; e < g->n_e; e++){
+		int len  = get_edge_len(&g->edges[e]);
+		if (len < thres_len_min) {
+			uint32_t seq_len = 0;
+			char *seq = NULL;
+			uint32_t len = dump_edge_seq(&seq, &seq_len, &g->edges[e]);
+			print_seq(out_file, count, seq, seq_len, 1); 
+			count++;
+		}
+	}
+
+	fclose(out_file);
+}
+
+void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e, uint32_t n_v, uint32_t *listV){
 	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
 	for (uint32_t i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE_ori[i];
@@ -380,8 +613,6 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 		list_one_dir_E[i + n_e].des = g->edges[list_one_dir_E[i].src].rc_id;
 	}
 	n_e *=2;
-	uint32_t *listV = NULL , n_v; 
-	build_V_from_E(list_one_dir_E, n_e, &listV, &n_v);
 	__VERBOSE("n_v: %d \n", n_v);
 	for (uint32_t i = 0; i < n_v; i++) {
 		__VERBOSE("%d ", listV[i]);
@@ -414,15 +645,13 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	// todo free all pointer
 }
 
-void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, uint32_t n_e)
+void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, uint32_t n_e, uint32_t *listV, uint32_t n_v)
 {
 	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
 	for (uint32_t i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE[i];
 		normalize_min_index(g, list_one_dir_E+i);
 	}
-	uint32_t *listV = NULL , n_v; 
-	build_V_from_E(list_one_dir_E, n_e, &listV, &n_v);
 	FILE *fp = fopen("gr" , "w");
 	for (uint32_t i = 0; i < n_v; i++) {
 		fprintf(fp,"S\t%d\tAAA\tKC:i:1\n", listV[i]);
@@ -439,29 +668,24 @@ void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, uint32_t
 
 void build_graph_2(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 {
-	for (uint32_t i = 0 ; i < 5; ++i) {
-		uint32_t t = fscanf(fp, "%*[^\n]\n");
+	uint32_t n_v, *listV = NULL;
+	fscanf(fp, "n_v: %d\n", &n_v);
+	listV = realloc(listV , n_v * sizeof(uint32_t));
+	for (uint32_t i = 0; i < n_v; i++) {
+		fscanf(fp, "vertex:%d\n", &listV[i]);
 	}
 	float score, center;
 	uint32_t src, des;
 	struct contig_edge *listE = NULL;
 	uint32_t n_e=0;
 	while (fscanf(fp,"score: %f center:%f edge: %d %d\n", &score, &center, &src, &des) !=EOF){
-//		__VERBOSE("%f", score);
 		n_e += 1;
 		listE = realloc(listE, n_e*sizeof(struct contig_edge));
 		add_contig_edge(g, listE, n_e-1, src, des, score, center);
 	}
-//	__VERBOSE("n_e: %d\n", n_e);
 	qsort(listE, n_e, sizeof(struct contig_edge), less_contig_edge);
 	unique_edge(listE, &n_e);
 
-	// finding hamiltonian path
-	find_hamiltonian_contig_edge(out_file, g, listE, n_e);
-
-//	print_gfa_from_E(g, listE, n_e);
-	// print as gfa graph
-//	__VERBOSE("n_v: %d \n",n_v);
-//	__VERBOSE("new_n_v: %d \n",n_v);
+	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV);
 }
 
