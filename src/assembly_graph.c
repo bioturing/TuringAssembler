@@ -213,6 +213,21 @@ gint_t asm_create_node(struct asm_graph_t *g)
 	return g->n_v - 2;
 }
 
+
+gint_t asm_clone_edge3(struct asm_graph_t *g, gint_t src)
+{
+	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	__VERBOSE("Cloning edges %ld -> %ld\n", src, g->n_e);
+	g->n_e += 2;
+	asm_clone_edge2(g, g->n_e - 2, src);
+	asm_clone_edge2(g, g->n_e - 1, g->edges[src].rc_id);
+	g->edges[g->n_e - 2].rc_id = g->n_e - 1;
+	g->edges[g->n_e - 1].rc_id = g->n_e - 2;
+	asm_add_node_adj(g, g->edges[g->n_e - 2].source, g->n_e - 2);
+	asm_add_node_adj(g, g->edges[g->n_e - 1].source, g->n_e - 1);
+	return g->n_e - 2;
+}
+
 void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
 	asm_clone_edge(g->edges + dst, g->edges + src);
@@ -715,14 +730,12 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 			continue;
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
-			g->edges[e].seq_len < MIN_CONTIG_LEN)
+			g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
-		if (e == 1300586)
-		// if (e == 74)
-			print_debug(g->edges + e);
 		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
-		fprintf(fp, ">SEQ_%lld_length_%lld_count_%llu\n", (long long)e,
-			(long long)len, (long long unsigned)g->edges[e].count);
+		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
+			(long long)e, (long long)e_rc, (long long)len,
+			__get_edge_cov(g->edges + e, g->ksize));
 		gint_t k = 0;
 		while (k < len) {
 			gint_t l = __min(80, len - k);
@@ -1151,3 +1164,27 @@ void load_asm_graph_complex(struct asm_graph_t *g, const char *path)
 	load_barcode(g, fp);
 	fclose(fp);
 }
+
+struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
+{
+	double fcov = __get_edge_cov(g->edges + e, g->ksize);
+	int icov = (int)fcov;
+	if (fcov + EPS < icov + 0.25)
+		return (struct cov_range_t){icov, icov};
+	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
+		return (struct cov_range_t){icov, icov + 1};
+	else
+		return (struct cov_range_t){icov + 1, icov + 1};
+}
+
+struct cov_range_t convert_cov_range(double fcov)
+{
+	int icov = (int)fcov;
+	if (fcov + EPS < icov + 0.25)
+		return (struct cov_range_t){icov, icov};
+	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
+		return (struct cov_range_t){icov, icov + 1};
+	else
+		return (struct cov_range_t){icov + 1, icov + 1};
+}
+

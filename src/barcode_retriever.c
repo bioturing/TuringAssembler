@@ -101,41 +101,12 @@ void barcode_bin_profiling(struct asm_graph_t *g, gint_t *bx_bin)
 	}
 }
 
-double get_barcode_ratio_sub(struct asm_graph_t *g, gint_t e1, gint_t e2)
-{
-	gint_t len1, len2, n1, n2, i, k;
-	len1 = get_edge_len(g->edges + e1);
-	len2 = get_edge_len(g->edges + e2);
-	if (len1 < 2000 || len2 < 2000)
-		return -1.0;
-	n1 = (len1 + g->bin_size / 10) / g->bin_size;
-	n2 = (len2 + g->bin_size / 10) / g->bin_size;
-	n1 = __min(n1, 3);
-	n2 = __min(n2, 3);
-	gint_t *s1, *s2;
-	s1 = alloca(n1 * sizeof(gint_t));
-	s2 = alloca(n2 * sizeof(gint_t));
-	for (i = 0; i < n1; ++i)
-		s1[i] = count_bc(g->edges[e1].bucks + i);
-	for (k = 0; k < n2; ++k)
-		s2[k] = count_bc(g->edges[e2].bucks + k);
-	double s = 0;
-	for (i = 1; i < n1; ++i) {
-		for (k = 1; k < n2; ++k) {
-			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
-						g->edges[e2].bucks + k);
-			s += ret * 1.0 / (s1[i] + s2[k]);
-		}
-	}
-	return (s * 1.0 / ((n1 - 1) * (n2 - 1)));
-}
-
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	gint_t len1, len2, n1, n2, i, k;
 	len1 = get_edge_len(g->edges + e1);
 	len2 = get_edge_len(g->edges + e2);
-	if (len1 < 2000 || len2 < 2000)
+	if (len1 < MIN_CONTIG_BARCODE || len2 < MIN_CONTIG_BARCODE)
 		return -1.0;
 	n1 = (len1 + g->bin_size / 10) / g->bin_size;
 	n2 = (len2 + g->bin_size / 10) / g->bin_size;

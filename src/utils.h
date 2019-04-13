@@ -43,6 +43,8 @@
 #define MAX_INT32		2147483647
 #define MIN_INT32		-2147483648
 
+#define EPS			1e-6
+
 #define MASK32			4294967295ULL
 
 #define BUFSZ			4096

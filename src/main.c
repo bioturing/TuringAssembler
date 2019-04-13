@@ -393,104 +393,6 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 	build_process(opt);
 }
 
-void build0_1_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build0_1_process(opt);
-}
-
-void build1_2_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build1_2_process(opt);
-}
-
-void build2_3_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build2_3_process(opt);
-}
-
-void build2_3a_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build2_3a_process(opt);
-}
-
-void build3_4_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build3_4_process(opt);
-}
-
-void build4_5_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build4_5_process(opt);
-}
-
-void build5_6_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	build5_6_process(opt);
-}
-
 void clean_opt_process(int argc, char *argv[])
 {
 	struct opt_build_t *opt;
@@ -518,20 +420,6 @@ void build0_opt_process(int argc, char *argv[])
 	init_log(tmp_dir);
 	print_opt_count_info(opt, argc, argv);
 	build0_process(opt);
-}
-
-void build_barcode_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build_barcode.log");
-	init_log(tmp_dir);
-	build_barcode_process(opt);
 }
 
 void graph_query_opt_process(int argc, char *argv[])
@@ -595,9 +483,6 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "build_2_3"))
 		// build2_3_opt_process(argc, argv);
 		build_opt_process(argc, argv, &build2_3_process);
-	else if (!strcmp(argv[1], "build_2_3a"))
-		// build2_3a_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build2_3a_process);
 	else if (!strcmp(argv[1], "build_3_4"))
 		// build3_4_opt_process(argc, argv);
 		build_opt_process(argc, argv, &build3_4_process);

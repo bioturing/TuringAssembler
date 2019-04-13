@@ -41,9 +41,10 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
-#define MIN_CONNECT_SIZE				250
-#define MIN_CONTIG_LEN					100
-#define MAX_TIPS_LEN					250
+#define MIN_NOTICE_LEN			500
+#define MIN_CONNECT_SIZE		500
+#define MIN_CONTIG_BARCODE		2000
+#define MAX_TIPS_LEN			250
 #define TIPS_THRESHOLD			5.0
 #define TIPS_RATIO_THRESHOLD		0.1
 
@@ -71,6 +72,18 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
 
+struct cov_range_t {
+	int lo;
+	int hi;
+};
+
+struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov);
+struct cov_range_t convert_cov_range(double fcov);
+
+#define __strictly_greater(cov1, cov2) ((cov1) > 2 * (cov2))
+#define __cov_range_intersect(rcov1, rcov2) ((rcov1).lo <= (rcov2).hi && (rcov2).lo <= (rcov1).hi)
+#define __diff_accept(cov1, cov2) (__abs((cov1) - (cov2)) < 0.75)
+
 /* Function signature:
  * int __int_cov_ratio(float cov1, float cov2);
  */
@@ -94,6 +107,7 @@ float get_genome_coverage(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src);
+gint_t asm_clone_edge3(struct asm_graph_t *g, gint_t src);
 /* Copy edge and do reversing complement */
 void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
 /* append edge, check for integrity */;
