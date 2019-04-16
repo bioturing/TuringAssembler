@@ -11,7 +11,7 @@
 
 KHASH_SET_INIT_INT64(gint);
 
-#define __positive_ratio(r)		((r) + EPS >= 0.01)
+#define __positive_ratio(r)		((r) + EPS >= 0.02)
 #define MAX_EDGE_COUNT			5000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
@@ -462,7 +462,81 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 	return ret;
 }
 
-int check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
+gint_t check_2_2_small_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
+{
+	gint_t e_rc, v, v_rc, u, u_rc;
+	int i, k, flag;
+	e_rc = g->edges[e].rc_id;
+	v = g->edges[e].target;
+	v_rc = g->nodes[v].rc_id;
+	u = g->edges[e].source;
+	u_rc = g->nodes[u].rc_id;
+	if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
+		g->nodes[u_rc].deg != 2 || g->nodes[v].deg != 2)
+		return 0;
+
+	/* callibrate uni_coverage */
+	gint_t *legs = alloca(4 * sizeof(gint_t));
+	legs[0] = g->nodes[u_rc].adj[0];
+	legs[1] = g->nodes[u_rc].adj[1];
+	legs[2] = g->nodes[v].adj[0];
+	legs[3] = g->nodes[v].adj[1];
+	double *fcov = alloca(4 * sizeof(double));
+	struct cov_range_t *rcov = alloca(4 * sizeof(struct cov_range_t));
+	for (i = 0; i < 4; ++i) {
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov;
+		rcov[i] = convert_cov_range(fcov[i]);
+	}
+	for (i = 0; i < 2; ++i) {
+		flag = 0;
+		for (k = 2; k < 4; ++k) {
+			if (__cov_range_intersect(rcov[i], rcov[k]))
+				flag = 1;
+		}
+		if (!flag)
+			return 0;
+	}
+	double *ratio = alloca(4 * sizeof(double));
+	ratio[0] = get_barcode_ratio_small(g, legs[0], legs[2]);
+	ratio[1] = get_barcode_ratio_small(g, legs[0], legs[3]);
+	ratio[2] = get_barcode_ratio_small(g, legs[1], legs[2]);
+	ratio[3] = get_barcode_ratio_small(g, legs[1], legs[3]);
+	if (__strictly_greater(ratio[0], ratio[1]) && __strictly_greater(ratio[3], ratio[2])) {
+		if (!__positive_ratio(ratio[0]) || !__positive_ratio(ratio[3]))
+			return 0;
+		if (!__cov_range_intersect(rcov[0], rcov[2]) ||
+			!__cov_range_intersect(rcov[1], rcov[3]) ||
+			!__diff_accept(fcov[0], fcov[2]) ||
+			!__diff_accept(fcov[1], fcov[3]))
+			return 0;
+		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
+			legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
+		asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
+			legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
+		return 1;
+	} else if (__strictly_greater(ratio[1], ratio[0]) && __strictly_greater(ratio[2], ratio[3])) {
+		if (!__positive_ratio(ratio[1]) || !__positive_ratio(ratio[2]))
+			return 0;
+		if (!__cov_range_intersect(rcov[0], rcov[3]) ||
+			!__cov_range_intersect(rcov[1], rcov[2]) ||
+			!__diff_accept(fcov[0], fcov[3]) ||
+			!__diff_accept(fcov[1], fcov[2]))
+			return 0;
+		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
+			legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
+		asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
+			legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+gint_t check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
 	gint_t e_rc, v, v_rc, u, u_rc;
 	int i, k, flag;
@@ -1214,8 +1288,8 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 gint_t collapse_2_2_strict_bridge(struct asm_graph_t *g)
 {
 	double uni_cov = get_genome_coverage(g);
-	__VERBOSE("Genome coverage: %.9lf\n", uni_cov);
-	gint_t e = 0;
+	// __VERBOSE("Genome coverage: %.9lf\n", uni_cov);
+	gint_t e;
 	gint_t cnt, cnt_local, ret;
 	cnt = 0;
 	do {
@@ -1237,10 +1311,35 @@ gint_t collapse_2_2_strict_bridge(struct asm_graph_t *g)
 	return cnt;
 }
 
+gint_t collapse_2_2_small_bridge(struct asm_graph_t *g)
+{
+	double uni_cov = get_genome_coverage(g);
+	gint_t cnt, cnt_local, ret, e;
+	cnt = 0;
+	do {
+		cnt_local = 0;
+		for (e = 0; e < g->n_e; ++e) {
+			if (g->edges[e].source == -1)
+				continue;
+			ret = check_simple_loop(g, e, uni_cov);
+			if (ret == 0) {
+				ret = check_2_2_small_bridge(g, e, uni_cov);
+				cnt_local += ret;
+			} else {
+				cnt_local += ret;
+			}
+		}
+		cnt += cnt_local;
+	} while (cnt_local);
+	__VERBOSE("Number of resolved 2-2 small bridges: %ld\n", cnt);
+	return cnt;
+
+}
+
 gint_t collapse_simple_jungle_strict(struct asm_graph_t *g)
 {
 	double uni_cov = get_genome_coverage(g);
-	__VERBOSE("Genome coverage: %.9lf\n", uni_cov);
+	// __VERBOSE("Genome coverage: %.9lf\n", uni_cov);
 	khash_t(gint) *visited, *set_e, *set_v, *set_leg, *set_self;
 	visited = kh_init(gint);
 	set_e = kh_init(gint);
@@ -1262,15 +1361,15 @@ gint_t collapse_simple_jungle_strict(struct asm_graph_t *g)
 			detect_leg(g, MIN_CONTIG_BARCODE, set_v, set_e, set_leg, set_self);
 			n_leg = kh_size(set_leg);
 			n_self = kh_size(set_self);
-			__VERBOSE("REGION: edge = %ld; n_leg = %u; n_self = %u; region size = %u\n",
-				e, n_leg, n_self, kh_size(set_e));
-			__VERBOSE("SET LEGS:\n");
-			khiter_t k;
-			for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k)
-				if (kh_exist(set_leg, k))
-					__VERBOSE("%ld\n", kh_key(set_leg, k));
-			// if (n_leg > 1 && n_self == 0)
-			// 	ret += check_simple_jungle_strict(g, set_e, set_leg, uni_cov);
+			// __VERBOSE("REGION: edge = %ld; n_leg = %u; n_self = %u; region size = %u\n",
+			// 	e, n_leg, n_self, kh_size(set_e));
+			// __VERBOSE("SET LEGS:\n");
+			// khiter_t k;
+			// for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k)
+			// 	if (kh_exist(set_leg, k))
+			// 		__VERBOSE("%ld\n", kh_key(set_leg, k));
+			if (n_leg > 1 && n_self == 0)
+				ret += check_simple_jungle_strict(g, set_e, set_leg, uni_cov);
 		}
 		kh_clear(gint, set_leg);
 		kh_clear(gint, set_e);
@@ -1391,13 +1490,14 @@ void collapse_n_m_jungle(struct asm_graph_t *g)
 
 void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
-	// gint_t cnt = 0, cnt_local;
-	// do {
-	// 	cnt_local = 0;
-	// 	cnt_local += collapse_2_2_strict_bridge(g0);
-	// 	cnt_local += collapse_n_m_bridge_strict(g0);
-	// 	cnt += cnt_local;
-	// } while (cnt_local);
+	gint_t cnt = 0, cnt_local;
+	do {
+		cnt_local = 0;
+		cnt_local += collapse_2_2_strict_bridge(g0);
+		cnt_local += collapse_2_2_small_bridge(g0);
+		cnt_local += collapse_n_m_bridge_strict(g0);
+		cnt += cnt_local;
+	} while (cnt_local);
 	collapse_simple_jungle_strict(g0);
 	// collapse_simple_jungle(g0);
 	// collapse_n_m_bridge(g0);

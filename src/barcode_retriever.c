@@ -101,6 +101,43 @@ void barcode_bin_profiling(struct asm_graph_t *g, gint_t *bx_bin)
 	}
 }
 
+double get_barcode_ratio_small(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	gint_t len1, len2, n1, n2, i, k;
+	len1 = get_edge_len(g->edges + e1);
+	len2 = get_edge_len(g->edges + e2);
+	if (len1 < MIN_FRAG_LEN || len2 < MIN_FRAG_LEN)
+		return -1.0;
+	n1 = (len1 + g->bin_size - 1) / g->bin_size;
+	n2 = (len2 + g->bin_size - 1) / g->bin_size;
+	n1 = __min(n1, 10);
+	n2 = __min(n2, 10);
+	gint_t *s1, *s2;
+	s1 = alloca(n1 * sizeof(gint_t));
+	s2 = alloca(n2 * sizeof(gint_t));
+	for (i = 0; i < n1; ++i)
+		s1[i] = count_bc(g->edges[e1].bucks + i);
+	for (k = 0; k < n2; ++k)
+		s2[k] = count_bc(g->edges[e2].bucks + k);
+	double s = 0;
+	gint_t cnt = 0;
+	for (i = 0; i < n1; ++i) {
+		if (s1[i] < MIN_UNIQUE_BARCODE)
+			continue;
+		for (k = 0; k < n2; ++k) {
+			if (s2[k] < MIN_UNIQUE_BARCODE)
+				continue;
+			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
+							g->edges[e2].bucks + k);
+			s += ret * 1.0 / (s1[i] + s2[k]);
+			++cnt;
+		}
+	}
+	if (cnt == 0)
+		return -1.0;
+	return (s / cnt);
+}
+
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	gint_t len1, len2, n1, n2, i, k;

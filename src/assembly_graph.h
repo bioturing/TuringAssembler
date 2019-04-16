@@ -41,6 +41,8 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;
 };
 
+#define MIN_FRAG_LEN			200
+#define MIN_UNIQUE_BARCODE		100
 #define MIN_NOTICE_LEN			500
 #define MIN_CONNECT_SIZE		500
 #define MIN_CONTIG_BARCODE		2000
@@ -68,6 +70,7 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* print matrix of shared barcodes */
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
+double get_barcode_ratio_small(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
