@@ -36,11 +36,35 @@ uint32_t roundint(float x)
 	return (x)>=0?(int)((x)+0.5):(int)((x)-0.5);
 }
 
-float get_score_bucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1) 
+int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, uint32_t b)
+{
+	int res = 0, l = b * g->bin_size, r = (b+1) * g->bin_size, sum_holes = 0;
+	for (uint32_t i = 0; i < e->n_holes; ++i){
+		int pos = e->p_holes[i] + sum_holes;
+		if (pos >= r){
+			break;
+		}
+		if (pos >= l) {
+			res += min(r-pos, e->l_holes[i]);
+		}
+		sum_holes += e->p_holes[i];
+	}
+	return res;
+}
+
+float get_score_bucks(struct asm_graph_t *g, struct asm_edge_t * e0, struct asm_edge_t *e1, uint32_t b0, uint32_t b1, float avg_bin_hash)
 {
 	const uint32_t thres_cnt = 30;
+	struct barcode_hash_t *buck0 = &e0->bucks[b0], *buck1 = &e1->bucks[b1];
 	uint32_t cnt0 = 0, cnt1 = 0, res2 = 0, cntss = 0;
-	
+	if (get_amount_hole(g, e0, b0)  > 0.7*g->bin_size) {
+		__VERBOSE("hole \n");
+		return -1;
+	}
+	if (get_amount_hole(g, e1, b1)  > 0.7*g->bin_size){
+		__VERBOSE("hole \n");
+		return -1;
+	}
 	for (uint32_t i = 0; i < buck1->size; ++i) {
 		cntss++;
 		if (buck1->cnts[i] != (uint32_t)(-1)) {
@@ -62,10 +86,12 @@ float get_score_bucks(struct barcode_hash_t *buck0,struct barcode_hash_t *buck1)
 			}
 		}
 	}
-//	__VERBOSE("ssss %d %d %d\n", cntss, cnt0, cnt1);
-	assert(cnt0 + cnt1 > 10 && "zzzzzzzzzzz\n");
-	if (cnt0 + cnt1 == 0)
-		return 0;
+	if (avg_bin_hash/2 > cnt0 || cnt0 > avg_bin_hash * 2
+		||avg_bin_hash/2 > cnt1 || cnt1 > avg_bin_hash * 2) {
+//		__VERBOSE("extreme case\n");
+		return -1;
+	}
+//	if (res2 == 0) __VERBOSE("res2==0 %d %d\n", cnt0 , cnt1);
 	return 1.0 * res2 / (cnt0 + cnt1);
 }
 
@@ -74,7 +100,7 @@ struct matrix_score{
 	float *A;
 };
 
-struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, uint32_t i1, int n_bucks)
+struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, uint32_t i1, int n_bucks, float avg_bin_hash)
 {
 	struct matrix_score *score = NULL;
 	score = realloc(score, sizeof(struct matrix_score));
@@ -90,7 +116,7 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
 	for (int i = 0; i < score->n_bucks; ++i) {
 		for (int j = 0; j < score->n_bucks; ++j) {
-			score->A[i*score->n_bucks+j] = get_score_bucks(&rev_e0->bucks[i], &e1->bucks[j]);
+			score->A[i*score->n_bucks+j] = get_score_bucks(g, rev_e0, e1, i, j, avg_bin_hash);
 		}
 	}
 
@@ -105,50 +131,59 @@ int detect_anomal_diagonal(struct matrix_score *score, float threshold)
 	sum_all = 0;
 	avg_dia = 0;
 	avg_all = 0;
+	int count_dia = 0, count_all = 0;
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			if (i == j) {
-				sum_dia += score->A[i*n+j];
+				float sc = score->A[i*n+j];
+				if (sc > -0.000001){
+					sum_dia += sc;
+					count_dia++;
+				}
 			} else {
-				sum_all += score->A[i*n+j];
+				float sc = score->A[i*n+j];
+				if (sc > -0.000001){
+					sum_all += sc;
+					count_all++;
+				}
 			}
 		}
 	}
-	avg_all = sum_all / (n*n-n);
-	avg_dia = sum_dia / n;
+	avg_all = sum_all / count_all;
+	avg_dia = sum_dia / count_dia;
 	return (sum_all + sum_dia > threshold && avg_dia > avg_all * 2);
 }
 
-int check_replicate_contig_edge(struct asm_graph_t *g, uint32_t i0, uint32_t i1, const int n_bucks, float threshold)
+int check_replicate_contig_edge(struct asm_graph_t *g, uint32_t i0, uint32_t i1, const int n_bucks, float threshold, float avg_bin_hash)
 {
 	uint32_t rev_i0 = g->edges[i0].rc_id, rev_i1 = g->edges[i1].rc_id;
-	struct matrix_score *s0 = get_score_edges_matrix(g, i0, i1, n_bucks);
-	struct matrix_score *s1 = get_score_edges_matrix(g, i0, rev_i1, n_bucks);
-	struct matrix_score *s2 = get_score_edges_matrix(g, rev_i0, i1, n_bucks);
-	struct matrix_score *s3 = get_score_edges_matrix(g, rev_i0, rev_i1, n_bucks);
+	struct matrix_score *s0 = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash);
+	struct matrix_score *s1 = get_score_edges_matrix(g, i0, rev_i1, n_bucks, avg_bin_hash);
+	struct matrix_score *s2 = get_score_edges_matrix(g, rev_i0, i1, n_bucks, avg_bin_hash);
+	struct matrix_score *s3 = get_score_edges_matrix(g, rev_i0, rev_i1, n_bucks, avg_bin_hash);
 	return (detect_anomal_diagonal(s0, threshold) || detect_anomal_diagonal(s1, threshold) || detect_anomal_diagonal(s2, threshold) || detect_anomal_diagonal(s3, threshold));
 }
 
-struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_graph_t *g, const int n_bucks) {
-	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks);
+struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_graph_t *g, const int n_bucks, float avg_bin_hash) {
+	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash);
+	mat_score->A[0] = -1;
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	float res = 0;
+	int count = 0;
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
 		for (int j = 0; j < mat_score->n_bucks; ++j) {
 			float tmp = mat_score->A[i * n_bucks + j];
-			if (i!=0 || j!=0) {
-			} else {
-				tmp = 0;
+//			__VERBOSE("%f ", tmp);
+			if (tmp >= -0.000001) {
+				count++;
+				res += tmp;
 			}
-			__VERBOSE("%f ", tmp);
-			tmp /= (mat_score->n_bucks * mat_score->n_bucks-1);
-			res += tmp;
 		}
-		__VERBOSE("\n");
+//		__VERBOSE("\n");
 	}
 	struct bucks_score res_score;
-	res_score.score = res;
-	__VERBOSE("score %d %d\n", i0, i1); 
+	res_score.score = res/count;
+//	__VERBOSE("score %d %d\n", i0, i1); 
 	return res_score;
 }
 
@@ -159,7 +194,7 @@ float abssss(float x)
 	return x;
 }
 
-int get_score_big_small(int i0, int i1, struct asm_graph_t *g) {
+int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_hash) {
 	struct asm_edge_t *e0 = &g->edges[i0];
 	struct asm_edge_t *e1 = &g->edges[i1];
 	int n_bucks = global_thres_n_buck_big_small;
@@ -173,19 +208,32 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g) {
 	float res = 0;
 	float maxtmp = 0;
 	for (int i = max(0, n0_bucks-20); i < n0_bucks-1; ++i) {
-		float left_value = 0, right_value = 0;
+		float left_value = 0, right_value = 0, count_left = 0, count_right = 0;
 		for (int j = 0; j < 3; ++j) {
 			float tmp = 0;
-			tmp = get_score_bucks(&e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
-			left_value += tmp;
+			tmp = get_score_bucks(g, e0, e1, i, j, avg_bin_hash);
+			if (tmp > -0.000001) {
+				left_value += tmp;
+				count_left++;
+			}
 		}
 		for (int j = n1_bucks - 4; j < n1_bucks-1; ++j) {
 			float tmp = 0;
-			tmp = get_score_bucks(&e0->bucks[i], &e1->bucks[j]) / (n_bucks * n_bucks-1);
+			tmp = get_score_bucks(g, e0, e1, i, j, avg_bin_hash);
+			if (tmp > -0.000001) {
+				right_value += tmp;
+				count_right++;
+			}
 //			__DEBUG_VERBOSE("%f ", tmp);
-			right_value += tmp;
 		}
+		if ( i0 == 3005 && i1== 5321){
+			__VERBOSE("caseee %f %f\n",  left_value, right_value);
+		}
+		left_value /= count_left;
+		right_value /= count_right;
+//		__VERBOSE("%f %f", left_value , right_value);
 		if (abssss(left_value - right_value) > 0.05 * max(left_value, right_value)) {
+//			__VERBOSE("%f", abssss(left_value - right_value));
 			if (left_value > right_value)
 				score++;
 			else 
@@ -195,7 +243,7 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g) {
 	return score;
 }
 
-void check_contig(struct asm_graph_t *g) {
+void check_contig(struct asm_graph_t *g, float avg_bin_hash) {
 	int cmp(const void *i, const void *j)
 	{
 		uint32_t x = *(uint32_t *)i;
@@ -209,31 +257,47 @@ void check_contig(struct asm_graph_t *g) {
 		listE[e] = e;
 	}
 	qsort(listE, n_e, sizeof(4), cmp);
-//	for (uint32_t i = 0; i < n_e - 4; i++) {
-//		uint32_t e = listE[i];
-//		uint32_t next_e = listE[i+2];
-//		uint32_t next_e_1 = listE[i+3];
-//		__DEBUG_VERBOSE("edges length: %d\n",  get_edge_len(&g->edges[e]));
-//		uint32_t e1 = g->edges[e].rc_id;
-//		struct bucks_score score = getScore(e, e, g);
-//		__DEBUG_VERBOSE("self e: %f \n", score.score);
-//		score = getScore(e, e1, g);
-//		__DEBUG_VERBOSE("reverse e: %f \n", score.score);
-//		score = getScore(e, next_e, g);
-//		__DEBUG_VERBOSE("next e: %f \n", score.score);
-//		score = getScore(e, next_e_1, g);
-//		__DEBUG_VERBOSE("next e 1: %f \n", score.score);
-//	}
 
 	FILE * f = fopen("list_pair.txt","r");
 	uint32_t a, b, asdf;
 	char *s = NULL;
 	s = realloc(s, 100);
 	while (fscanf(f, "%d %d %d\n", &a, &b, &asdf) != EOF) {
-		float score = get_score_big_small(a, b, g);
+		float score = get_score_big_small(a, b, g, avg_bin_hash);
 		__DEBUG_VERBOSE("%d %d edge length: %d %d score:%f %f\n", a, b, get_edge_len(&g->edges[a]), get_edge_len(&g->edges[b]), score, 0.000000);
 	}
 	fclose(f);
+}
+
+float count_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
+{
+	const uint32_t thres_cnt = 30;
+	uint32_t cnt = 0;
+	
+	for (uint32_t i = 0; i < buck->size; ++i) {
+		if (buck->cnts[i] != (uint32_t)(-1)) {
+			if (buck->cnts[i] >= thres_cnt) 
+				cnt++;
+		}
+	}
+	return cnt;
+}
+
+float get_avg_bin_hash(struct asm_graph_t *g)
+{
+	int count = 0;
+	long long sum = 0;
+	for (uint32_t i = 0; i < g->n_e; ++i) {
+		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
+		for (int j = 0; j < n_bucks - 1; j++){
+			int tmp = count_bin_hash(g, &g->edges[i].bucks[j]);
+			if (tmp > 0) {
+				count++;
+				sum += tmp;
+			}
+		}
+	}
+	return 1.0*sum/count;
 }
 
 void listContig(struct asm_graph_t *g, FILE *out_file) {
@@ -255,13 +319,16 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 		uint32_t e = listE[i];
 		fprintf(out_file, "vertex:%d\n", e);
 	}
+
+	float avg_bin_hash = get_avg_bin_hash(g);
+	__VERBOSE("avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE("n_e: %d\n", n_e);
 	for (uint32_t i = 0; i < n_e; i++) {
 		__VERBOSE("%d\n",i);
 		uint32_t e0 = listE[i];
 		for (uint32_t i1 = 0; i1 < n_e; i1++) {
 			uint32_t e1 = listE[i1];
-			struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks);
+			struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
 			uint32_t check = 0;
 			if (e0 == e1){
 				float cvr = get_genome_coverage(g);
@@ -274,12 +341,12 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 			}
 			if (check) {
 				if (score.score > thres_score) {
-					if (!check_replicate_contig_edge(g, e0, e1, n_bucks, thres_score*(n_bucks * n_bucks - 1))) {
-						fprintf(out_file, "score: %f center:%f edge: %d %d\n", score.score, 0.0000001, e0, e1); 
+					if (!check_replicate_contig_edge(g, e0, e1, n_bucks, thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
+						fprintf(out_file, "score: %f edge: %d %d\n", score.score, e0, e1); 
 					}
 				}
 			}
-			__VERBOSE("score: %f center:%f edge: %d %d\n", score.score, 0.0000001, e0, e1); 
+			__VERBOSE("score %f edge: %d %d\n", score.score, e0, e1); 
 		}
 	}
 	fclose(out_file);
@@ -288,7 +355,7 @@ void listContig(struct asm_graph_t *g, FILE *out_file) {
 struct contig_edge {
 	uint32_t src, des;
 	uint32_t rv_src, rv_des;
-	float score0, score1;
+	float score0;
 };
 
 void swap(uint32_t *a, uint32_t *b)
@@ -331,13 +398,12 @@ void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
 	}
 }
 
-void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, uint32_t pos, uint32_t src, uint32_t des, float score0, float score1)
+void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, uint32_t pos, uint32_t src, uint32_t des, float score0)
 {
 	struct contig_edge e;
 	e.src = src;
 	e.des = des;
 	e.score0 = score0;
-	e.score1 = score1;
 	e.rv_src = 0;
 	e.rv_des = 0;
 	normalize_min_index(g, &e);
@@ -460,7 +526,7 @@ void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
 	}
 }
 
-void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, uint32_t n_e, int *head, uint32_t *next, uint32_t n_v, uint32_t *res, uint32_t *n_res, uint32_t *listV)
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, uint32_t n_e, int *head, uint32_t *next, uint32_t n_v, uint32_t *res, uint32_t *n_res, uint32_t *listV, float avg_bin_hash)
 {
 	void print_contig(int index, uint32_t n_contig, uint32_t *list_contig)
 	{
@@ -487,12 +553,16 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 			int n_short, int *arr_i_short, int *mark_short)
 	{
 		//todo insert to the beginning
+		__VERBOSE("big contig length %d:", n_big_contigs);
+		for (int i = 0; i < n_big_contigs; i++){
+			__VERBOSE("%d ", big_contigs[i]);
+		}
 		for (uint32_t i = 1; i < n_insert - 1; i++) {
 			__VERBOSE("i insert: %d\n", i);
 			int max_score = -1, pos = -1;
 			for (int j = 0; j < n_short; j++) if (mark_short[j] == 0) {
-				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g);
-				int score1 = get_score_big_small(g->edges[big_contigs[i]].rc_id, g->edges[arr_i_short[j]].rc_id, g);
+				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g, avg_bin_hash);
+				int score1 = get_score_big_small(g->edges[big_contigs[i]].rc_id, g->edges[arr_i_short[j]].rc_id, g, avg_bin_hash);
 				int score = score0 + score1;
 				if (score > max_score){
 					max_score = score;
@@ -511,6 +581,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 
 	void add_insert_except_m1(int *n_arr, uint32_t **new_arr, uint32_t ele)
 	{
+		if (ele == -1) 
+			return;
 		*new_arr = realloc(*new_arr, (*n_arr+1) * sizeof(uint32_t));
 		(*new_arr)[*n_arr] = ele;
 		++(*n_arr);
@@ -524,6 +596,12 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 		for (uint32_t i = 0; i < *best_n_res; i++) {
 			add_insert_except_m1(&n_arr, &new_arr, (*best_res)[i]); 
 			add_insert_except_m1(&n_arr, &new_arr, arr_insert[i]); 
+		}
+		*best_n_res = n_arr;
+		*best_res = new_arr;
+		__VERBOSE("after merge contig length %d:", *best_n_res);
+		for (int i = 0; i < *best_n_res; i++){
+			__VERBOSE("%d ", (*best_res)[i]);
 		}
 	}
 
@@ -553,7 +631,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	for(uint32_t ii = 0; ii < n_v; ii++){
 		uint32_t *best_res = calloc(n_v, sizeof(uint32_t)), best_n_res = 0 ;
 		for (uint32_t i = 0; i < n_v; i++) if (mark[i] > 0) {
-			__VERBOSE("dfs from %d %d\n", i, mark[i]);
+//			__VERBOSE("dfs from %d %d\n", i, mark[i]);
 			dfs_hamiltonian(i,  1, E, head, next, mark, n_v, res, best_res, &best_n_res);
 		}
 		if (best_n_res == 0) 
@@ -601,7 +679,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	fclose(out_file);
 }
 
-void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e, uint32_t n_v, uint32_t *listV){
+void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, uint32_t n_e, uint32_t n_v, uint32_t *listV, float avg_bin_hash){
 	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
 	for (uint32_t i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE_ori[i];
@@ -641,7 +719,7 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	__VERBOSE("\nE:\n"); 
 	__VERBOSE("\n"); 
 	uint32_t *res = calloc(n_v, sizeof(uint32_t)), n_res=0;
-	algo_find_hamiltonian(out_file, g,E, m, head, next, n_v, res, &n_res, listV);
+	algo_find_hamiltonian(out_file, g,E, m, head, next, n_v, res, &n_res, listV, avg_bin_hash);
 	// todo free all pointer
 }
 
@@ -674,18 +752,19 @@ void build_graph_2(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 	for (uint32_t i = 0; i < n_v; i++) {
 		fscanf(fp, "vertex:%d\n", &listV[i]);
 	}
-	float score, center;
+	float score;
 	uint32_t src, des;
 	struct contig_edge *listE = NULL;
 	uint32_t n_e=0;
-	while (fscanf(fp,"score: %f center:%f edge: %d %d\n", &score, &center, &src, &des) !=EOF){
+	float avg_bin_hash = get_avg_bin_hash(g);
+	while (fscanf(fp,"score: %f edge: %d %d\n", &score, &src, &des) !=EOF){
 		n_e += 1;
 		listE = realloc(listE, n_e*sizeof(struct contig_edge));
-		add_contig_edge(g, listE, n_e-1, src, des, score, center);
+		add_contig_edge(g, listE, n_e-1, src, des, score);
 	}
 	qsort(listE, n_e, sizeof(struct contig_edge), less_contig_edge);
 	unique_edge(listE, &n_e);
 
-	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV);
+	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV, avg_bin_hash);
 }
 
