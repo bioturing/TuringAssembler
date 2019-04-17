@@ -511,8 +511,8 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 	// fprintf(stderr, "consider edge %ld: cov = %.3lf\n", e, e_cov);
 	uint32_t e_len, max_len;
 	e_len = get_edge_len(g->edges + e);
-	// if (e_len > 1000)
-	// 	return -1;
+	if (e_len > 2000)
+		return -1;
 	max_len = 0;
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
@@ -527,7 +527,8 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		max_len = __max(max_len, len);
 	}
 	if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
-		if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
+		// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
+		if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
 			return -1;
 	}
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
