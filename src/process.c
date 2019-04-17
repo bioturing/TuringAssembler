@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "huu.h"
 
 void graph_convert_process(struct opt_build_t *opt)
 {
@@ -189,6 +190,22 @@ void build4_5_process(struct opt_build_t *opt)
 	write_fasta(g1, path);
 	snprintf(path, 1024, "%s/graph_k_%d_level_5.bin", opt->out_dir, g0->ksize);
 	save_asm_graph_simple(g1, path);
+}
+
+void build_huu_process(struct opt_build_t *opt)
+{
+	char path[1024];
+	init_clock();
+
+	struct asm_graph_t *g0, *g1;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	g1 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("huuuuuuuuuuuuuuuu");
+	listContig(g0);
 }
 
 void build5_6_process(struct opt_build_t *opt)
