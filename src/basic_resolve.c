@@ -602,67 +602,58 @@ int test_bubble2(struct asm_graph_t *g, gint_t u)
 {
 	if (g->nodes[u].deg < 2)
 		return 0;
-	gint_t j, k, e, ke, v, deg;
-	deg = 0;
-	int count_resolve = 0;
-	for (j = 0; j < g->nodes[u].deg; ++j) {
-		e = g->nodes[u].adj[j];
-		if (e == -1)
-			continue;
-		v = g->edges[e].target;
-		float cov, cur_cov = 0.0;
-		uint32_t max_len = 0;
-		uint32_t base_len = get_edge_len(g->edges + e);
-		gint_t idx = -1;
-		int cnt = 0;
-		for (k = 0; k < g->nodes[u].deg; ++k) {
-			e = g->nodes[u].adj[k];
-			if (e == -1 || v != g->edges[e].target)
-				continue;
-			uint32_t len = get_edge_len(g->edges + e);
-			if (!((len < MAX_JOIN_LEN && base_len < MAX_JOIN_LEN) ||
-				(base_len - LEN_VAR <= len && base_len + LEN_VAR >= len)))
-				continue;
-			cov = __get_edge_cov(g->edges + e, g->ksize);
-			if (cov > cur_cov) {
-				cur_cov = cov;
-				idx = k;
-			}
-			max_len = __max(max_len, len);
-			++cnt;
-		}
-		if (cnt < 2 || v == g->nodes[u].rc_id) {
+	gint_t j, k, e, ke, v, deg, best_e;
+	int resolve, count_resolve = 0;
+	do {
+		resolve = 0;
+		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
-			g->nodes[u].adj[j] = -1;
-			g->nodes[u].adj[deg++] = e;
-			continue;
-		}
-		assert(v != u);
-		ke = g->nodes[u].adj[idx];
-		uint64_t kmer_count = 0;
-		for (k = 0; k < g->nodes[u].deg; ++k) {
-			e = g->nodes[u].adj[k];
-			if (e == -1 || v != g->edges[e].target)
+			if (v == g->nodes[u].rc_id)
 				continue;
-			uint32_t len = get_edge_len(g->edges + e);
-			if (!((len < MAX_JOIN_LEN && base_len < MAX_JOIN_LEN) ||
-				(base_len - LEN_VAR <= len && base_len + LEN_VAR >= len)))
-				continue;
-			kmer_count += g->edges[e].count;
-			if (e != ke) {
-				g->edges[e].source = g->edges[e].target = -1;
-				asm_remove_edge(g, g->edges[e].rc_id);
-				g->nodes[u].adj[k] = -1;
+			v = g->edges[e].target;
+			uint32_t max_len, base_len;
+			base_len = get_edge_len(g->edges + e);
+			gint_t idx = -1;
+			uint64_t cur_count, sum_count;
+			sum_count = 0;
+			int cnt = 0;
+			for (k = 0; k < g->nodes[u].deg; ++k) {
+				e = g->nodes[u].adj[k];
+				if (v != g->edges[e].target)
+					continue;
+				uint32_t len = get_edge_len(g->edges + e);
+				if ((len >= MAX_JOIN_LEN || base_len >= MAX_JOIN_LEN) &&
+					(base_len - LEN_VAR > len || base_len + LEN_VAR < len))
+					continue;
+				if (g->edges[e].count > cur_count) {
+					cur_count = g->edges[e].count;
+					best_e = e;
+				}
+				max_len = __max(max_len, len);
+				sum_count += g->edges[e].count;
+				++cnt;
 			}
+			if (cnt < 2)
+				continue;
+			g->edges[best_e].count = g->edges[g->edges[best_e].rc_id].count = sum_count;
+			for (k = 0; k < g->nodes[u].deg; ++k) {
+				e = g->nodes[u].adj[k];
+				if (v != g->edges[e].target)
+					continue;
+				if (e != best_e)
+					g->nodes[u].adj[k] = -1;
+			}
+			deg = 0;
+			for (k = 0; k < g->nodes[u].deg; ++k) {
+				if (g->nodes[u].adj[k] != -1)
+					g->nodes[u].adj[deg++] = g->nodes[u].adj[k];
+			}
+			g->nodes[u].deg = deg;
+			resolve = 1;
+			break;
 		}
-		g->edges[ke].count = kmer_count;
-		g->edges[g->edges[ke].rc_id].count = kmer_count;
-		g->nodes[u].adj[idx] = -1;
-		g->nodes[u].adj[deg++] = ke;
-		++count_resolve;
-	}
-	g->nodes[u].adj = realloc(g->nodes[u].adj, deg * sizeof(gint_t));
-	g->nodes[u].deg = deg;
+		count_resolve += resolve;
+	} while (resolve);
 	return count_resolve;
 }
 
