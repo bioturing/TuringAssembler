@@ -144,6 +144,8 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, uint32_t b, 
 			cnt += buck->cnts[i];
 		}
 	}
+	__VERBOSE("cov %d binsize %d ksize", cov, g->bin_size, g->ksize);
+	assert(normal_count != 0);
 	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
 	{
 		__VERBOSE("count hash is abnormal: %d %d\n", cnt, normal_count);
@@ -580,10 +582,10 @@ void print_seq(FILE *fp, uint32_t index, char *seq, uint32_t len, uint32_t cov)
 
 gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 {
-//	for (uint32_t i = 0; i < e->n_holes; i++) {
-//		if (e->l_holes[i] > 1000)
-//			e->l_holes[i] = 1000;
-//	}
+	for (uint32_t i = 0; i < e->n_holes; i++) {
+		if (e->l_holes[i] > 1000)
+			e->l_holes[i] = 1000;
+	}
 	return dump_edge_seq(seq, m_seq, e);
 }
 
@@ -666,11 +668,14 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	}
 
 	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
+	__VERBOSE("xxxxxxx %d ", thres_len_min);
 
 	int *arr_i_short = NULL, n_arr_short = 0;
 	int *mark_short = NULL;
+	__VERBOSE("g->n_e %ld", g->n_e);
 	for (uint32_t e = 0; e < g->n_e; ++e) {
 		int len = get_edge_len(&g->edges[e]);
+		__VERBOSE("len %d\n", len);
 		if (len < thres_len && len > thres_len_min) {
 			++n_arr_short;
 			arr_i_short = realloc(arr_i_short, n_arr_short * sizeof(uint32_t));
@@ -716,7 +721,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 		count++;
 	}
 
+	__VERBOSE("n arr short %d\n", n_arr_short);
 	for (int i = 0; i < n_arr_short; i++) if (mark[i] == 0) {
+		__VERBOSE("printf short edge \n");
 		uint32_t e = arr_i_short[i]; 
 		uint32_t seq_len = 0;
 		char *seq = NULL;
@@ -727,7 +734,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 
 	for (int e = 0; e < g->n_e; e++){
 		int len  = get_edge_len(&g->edges[e]);
+		__VERBOSE("len very short %d %d\n", len, thres_len_min); 
 		if (len < thres_len_min && len > 1000) {
+			__VERBOSE("printf very short edge \n");
 			uint32_t seq_len = 0;
 			char *seq = NULL;
 			uint32_t len = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
@@ -805,6 +814,8 @@ void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, uint32_t
 
 void build_graph_2(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 {
+	init_global_params(g);
+	check_global_params(g);
 	uint32_t n_v, *listV = NULL;
 	fscanf(fp, "n_v: %d\n", &n_v);
 	listV = realloc(listV , n_v * sizeof(uint32_t));
