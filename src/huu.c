@@ -83,6 +83,9 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	for(uint32_t i = 0; i < n_arr; i++) {
 		count_count[arr_count[i]]++;
 	}
+	for(uint32_t i = 0; i < 60 ; i++){
+		__VERBOSE("count hash %d\n", count_count[i]);
+	}
 	uint32_t max_count = 0;
 	for (uint32_t i = 1; i < 10 ; i++){
 		max_count = max(max_count, count_count[i]);
