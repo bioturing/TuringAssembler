@@ -640,8 +640,11 @@ int test_bubble2(struct asm_graph_t *g, gint_t u)
 				e = g->nodes[u].adj[k];
 				if (v != g->edges[e].target)
 					continue;
-				if (e != best_e)
+				if (e != best_e) {
+					asm_remove_edge(g, g->edges[e].rc_id);
 					g->nodes[u].adj[k] = -1;
+					g->edges[e].source = g->edges[e].target = -1;
+				}
 			}
 			deg = 0;
 			for (k = 0; k < g->nodes[u].deg; ++k) {
