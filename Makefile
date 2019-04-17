@@ -34,6 +34,7 @@ SRC = src/assembly_graph.c 				\
       src/verbose.c 					\
       src/huu.c 						\
       src/algorithm.c 						\
+      src/compare.c 						\
       src/main.c
 
 OBJ = $(SRC:.c=.o)

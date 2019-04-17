@@ -118,6 +118,7 @@ gint_t get_longest_edge(struct asm_graph_t *g)
 	return ret;
 }
 
+//not optimize, can use get_longest_edge to improve
 float get_genome_coverage(struct asm_graph_t *g)
 {
 	/* Using the coverage of the longest contigs */
