@@ -133,8 +133,10 @@ void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 			gint_t e2, gint_t e_rc2, uint64_t added_count);
 void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t gap_size);
+void asm_graph_destroy(struct asm_graph_t *g);
 /* clean local data */
 void asm_clean_edge_seq(struct asm_edge_t *e);
+void asm_clean_edge_seq2(struct asm_graph_t *g, gint_t e);
 /* only set the link to the edge to -1 */
 void asm_remove_edge(struct asm_graph_t *g, gint_t e);
 /* get the real length of the edge */

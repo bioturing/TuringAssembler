@@ -720,6 +720,7 @@ void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1)
 			__VERBOSE("Gnome coverage expand: %.9lf\n", uni_cov);
 			asm_condense(g0, g1);
 			test_asm_graph(g1);
+			asm_graph_destroy(g0);
 			*g0 = *g1;
 			if (cnt_expand == 0 && cnt_collapse == 0 && cnt_loop == 0)
 				break;
@@ -727,6 +728,7 @@ void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		gint_t cnt_trim = remove_low_cov_edge(g0, g1);
 		if (cnt_trim == 0)
 			break;
+		asm_graph_destroy(g0);
 		*g0 = *g1;
 	}
 }

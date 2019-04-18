@@ -104,6 +104,24 @@ static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 	return 1;
 }
 
+void asm_graph_destroy(struct asm_graph_t *g)
+{
+	gint_t u, e;
+	for (e = 0; e < g->n_e; ++e)
+		asm_clean_edge_seq2(g, e);
+	free(g->edges);
+	g->edges = NULL;
+	for (u = 0; u < g->n_v; ++u) {
+		free(g->nodes[u].adj);
+		g->nodes[u].adj = NULL;
+	}
+	free(g->nodes);
+	g->nodes = NULL;
+	g->n_e = g->n_v = 0;
+	g->ksize = 0;
+	g->bin_size = 0;
+}
+
 gint_t get_longest_edge(struct asm_graph_t *g)
 {
 	gint_t e, ret = -1;
@@ -618,6 +636,21 @@ void asm_append_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 	g->edges[dst].count += g->edges[src].count;
 	g->edges[dst].target = g->edges[src].target;
 }
+
+void asm_clean_edge_seq2(struct asm_graph_t *g, gint_t e)
+{
+	asm_clean_edge_seq(g->edges + e);
+	uint32_t len, n_bin, i;
+	if (g->edges[e].bucks != NULL && g->bin_size != 0) {
+		len = get_edge_len(g->edges + e);
+		n_bin = (len + 15) >> 4;
+		for (i = 0; i < n_bin; ++i)
+			barcode_hash_clean(g->edges[e].bucks + i);
+		free(g->edges[e].bucks);
+		g->edges[e].bucks = NULL;
+	}
+}
+
 void asm_clean_edge_seq(struct asm_edge_t *e)
 {
 	free(e->seq);
