@@ -385,7 +385,6 @@ struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_grap
 	}
 	struct bucks_score res_score;
 	res_score.score = res/count;
-	__VERBOSE("score %d %d\n", i0, i1); 
 	return res_score;
 }
 
@@ -420,6 +419,7 @@ void list_contig(struct asm_graph_t *g, FILE *out_file)
 		uint32_t e0 = listE[i];
 		for (uint32_t i1 = 0; i1 < n_e; i1++) {
 			uint32_t e1 = listE[i1];
+			__VERBOSE("edge: %d %d\n", e0, e1); 
 			assert(e1 < g->n_e && e0 < g->n_e);
 			struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
 			uint32_t check = 0;
@@ -439,7 +439,7 @@ void list_contig(struct asm_graph_t *g, FILE *out_file)
 					}
 				}
 			}
-			__VERBOSE("score %f edge: %d %d\n", score.score, e0, e1); 
+			__VERBOSE("score %f\n", score.score); 
 		}
 	}
 	fclose(out_file);
