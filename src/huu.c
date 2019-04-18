@@ -93,13 +93,13 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	__VERBOSE("max_count %d \n", max_count);
 	for(uint32_t i = 10; i < 1000; i++) {
 		__VERBOSE("%d ",  count_count[i]);
-		if (count_count[i] > 5 * max_count){
+		if (count_count[i] > 3 * max_count){
 			res = i;
 			break;
 		}
 	}
 	__VERBOSE("global thres count kmer: %d\n", res);
-	assert(res < 50);
+//	assert(res < 50);
 	return res;
 }
 
