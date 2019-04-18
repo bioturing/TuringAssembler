@@ -696,10 +696,10 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if ((__positive_ratio(ratio) || ratio < 0) &&
 			__cov_range_intersect(rcov1, rcov2) &&
 			__diff_accept(fcov1, fcov2)) {
-			if (e1 == g->edges[e2].rc_id)
-				asm_join_edge_loop(g, e1, e2, e, e_rc,
-						g->edges[e].count);
-			else
+			if (e1 != g->edges[e2].rc_id)
+				// asm_join_edge_loop(g, e1, e2, e, e_rc,
+				// 		g->edges[e].count);
+			// else
 				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 					e2, g->edges[e2].rc_id, g->edges[e].count);
 			++ret;

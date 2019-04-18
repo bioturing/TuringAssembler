@@ -341,6 +341,41 @@ void asm_append_seq_with_gap2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	}
 }
 
+void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap)
+{
+	/* append the bin seq */
+	uint32_t seq_len, new_m, m;
+	seq_len = dst->seq_len + src->seq_len - overlap;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len + 15) >> 4;
+	if (new_m > m) {
+		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+		if (dst->seq == NULL)
+			__ERROR("Unable to realloc");
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	}
+
+	uint32_t i, k;
+	for (i = overlap; i < src->seq_len; ++i) {
+		k = i - overlap + dst->seq_len;
+		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
+							<< ((k & 15) << 1);
+	}
+	/* append the gaps */
+	if (src->n_holes) {
+		uint32_t n_holes = dst->n_holes + src->n_holes;
+		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
+		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
+		for (i = 0; i < src->n_holes; ++i) {
+			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len - overlap;
+		}
+		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
+		dst->n_holes = n_holes;
+	}
+	dst->seq_len = seq_len;
+}
+
 void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	gint_t slen, slen1, slen2, nbin, nbin1, nbin2;
@@ -562,41 +597,6 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
 		dst->p_holes[dst->n_holes + i + 1] = src->p_holes[i] + dst->seq_len;
 	memcpy(dst->l_holes + dst->n_holes + 1, src->l_holes, src->n_holes * sizeof(uint32_t));
 	dst->n_holes = n_holes;
-	dst->seq_len = seq_len;
-}
-
-void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap)
-{
-	/* append the bin seq */
-	uint32_t seq_len, new_m, m;
-	seq_len = dst->seq_len + src->seq_len - overlap;
-	new_m = (seq_len + 15) >> 4;
-	m = (dst->seq_len + 15) >> 4;
-	if (new_m > m) {
-		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
-		if (dst->seq == NULL)
-			__ERROR("Unable to realloc");
-		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	}
-
-	uint32_t i, k;
-	for (i = overlap; i < src->seq_len; ++i) {
-		k = i - overlap + dst->seq_len;
-		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
-							<< ((k & 15) << 1);
-	}
-	/* append the gaps */
-	if (src->n_holes) {
-		uint32_t n_holes = dst->n_holes + src->n_holes;
-		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
-		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
-		for (i = 0; i < src->n_holes; ++i) {
-			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len - overlap;
-		}
-		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
-		dst->n_holes = n_holes;
-	}
 	dst->seq_len = seq_len;
 }
 
