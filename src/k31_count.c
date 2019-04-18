@@ -357,8 +357,8 @@ void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksiz
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", ksize,
 					(long long unsigned)h->n_item);
-	k31_check_edge(h, ksize);
-	k31_test_hash(h);
+	// k31_check_edge(h, ksize);
+	// k31_test_hash(h);
 
 	/* Filter singleton kmer */
 	__VERBOSE("Filtering singleton %d-mer\n", ksize);
@@ -369,9 +369,9 @@ void build_k31_table_lazy(struct opt_count_t *opt, struct k31hash_t *h, int ksiz
 	/* Correct edges */
 	k31_correct_edge(h, ksize);
 
-	k31_test_hash(h);
-	k31_check_sum(h);
-	k31_check_edge(h, ksize);
+	// k31_test_hash(h);
+	// k31_check_sum(h);
+	// k31_check_edge(h, ksize);
 }
 
 void k31_test_process(struct opt_count_t *opt)

@@ -354,7 +354,7 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 	__VERBOSE("\n");
 	__VERBOSE_LOG("KMER COUNT", "Number of %d-mer: %llu\n", ksize,
 					(long long unsigned)h->n_item);
-	k63_check_edge(h, ksize);
+	// k63_check_edge(h, ksize);
 
 	/* Filter singleton kmer */
 	k63hash_filter(h, 1);
@@ -363,7 +363,7 @@ void build_k63_table_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ksiz
 
 	/* Correct edges */
 	k63_correct_edge(h, ksize);
-	k63_check_edge(h, ksize);
+	// k63_check_edge(h, ksize);
 	// recount_edge(h);
 	// check_edge(h, opt->k1);
 }
