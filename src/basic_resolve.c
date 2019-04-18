@@ -305,8 +305,8 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		else
 			rep = rep_e_return;
 		if (rep > 0) {
-			asm_duplicate_edge_seq2(g, e, e_return, rep);
-			asm_duplicate_edge_seq2(g, e_rc, e_return_rc, rep);
+			asm_duplicate_edge_seq2(g, e, e_return, 1);
+			asm_duplicate_edge_seq2(g, e_rc, e_return_rc, 1);
 		}
 		asm_remove_edge(g, e_return);
 		asm_remove_edge(g, e_return_rc);
@@ -617,6 +617,8 @@ int test_bubble2(struct asm_graph_t *g, gint_t u)
 			uint64_t cur_count, sum_count;
 			sum_count = 0;
 			int cnt = 0;
+			best_e = e;
+			cur_count = g->edges[e].count;
 			for (k = 0; k < g->nodes[u].deg; ++k) {
 				e = g->nodes[u].adj[k];
 				if (v != g->edges[e].target)
@@ -635,6 +637,8 @@ int test_bubble2(struct asm_graph_t *g, gint_t u)
 			}
 			if (cnt < 2)
 				continue;
+			// assert(v != g->nodes[u].rc_id);
+			// assert(v != u);
 			g->edges[best_e].count = g->edges[g->edges[best_e].rc_id].count = sum_count;
 			for (k = 0; k < g->nodes[u].deg; ++k) {
 				e = g->nodes[u].adj[k];
@@ -642,8 +646,8 @@ int test_bubble2(struct asm_graph_t *g, gint_t u)
 					continue;
 				if (e != best_e) {
 					asm_remove_edge(g, g->edges[e].rc_id);
-					g->nodes[u].adj[k] = -1;
-					g->edges[e].source = g->edges[e].target = -1;
+					asm_remove_edge(g, e);
+					k = 0;
 				}
 			}
 			deg = 0;
@@ -706,8 +710,14 @@ void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1)
 			double uni_cov = get_genome_coverage(g0);
 			__VERBOSE("Genome coverage: %.9lf\n", uni_cov);
 			cnt_loop = unroll_simple_loop(g0, uni_cov);
+			uni_cov = get_genome_coverage(g0);
+			__VERBOSE("Gnome coverage loop: %.9lf\n", uni_cov);
 			cnt_collapse = resolve_bubble2(g0);
+			uni_cov = get_genome_coverage(g0);
+			__VERBOSE("Gnome coverage collapse: %.9lf\n", uni_cov);
 			cnt_expand = graph_expanding(g0, uni_cov);
+			uni_cov = get_genome_coverage(g0);
+			__VERBOSE("Gnome coverage expand: %.9lf\n", uni_cov);
 			asm_condense(g0, g1);
 			test_asm_graph(g1);
 			*g0 = *g1;

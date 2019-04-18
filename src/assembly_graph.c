@@ -118,18 +118,31 @@ gint_t get_longest_edge(struct asm_graph_t *g)
 	return ret;
 }
 
-float get_genome_coverage(struct asm_graph_t *g)
+uint32_t get_hash_edge32(struct asm_edge_t *e)
+{
+	uint32_t ret = 0, i;
+	for (i = 0; i < ((e->seq_len + 15) >> 4); ++i)
+		ret ^= e->seq[i];
+	return ret;
+}
+
+double get_genome_coverage(struct asm_graph_t *g)
 {
 	/* Using the coverage of the longest contigs */
 	gint_t e;
-	float ret_cov = 0.0;
+	double ret_cov = 0.0;
 	uint32_t max_len = 0;
+	uint32_t hash = 0;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		if (g->edges[e].seq_len > max_len) {
 			max_len = g->edges[e].seq_len;
 			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
+			hash = get_hash_edge32(g->edges + e);
 		}
 	}
+	__VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
 	return ret_cov;
 }
 

@@ -12,7 +12,7 @@
 KHASH_SET_INIT_INT64(gint);
 
 #define __positive_ratio(r)		((r) + EPS >= 0.02)
-#define MAX_EDGE_COUNT			5000
+#define MAX_EDGE_COUNT			10000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
 	(uni_cov) + 0.499999999)
@@ -72,12 +72,12 @@ void find_region(struct asm_graph_t *g, gint_t se, uint32_t min_contig_len,
 			uint32_t len = get_edge_len(g->edges + ne);
 			if (len < min_contig_len) {
 				if (cb_add(set_e, ne) == 1) {
-					if (edge_count == max_edge_count)
+					if (r + 1 == max_edge_count)
 						goto clean_up;
 					q[++r] = ne;
 				}
 				if (cb_add(set_e, ne_rc) == 1) {
-					if (edge_count == max_edge_count)
+					if (r + 1 == max_edge_count)
 						goto clean_up;
 					q[++r] = ne_rc;
 				}
@@ -97,12 +97,12 @@ void find_region(struct asm_graph_t *g, gint_t se, uint32_t min_contig_len,
 			uint32_t len = get_edge_len(g->edges + ne);
 			if (len < min_contig_len) {
 				if (cb_add(set_e, ne) == 1) {
-					if (edge_count == max_edge_count)
+					if (r + 1 == max_edge_count)
 						goto clean_up;
 					q[++r] = ne;
 				}
 				if (cb_add(set_e, ne_rc) == 1) {
-					if (edge_count == max_edge_count)
+					if (r + 1 == max_edge_count)
 						goto clean_up;
 					q[++r] = ne_rc;
 				}
@@ -458,7 +458,7 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 		ret = sum_cov / cnt;
 	else
 		ret = uni_cov;
-	__VERBOSE("Global cov ~ %.6lf. Local cov ~ %.6lf\n", uni_cov, ret);
+//	__VERBOSE("Global cov ~ %.6lf. Local cov ~ %.6lf\n", uni_cov, ret);
 	return ret;
 }
 
@@ -1498,6 +1498,7 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		cnt_local += collapse_n_m_bridge_strict(g0);
 		cnt += cnt_local;
 	} while (cnt_local);
+	test_asm_graph(g0);
 	collapse_simple_jungle_strict(g0);
 	// collapse_simple_jungle(g0);
 	// collapse_n_m_bridge(g0);

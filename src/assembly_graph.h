@@ -106,7 +106,7 @@ struct cov_range_t convert_cov_range(double fcov);
 /* Write plain nucleotide sequence to buffer seq */
 gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 /* Estimate coverage of 1 walk on genome */
-float get_genome_coverage(struct asm_graph_t *g);
+double get_genome_coverage(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src);
