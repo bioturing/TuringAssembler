@@ -70,7 +70,7 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	uint32_t *arr_count = NULL, n_arr = 0, *count_count = NULL, res = -1;
 	for (uint32_t i = 0; i < g->n_e; i++) {
 		uint32_t n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-		for (uint32_t j = 0; j < n_bucks; j++){
+		for (uint32_t j = 0; j < n_bucks-1; j++){
 			struct barcode_hash_t buck = g->edges[i].bucks[j];
 			for (uint32_t l = 0; l < buck.n_item; l++){
 				arr_count = realloc(arr_count, (n_arr + 1) * sizeof(uint32_t));
@@ -147,7 +147,6 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, uint32_t b, 
 			cnt += buck->cnts[i];
 		}
 	}
-	__VERBOSE("cov %d binsize %d ksize", cov, g->bin_size, g->ksize);
 	assert(normal_count != 0);
 	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
 	{
@@ -205,6 +204,7 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 	score->A = NULL;
 	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
 	// check_bucks_A[i] && check_bucks_B[i] de improve performance
+	__VERBOSE("cov %f binsize %d ksize %d", get_genome_coverage(g), g->bin_size, g->ksize);
 	uint32_t *check_bucks_A = NULL, *check_bucks_B = NULL;
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(uint32_t));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(uint32_t));
@@ -699,7 +699,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 	for(uint32_t ii = 0; ii < n_v; ii++){
 		uint32_t *best_res = calloc(n_v, sizeof(uint32_t)), best_n_res = 0 ;
 		for (uint32_t i = 0; i < n_v; i++) if (mark[i] > 0) {
-//			__VERBOSE("dfs from %d %d\n", i, mark[i]);
+			__VERBOSE("dfs from %d %d\n", i, mark[i]);
 			dfs_hamiltonian(i,  1, E, head, next, mark, n_v, res, best_res, &best_n_res, listV);
 		}
 		if (best_n_res == 0) 
