@@ -17,6 +17,7 @@
 	X(int, global_thres_length_min , -1)\
 	X(int, global_thres_n_buck_big_small , -1)\
 	X(int, global_n_buck , -1)\
+	X(float, global_genome_coverage, -1)\
 	X(int, global_molecule_length, -1)
 
 #define X(type, name, default_value) type name=default_value;
@@ -67,7 +68,8 @@ float get_global_thres_score(struct asm_graph_t *g)
 
 int get_global_count_kmer(struct asm_graph_t *g)
 {
-	uint32_t *arr_count = NULL, n_arr = 0, *count_count = NULL, res = -1;
+	uint32_t *arr_count = NULL, n_arr = 0, *count_count = NULL; 
+	 int res = -1;
 	for (uint32_t i = 0; i < g->n_e; i++) {
 		uint32_t n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
 		for (uint32_t j = 0; j < n_bucks-1; j++){
@@ -79,27 +81,26 @@ int get_global_count_kmer(struct asm_graph_t *g)
 			}
 		}
 	}
-	count_count = realloc(count_count, 1000*sizeof(uint32_t)); 
+	uint32_t size_count = 1000;
+	count_count = realloc(count_count, size_count*sizeof(uint32_t)); 
 	for(uint32_t i = 0; i < n_arr; i++) {
+		assert(arr_count[i] >  size_count);
 		count_count[arr_count[i]]++;
-	}
-	for(uint32_t i = 0; i < 60 ; i++){
-		__VERBOSE("count hash %d\n", count_count[i]);
 	}
 	uint32_t max_count = 0;
 	for (uint32_t i = 1; i < 10 ; i++){
 		max_count = max(max_count, count_count[i]);
 	}
 	__VERBOSE("max_count %d \n", max_count);
-	for(uint32_t i = 10; i < 1000; i++) {
-		__VERBOSE("%d ",  count_count[i]);
+	for(uint32_t i = 10; i < size_count; i++) {
+		__VERBOSE("%count hash ",  count_count[i]);
 		if (count_count[i] > 3 * max_count){
 			res = i;
 			break;
 		}
 	}
 	__VERBOSE("global thres count kmer: %d\n", res);
-//	assert(res < 50);
+	assert(res == -1);
 	return res;
 }
 
@@ -110,12 +111,14 @@ void init_global_params(struct asm_graph_t *g)
 	global_thres_n_buck_big_small = 5;
 	global_n_buck = 6;
 	global_molecule_length = 20000;
-	global_thres_count_kmer =  get_global_count_kmer(g);
+	global_thres_count_kmer =  25;//get_global_count_kmer(g);
+	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 }
 
 int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, uint32_t b)
 {
+	//todo sort hole 
 	int res = 0, l = b * g->bin_size, r = (b+1) * g->bin_size, sum_holes = 0;
 //	for (uint32_t i = 0; i < e->n_holes; ++i){
 //		__VERBOSE("holeee %d %d %d\n" , e->seq_len, e->l_holes[i], e->p_holes[i]);
@@ -139,7 +142,7 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, uint32_t b, 
 		__VERBOSE("NNNNN size is to big ");
 		return 0;
 	}
-	int cnt = 0, cov = get_genome_coverage(g), normal_count = (g->bin_size - g->ksize +1) * cov;
+	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
 
 	struct barcode_hash_t *buck = &e->bucks[b];
 	for (uint32_t i = 0; i < buck->size; ++i) {
@@ -160,6 +163,11 @@ float get_score_bucks(struct asm_graph_t *g, struct asm_edge_t * e0, struct asm_
 {
 	// todo: recalculate score
 	const uint32_t thres_cnt = global_thres_count_kmer;
+	// must be not last buck
+	uint32_t n0_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
+	uint32_t n1_bucks = (get_edge_len(e0) + g->bin_size-1) / g->bin_size;
+	assert(b0 < n0_bucks);
+	assert(b1 < n1_bucks);
 	struct barcode_hash_t *buck0 = &e0->bucks[b0], *buck1 = &e1->bucks[b1];
 	uint32_t cnt0 = 0, cnt1 = 0, res2 = 0, cntss = 0;
 
@@ -194,6 +202,7 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 	struct matrix_score *score = NULL;
 	score = realloc(score, sizeof(struct matrix_score));
 	uint32_t rev_i0 = g->edges[i0].rc_id;
+	assert(rev_i0 < g->n_e);
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
 	int n0_bucks = (get_edge_len(rev_e0) + g->bin_size-1) / g->bin_size;
 	int n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
@@ -204,7 +213,7 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 	score->A = NULL;
 	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
 	// check_bucks_A[i] && check_bucks_B[i] de improve performance
-	__VERBOSE("cov %f binsize %d ksize %d", get_genome_coverage(g), g->bin_size, g->ksize);
+	__VERBOSE("cov %f binsize %d ksize %d", global_genome_coverage, g->bin_size, g->ksize);
 	uint32_t *check_bucks_A = NULL, *check_bucks_B = NULL;
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(uint32_t));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(uint32_t));
@@ -212,38 +221,38 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, uint32_t i0, 
 		check_bucks_A[i] = check_qualify_buck(g, rev_e0, i, avg_bin_hash);
 		check_bucks_B[i] = check_qualify_buck(g, e1, i, avg_bin_hash);
 	}
-	for (int i = 0; i < score->n_bucks; ++i) {
-		for (int j = 0; j < score->n_bucks; ++j) {
+	for (int i = 0; i < n_bucks; ++i) {
+		for (int j = 0; j < n_bucks; ++j) {
 			if (check_bucks_A[i] && check_bucks_B[j]) 
-				score->A[i*score->n_bucks+j] = get_score_bucks(g, rev_e0, e1, i, j, avg_bin_hash);
+				score->A[i*n_bucks+j] = get_score_bucks(g, rev_e0, e1, i, j, avg_bin_hash);
 			else 
-				score->A[i*score->n_bucks+j] = -1;
+				score->A[i*n_bucks+j] = -1;
 		}
-		__VERBOSE("`````````````\n");
 	}
+	__VERBOSE("`````````````\n");
 
 	return score;
 }
 
 int detect_anomal_diagonal(struct matrix_score *score, float threshold)
 {
-	int n = score->n_bucks;
+	int n_bucks = score->n_bucks;
 	float sum_dia, sum_all, avg_dia, avg_all;
 	sum_dia = 0;
 	sum_all = 0;
 	avg_dia = 0;
 	avg_all = 0;
 	int count_dia = 0, count_all = 0;
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < n; j++) {
+	for (int i = 0; i < n_bucks; i++) {
+		for (int j = 0; j < n_bucks; j++) {
 			if (i == j) {
-				float sc = score->A[i*n+j];
+				float sc = score->A[i*n_bucks+j];
 				if (sc > -0.000001){
 					sum_dia += sc;
 					count_dia++;
 				}
 			} else {
-				float sc = score->A[i*n+j];
+				float sc = score->A[i*n_bucks+j];
 				if (sc > -0.000001){
 					sum_all += sc;
 					count_all++;
@@ -366,13 +375,13 @@ struct bucks_score get_score_edges_res(uint32_t i0, uint32_t i1, struct asm_grap
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
 		for (int j = 0; j < mat_score->n_bucks; ++j) {
 			float tmp = mat_score->A[i * n_bucks + j];
-			__VERBOSE("%f ", tmp);
+//			__VERBOSE("%f ", tmp);
 			if (tmp >= -0.000001) {
 				count++;
 				res += tmp;
 			}
 		}
-		__VERBOSE("\n");
+//		__VERBOSE("\n");
 	}
 	struct bucks_score res_score;
 	res_score.score = res/count;
@@ -411,10 +420,11 @@ void list_contig(struct asm_graph_t *g, FILE *out_file)
 		uint32_t e0 = listE[i];
 		for (uint32_t i1 = 0; i1 < n_e; i1++) {
 			uint32_t e1 = listE[i1];
+			assert(e1 < g->n_e && e0 < g->n_e);
 			struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
 			uint32_t check = 0;
 			if (e0 == e1){
-				float cvr = get_genome_coverage(g);
+				float cvr = global_genome_coverage;
 				if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
 					check = 1;
 				}
@@ -445,6 +455,7 @@ void swap(uint32_t *a, uint32_t *b)
 
 void normalize_min_index(struct asm_graph_t *g, struct contig_edge *e)
 {
+	assert(e->src < g->n_e && e->des < g->n_e);
 	uint32_t rc_id_src = g->edges[e->src].rc_id;
 	if (rc_id_src < e->src) {
 		e->src = rc_id_src;
@@ -465,6 +476,7 @@ void normalize_min_index(struct asm_graph_t *g, struct contig_edge *e)
 
 void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
 {
+	assert(e->src < g->n_e && e->des < g->n_e);
 	if (e->rv_src == 1) {
 		e->src = g->edges[e->src].rc_id;
 		e->rv_src = 0;
@@ -494,7 +506,7 @@ void unique_edge(struct contig_edge *listE, uint32_t *n_e)
 		uint32_t j = i;
 		struct contig_edge best;
 		best.score0 = 0;
-		while (equal_contig_edge(&listE[j], &listE[i])){
+		while (j < *n_e && equal_contig_edge(&listE[j], &listE[i])){
 			if (better_contig_edge(&listE[j], &best)){
 				best = listE[j];
 			}
@@ -519,6 +531,7 @@ uint32_t *binary_search(uint32_t *list, uint32_t n, uint32_t value)
 		else
 			r = m;
 	}
+	assert(list[l] == value);
 	if (list[l] != value)
 		return list-1;
 	return &list[l];
@@ -529,7 +542,7 @@ void unique_vertex(uint32_t *listV, uint32_t *n_v)
 	uint32_t new_n_v = 0;
 	for (uint32_t i = 0; i < *n_v; ) {
 		uint32_t j = i;
-		while (listV[i] == listV[j]) j++;
+		while (j < *n_v && listV[i] == listV[j]) j++;
 		listV[new_n_v++] = listV[i];
 		i = j;
 	}
@@ -690,7 +703,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 
 	int *mark = calloc(n_v, sizeof(uint32_t));
 	for (uint32_t i = 0; i < n_v; i++) {
-		float cvr = get_genome_coverage(g);
+		float cvr = global_genome_coverage;
 		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr) ;
 		mark[i] = roundint(cov_times);
 		__VERBOSE("%d " , mark[i]);
@@ -701,6 +714,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, uint32_t *E, u
 		for (uint32_t i = 0; i < n_v; i++) if (mark[i] > 0) {
 			__VERBOSE("dfs from %d %d\n", i, mark[i]);
 			dfs_hamiltonian(i,  1, E, head, next, mark, n_v, res, best_res, &best_n_res, listV);
+			assert(best_n_res < n_v);
 		}
 		if (best_n_res == 0) 
 			break;

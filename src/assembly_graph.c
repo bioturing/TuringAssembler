@@ -160,7 +160,7 @@ double get_genome_coverage(struct asm_graph_t *g)
 			hash = get_hash_edge32(g->edges + e);
 		}
 	}
-	__VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
+//	__VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
 	return ret_cov;
 }
 
