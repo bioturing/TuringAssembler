@@ -104,6 +104,24 @@ static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 	return 1;
 }
 
+void asm_graph_destroy(struct asm_graph_t *g)
+{
+	gint_t u, e;
+	for (e = 0; e < g->n_e; ++e)
+		asm_clean_edge_seq2(g, e);
+	free(g->edges);
+	g->edges = NULL;
+	for (u = 0; u < g->n_v; ++u) {
+		free(g->nodes[u].adj);
+		g->nodes[u].adj = NULL;
+	}
+	free(g->nodes);
+	g->nodes = NULL;
+	g->n_e = g->n_v = 0;
+	g->ksize = 0;
+	g->bin_size = 0;
+}
+
 gint_t get_longest_edge(struct asm_graph_t *g)
 {
 	gint_t e, ret = -1;
@@ -118,19 +136,31 @@ gint_t get_longest_edge(struct asm_graph_t *g)
 	return ret;
 }
 
-//not optimize, can use get_longest_edge to improve
-float get_genome_coverage(struct asm_graph_t *g)
+uint32_t get_hash_edge32(struct asm_edge_t *e)
+{
+	uint32_t ret = 0, i;
+	for (i = 0; i < ((e->seq_len + 15) >> 4); ++i)
+		ret ^= e->seq[i];
+	return ret;
+}
+
+double get_genome_coverage(struct asm_graph_t *g)
 {
 	/* Using the coverage of the longest contigs */
 	gint_t e;
-	float ret_cov = 0.0;
+	double ret_cov = 0.0;
 	uint32_t max_len = 0;
+	uint32_t hash = 0;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		if (g->edges[e].seq_len > max_len) {
 			max_len = g->edges[e].seq_len;
 			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
+			hash = get_hash_edge32(g->edges + e);
 		}
 	}
+	__VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
 	return ret_cov;
 }
 
@@ -164,8 +194,8 @@ void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
 		return;
 	double fcov;
 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-	__VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
-				get_edge_len(g->edges + e), fcov, cov);
+	// __VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
+	// 			get_edge_len(g->edges + e), fcov, cov);
 
 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
 	asm_clone_edge2(g, g->n_e, e);
@@ -175,8 +205,8 @@ void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
 	asm_clean_edge_seq(g->edges + g->n_e);
 
 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-	__VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
-			get_edge_len(g->edges + e), fcov);
+	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+	// 		get_edge_len(g->edges + e), fcov);
 }
 
 void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
@@ -184,9 +214,9 @@ void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int co
 	double fcov1, fcov2;
 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	__VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
-		e1, get_edge_len(g->edges + e1), fcov1,
-		e2, get_edge_len(g->edges + e2), fcov2, cov);
+	// __VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
+	// 	e1, get_edge_len(g->edges + e1), fcov1,
+	// 	e2, get_edge_len(g->edges + e2), fcov2, cov);
 
 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
 	asm_clone_edge2(g, g->n_e, e1);
@@ -199,8 +229,8 @@ void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int co
 	asm_clean_edge_seq(g->edges + g->n_e);
 
 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
-			get_edge_len(g->edges + e1), fcov1);
+	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+	// 		get_edge_len(g->edges + e1), fcov1);
 }
 
 gint_t asm_create_node(struct asm_graph_t *g)
@@ -218,7 +248,7 @@ gint_t asm_create_node(struct asm_graph_t *g)
 gint_t asm_clone_edge3(struct asm_graph_t *g, gint_t src)
 {
 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
-	__VERBOSE("Cloning edges %ld -> %ld\n", src, g->n_e);
+	// __VERBOSE("Cloning edges %ld -> %ld\n", src, g->n_e);
 	g->n_e += 2;
 	asm_clone_edge2(g, g->n_e - 2, src);
 	asm_clone_edge2(g, g->n_e - 1, g->edges[src].rc_id);
@@ -329,6 +359,41 @@ void asm_append_seq_with_gap2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	}
 }
 
+void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
+							uint32_t overlap)
+{
+	/* append the bin seq */
+	uint32_t seq_len, new_m, m;
+	seq_len = dst->seq_len + src->seq_len - overlap;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len + 15) >> 4;
+	if (new_m > m) {
+		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+		if (dst->seq == NULL)
+			__ERROR("Unable to realloc");
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	}
+
+	uint32_t i, k;
+	for (i = overlap; i < src->seq_len; ++i) {
+		k = i - overlap + dst->seq_len;
+		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
+							<< ((k & 15) << 1);
+	}
+	/* append the gaps */
+	if (src->n_holes) {
+		uint32_t n_holes = dst->n_holes + src->n_holes;
+		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
+		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
+		for (i = 0; i < src->n_holes; ++i) {
+			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len - overlap;
+		}
+		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
+		dst->n_holes = n_holes;
+	}
+	dst->seq_len = seq_len;
+}
+
 void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	gint_t slen, slen1, slen2, nbin, nbin1, nbin2;
@@ -382,8 +447,8 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	__VERBOSE("Join with gap [%u] %ld(~%.3lf) -> %ld(~%.3lf). ",
-		gap_size, e1, cov1, e2, cov2);
+	// __VERBOSE("Join with gap [%u] %ld(~%.3lf) -> %ld(~%.3lf). ",
+	// 	gap_size, e1, cov1, e2, cov2);
 	uint32_t j;
 	asm_append_seq_with_gap2(g, e1, e2, gap_size);
 	g->edges[e1].target = g->edges[e2].target;
@@ -399,7 +464,7 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("New cov: %.3f\n", cov);
+	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -408,8 +473,8 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	__VERBOSE("Join %ld(~%.3lf) -> %ld(~%.3lf). ",
-		e1, cov1, e2, cov2);
+	// __VERBOSE("Join %ld(~%.3lf) -> %ld(~%.3lf). ",
+	// 	e1, cov1, e2, cov2);
 	asm_append_edge_seq2(g, e1, e2);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
@@ -423,7 +488,7 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("New cov: %.3f\n", cov);
+	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -432,8 +497,8 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	cov2 = __get_edge_cov(g->edges + e3, g->ksize);
-	__VERBOSE("Join %ld(~%.3lf) -> %ld -> %ld(~%.3lf). ",
-		e1, cov1, e2, e3, cov2);
+	// __VERBOSE("Join %ld(~%.3lf) -> %ld -> %ld(~%.3lf). ",
+	// 	e1, cov1, e2, e3, cov2);
 
 	asm_append_edge_seq2(g, e1, e2);
 	asm_append_edge_seq2(g, e1, e3);
@@ -451,7 +516,7 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_remove_edge(g, e3);
 	asm_remove_edge(g, e_rc1);
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("New cov: %.3f\n", cov);
+	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
@@ -460,10 +525,10 @@ void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	__VERBOSE("Join loop reverse %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf)",
-		e1, get_edge_len(g->edges + e1), cov1,
-		e2, get_edge_len(g->edges + e2), cov2,
-		e1, get_edge_len(g->edges + e1), cov1);
+	// __VERBOSE("Join loop reverse %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf)",
+	// 	e1, get_edge_len(g->edges + e1), cov1,
+	// 	e2, get_edge_len(g->edges + e2), cov2,
+	// 	e1, get_edge_len(g->edges + e1), cov1);
 
 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
 	g->n_e += 2;
@@ -491,8 +556,7 @@ void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	g->n_e -= 2;
 
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("New cov: %.3f\n", cov);
-
+	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -501,8 +565,8 @@ void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	double cov, cov1, cov2;
 	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	__VERBOSE("Join loop %ld(~%.3lf) -> %ld(~%.3lf) -> %ld(~%.3lf). Added count: %lu. ",
-		e1, cov1, e2, cov2, e1, cov1, added_count);
+	// __VERBOSE("Join loop %ld(~%.3lf) -> %ld(~%.3lf) -> %ld(~%.3lf). Added count: %lu. ",
+	// 	e1, cov1, e2, cov2, e1, cov1, added_count);
 
 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
 	g->n_e += 2;
@@ -521,7 +585,7 @@ void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	g->n_e -= 2;
 
 	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	__VERBOSE("New cov: %.3f\n", cov);
+	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
@@ -554,41 +618,6 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
 	dst->seq_len = seq_len;
 }
 
-void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap)
-{
-	/* append the bin seq */
-	uint32_t seq_len, new_m, m;
-	seq_len = dst->seq_len + src->seq_len - overlap;
-	new_m = (seq_len + 15) >> 4;
-	m = (dst->seq_len + 15) >> 4;
-	if (new_m > m) {
-		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
-		if (dst->seq == NULL)
-			__ERROR("Unable to realloc");
-		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	}
-
-	uint32_t i, k;
-	for (i = overlap; i < src->seq_len; ++i) {
-		k = i - overlap + dst->seq_len;
-		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
-							<< ((k & 15) << 1);
-	}
-	/* append the gaps */
-	if (src->n_holes) {
-		uint32_t n_holes = dst->n_holes + src->n_holes;
-		dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
-		dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
-		for (i = 0; i < src->n_holes; ++i) {
-			dst->p_holes[dst->n_holes + i] = src->p_holes[i] + dst->seq_len - overlap;
-		}
-		memcpy(dst->l_holes + dst->n_holes, src->l_holes, src->n_holes * sizeof(uint32_t));
-		dst->n_holes = n_holes;
-	}
-	dst->seq_len = seq_len;
-}
-
 void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
 							uint32_t overlap)
 {
@@ -607,6 +636,21 @@ void asm_append_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 	g->edges[dst].count += g->edges[src].count;
 	g->edges[dst].target = g->edges[src].target;
 }
+
+void asm_clean_edge_seq2(struct asm_graph_t *g, gint_t e)
+{
+	asm_clean_edge_seq(g->edges + e);
+	uint32_t len, n_bin, i;
+	if (g->edges[e].bucks != NULL && g->bin_size != 0) {
+		len = get_edge_len(g->edges + e);
+		n_bin = (len + 15) >> 4;
+		for (i = 0; i < n_bin; ++i)
+			barcode_hash_clean(g->edges[e].bucks + i);
+		free(g->edges[e].bucks);
+		g->edges[e].bucks = NULL;
+	}
+}
+
 void asm_clean_edge_seq(struct asm_edge_t *e)
 {
 	free(e->seq);
