@@ -1,27 +1,32 @@
 #include <stdint.h>
 #include <assert.h>
 #include "verbose.h"
-void dfs_hamiltonian(int x, uint32_t depth, uint32_t *E, int *head, uint32_t *next, int *mark, uint32_t n_v, 
-		uint32_t *res, uint32_t *best_res, uint32_t *best_n_res, uint32_t *listV)
+void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, int *E, int *remain_unvisited, 
+		int *cur_path, int *best_n_res, int *best_res, int *listV)
 {
-	mark[x]--;
-	mark[x^1]--;
-	res[depth-1] = x;
+	int a = best_res;
+	__VERBOSE("dfs %d %d %d\n", x, depth, a);
+	remain_unvisited[x]--;
+	remain_unvisited[x^1]--;
+	assert(remain_unvisited[x]>=0 && remain_unvisited[x^1]>=0);
+	cur_path[depth-1] = x;
 	if (depth > *best_n_res) {
 		*best_n_res = depth;
-		for (uint32_t i = 0; i < depth; i++){
-			best_res[i] = res[i];
-			__VERBOSE("%d ", listV[res[i]]);
+		__VERBOSE("new path depth %d\n", depth);
+		for (int i = 0; i < depth; i++){
+			best_res[i] = cur_path[i];
+			__VERBOSE("%d ", cur_path[i]);
 		}
 		__VERBOSE("\n");
 	} 
-	for (int i = head[x]; i != -1; i = next[i]) {
-		assert(mark[E[i]] >= 0);
-		if (mark[E[i]] > 0) {
-			dfs_hamiltonian(E[i], depth + 1, E, head, next, mark, n_v, res, best_res, best_n_res, listV);
+	for (int i = 0; i < n_adj; i++) {
+		int adj = list_adj[i];
+		if (remain_unvisited[adj] && E[x * n_v + adj]) {
+			dfs_hamiltonian(adj, depth+1, n_adj, list_adj, n_v, E, remain_unvisited, 
+				cur_path, best_n_res, best_res, listV);
 		}
 	}
-	mark[x]++;
-	mark[x^1]++;
+	remain_unvisited[x]++;
+	remain_unvisited[x^1]++;
 }
 
