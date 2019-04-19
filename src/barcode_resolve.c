@@ -1250,6 +1250,8 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 			if (rcov1.hi != 1)
 				continue;
 			e2 = bc_find_pair_check_path_strict(g, set_e, e1, legs, n_leg);
+			if (e2 == -1)
+				continue;
 			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (rcov2.hi != 1)
