@@ -209,7 +209,7 @@ void build_huu_process(struct opt_build_t *opt)
 	char *tmp = "/list_contig";
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
-	list_contig(g0, fp);
+	build_list_contig(g0, fp);
 }
 
 void build_huu_2_process(struct opt_build_t *opt)
@@ -229,7 +229,7 @@ void build_huu_2_process(struct opt_build_t *opt)
 	strcat(out_name , tmp);
 	FILE *out_file = fopen(out_name, "w");
 	
-	build_graph_2(fp, out_file, g0);
+	connect_contig(fp, out_file, g0);
 }
 
 void build_huu_3_process(struct opt_build_t *opt)
