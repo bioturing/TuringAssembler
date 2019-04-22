@@ -21,8 +21,8 @@
 	X(int, global_molecule_length, -1)
 
 // constant for logging
-int log_bin_score = 0;
-int log_share_barcode = 0;
+int log_bin_score = 1;
+int log_share_barcode = 1;
 int log_global_var = 0;
 int log_hole = 0;
 int log_outliner = 1;
@@ -82,7 +82,7 @@ int roundint(float x)
 float get_global_thres_score(struct asm_graph_t *g)
 {
 	float cvr = get_genome_coverage(g);
-	float res = 1.0 * g->bin_size / global_molecule_length * 0.4;
+	float res = 1.0 * g->bin_size / global_molecule_length * 0.2;
 	__VERBOSE_FLAG(log_global_var, "global thres score: %f\n", res);
 	return res;
 }
@@ -216,7 +216,7 @@ float get_score_bucks(struct asm_graph_t *g, struct asm_edge_t * e0, struct asm_
 		}
 	}
 	__VERBOSE_FLAG(log_share_barcode, "res %d cnt0 %d cnt1 %d hole0 %d hole1 %d  \n", res2, cnt0, cnt1 ,get_amount_hole(g, e0, b0), get_amount_hole(g, e1, b1));
-	if (res2 == 0) __VERBOSE_FLAG(log_outliner, "res2==0 %d %d\n", cnt0 , cnt1);
+//	if (res2 == 0) __VERBOSE_FLAG(log_outliner, "res2==0 %d %d\n", cnt0 , cnt1);
 	return 1.0 * res2 / min(cnt0 , cnt1);
 }
 
@@ -845,6 +845,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, int *E, int n_
 		merge_big_and_small(&best_n_hamiltonian_path, &best_hamiltonian_path, n_insert, arr_insert);
 
 		print_contig(count, best_n_hamiltonian_path, best_hamiltonian_path);
+		__VERBOSE_FLAG(log_hamiltonian, "contig path ");
+		for (int i = 0; i < best_n_hamiltonian_path; i++) 
+			__VERBOSE_FLAG(log_hamiltonian, "%d " , best_hamiltonian_path[i]);
 		__VERBOSE_FLAG(log_hamiltonian, "best n %d\n", best_n_hamiltonian_path);
 //		__VERBOSE_FLAG(log_hamiltonian, "\nmark\n");
 		count++;
