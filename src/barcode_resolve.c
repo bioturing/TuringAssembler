@@ -252,7 +252,7 @@ gint_t bc_find_pair_check_path(struct asm_graph_t *g, khash_t(gint) *set_e,
 		e = adj[j];
 		if (e == se || e == se_rc)
 			continue;
-		uint32_t dist = get_distance(g, MIN_CONTIG_BARCODE, set_e,
+		gint_t dist = get_distance(g, MIN_CONTIG_BARCODE, set_e,
 			g->nodes[g->edges[e].source].rc_id, g->edges[se].source);
 		if (dist == -1)
 			continue;
@@ -278,7 +278,8 @@ gint_t bc_find_pair_check_path_strict(struct asm_graph_t *g, khash_t(gint) *set_
 		e = adj[j];
 		if (e == se || e == se_rc)
 			continue;
-		uint32_t dist = get_distance(g, MIN_CONTIG_BARCODE, set_e,
+		assert(g->edges[e].source != -1);
+		gint_t dist = get_distance(g, MIN_CONTIG_BARCODE, set_e,
 			g->nodes[g->edges[e].source].rc_id, g->edges[se].source);
 		if (dist == -1)
 			continue;
@@ -407,7 +408,7 @@ gint_t check_2_2_small_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	for (i = 0; i < 2; ++i) {
 		flag = 0;
 		for (k = 2; k < 4; ++k) {
-			if (__cov_range_intersect(rcov[i], rcov[k]))
+			if (__check_coverage(fcov[i], fcov[k], rcov[i], rcov[k]))
 				flag = 1;
 		}
 		if (!flag)
@@ -421,10 +422,8 @@ gint_t check_2_2_small_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	if (__strictly_greater(ratio[0], ratio[1]) && __strictly_greater(ratio[3], ratio[2])) {
 		if (!__positive_ratio(ratio[0]) || !__positive_ratio(ratio[3]))
 			return 0;
-		if (!__cov_range_intersect(rcov[0], rcov[2]) ||
-			!__cov_range_intersect(rcov[1], rcov[3]) ||
-			!__diff_accept(fcov[0], fcov[2]) ||
-			!__diff_accept(fcov[1], fcov[3]))
+		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
+			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3]))
 			return 0;
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
@@ -436,10 +435,8 @@ gint_t check_2_2_small_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	} else if (__strictly_greater(ratio[1], ratio[0]) && __strictly_greater(ratio[2], ratio[3])) {
 		if (!__positive_ratio(ratio[1]) || !__positive_ratio(ratio[2]))
 			return 0;
-		if (!__cov_range_intersect(rcov[0], rcov[3]) ||
-			!__cov_range_intersect(rcov[1], rcov[2]) ||
-			!__diff_accept(fcov[0], fcov[3]) ||
-			!__diff_accept(fcov[1], fcov[2]))
+		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
+			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2]))
 			return 0;
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
@@ -486,7 +483,7 @@ gint_t check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	for (i = 0; i < 2; ++i) {
 		flag = 0;
 		for (k = 2; k < 4; ++k) {
-			if (__cov_range_intersect(rcov[i], rcov[k]))
+			if (__check_coverage(fcov[i], fcov[k], rcov[i], rcov[k]))
 				flag = 1;
 		}
 		if (!flag)
@@ -500,10 +497,8 @@ gint_t check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	if (__strictly_greater(ratio[0], ratio[1]) && __strictly_greater(ratio[3], ratio[2])) {
 		if (!__positive_ratio(ratio[0]) || !__positive_ratio(ratio[3]))
 			return 0;
-		if (!__cov_range_intersect(rcov[0], rcov[2]) ||
-			!__cov_range_intersect(rcov[1], rcov[3]) ||
-			!__diff_accept(fcov[0], fcov[2]) ||
-			!__diff_accept(fcov[1], fcov[3]))
+		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
+			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3]))
 			return 0;
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
@@ -515,10 +510,8 @@ gint_t check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	} else if (__strictly_greater(ratio[1], ratio[0]) && __strictly_greater(ratio[2], ratio[3])) {
 		if (!__positive_ratio(ratio[1]) || !__positive_ratio(ratio[2]))
 			return 0;
-		if (!__cov_range_intersect(rcov[0], rcov[3]) ||
-			!__cov_range_intersect(rcov[1], rcov[2]) ||
-			!__diff_accept(fcov[0], fcov[3]) ||
-			!__diff_accept(fcov[1], fcov[2]))
+		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
+			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2]))
 			return 0;
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
@@ -575,14 +568,16 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 			e1 = g->nodes[u_rc].adj[i];
 			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
-			if (rcov1.hi != 1)
+			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
+			// if (rcov1.hi != 1)
+			// 	continue;
 			e2 = bc_find_pair_strict(g, e1, g->nodes[v].adj, g->nodes[v].deg);
 			if (e2 < 0)
 				continue;
 			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
-			if (rcov2.hi != 1)
+			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
 			et1 = bc_find_pair_strict(g, e2, g->nodes[u_rc].adj, g->nodes[u_rc].deg);
 			if (et1 != e1) {
@@ -611,15 +606,12 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 		__VERBOSE("Leftover path: %ld(~%.6lf) -> %ld -> %ld(~%.6lf), ratio: %.6lf\n",
 				e1, fcov1, e, e2, fcov2, ratio);
 		if ((__positive_ratio(ratio) || ratio < 0) &&
-			__cov_range_intersect(rcov1, rcov2) &&
-			__diff_accept(fcov1, fcov2)) {
-			if (e1 != g->edges[e2].rc_id)
-				// asm_join_edge_loop(g, e1, e2, e, e_rc,
-				// 		g->edges[e].count);
-			// else
+			__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
+			if (e1 != g->edges[e2].rc_id) {
 				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 					e2, g->edges[e2].rc_id, g->edges[e].count);
-			++ret;
+				++ret;
+			}
 		}
 		if (ret) {
 			asm_remove_edge(g, e);
@@ -635,51 +627,124 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 	return ret;
 }
 
-// gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
-// 								double uni_cov)
-// {
-// 	double uni_cov_local = callibrate_uni_cov(g, legs, n_leg, uni_cov);
-// 	gint_t i, e1, e2, et1, ret, resolve;
-// 	double fcov1, fcov2;
-// 	struct cov_range_t rcov1, rcov2;
-// 	ret = 0;
-// 	do {
-// 		resolve = 0;
-// 		for (i = 0; i < n_leg; ++i) {
-// 			e1 = legs[i];
-// 			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
-// 			rcov1 = convert_cov_range(fcov1);
-// 			if (rcov1.hi != 1)
-// 				continue;
-// 			e2 = bc_find_consecutive_strict(g, e1, legs, n_leg);
-// 			if (e2 == -1)
-// 				continue;
-// 			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
-// 			rcov2 = convert_cov_range(fcov2);
-// 			if (rcov2.hi != 1)
-// 				continue;
-// 			et1 = bc_find_consecutive_strict(g, e2, legs, n_leg);
-// 			if (et1 != e1) {
-// 				__VERBOSE("Not best pair (%ld, %ld) -> %ld\n",
-// 					e1, et1, e2);
-// 				continue;
-// 			}
-// 			asm_join_edge(g, g->edges[e1].rc_id, e1,
-// 							e2, g->edges[e2].rc_id);
-// 			gint_t j;
-// 			j = find_adj_idx(legs, n_leg, e1);
-// 			if (j != -1)
-// 				legs[j] = legs[--n_leg];
-// 			j = find_adj_idx(legs, n_leg, e2);
-// 			if (j != -1)
-// 				legs[j] = legs[--n_leg];
-// 			resolve = 1;
-// 			break;
-// 		}
-// 		ret += resolve;
-// 	} while (resolve);
-// 	return ret;
-// }
+gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t u, double uni_cov)
+{
+	gint_t u_rc;
+	u_rc = g->nodes[u].rc_id;
+	if (u == u_rc)
+		return 0;
+	if (g->nodes[u].deg == 0 || g->nodes[u_rc].deg == 0)
+		return 0;
+	gint_t *legs_1, *legs_2;
+	gint_t n_leg1, n_leg2, i, e, resolve, ret;
+	legs_1 = alloca(g->nodes[u].deg * sizeof(gint_t));
+	legs_2 = alloca(g->nodes[u_rc].deg * sizeof(gint_t));
+	n_leg1 = n_leg2 = 0;
+	for (i = 0; i < g->nodes[u].deg; ++i) {
+		e = g->nodes[u].adj[i];
+		if (get_edge_len(g->edges + e) < MIN_CONTIG_BARCODE)
+			return 0;
+		if (g->edges[e].source == g->edges[e].target ||
+			g->edges[e].source == g->nodes[g->edges[e].target].rc_id)
+			return 0;
+		legs_1[n_leg1++] = e;
+	}
+	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
+		e = g->nodes[u_rc].adj[i];
+		if (get_edge_len(g->edges + e) < MIN_CONTIG_BARCODE)
+			return 0;
+		if (g->edges[e].source == g->edges[e].target ||
+			g->edges[e].source == g->nodes[g->edges[e].target].rc_id)
+			return 0;
+		legs_2[n_leg2++] = e;
+	}
+	ret = 0;
+	gint_t e1, e2, et1;
+	double fcov1, fcov2;
+	struct cov_range_t rcov1, rcov2;
+	do {
+		resolve = 0;
+		for (i = 0; i < g->nodes[u_rc].deg; ++i) {
+			e1 = g->nodes[u_rc].adj[i];
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov;
+			rcov1 = convert_cov_range(fcov1);
+			if (rcov1.hi < 1 || rcov1.lo > 1)
+				continue;
+			e2 = bc_find_pair_strict(g, e1, g->nodes[u].adj, g->nodes[u].deg);
+			if (e2 < 0)
+				continue;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov;
+			rcov2 = convert_cov_range(fcov2);
+			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
+				continue;
+			et1 = bc_find_pair_strict(g, e2, g->nodes[u_rc].adj, g->nodes[u_rc].deg);
+			if (et1 != e1) {
+				__VERBOSE("Not best pair: (%ld, %ld) <-> %ld\n", e1, et1, e2);
+				continue;
+			}
+			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
+			resolve = 1;
+			break;
+		}
+		ret += resolve;
+	} while (resolve);
+	if (g->nodes[u_rc].deg == 1 && g->nodes[u].deg == 1) {
+		e1 = g->nodes[u].adj[0];
+		e2 = g->nodes[u_rc].adj[0];
+		fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov;
+		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov;
+		rcov1 = convert_cov_range(fcov1);
+		rcov2 = convert_cov_range(fcov2);
+		double ratio = get_barcode_ratio(g, e1, e2);
+		__VERBOSE("Leftover path: %ld(~%.6lf) ->%ld(~%.6lf), ratio: %.6lf\n",
+			e1, fcov1, e2, fcov2, ratio);
+		if ((__positive_ratio(ratio) || ratio < 0) &&
+			__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
+			if (e1 != g->edges[e2].rc_id) {
+				asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
+			} else {
+				asm_remove_node_adj(g, g->edges[e1].source, e1);
+				gint_t n = asm_create_node(g);
+				g->edges[e1].source = n;
+				g->nodes[n].adj = malloc(sizeof(gint_t));
+				g->nodes[n].adj[0] = e1;
+				g->nodes[n].deg = 1;
+				g->edges[g->edges[e1].rc_id].target = g->nodes[n].rc_id;
+			}
+		} else {
+			asm_remove_node_adj(g, g->edges[e1].source, e1);
+			gint_t n = asm_create_node(g);
+			g->edges[e1].source = n;
+			g->nodes[n].adj = malloc(sizeof(gint_t));
+			g->nodes[n].adj[0] = e1;
+			g->nodes[n].deg = 1;
+			g->edges[g->edges[e1].rc_id].target = g->nodes[n].rc_id;
+		}
+	}
+	return ret;
+}
+
+static gint_t get_array_legs2(struct asm_graph_t *g, gint_t *legs,
+		khash_t(gint) *set_e, khash_t(gint) *set_leg, khash_t(gint) *set_self)
+{
+	khiter_t k;
+	gint_t e, ret = 0;
+	for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
+		if (kh_exist(set_leg, k)) {
+			e = kh_key(set_leg, k);
+			legs[ret++] = e;
+			kh_del(gint, set_e, kh_get(gint, set_e, e));
+			kh_del(gint, set_e, kh_get(gint, set_e, g->edges[e].rc_id));
+		}
+	}
+	for (k = kh_begin(set_self); k != kh_end(set_self); ++k) {
+		if (kh_exist(set_self, k)) {
+			e = kh_key(set_self, k);
+			legs[ret++] = e;
+		}
+	}
+	return ret;
+}
 
 static gint_t get_array_legs(struct asm_graph_t *g, gint_t *legs,
 				khash_t(gint) *set_e, khash_t(gint) *set_leg)
@@ -703,10 +768,6 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 	gint_t *legs = alloca(kh_size(set_leg) * sizeof(gint_t));
 	gint_t n_leg = get_array_legs(g, legs, set_e, set_leg);
 	gint_t ret, resolve, i;
-	// if (kh_size(set_e) == 0) {
-	// 	ret = check_n_m_node_strict(g, legs, n_leg, uni_cov);
-	// 	return ret;
-	// }
 	double uni_cov_local = callibrate_uni_cov(g, legs, n_leg, uni_cov);
 	ret = 0;
 	do {
@@ -719,14 +780,14 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 			e1 = legs[i];
 			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
-			if (rcov1.hi != 1)
+			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
 			e2 = bc_find_pair_check_path_strict(g, set_e, e1, legs, n_leg);
 			if (e2 < 0)
 				continue;
 			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
-			if (rcov2.hi != 1)
+			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
 			et1 = bc_find_pair_check_path(g, set_e, e2, legs, n_leg);
 			if (et1 != e1) {
@@ -759,6 +820,7 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 	return ret;
 }
 
+
 gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 	khash_t(gint) *set_leg, khash_t(gint) *set_self, double uni_cov)
 {
@@ -778,44 +840,51 @@ gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 				continue;
 			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
-			if (rcov1.hi != 1)
+			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
 			e2 = bc_find_pair_check_path_strict(g, set_e, e1, legs, n_leg);
 			if (e2 < 0)
 				continue;
 			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
-			if (rcov2.hi != 1)
+			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
 			gap_size = get_distance(g, MIN_CONTIG_BARCODE, set_e,
 				g->nodes[g->edges[e1].source].rc_id,
 				g->edges[e2].source);
+			__VERBOSE("Join %ld->%ld\n", e1, e2);
 			if (gap_size)
-				asm_join_edge_with_pat(g, g->edges[e1].rc_id, e1,
+				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
 					e2, g->edges[e2].rc_id, gap_size);
 			else
 				asm_join_edge(g, g->edges[e1].rc_id, e1,
 							e2, g->edges[e2].rc_id);
 			/* remove legs */
 			gint_t j;
-			if (kh_get(gint, set_self, e2) != kh_end(set_self)) {
-				j = find_adj_idx(e2);
-				if (j != -1)
-					legs[j] = legs[--n_leg];
-				j = find_adj_idx(g->edges[e2].rc_id);
-				if (j != -1)
-					legs[j] = legs[--n_leg];
-			} else {
-				j = find_adj_idx(e2);
-				if (j != -1)
-					legs[j] = legs[--n_leg];
-				j = find_adj_idx(e1);
-				if (j != -1)
-					legs[j] = legs[--n_leg];
-			}
+			j = find_adj_idx(legs, n_leg, e2);
+			if (j != -1)
+				legs[j] = legs[--n_leg];
+			j = find_adj_idx(legs, n_leg, e1);
+			if (j != -1)
+				legs[j] = legs[--n_leg];
+			if (kh_get(gint, set_self, e2) != kh_end(set_self))
+				kh_del(gint, set_self, kh_get(gint, set_self, g->edges[e2].rc_id));
+
+			// if (kh_get(gint, set_self, e2) != kh_end(set_self)) {
+			// 	__VERBOSE("Remove %ld+%ld\n", e2, g->edges[e2].rc_id);
+			// 	j = find_adj_idx(legs, n_leg, e2);
+			// 	if (j != -1)
+			// 		legs[j] = legs[--n_leg];
+			// 	j = find_adj_idx(legs, n_leg, g->edges[e2].rc_id);
+			// 	if (j != -1)
+			// 		legs[j] = legs[--n_leg];
+			// } else {
+			// 	__VERBOSE("Remove %ld+%ld\n", e1, e2);
+			// }
 		}
 		ret += resolve;
 	} while (resolve);
+	return ret;
 }
 
 gint_t collapse_2_2_bridge_strict(struct asm_graph_t *g)
@@ -956,7 +1025,7 @@ gint_t collapse_n_m_bridge_strict(struct asm_graph_t *g)
 	return cnt;
 }
 
-gint_t collapse_n_m_node_strict(struct asm_graph_t *g0)
+gint_t collapse_n_m_node_strict(struct asm_graph_t *g)
 {
 	double uni_cov = get_genome_coverage(g);
 	gint_t u, cnt_local, cnt = 0;
@@ -983,7 +1052,7 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1)
 	} while (cnt_local);
 	test_asm_graph(g0);
 	collapse_simple_jungle_strict(g0);
-	collapse_complex_jungle_strict(g0);
+	// collapse_complex_jungle_strict(g0);
 	// collapse_simple_jungle(g0);
 	// collapse_n_m_bridge(g0);
 	asm_condense(g0, g1);
