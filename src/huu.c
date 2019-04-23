@@ -18,7 +18,8 @@
 	X(int, global_thres_n_buck_big_small , -1)\
 	X(int, global_n_buck , -1)\
 	X(float, global_genome_coverage, -1)\
-	X(int, global_molecule_length, -1)
+	X(int, global_molecule_length, -1)\
+	X(float, global_thres_coefficent, -1); 
 
 // constant for logging
 int log_bin_score = 1;
@@ -82,7 +83,7 @@ int roundint(float x)
 float get_global_thres_score(struct asm_graph_t *g)
 {
 	float cvr = get_genome_coverage(g);
-	float res = 1.0 * g->bin_size / global_molecule_length * 0.2;
+	float res = 1.0 * g->bin_size / global_molecule_length * global_thres_coefficent;
 	__VERBOSE_FLAG(log_global_var, "global thres score: %f\n", res);
 	return res;
 }
@@ -135,6 +136,7 @@ void init_global_params(struct asm_graph_t *g)
 	global_n_buck = 6;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  25;//get_global_count_kmer(g);
+	global_thres_coefficent = 0.2;
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 }
@@ -628,7 +630,7 @@ gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	return dump_edge_seq(seq, m_seq, e);
 }
 
-void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, int *E, int n_v, int *res, int *n_res, int *listV, float avg_bin_hash)
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, int *res, int *n_res, int *listV, float avg_bin_hash)
 {
 	void print_contig(int index, int n_contig, int *list_contig)
 	{
@@ -718,7 +720,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, int *E, int n_
 		while (1) {
 			int *list_adj = NULL, count_adj = 0;
 			int last_pos = best_hamiltonian_path[*best_n_hamiltonian_path-1];
-			for (int i = 0; i < n_v; i++) if (E[last_pos * n_v + i] && remain_unvisited[i]){
+			for (int i = 0; i < n_v; i++) if (E[last_pos * n_v + i] != 0 && remain_unvisited[i]){
 				assert(remain_unvisited[i] >0);
 				list_adj = realloc(list_adj, (count_adj+1) * sizeof(int));
 				list_adj[count_adj] = i;
@@ -895,7 +897,7 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	}
 
 	int m = 0;
-	int *E = calloc(n_v * n_v, sizeof(int));
+	float *E = calloc(n_v * n_v, sizeof(float));
 	for (int i = 0; i < n_e; i++) {
 		int u = list_one_dir_E[i].src;
 		u = binary_search(listV, n_v, u) - listV;
@@ -905,7 +907,7 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 		if (u == -1 || v == -1){
 			__VERBOSE_FLAG(log_hamiltonian, "%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 		}
-		E[u * n_v + v] = 1;
+		E[u * n_v + v] = list_one_dir_E[i].score0;
 	}
 	int *res = calloc(n_v, sizeof(int)), n_res=0;
 	algo_find_hamiltonian(out_file, g,E, n_v, res, &n_res, listV, avg_bin_hash);
@@ -947,7 +949,7 @@ void connect_contig(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 	struct contig_edge *listE = NULL;
 	int n_e=0;
 	float avg_bin_hash = get_avg_bin_hash(g);
-	while (fscanf(fp,"score: %f edge: %d %d\n", &score, &src, &des) !=EOF){
+	while (fscanf(fp,"score: %f edge: %d %d\n", &score, &src, &des) !=EOF) {
 		n_e += 1;
 		listE = realloc(listE, n_e*sizeof(struct contig_edge));
 		add_contig_edge(g, listE, n_e-1, src, des, score);
