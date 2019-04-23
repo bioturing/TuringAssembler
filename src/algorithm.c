@@ -34,11 +34,6 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 		list_sort[i] = list_adj[i];
 	}
 	qsort(list_sort, n_adj, sizeof(int), cmp);
-	for(int  i = 0; i < n_adj; i++) 
-		__VERBOSE("%d ", list_sort[i]);
-	__VERBOSE("after sort distance "); 
-	for(int  i = 0; i < n_adj; i++) 
-		__VERBOSE("%d %f\n", list_sort[i], E[x*n_v + list_sort[i]]);
 	for (int i = 0; i < n_adj; i++) {
 		int adj = list_sort[i];
 		if (remain_unvisited[adj] && E[x * n_v + adj]) {
