@@ -84,8 +84,9 @@ struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double un
 struct cov_range_t convert_cov_range(double fcov);
 
 #define __strictly_greater(cov1, cov2) ((cov1) > 2 * (cov2))
-#define __cov_range_intersect(rcov1, rcov2) ((rcov1).lo <= (rcov2).hi && (rcov2).lo <= (rcov1).hi)
-#define __diff_accept(cov1, cov2) (__abs((cov1) - (cov2)) < 0.75)
+#define __coverage_range_intersect(rcov1, rcov2) ((rcov1).lo <= (rcov2).hi && (rcov2).lo <= (rcov1).hi)
+#define __check_coverage(fcov1, fcov2, rcov1, rcov2)			\
+	(__coverage_range_intersect(rcov1, rcov2) && __abs((fcov1) - (fcov2)) < 0.5)
 
 /* Function signature:
  * int __int_cov_ratio(float cov1, float cov2);

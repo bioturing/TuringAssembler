@@ -127,6 +127,8 @@ gint_t get_longest_edge(struct asm_graph_t *g)
 	gint_t e, ret = -1;
 	uint32_t max_len = 0;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		uint32_t len = get_edge_len(g->edges + e);
 		if (len > max_len) {
 			max_len = len;
@@ -136,7 +138,7 @@ gint_t get_longest_edge(struct asm_graph_t *g)
 	return ret;
 }
 
-uint32_t get_hash_edge32(struct asm_edge_t *e)
+static uint32_t get_hash_edge32(struct asm_edge_t *e)
 {
 	uint32_t ret = 0, i;
 	for (i = 0; i < ((e->seq_len + 15) >> 4); ++i)
