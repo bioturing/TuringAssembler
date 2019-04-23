@@ -1052,7 +1052,7 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1)
 	} while (cnt_local);
 	test_asm_graph(g0);
 	collapse_simple_jungle_strict(g0);
-	// collapse_complex_jungle_strict(g0);
+	collapse_complex_jungle_strict(g0);
 	// collapse_simple_jungle(g0);
 	// collapse_n_m_bridge(g0);
 	asm_condense(g0, g1);
