@@ -870,18 +870,8 @@ gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 				legs[j] = legs[--n_leg];
 			if (kh_get(gint, set_self, e2) != kh_end(set_self))
 				kh_del(gint, set_self, kh_get(gint, set_self, g->edges[e2].rc_id));
-
-			// if (kh_get(gint, set_self, e2) != kh_end(set_self)) {
-			// 	__VERBOSE("Remove %ld+%ld\n", e2, g->edges[e2].rc_id);
-			// 	j = find_adj_idx(legs, n_leg, e2);
-			// 	if (j != -1)
-			// 		legs[j] = legs[--n_leg];
-			// 	j = find_adj_idx(legs, n_leg, g->edges[e2].rc_id);
-			// 	if (j != -1)
-			// 		legs[j] = legs[--n_leg];
-			// } else {
-			// 	__VERBOSE("Remove %ld+%ld\n", e1, e2);
-			// }
+			resolve = 1;
+			break;
 		}
 		ret += resolve;
 	} while (resolve);
