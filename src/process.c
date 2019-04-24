@@ -210,6 +210,7 @@ void build_huu_process(struct opt_build_t *opt)
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
 	build_list_contig(g0, fp);
+	fclose(fp);
 	free(out_name);
 }
 
@@ -224,14 +225,23 @@ void build_huu_2_process(struct opt_build_t *opt)
 	if ((fp = fopen(opt->in_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
+
 	char *out_name = calloc(100, 1); 
 	strcat(out_name, opt->out_dir);
 	char *tmp = "/scaffolds.fasta";
 	strcat(out_name , tmp);
 	FILE *out_file = fopen(out_name, "w");
+
+	char *out_graph_name = calloc(100, 1); 
+	strcat(out_graph_name, opt->out_dir);
+	char *tmp2 = "/tengicungduoc";
+	strcat(out_graph_name , tmp2);
+	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, g0);
+	connect_contig(fp, out_file, out_graph, g0);
 	free(out_name);
+	fclose(out_file);
+	fclose(out_graph);
 //	asm_graph_destroy(g0);
 }
 
