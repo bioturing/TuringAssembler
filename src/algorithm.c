@@ -43,5 +43,6 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 	}
 	remain_unvisited[x]++;
 	remain_unvisited[x^1]++;
+	free(list_sort);
 }
 

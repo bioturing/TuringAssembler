@@ -210,6 +210,7 @@ void build_huu_process(struct opt_build_t *opt)
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
 	build_list_contig(g0, fp);
+	free(out_name);
 }
 
 void build_huu_2_process(struct opt_build_t *opt)
@@ -230,6 +231,8 @@ void build_huu_2_process(struct opt_build_t *opt)
 	FILE *out_file = fopen(out_name, "w");
 	
 	connect_contig(fp, out_file, g0);
+	free(out_name);
+//	asm_graph_destroy(g0);
 }
 
 void build_huu_3_process(struct opt_build_t *opt)
