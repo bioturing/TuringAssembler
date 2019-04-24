@@ -24,7 +24,7 @@
 // constant for logging
 int log_debug = 1;
 int log_bin_score = 0;
-int log_share_barcode = 1;
+int log_share_barcode = 0;
 int log_global_var = 0;
 int log_hole = 0;
 int log_outliner = 0;
@@ -603,7 +603,6 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file)
 			__VERBOSE_FLAG(log_build_contig, "score %f\n", score.score); 
 		}
 	}
-	fclose(out_file);
 	free(listE);
 }
 
@@ -1031,7 +1030,6 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	free(remain_unvisited);
 	free(arr_i_short);
 	free(mark_short);
-	fclose(out_file);
 }
 
 void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, int n_e, int n_v, int *listV, float avg_bin_hash)
@@ -1071,27 +1069,30 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	free(res);
 }
 
-void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, int n_e, int *listV, int n_v)
+void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE, int n_v, int *listV, FILE *out_graph)
 {
-	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
+	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
 	for (int i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE[i];
 		normalize_min_index(g, list_one_dir_E+i);
 	}
-	FILE *fp = fopen("gr" , "w");
 	for (int i = 0; i < n_v; i++) {
-		fprintf(fp,"S\t%d\tAAA\tKC:i:1\n", listV[i]);
+		struct asm_edge_t *e = &g->edges[listV[i]];
+		char *seq = NULL;
+		uint32_t seq_len = 0;
+		dump_edge_seq_reduce_N(&seq, &seq_len, e);
+		fprintf(out_graph,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
 	}
 
 	for (int i = 0; i < n_e; i++) {
-		fprintf(fp, "L\t%d\t%c\t%d\t%c\t45M\n", 
+		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
 			list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'+':'-', list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'+':'-');
-		fprintf(fp, "L\t%d\t%c\t%d\t%c\t45M\n", 
+		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
 			list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'-':'+', list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'-':'+');
 	}
 }
 
-void connect_contig(FILE *fp, FILE *out_file, struct asm_graph_t *g)
+void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g)
 {
 	init_global_params(g);
 	check_global_params(g);
@@ -1117,6 +1118,7 @@ void connect_contig(FILE *fp, FILE *out_file, struct asm_graph_t *g)
 		__VERBOSE_FLAG(log_graph, "%d %d %d %d\n",listE[i].src, listE[i].des, listE[i].rv_src, listE[i].rv_des);
 	}
 	unique_edge(listE, &n_e);
+	print_gfa_from_E(g, n_e, listE, n_v, listV, out_graph);
 	__VERBOSE_FLAG(log_graph, "after unique");
 	for (int i = 0; i < n_e; i++){
 		__VERBOSE_FLAG(log_graph, "%d %d %d %d\n",listE[i].src, listE[i].des, listE[i].rv_src, listE[i].rv_des);
