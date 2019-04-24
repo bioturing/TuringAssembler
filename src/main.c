@@ -99,7 +99,6 @@ struct opt_build_t *init_opt_build()
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
-	free(opt);
 	return opt;
 }
 

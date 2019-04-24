@@ -24,7 +24,7 @@
 // constant for logging
 int log_debug = 1;
 int log_bin_score = 0;
-int log_share_barcode = 1;
+int log_share_barcode = 0;
 int log_global_var = 0;
 int log_hole = 0;
 int log_outliner = 0;
@@ -1071,16 +1071,18 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	free(res);
 }
 
-void print_gfa_from_E(struct asm_graph_t *g, struct contig_edge *listE, int n_e, int *listV, int n_v)
+void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE, int n_v, int *listV)
 {
-	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
+	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
 	for (int i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE[i];
 		normalize_min_index(g, list_one_dir_E+i);
 	}
 	FILE *fp = fopen("gr" , "w");
 	for (int i = 0; i < n_v; i++) {
-		fprintf(fp,"S\t%d\tAAA\tKC:i:1\n", listV[i]);
+		struct asm_edge_t *e = &g->edges[listV[i]];
+		char *seq = "XXX";
+		fprintf(fp,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
 	}
 
 	for (int i = 0; i < n_e; i++) {
