@@ -136,7 +136,7 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	return res;
 }
 
-void init_global_params(struct asm_graph_t *g)
+void init_global_params(struct asm_graph_t *g, float huu_1_score)
 {
 	global_thres_length = 10000;
 	global_thres_length_min = 5000;
@@ -144,7 +144,11 @@ void init_global_params(struct asm_graph_t *g)
 	global_n_buck = 6;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  1;//get_global_count_kmer(g);
-	global_thres_coefficent = 0.2;
+	if (huu_1_score != -1) {
+		global_thres_coefficent = huu_1_score;
+	} else {
+		global_thres_coefficent = 0.2;
+	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 }
@@ -470,7 +474,7 @@ void *process(void *data)
 	return NULL;
 }
 
-void check_contig(struct asm_graph_t *g, float avg_bin_hash) 
+void check_contig(struct asm_graph_t *g, float avg_bin_hash, float huu_1_score) 
 {
 	int cmp(const void *i, const void *j)
 	{
@@ -478,12 +482,11 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash)
 		int y = *(int *)j;
 		return get_edge_len(&g->edges[x]) > get_edge_len(&g->edges[y]);
 	}
-	init_global_params(g);
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
-	__VERBOSE("dsfsdfdsfds");
 	__VERBOSE_FLAG(log_check_contig, "check contig\n");
 	for (int i = 0; i < g->n_e; i++) {
-		__VERBOSE("edge %d", i);
+		__VERBOSE("edge %d leng %d ", i, get_edge_len(&g->edges[i]));
 		for (int j = 0; j < g->edges[i].n_holes; j++){
 			__VERBOSE("hole %d ", g->edges[i].p_holes[j]);
 		}
@@ -549,9 +552,9 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 	return res_score;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file) 
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score) 
 {
-	init_global_params(g);
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
 	const int thres_len_e = global_thres_length; 
 	const int n_bucks = global_n_buck;
@@ -1092,9 +1095,9 @@ void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE,
 	}
 }
 
-void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g)
+void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g, float huu_1_score)
 {
-	init_global_params(g);
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_v: %d\n", &n_v);

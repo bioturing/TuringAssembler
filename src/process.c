@@ -209,7 +209,7 @@ void build_huu_process(struct opt_build_t *opt)
 	char *tmp = "/list_contig";
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
-	build_list_contig(g0, fp);
+	build_list_contig(g0, fp, opt->huu_1_score);
 	fclose(fp);
 	free(out_name);
 }
@@ -238,7 +238,7 @@ void build_huu_2_process(struct opt_build_t *opt)
 	strcat(out_graph_name , tmp2);
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, out_graph, g0);
+	connect_contig(fp, out_file, out_graph, g0, opt->huu_1_score);
 	free(out_name);
 	fclose(out_file);
 	fclose(out_graph);
@@ -253,7 +253,7 @@ void build_huu_3_process(struct opt_build_t *opt)
 	g0 = calloc(1, sizeof(struct asm_graph_t));
 
 	load_asm_graph(g0, opt->in_path);
-	check_contig(g0);
+	check_contig(g0, opt->huu_1_score);
 }
 
 void build5_6_process(struct opt_build_t *opt)
