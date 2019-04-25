@@ -527,6 +527,8 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
+	// if (e == 620 || e == 621)
+	// 	__VERBOSE("enter\n");
 	gint_t u, v, u_rc, v_rc, e_rc, ec, ec_rc, j, k;
 	u = g->edges[e].source;
 	v = g->edges[e].target;
@@ -560,6 +562,8 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 	}
 	if (e_len > MIN_NOTICE_LEN && max_len < e_len)
 		return 0;
+	// if (e == 620 || e == 621)
+	// 	__VERBOSE("e_len = %u; max_len = %u\n", e_len, max_len);
 	if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
 		// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
 		if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
@@ -571,10 +575,13 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		e1 = g->nodes[u_rc].adj[j];
 		for (k = j + 1; k < g->nodes[u_rc].deg; ++k) {
 			e2 = g->nodes[u_rc].adj[k];
-			if (g->edges[e1].source == g->edges[e2].source)
+			if (g->edges[e1].target == g->edges[e2].target) {
 				return 0;
+			}
 		}
 	}
+	// if (e == 620 || e == 621)
+	// 	__VERBOSE("here\n");
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[j];
@@ -582,6 +589,8 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if (n == e || n_rc == e)
 			return 0;
 	}
+	// if (e == 620 || e == 621)
+	// 	__VERBOSE("there\n");
 	while (g->nodes[u_rc].deg) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[0];
