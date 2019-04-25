@@ -9,6 +9,8 @@
 #define SIZE_4MB		4194304
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
+#define BARCODE_LEN_10X 16
+#define UMI_LEN_10X 7
 
 #include "pthread_barrier.h"
 
@@ -33,6 +35,7 @@ struct opt_count_t {
 	int n_files;
 	char **files_1, **files_2;
 	char *out_dir;
+	int is10X;
 };
 
 struct opt_build_t {

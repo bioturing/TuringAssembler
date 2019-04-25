@@ -29,6 +29,7 @@ struct maincount_bundle_t {
 	int klarge;
 	int64_t *n_reads;
 	pthread_mutex_t *lock_hash;
+	int is10X;
 };
 
 static void k63_dump_kmer(k63key_t key, char *seq, int l)
@@ -192,6 +193,7 @@ static void count_kmer_lazy(struct opt_count_t *opt, struct k63hash_t *h, int ks
 		worker_bundles[i].klarge = ksize;
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].lock_hash = h->locks + i;
+		worker_bundles[i].is10X = opt->is10X;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
