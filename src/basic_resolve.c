@@ -58,6 +58,38 @@ int is_dead_end(struct asm_graph_t *g, gint_t u)
 	return len >= 250 ? 0 : 1;
 }
 
+void asm_lazy_condense(struct asm_graph_t *g)
+{
+	/* remove unused links */
+	gint_t u, u_rc, deg_fw, deg_rv, e1, e2;
+	for (u = 0; u < g->n_v; ++u) {
+		gint_t c, deg;
+		deg = g->nodes[u].deg;
+		g->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g->nodes[u].adj[c];
+			if (e_id != -1)
+				g->nodes[u].adj[g->nodes[u].deg++] = e_id;
+		}
+		g->nodes[u].adj = realloc(g->nodes[u].adj,
+					g->nodes[u].deg * sizeof(gint_t));
+	}
+
+	/* join non-branching path */
+	for (u = 0; u < g->n_v; ++u) {
+		u_rc = g->nodes[u].rc_id;
+		deg_fw = g->nodes[u].deg;
+		deg_rv = g->nodes[u_rc].deg;
+		if (deg_fw == 1 && deg_rv == 1) {
+			e1 = g->nodes[u].adj[0];
+			e2 = g->nodes[u_rc].adj[0];
+			if (e1 == e2 || e1 == g->edges[e2].rc_id)
+				continue;
+			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
+		}
+	}
+}
+
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t *node_id;
@@ -495,7 +527,7 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
-	gint_t u, v, u_rc, v_rc, e_rc, ec, ec_rc, j;
+	gint_t u, v, u_rc, v_rc, e_rc, ec, ec_rc, j, k;
 	u = g->edges[e].source;
 	v = g->edges[e].target;
 	e_rc = g->edges[e].rc_id;
@@ -511,8 +543,8 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 	// fprintf(stderr, "consider edge %ld: cov = %.3lf\n", e, e_cov);
 	uint32_t e_len, max_len;
 	e_len = get_edge_len(g->edges + e);
-	if (e_len > 2000)
-		return -1;
+	// if (e_len > 2000)
+	// 	return -1;
 	max_len = 0;
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
@@ -526,20 +558,30 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		uint32_t len = get_edge_len(g->edges + n);
 		max_len = __max(max_len, len);
 	}
+	if (e_len > MIN_NOTICE_LEN && max_len < e_len)
+		return 0;
 	if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
 		// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
 		if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
-			return -1;
+			return 0;
+	}
+	/* check if on-going edges have same source */
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		gint_t e1, e2;
+		e1 = g->nodes[u_rc].adj[j];
+		for (k = j + 1; k < g->nodes[u_rc].deg; ++k) {
+			e2 = g->nodes[u_rc].adj[k];
+			if (g->edges[e1].source == g->edges[e2].source)
+				return 0;
+		}
 	}
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[j];
 		n = g->edges[n_rc].rc_id;
 		if (n == e || n_rc == e)
-			return -1;
+			return 0;
 	}
-	// g->nodes[v_rc].adj = realloc(g->nodes[v_rc].adj,
-	// 	(g->nodes[v_rc].deg + g->nodes[u_rc].deg) * sizeof(gint_t));
 	while (g->nodes[u_rc].deg) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[0];
@@ -549,21 +591,7 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		cov = __get_edge_cov(g->edges + n, g->ksize) / uni_cov;
 		g->edges[ec].count = g->edges[ec_rc].count =
 				(uint64_t)(cov / sum_fcov * g->edges[e].count);
-
 		asm_join_edge(g, n, n_rc, ec, ec_rc);
-		// asm_append_edge_seq(g->edges + n, g->edges + e, g->ksize);
-		// g->edges[n].count += split_count;
-		// g->edges[n].target = v;
-
-		// asm_clean_edge_seq(g->edges + n_rc);
-		// asm_clone_reverse(g->edges + n_rc, g->edges + n);
-		// g->edges[n_rc].source = v_rc;
-		// g->edges[n_rc].target = g->nodes[g->edges[n].source].rc_id;
-		// g->nodes[v_rc].adj[g->nodes[v_rc].deg++] = n_rc;
-		// g->edges[n].rc_id = n_rc;
-		// g->edges[n_rc].rc_id = n;
-		// if (get_edge_len(g->edges + n) >= 5000 && __get_edge_cov(g->edges + n, g->ksize) < 100.0)
-		// 	__VERBOSE("old_cov = %.9lf; new_cov = %.9lf\n", cov, __get_edge_cov(g->edges + n, g->ksize));
 	}
 	asm_remove_edge(g, e);
 	asm_remove_edge(g, e_rc);
@@ -575,104 +603,177 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 
 int graph_expanding(struct asm_graph_t *g, double uni_cov)
 {
-	int cnt, cnt_fp, step;
+	int cnt, cnt_fp, step, local_cnt;
 	cnt = cnt_fp = step =  0;
 	gint_t e;
-	while (1) {
-		int local_cnt = 0;
+	do {
+		local_cnt = 0;
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
-			int ret = test_split(g, e, uni_cov);
-			if (ret == -1)
-				++cnt_fp;
-			else if (ret == 1)
-				++local_cnt;
+			local_cnt += test_split(g, e, uni_cov);
 		}
 		cnt += local_cnt;
 		if (local_cnt == 0)
 			break;
-	}
+	} while (local_cnt);
 	__VERBOSE("Number of expanding edges: %d\n", cnt);
 	// __VERBOSE("Number of edges cannot expand: %d\n", cnt_fp);
 	return cnt;
 }
 
-int test_bubble2(struct asm_graph_t *g, gint_t u)
+static void bubble_keep_best(struct asm_graph_t *g, gint_t *edges, gint_t n)
 {
-	if (g->nodes[u].deg < 2)
-		return 0;
-	gint_t j, k, e, ke, v, deg, best_e;
-	int resolve, count_resolve = 0;
-	do {
-		resolve = 0;
-		for (j = 0; j < g->nodes[u].deg; ++j) {
-			e = g->nodes[u].adj[j];
-			if (v == g->nodes[u].rc_id)
-				continue;
-			v = g->edges[e].target;
-			uint32_t max_len, base_len;
-			base_len = get_edge_len(g->edges + e);
-			gint_t idx = -1;
-			uint64_t cur_count, sum_count;
-			sum_count = 0;
-			int cnt = 0;
-			best_e = e;
-			cur_count = g->edges[e].count;
-			for (k = 0; k < g->nodes[u].deg; ++k) {
-				e = g->nodes[u].adj[k];
-				if (v != g->edges[e].target)
-					continue;
-				uint32_t len = get_edge_len(g->edges + e);
-				if ((len >= MAX_JOIN_LEN || base_len >= MAX_JOIN_LEN) &&
-					(base_len - LEN_VAR > len || base_len + LEN_VAR < len))
-					continue;
-				if (g->edges[e].count > cur_count) {
-					cur_count = g->edges[e].count;
-					best_e = e;
-				}
-				max_len = __max(max_len, len);
-				sum_count += g->edges[e].count;
-				++cnt;
-			}
-			if (cnt < 2)
-				continue;
-			// assert(v != g->nodes[u].rc_id);
-			// assert(v != u);
-			g->edges[best_e].count = g->edges[g->edges[best_e].rc_id].count = sum_count;
-			for (k = 0; k < g->nodes[u].deg; ++k) {
-				e = g->nodes[u].adj[k];
-				if (v != g->edges[e].target)
-					continue;
-				if (e != best_e) {
-					asm_remove_edge(g, g->edges[e].rc_id);
-					asm_remove_edge(g, e);
-					k = 0;
-				}
-			}
-			deg = 0;
-			for (k = 0; k < g->nodes[u].deg; ++k) {
-				if (g->nodes[u].adj[k] != -1)
-					g->nodes[u].adj[deg++] = g->nodes[u].adj[k];
-			}
-			g->nodes[u].deg = deg;
-			resolve = 1;
-			break;
+	gint_t keep_e, e, e_rc, i;
+	uint64_t max_count, sum_count;
+	keep_e = -1;
+	max_count = 0;
+	sum_count = 0;
+	for (i = 0; i < n; ++i) {
+		e = edges[i];
+		if (g->edges[e].count > max_count) {
+			max_count = g->edges[e].count;
+			keep_e = e;
 		}
-		count_resolve += resolve;
-	} while (resolve);
-	return count_resolve;
+		sum_count += g->edges[e].count;
+	}
+	for (i = 0; i < n; ++i) {
+		e = edges[i];
+		if (e != keep_e) {
+			e_rc = g->edges[e].rc_id;
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, e_rc);
+		}
+	}
+	g->edges[keep_e].count = sum_count;
+	g->edges[g->edges[keep_e].rc_id].count = sum_count;
 }
 
-int resolve_bubble2(struct asm_graph_t *g)
+gint_t test_bubble(struct asm_graph_t *g, gint_t e_id, double uni_cov)
 {
-	gint_t v;
-	int cnt = 0;
-	for (v = 0; v < g->n_v; ++v) {
-		int ret = test_bubble2(g, v);
-		cnt += ret;
+	gint_t u, j, e, n, v;
+	u = g->edges[e_id].source;
+	v = g->edges[e_id].target;
+	if (u == g->nodes[v].rc_id)
+		return 0;
+	n = 0;
+	for (j = 0; j < g->nodes[u].deg; ++j) {
+		e = g->nodes[u].adj[j];
+		if (g->edges[e].target == v)
+			++n;
 	}
-	__VERBOSE("Number of collapse bubble: %d\n", cnt);
+	if (n < 2)
+		return 0;
+	gint_t *branch = alloca(n * sizeof(gint_t));
+	n = 0;
+	double sum_cov = 0;
+	for (j = 0; j < g->nodes[u].deg; ++j) {
+		e = g->nodes[u].adj[j];
+		if (g->edges[e].target == v) {
+			branch[n++] = e;
+			sum_cov += __get_edge_cov(g->edges + e, g->ksize);
+		}
+	}
+	if (n < 2)
+		return 0;
+	struct cov_range_t sum_cov_range = convert_cov_range(sum_cov / uni_cov);
+	if (sum_cov_range.hi <= 1) { /* Just 1 genome walk, collapse anyway */
+		bubble_keep_best(g, branch, n);
+		return 1;
+	}
+	uint32_t base_len, len;
+	base_len = get_edge_len(g->edges + e_id);
+	n = 0;
+	for (j = 0; j < g->nodes[u].deg; ++j) {
+		e = g->nodes[u].adj[j];
+		if (g->edges[e].target == v) {
+			len = get_edge_len(g->edges + e);
+			if (base_len > len + LEN_VAR || base_len + LEN_VAR < len)
+				continue;
+			branch[n++] = e;
+		}
+	}
+	if (n < 2)
+		return 0;
+	bubble_keep_best(g, branch, n);
+	return 1;
+}
+
+// int test_bubble2(struct asm_graph_t *g, gint_t u)
+// {
+// 	if (g->nodes[u].deg < 2)
+// 		return 0;
+// 	gint_t j, k, e, ke, v, deg, best_e;
+// 	int resolve, count_resolve = 0;
+// 	do {
+// 		resolve = 0;
+// 		for (j = 0; j < g->nodes[u].deg; ++j) {
+// 			e = g->nodes[u].adj[j];
+// 			if (v == g->nodes[u].rc_id)
+// 				continue;
+// 			v = g->edges[e].target;
+// 			uint32_t max_len, base_len;
+// 			base_len = get_edge_len(g->edges + e);
+// 			gint_t idx = -1, cnt, share_source;
+// 			uint64_t cur_count, sum_count;
+// 			sum_count = 0;
+// 			cnt = 0;
+// 			best_e = e;
+// 			cur_count = g->edges[e].count;
+// 			for (k = 0; k < g->nodes[u].deg; ++k) {
+// 				e = g->nodes[u].adj[k];
+// 				if (v != g->edges[e].target)
+// 					continue;
+// 				uint32_t len = get_edge_len(g->edges + e);
+// 				if ((len >= MAX_JOIN_LEN || base_len >= MAX_JOIN_LEN) &&
+// 					(base_len - LEN_VAR > len || base_len + LEN_VAR < len))
+// 					continue;
+// 				if (g->edges[e].count > cur_count) {
+// 					cur_count = g->edges[e].count;
+// 					best_e = e;
+// 				}
+// 				max_len = __max(max_len, len);
+// 				sum_count += g->edges[e].count;
+// 				++cnt;
+// 			}
+// 			if (cnt < 2)
+// 				continue;
+// 			// assert(v != g->nodes[u].rc_id);
+// 			// assert(v != u);
+// 			g->edges[best_e].count = g->edges[g->edges[best_e].rc_id].count = sum_count;
+// 			for (k = 0; k < g->nodes[u].deg; ++k) {
+// 				e = g->nodes[u].adj[k];
+// 				if (v != g->edges[e].target)
+// 					continue;
+// 				if (e != best_e) {
+// 					asm_remove_edge(g, g->edges[e].rc_id);
+// 					asm_remove_edge(g, e);
+// 					k = 0;
+// 				}
+// 			}
+// 			deg = 0;
+// 			for (k = 0; k < g->nodes[u].deg; ++k) {
+// 				if (g->nodes[u].adj[k] != -1)
+// 					g->nodes[u].adj[deg++] = g->nodes[u].adj[k];
+// 			}
+// 			g->nodes[u].deg = deg;
+// 			resolve = 1;
+// 			break;
+// 		}
+// 		count_resolve += resolve;
+// 	} while (resolve);
+// 	return count_resolve;
+// }
+
+gint_t resolve_bubble(struct asm_graph_t *g, double uni_cov)
+{
+	gint_t e, cnt = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		cnt += test_bubble(g, e, uni_cov);
+	}
+	__VERBOSE("Number of collapse bubble: %ld\n", cnt);
 	return cnt;
 }
 
@@ -710,18 +811,19 @@ void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1)
 			double uni_cov = get_genome_coverage(g0);
 			__VERBOSE("Genome coverage: %.9lf\n", uni_cov);
 			cnt_loop = unroll_simple_loop(g0, uni_cov);
-			uni_cov = get_genome_coverage(g0);
-			__VERBOSE("Gnome coverage loop: %.9lf\n", uni_cov);
-			cnt_collapse = resolve_bubble2(g0);
-			uni_cov = get_genome_coverage(g0);
-			__VERBOSE("Gnome coverage collapse: %.9lf\n", uni_cov);
+			// uni_cov = get_genome_coverage(g0);
+			// __VERBOSE("Gnome coverage loop: %.9lf\n", uni_cov);
+			cnt_collapse = resolve_bubble(g0, uni_cov);
+			// uni_cov = get_genome_coverage(g0);
+			// __VERBOSE("Gnome coverage collapse: %.9lf\n", uni_cov);
 			cnt_expand = graph_expanding(g0, uni_cov);
-			uni_cov = get_genome_coverage(g0);
-			__VERBOSE("Gnome coverage expand: %.9lf\n", uni_cov);
-			asm_condense(g0, g1);
-			test_asm_graph(g1);
-			asm_graph_destroy(g0);
-			*g0 = *g1;
+			asm_lazy_condense(g0);
+			// uni_cov = get_genome_coverage(g0);
+			// __VERBOSE("Gnome coverage expand: %.9lf\n", uni_cov);
+			// asm_condense(g0, g1);
+			// test_asm_graph(g1);
+			// asm_graph_destroy(g0);
+			// *g0 = *g1;
 			if (cnt_expand == 0 && cnt_collapse == 0 && cnt_loop == 0)
 				break;
 		}

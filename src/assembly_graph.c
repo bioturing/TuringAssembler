@@ -152,17 +152,17 @@ double get_genome_coverage(struct asm_graph_t *g)
 	gint_t e;
 	double ret_cov = 0.0;
 	uint32_t max_len = 0;
-	uint32_t hash = 0;
+	// uint32_t hash = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
 		if (g->edges[e].seq_len > max_len) {
 			max_len = g->edges[e].seq_len;
 			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
-			hash = get_hash_edge32(g->edges + e);
+			// hash = get_hash_edge32(g->edges + e);
 		}
 	}
-	__VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
+	// __VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
 	return ret_cov;
 }
 
