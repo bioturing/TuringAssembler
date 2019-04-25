@@ -853,7 +853,7 @@ gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 			gap_size = get_distance(g, MIN_CONTIG_BARCODE, set_e,
 				g->nodes[g->edges[e1].source].rc_id,
 				g->edges[e2].source);
-			__VERBOSE("Join %ld->%ld\n", e1, e2);
+			__VERBOSE("Join %ld v %ld (gap size = %u)\n", e1, e2, gap_size);
 			if (gap_size)
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
 					e2, g->edges[e2].rc_id, gap_size);

@@ -5,8 +5,8 @@
 
 int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov);
 
-/* Condense graph by merging non-branching paths */
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
+void asm_lazy_condense(struct asm_graph_t *g);
 void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g);
 void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g);
 void remove_bubble_and_loop(struct asm_graph_t *g0, struct asm_graph_t *g);
