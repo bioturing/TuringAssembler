@@ -774,17 +774,19 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	void print_contig(int index, int n_contig, int *list_contig)
 	{
 		char *seq = NULL, *total_seq = NULL, *NNN = NULL;
-		NNN = calloc(1000, sizeof(char));
-		for (int i = 0; i < 1000; i++) 
+		const int len_NNN = 300;
+		NNN = calloc(len_NNN, sizeof(char));
+		for (int i = 0; i < len_NNN; i++) 
 			NNN[i] = 'N';
 		uint32_t seq_len = 0;
  		int total_len = 0;
 		for(int i = 0; i < n_contig; i++) {
 			int e = list_contig[i];
-			int len = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
-			total_seq = realloc(total_seq, (total_len + len) * sizeof(char));
-			memcpy(total_seq+total_len, seq, len);
-			total_len += len;
+			int len_of_contig = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
+			total_seq = realloc(total_seq, (total_len + len_of_contig + len_NNN) * sizeof(char));
+			memcpy(total_seq + total_len, seq, len_of_contig);
+			memcpy(total_seq + total_len + len_of_contig, NNN, len_NNN);
+			total_len += len_of_contig + len_NNN;
 		}
 		print_seq(out_file, index, total_seq, total_len, 1);
 		for(int i = 0; i < n_contig; i++) {
