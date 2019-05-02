@@ -631,7 +631,7 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score)
 	__VERBOSE_FLAG(log_global_var, "avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE_FLAG(log_global_var, "n_e: %d\n", n_e);
 
-	int n_threads = 4;
+	int n_threads = 56;
 	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
