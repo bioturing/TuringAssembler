@@ -100,6 +100,7 @@ struct opt_build_t *init_opt_build()
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
+	opt->huu_1_score = -1;
 	return opt;
 }
 
@@ -152,7 +153,10 @@ struct opt_build_t *parse_build_option(int argc, char *argv[])
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
 			pos += (n + 1);
-		} else {
+		} else if (!strcmp(argv[pos], "-zz")) {
+			opt->huu_1_score = atof(argv[pos+1]);
+			pos += 2;
+		}else {
 			__ERROR("Unknown option %s", argv[pos]);
 		}
 	}

@@ -136,7 +136,7 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	return res;
 }
 
-void init_global_params(struct asm_graph_t *g)
+void init_global_params(struct asm_graph_t *g, float huu_1_score)
 {
 	global_thres_length = 10000;
 	global_thres_length_min = 5000;
@@ -144,7 +144,11 @@ void init_global_params(struct asm_graph_t *g)
 	global_n_buck = 6;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  1;//get_global_count_kmer(g);
-	global_thres_coefficent = 0.2;
+	if (huu_1_score != -1) {
+		global_thres_coefficent = huu_1_score;
+	} else {
+		global_thres_coefficent = 0.2;
+	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 }
@@ -423,6 +427,7 @@ float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, struc
 
 static pthread_mutex_t lock_merge = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t lock_write_file = PTHREAD_MUTEX_INITIALIZER;
 
 struct params{
 	struct asm_graph_t *g;
@@ -470,7 +475,7 @@ void *process(void *data)
 	return NULL;
 }
 
-void check_contig(struct asm_graph_t *g, float avg_bin_hash) 
+void check_contig(struct asm_graph_t *g, float avg_bin_hash, float huu_1_score) 
 {
 	int cmp(const void *i, const void *j)
 	{
@@ -478,12 +483,11 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash)
 		int y = *(int *)j;
 		return get_edge_len(&g->edges[x]) > get_edge_len(&g->edges[y]);
 	}
-	init_global_params(g);
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
-	__VERBOSE("dsfsdfdsfds");
 	__VERBOSE_FLAG(log_check_contig, "check contig\n");
 	for (int i = 0; i < g->n_e; i++) {
-		__VERBOSE("edge %d", i);
+		__VERBOSE("edge %d leng %d ", i, get_edge_len(&g->edges[i]));
 		for (int j = 0; j < g->edges[i].n_holes; j++){
 			__VERBOSE("hole %d ", g->edges[i].p_holes[j]);
 		}
@@ -499,21 +503,6 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash)
 //	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 //
 //	int count_thread = 0;
-////	for(int  i = 0; i < g->n_e; i+=2) {
-////		struct asm_edge_t *e = &g->edges[i];
-////		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-////		if (n_bucks > 40) {
-////		__VERBOSE("dfdfdsfs");
-////			struct params *para = calloc(1, sizeof(struct params));
-////			para->g = g;
-////			para->e = e;
-////			para->n_bucks = n_bucks;
-////			para->file_name = calloc(20, 1);
-////			sprintf(para->file_name, "logfile_%d", i);
-////			count_thread++;
-////		}
-////	}
-////	pa
 //	struct params *para =  calloc(1, sizeof(struct params));
 //	para->g = g;
 //	para->i = 0;
@@ -549,15 +538,81 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 	return res_score;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file) 
+struct params_check_edge {
+	struct asm_graph_t *g;
+	int i, j;
+	int *listE, n_bucks, n_listE;
+	float avg_bin_hash, thres_score;
+	FILE *out_file;
+};
+
+void *process_check_edge(void *data)
 {
-	init_global_params(g);
+	struct params_check_edge *pa_check_edge = (struct params_check_edge *) data;
+	int *listE = pa_check_edge->listE;
+	struct asm_graph_t *g = pa_check_edge->g;
+	int n_bucks = pa_check_edge->n_bucks;
+	float avg_bin_hash = pa_check_edge->avg_bin_hash;
+	float thres_score = pa_check_edge->thres_score;
+	FILE* out_file = pa_check_edge->out_file;
+	int n_listE = pa_check_edge->n_listE;
+	do {
+		int i, j;
+		pthread_mutex_lock(&lock_id);
+		if (pa_check_edge->i == n_listE) {
+			pthread_mutex_unlock(&lock_id);
+			break;
+		} else {
+			i = pa_check_edge->i;
+			j = pa_check_edge->j++;
+			if (pa_check_edge->j == n_listE){
+				pa_check_edge->i++;
+				pa_check_edge->j = 0;
+			}
+		}
+		assert(i < n_listE && j < n_listE);
+		pthread_mutex_unlock(&lock_id);
+		int e0 = listE[i];
+		int e1 = listE[j];
+		__VERBOSE_FLAG(log_build_contig, "edge: %d %d\n", e0, e1); 
+		__VERBOSE_FLAG(log_assert, "edges: %d %d\n", e0, e1); 
+		assert(e1 < g->n_e && e0 < g->n_e);
+		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
+		int check = 0;
+		if (e0 == e1){
+			float cvr = global_genome_coverage;
+			if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
+				check = 1;
+			}
+		} else if (e0 == g->edges[e1].rc_id) {
+		} else {
+			check = 1;
+		}
+		if (check) {
+			if (score.score > thres_score) {
+				if (!check_replicate_contig_edge(g, e0, e1, n_bucks, thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
+					pthread_mutex_lock(&lock_write_file);
+					fprintf(out_file, "score: %f edge: %d %d\n", score.score, e0, e1); 
+					pthread_mutex_unlock(&lock_write_file);
+				}
+			}
+		}
+		__VERBOSE_FLAG(log_build_contig, "score %f\n", score.score); 
+	} while (1); 
+	pthread_exit(NULL);
+	return NULL;
+}
+
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score) 
+{
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
 	const int thres_len_e = global_thres_length; 
 	const int n_bucks = global_n_buck;
 	float thres_score = global_thres_bucks_score; 
 	int *listE = NULL;
 	int n_e=0;
+
 	for (int e = 0; e < g->n_e; ++e) {
 		int len = get_edge_len(&g->edges[e]);
 		if (len > thres_len_e) {
@@ -575,34 +630,30 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file)
 	float avg_bin_hash = get_avg_bin_hash(g);
 	__VERBOSE_FLAG(log_global_var, "avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE_FLAG(log_global_var, "n_e: %d\n", n_e);
-	for (int i = 0; i < n_e; i++) {
-		__VERBOSE_FLAG(log_build_contig, "%d\n",i);
-		int e0 = listE[i];
-		for (int i1 = 0; i1 < n_e; i1++) {
-			int e1 = listE[i1];
-			__VERBOSE_FLAG(log_build_contig, "edge: %d %d\n", e0, e1); 
-			assert(e1 < g->n_e && e0 < g->n_e);
-			struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
-			int check = 0;
-			if (e0 == e1){
-				float cvr = global_genome_coverage;
-				if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
-					check = 1;
-				}
-			} else if (e0 == g->edges[e1].rc_id) {
-			} else {
-				check = 1;
-			}
-			if (check) {
-				if (score.score > thres_score) {
-					if (!check_replicate_contig_edge(g, e0, e1, n_bucks, thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
-						fprintf(out_file, "score: %f edge: %d %d\n", score.score, e0, e1); 
-					}
-				}
-			}
-			__VERBOSE_FLAG(log_build_contig, "score %f\n", score.score); 
-		}
-	}
+
+	int n_threads = 4;
+	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct params_check_edge *para =  calloc(1, sizeof(struct params_check_edge));
+	para->g = g;
+	para->i = 0;
+	para->j = 0;
+	para->listE = listE;
+	para->n_bucks = n_bucks;
+	para->avg_bin_hash = avg_bin_hash;
+	para->thres_score = thres_score;
+	para->out_file = out_file;
+	para->n_listE = n_e;
+	for (int i = 0; i < n_threads; ++i)
+		pthread_create(&thr[i], &attr, process_check_edge, para);
+	for (int i = 0; i < n_threads; ++i)
+		pthread_join(thr[i], NULL);
+	free(thr);
+	pthread_attr_destroy(&attr);
 	free(listE);
 }
 
@@ -771,17 +822,19 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	void print_contig(int index, int n_contig, int *list_contig)
 	{
 		char *seq = NULL, *total_seq = NULL, *NNN = NULL;
-		NNN = calloc(1000, sizeof(char));
-		for (int i = 0; i < 1000; i++) 
+		const int len_NNN = 300;
+		NNN = calloc(len_NNN, sizeof(char));
+		for (int i = 0; i < len_NNN; i++) 
 			NNN[i] = 'N';
 		uint32_t seq_len = 0;
  		int total_len = 0;
 		for(int i = 0; i < n_contig; i++) {
 			int e = list_contig[i];
-			int len = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
-			total_seq = realloc(total_seq, (total_len + len) * sizeof(char));
-			memcpy(total_seq+total_len, seq, len);
-			total_len += len;
+			int len_of_contig = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
+			total_seq = realloc(total_seq, (total_len + len_of_contig + len_NNN) * sizeof(char));
+			memcpy(total_seq + total_len, seq, len_of_contig);
+			memcpy(total_seq + total_len + len_of_contig, NNN, len_NNN);
+			total_len += len_of_contig + len_NNN;
 		}
 		print_seq(out_file, index, total_seq, total_len, 1);
 		for(int i = 0; i < n_contig; i++) {
@@ -1092,9 +1145,9 @@ void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE,
 	}
 }
 
-void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g)
+void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g, float huu_1_score)
 {
-	init_global_params(g);
+	init_global_params(g, huu_1_score);
 	check_global_params(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_v: %d\n", &n_v);
