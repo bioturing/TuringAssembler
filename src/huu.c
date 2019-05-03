@@ -22,23 +22,7 @@
 	X(float, global_thres_coefficent, -1); 
 
 // constant for logging
-int log_debug = 1;
-int log_bin_score = 0;
-int log_share_barcode = 0;
-int log_global_var = 0;
-int log_hole = 0;
-int log_outliner = 0;
-int log_beautify = 0;
-int log_edge_score = 0;
-int log_build_contig = 0;
-int log_build_V = 0;
-int log_count_kmer = 0;
-int log_check_contig = 1;
-int log_insert_small_contig = 0;
-int log_hamiltonian = 0;
-int log_graph = 1;
-int log_assert = 1;
-int log_distance_score = 1;
+int log_level = 0;
 
 #define X(type, name, default_value) type name=default_value;
 LIST_GLOBAL_PARAMS
@@ -51,7 +35,7 @@ LIST_GLOBAL_PARAMS
 #undef X
 }
 
-#define __VERBOSE_FLAG(flag, ...) if (flag) { __VERBOSE("["#flag"] "); __VERBOSE(__VA_ARGS__);}
+#define __VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
 
 #define __COPY_ARR(src, des, n) for(int i = 0; i < n; i++) des[i] = src[i]
 
@@ -92,7 +76,7 @@ float get_global_thres_score(struct asm_graph_t *g)
 {
 	float cvr = get_genome_coverage(g);
 	float res = 1.0 * g->bin_size / global_molecule_length * global_thres_coefficent;
-	__VERBOSE_FLAG(log_global_var, "global thres score: %f\n", res);
+	__VERBOSE_FLAG(1, "global thres score: %f\n", res);
 	return res;
 }
 
@@ -114,7 +98,6 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	int size_count = 1000;
 	count_count = realloc(count_count, size_count*sizeof(int)); 
 	for(int i = 0; i < n_arr; i++) {
-		__VERBOSE_FLAG(log_assert, "%d %d", arr_count[i], size_count);
 		assert(arr_count[i] >  size_count);
 		count_count[arr_count[i]]++;
 	}
@@ -122,16 +105,15 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	for (int i = 1; i < 10 ; i++){
 		max_count = max(max_count, count_count[i]);
 	}
-	__VERBOSE_FLAG(log_count_kmer, "max_count %d \n", max_count);
+	__VERBOSE_FLAG(1, "max_count %d \n", max_count);
 	for(int i = 10; i < size_count; i++) {
-		__VERBOSE_FLAG(log_count_kmer, "%count hash ",  count_count[i]);
+		__VERBOSE_FLAG(2, "%count hash ",  count_count[i]);
 		if (count_count[i] > 3 * max_count){
 			res = i;
 			break;
 		}
 	}
-	__VERBOSE_FLAG(log_count_kmer, "global thres count kmer: %d\n", res);
-	__VERBOSE_FLAG(log_assert, "%d\n", res);
+	__VERBOSE_FLAG(1, "global thres count kmer: %d\n", res);
 	assert(res == -1);
 	return res;
 }
@@ -175,7 +157,7 @@ int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, int b)
 int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash)
 {
 	if (get_amount_hole(g, e, b)  > 0.7*g->bin_size) {
-		__VERBOSE_FLAG(log_hole, "NNNNN size is to big ");
+		__VERBOSE_FLAG(2, "NNNNN size is to big ");
 		return 0;
 	}
 	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
@@ -189,7 +171,7 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float
 	assert(normal_count != 0);
 	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
 	{
-		__VERBOSE_FLAG(log_outliner, "count hash is abnormal: %d %d\n", cnt, normal_count);
+		__VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
 	}
 	return 1;
@@ -206,7 +188,7 @@ int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct ba
 	assert(normal_count != 0);
 	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
 	{
-		__VERBOSE_FLAG(log_outliner, "count hash is abnormal: %d %d\n", cnt, normal_count);
+		__VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
 	}
 	return 1;
@@ -238,7 +220,7 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 			}
 		}
 	}
-	__VERBOSE_FLAG(log_share_barcode, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
+	__VERBOSE_FLAG(2, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	if (min(cnt0, cnt1) == 0) 
 		return 0;
 	return 1.0 * res2 / min(cnt0 , cnt1);
@@ -260,7 +242,7 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i
 	score->A = NULL;
 	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
 	// check_bucks_A[i] && check_bucks_B[i] de improve performance
-	__VERBOSE_FLAG(log_global_var, "cov %f binsize %d ksize %d", global_genome_coverage, g->bin_size, g->ksize);
+	__VERBOSE_FLAG(2, "cov %f binsize %d ksize %d", global_genome_coverage, g->bin_size, g->ksize);
 	int *check_bucks_A = NULL, *check_bucks_B = NULL;
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(int));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(int));
@@ -276,7 +258,6 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i
 				score->A[i*n_bucks+j] = -1;
 		}
 	}
-	__VERBOSE_FLAG(log_beautify, "`````````````\n");
 
 	free(check_bucks_A);
 	free(check_bucks_B);
@@ -360,13 +341,13 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_has
 				right_value += tmp;
 				count_right++;
 			}
-			__VERBOSE_FLAG(log_edge_score, "%f ", tmp);
+			__VERBOSE_FLAG(3, "%f ", tmp);
 		}
 		left_value /= count_left;
 		right_value /= count_right;
-		__VERBOSE_FLAG(log_edge_score, "%f %f", left_value , right_value);
+		__VERBOSE_FLAG(3, "%f %f", left_value , right_value);
 		if (fabsf(left_value - right_value) > 0.05 * max(left_value, right_value)) {
-			__VERBOSE_FLAG(log_edge_score, "%f", fabsf(left_value - right_value));
+			__VERBOSE_FLAG(2, "%f", fabsf(left_value - right_value));
 			if (left_value > right_value)
 				score++;
 			else 
@@ -446,8 +427,6 @@ void *process(void *data)
 		}
 		else {
 			iiii = pa->i++;
-			__VERBOSE("start %d\n", iiii);
-		//	__VERBOSE("huu %d\n", i);
 		}
 		pthread_mutex_unlock(&lock_id);
 		struct asm_graph_t *g = pa->g;
@@ -460,15 +439,12 @@ void *process(void *data)
 		FILE *f = fopen(file_name, "w");
 		for (int j = 0; j < min(20, n_bucks - 4); j+=5){
 			for (int j1 = j + 4; j1 < n_bucks -4; j1++) {
-	//			__VERBOSE("%d %d\n", j, j1);
 				float tmp  = get_score_multiple_buck(pa->g, e, &e->bucks[j], &e->bucks[j1]);
 				fprintf(f, "distance %d %f\n", j1 - j, tmp);
-	//			__VERBOSE_FLAG(log_distance_score, "distance %d %f \n", j1 - j, tmp);
 			}
 		}
 		fclose(f);
 		pthread_mutex_lock(&lock_id);
-		__VERBOSE("done %d\n", iiii);
 		pthread_mutex_unlock(&lock_id);
 	} while (1);
 	pthread_exit(NULL);
@@ -485,13 +461,13 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash, float huu_1_score)
 	}
 	init_global_params(g, huu_1_score);
 	check_global_params(g);
-	__VERBOSE_FLAG(log_check_contig, "check contig\n");
+	__VERBOSE_FLAG(1, "check contig\n");
 	for (int i = 0; i < g->n_e; i++) {
-		__VERBOSE("edge %d leng %d ", i, get_edge_len(&g->edges[i]));
+		__VERBOSE_FLAG(3, "edge %d leng %d ", i, get_edge_len(&g->edges[i]));
 		for (uint32_t j = 0; j < g->edges[i].n_holes; j++){
-			__VERBOSE("hole %d ", g->edges[i].p_holes[j]);
+			__VERBOSE_FLAG(3, "hole %d ", g->edges[i].p_holes[j]);
 		}
-		__VERBOSE("\n");
+		__VERBOSE_FLAG(3, "\n");
 
 	}
 
@@ -524,13 +500,13 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
 		for (int j = 0; j < mat_score->n_bucks; ++j) {
 			float tmp = mat_score->A[i * n_bucks + j];
-			__VERBOSE_FLAG(log_bin_score, "%f ", tmp);
+			__VERBOSE_FLAG(3, "%f ", tmp);
 			if (tmp >= -0.000001) {
 				count++;
 				res += tmp;
 			}
 		}
-		__VERBOSE_FLAG(log_bin_score, "#\n");
+		__VERBOSE_FLAG(3, "#\n");
 	}
 	struct bucks_score res_score;
 	res_score.score = res/count;
@@ -574,8 +550,8 @@ void *process_check_edge(void *data)
 		pthread_mutex_unlock(&lock_id);
 		int e0 = listE[i];
 		int e1 = listE[j];
-		__VERBOSE_FLAG(log_build_contig, "edge: %d %d\n", e0, e1); 
-		__VERBOSE_FLAG(log_assert, "edges: %d %d\n", e0, e1); 
+		__VERBOSE_FLAG(3, "edge: %d %d\n", e0, e1); 
+		__VERBOSE_FLAG(3, "edges: %d %d\n", e0, e1); 
 		assert(e1 < g->n_e && e0 < g->n_e);
 		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
 		int check = 0;
@@ -597,7 +573,7 @@ void *process_check_edge(void *data)
 				}
 			}
 		}
-		__VERBOSE_FLAG(log_build_contig, "score %f\n", score.score); 
+		__VERBOSE_FLAG(3, "score %f\n", score.score); 
 	} while (1); 
 	pthread_exit(NULL);
 	return NULL;
@@ -628,8 +604,8 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score)
 	}
 
 	float avg_bin_hash = get_avg_bin_hash(g);
-	__VERBOSE_FLAG(log_global_var, "avg_bin_hash %f", avg_bin_hash);
-	__VERBOSE_FLAG(log_global_var, "n_e: %d\n", n_e);
+	__VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
+	__VERBOSE_FLAG(1, "n_e: %d\n", n_e);
 
 	int n_threads = 56;
 	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
@@ -766,7 +742,7 @@ void build_V_from_E(struct contig_edge *listE, int n_e, int **listV, int *n_v)
 	*listV = NULL; 
 	*n_v = 0;
 	for (int i = 0; i < n_e; i++) {
-		__VERBOSE_FLAG(log_build_V, "%d %d BBBB\n", listE[i].src, listE[i].des);
+		__VERBOSE_FLAG(3, "listE edges: %d %d BBBB\n", listE[i].src, listE[i].des);
 
 		++(*n_v);
 		int t = (*n_v)*sizeof(int);
@@ -779,10 +755,9 @@ void build_V_from_E(struct contig_edge *listE, int n_e, int **listV, int *n_v)
 	}
 	qsort(*listV, *n_v, sizeof(int), less_uint32);
 	for (int i = 0; i < *n_v; i++) {
-		__VERBOSE_FLAG(log_build_V, "%d ", (*listV)[i]);
+		__VERBOSE_FLAG(3, "list V: %d ", (*listV)[i]);
 	}
 	unique_vertex(*listV, n_v);
-//	__VERBOSE_FLAG("listV %d\n", listV);
 }
 
 void print_seq(FILE *fp, int index, char *seq, int len, int cov)
@@ -791,7 +766,6 @@ void print_seq(FILE *fp, int index, char *seq, int len, int cov)
 		(long long)len, (long long unsigned)cov);
 	gint_t k = 0;
 	char *buf = alloca(81);
-//	printf("%s\n", seq);
 	while (k < len) {
 		gint_t l = __min(80, len - k);
 		memcpy(buf, seq + k, l);
@@ -850,12 +824,12 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			int n_short, int *arr_i_short, int *mark_short)
 	{
 		//todo @huu insert to the beginning
-		__VERBOSE_FLAG(log_insert_small_contig, "big contig length %d:", n_big_contigs);
+		__VERBOSE_FLAG(1, "big contig length %d:", n_big_contigs);
 		for (int i = 0; i < n_big_contigs; i++){
-			__VERBOSE_FLAG(log_insert_small_contig, "%d ", big_contigs[i]);
+			__VERBOSE_FLAG(3, "%d ", big_contigs[i]);
 		}
 		for (int i = 1; i < n_insert - 1; i++) {
-			__VERBOSE_FLAG(log_insert_small_contig, "i insert: %d\n", i);
+			__VERBOSE_FLAG(3, "i insert: %d\n", i);
 			int max_score = -1, pos = -1;
 			for (int j = 0; j < n_short; j++) if (mark_short[j] == 0) {
 				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g, avg_bin_hash);
@@ -866,7 +840,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 					pos = j;
 				}
 			}
-			__VERBOSE_FLAG(log_insert_small_contig, "max score: %d \n",max_score);
+			__VERBOSE_FLAG(3, "max score: %d \n",max_score);
 			//todo @huu check if normal score large enough
 			if (max_score > 15) {
 				arr_insert[i] = arr_i_short[pos];
@@ -897,15 +871,15 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		free(*best_res);
 		*best_n_res = n_arr;
 		*best_res = new_arr;
-		__VERBOSE_FLAG(log_insert_small_contig, "after merge contig length %d:", *best_n_res);
+		__VERBOSE_FLAG(3, "after merge contig length %d:", *best_n_res);
 		for (int i = 0; i < *best_n_res; i++){
-			__VERBOSE_FLAG(log_insert_small_contig, "%d ", (*best_res)[i]);
+			__VERBOSE_FLAG(3, "%d ", (*best_res)[i]);
 		}
 	}
 
 	void find_longest_path_from_node(int x, int *best_n_hamiltonian_path, int *best_hamiltonian_path, int *remain_unvisited)
 	{
-		__VERBOSE_FLAG(log_hamiltonian, "find longest path from node");
+		__VERBOSE_FLAG(1, "find longest path from node");
 		remain_unvisited[x]--;
 		remain_unvisited[x^1]--;
 		assert(*best_n_hamiltonian_path == 0);
@@ -922,10 +896,11 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			if (count_adj == 0)
 				break;
+			__VERBOSE_FLAG(0, "count_adj %d\n", count_adj);
 			int best_n_local_path = 0 , *best_local_path = calloc(n_v, sizeof(int)), best_add_len = 0;
 			for (int i_adj = 0; i_adj < count_adj; i_adj++) {
 				int adj = list_adj[i_adj];
-				__VERBOSE_FLAG(log_hamiltonian, "dfs from %d %d %d\n", i_adj, adj, remain_unvisited[adj]);
+				__VERBOSE_FLAG(3, "dfs from %d %d %d\n", i_adj, adj, remain_unvisited[adj]);
 				int *cur_path = calloc(n_v, sizeof(int));
 				dfs_hamiltonian(
 					adj, 1, count_adj, list_adj, n_v, E, remain_unvisited,
@@ -934,12 +909,10 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 				free(cur_path);
 			}
 			assert(best_add_len != 0);
-			__VERBOSE_FLAG(log_assert, "best n hamiltonian path n_v best add len %d %d %d\n", *best_n_hamiltonian_path, n_v, best_add_len);
+			__VERBOSE_FLAG(1, "best n hamiltonian path n_v best add len %d %d %d\n", *best_n_hamiltonian_path, n_v, best_add_len);
 			for (int i = 0; i < *best_n_hamiltonian_path + best_add_len ; i++) {
-				__VERBOSE("%d ", best_hamiltonian_path[i]);
+				__VERBOSE_FLAG(3, "%d ", best_hamiltonian_path[i]);
 			}
-			__VERBOSE("#\n\n");
-			for (int i = 0 ; i < n_v; i++) __VERBOSE("%d ", remain_unvisited[i]);
 			for (int i_path = *best_n_hamiltonian_path; i_path < *best_n_hamiltonian_path + best_add_len; i_path++){
 				assert(remain_unvisited[best_hamiltonian_path[i_path]] >0);
 				assert(remain_unvisited[best_hamiltonian_path[i_path]^1] >0);
@@ -949,7 +922,6 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			*best_n_hamiltonian_path += best_add_len;
 			assert(*best_n_hamiltonian_path <= n_v);
 			free(best_local_path);
-			for (int i = 0 ; i < n_v; i++) __VERBOSE("%d ", remain_unvisited[i]);
 			free(list_adj);
 		}
 		for (int i = 0; i < *best_n_hamiltonian_path; i++){
@@ -971,36 +943,32 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	void iter_find_longest_path(int *remain_unvisited, int *best_n_hamiltonian_path, int *best_hamiltonian_path)
 	{
 		int *save_remain_unvisited = calloc(n_v, sizeof(int));
-		__VERBOSE("begin of iter find longest");
-		for(int i = 0; i< n_v; i++) {
-			__VERBOSE("%d ", remain_unvisited[i]);
-		}
 		__COPY_ARR(remain_unvisited, save_remain_unvisited, n_v);
-		__VERBOSE_FLAG(log_hamiltonian, "iter find longest path");
 		int *connected_component = calloc(n_v, sizeof(int));
 		for (int i = 0; i < n_v; i++) if (remain_unvisited[i]) {
 			dfs_find_connected_component(i, remain_unvisited, connected_component);
 			break;
 		}
-		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] ){ //&& connected_component[i]) {
+		int count_connected_compoent = 0;
+		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] && connected_component[i]) {
+			count_connected_compoent++;
 			assert(remain_unvisited[i] > 0);
 			int *hamiltonian_path = calloc(n_v, sizeof(int)), n_hamiltonian_path = 0 ;
 			
 			find_longest_path_from_node(i, &n_hamiltonian_path, hamiltonian_path, remain_unvisited);
 			if (n_hamiltonian_path > *best_n_hamiltonian_path) {
 				*best_n_hamiltonian_path = n_hamiltonian_path;
-				__VERBOSE("new best hamilton iter %d %d\n", *best_n_hamiltonian_path, n_hamiltonian_path);
+				__VERBOSE_FLAG(2, "new best hamilton iter %d %d\n", *best_n_hamiltonian_path, n_hamiltonian_path);
 				for(int i_path = 0; i_path < n_hamiltonian_path; i_path++) {
-					__VERBOSE("x");
 					best_hamiltonian_path[i_path] = hamiltonian_path[i_path];
-					__VERBOSE("%d ", best_hamiltonian_path[i_path]);
+					__VERBOSE_FLAG(3, "%d ", best_hamiltonian_path[i_path]);
 				}
 			}
 			free(hamiltonian_path);
 		}
-		__VERBOSE("best hamilton iter\n");
+		__VERBOSE_FLAG(0, "count connected component %d\n", count_connected_compoent);
 		for(int i = 0 ; i < *best_n_hamiltonian_path; i++) 
-			__VERBOSE("%d ", best_hamiltonian_path[i]);
+			__VERBOSE_FLAG(3, "best ham path %d ", best_hamiltonian_path[i]);
 		for (int i = 0 ; i < n_v; i++){
 			assert(save_remain_unvisited[i] ==  remain_unvisited[i]);
 		}
@@ -1009,14 +977,14 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	
 //#############################  BEGIN OF FUNCTION  ###########################
 	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
-	__VERBOSE_FLAG(log_hamiltonian, "xxxxxxx %d ", thres_len_min);
+	__VERBOSE_FLAG(1, "thres len min %d ", thres_len_min);
 
 	int *arr_i_short = NULL, n_arr_short = 0;
 	int *mark_short = NULL;
-	__VERBOSE_FLAG(log_hamiltonian, "g->n_e %ld", g->n_e);
+	__VERBOSE_FLAG(1, "g->n_e %ld", g->n_e);
 	for (int e = 0; e < g->n_e; ++e) {
 		int len = get_edge_len(&g->edges[e]);
-		__VERBOSE_FLAG(log_hamiltonian, "len %d\n", len);
+		__VERBOSE_FLAG(3, "len %d\n", len);
 		if (len < thres_len && len > thres_len_min) {
 			++n_arr_short;
 			arr_i_short = realloc(arr_i_short, n_arr_short * sizeof(int));
@@ -1029,18 +997,18 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	int *remain_unvisited = calloc(n_v, sizeof(int));
 	for (int i = 0; i < n_v; i++) {
 		float cvr = global_genome_coverage;
-		__VERBOSE_FLAG(log_debug, "list v %d", listV[i]);
+		__VERBOSE_FLAG(3, "list v %d", listV[i]);
 		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr) ;
 		remain_unvisited[i] = roundint(cov_times);
-		__VERBOSE_FLAG(log_hamiltonian, "%d " , remain_unvisited[i]);
+		__VERBOSE_FLAG(3, "%d " , remain_unvisited[i]);
 	}
 	int count = 0;
 	while (1){
 		int *best_hamiltonian_path = calloc(n_v, sizeof(int)), best_n_hamiltonian_path = 0 ;
 		iter_find_longest_path(remain_unvisited, &best_n_hamiltonian_path, best_hamiltonian_path);
-		__VERBOSE_FLAG(log_hamiltonian, "best_n_hamiltonian_path %d\n", best_n_hamiltonian_path);
+		__VERBOSE_FLAG(3, "best_n_hamiltonian_path %d\n", best_n_hamiltonian_path);
 		for(int i = 0; i < best_n_hamiltonian_path; i++) {
-			__VERBOSE_FLAG(log_hamiltonian, "remain %d %d\n", best_hamiltonian_path[i], remain_unvisited[best_hamiltonian_path[i]]);
+			__VERBOSE_FLAG(3, "remain %d %d\n", best_hamiltonian_path[i], remain_unvisited[best_hamiltonian_path[i]]);
 			remain_unvisited[best_hamiltonian_path[i]]--;
 			remain_unvisited[best_hamiltonian_path[i]^1]--;
 			assert(remain_unvisited[best_hamiltonian_path[i]]>=0);
@@ -1060,18 +1028,18 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		merge_big_and_small(&best_n_hamiltonian_path, &best_hamiltonian_path, n_insert, arr_insert);
 
 		print_contig(count, best_n_hamiltonian_path, best_hamiltonian_path);
-		__VERBOSE_FLAG(log_hamiltonian, "contig path ");
+		__VERBOSE_FLAG(3, "contig path ");
 		for (int i = 0; i < best_n_hamiltonian_path; i++) 
-			__VERBOSE_FLAG(log_hamiltonian, "%d " , best_hamiltonian_path[i]);
-		__VERBOSE_FLAG(log_hamiltonian, "best n %d\n", best_n_hamiltonian_path);
+			__VERBOSE_FLAG(3, "%d " , best_hamiltonian_path[i]);
+		__VERBOSE_FLAG(3, "best n %d\n", best_n_hamiltonian_path);
 		count++;
 		free(best_hamiltonian_path);
 		free(arr_insert);
 	}
 
-	__VERBOSE_FLAG(log_hamiltonian, "n arr short %d\n", n_arr_short);
+	__VERBOSE_FLAG(1, "n arr short %d\n", n_arr_short);
 	for (int i = 0; i < n_arr_short; i++) if (remain_unvisited[i] == 0) {
-		__VERBOSE_FLAG(log_hamiltonian, "printf short edge \n");
+		__VERBOSE_FLAG(3, "printf short edge \n");
 		int e = arr_i_short[i]; 
 		uint32_t seq_len = 0;
 		char *seq = NULL;
@@ -1083,9 +1051,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 
 	for (int e = 0; e < g->n_e; e++){
 		int len  = get_edge_len(&g->edges[e]);
-		__VERBOSE_FLAG(log_hamiltonian, "len very short %d %d\n", len, thres_len_min); 
+		__VERBOSE_FLAG(3, "len very short %d %d\n", len, thres_len_min); 
 		if (len < thres_len_min && len > 1000) {
-			__VERBOSE_FLAG(log_hamiltonian, "printf very short edge \n");
+			__VERBOSE_FLAG(3, "printf very short edge \n");
 			uint32_t seq_len = 0;
 			char *seq = NULL;
 			int len = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
@@ -1107,10 +1075,10 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 		list_one_dir_E[i] = listE_ori[i];
 		normalize_one_dir(g, list_one_dir_E+i);
 	}
-	__VERBOSE_FLAG(log_hamiltonian, "in graph when find hamiltonian n_e n_v: %d %d\n", n_e, n_v);
-	__VERBOSE_FLAG(log_hamiltonian, "listV:\n");
+	__VERBOSE_FLAG(1, "in graph when find hamiltonian n_e n_v: %d %d\n", n_e, n_v);
+	__VERBOSE_FLAG(3, "listV:\n");
 	for (int i = 0; i < n_v; i++) {
-		__VERBOSE_FLAG(log_hamiltonian, "%d ", listV[i]);
+		__VERBOSE_FLAG(3, "%d ", listV[i]);
 	}
 
 	int m = 0;
@@ -1120,17 +1088,13 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 		u = binary_search(listV, n_v, u) - listV;
 		int v = list_one_dir_E[i].des;
 		v = binary_search(listV, n_v, v) - listV;
-		__VERBOSE_FLAG(log_hamiltonian, "edge: %d %d \n", listV[u], listV[v]);
+		__VERBOSE_FLAG(3, "edge: %d %d \n", listV[u], listV[v]);
 		if (u == -1 || v == -1){
-			__VERBOSE_FLAG(log_hamiltonian, "%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
+			__VERBOSE_FLAG(3, "%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 		}
 		E[u * n_v + v] = list_one_dir_E[i].score0;
 	}
 	int *res = calloc(n_v, sizeof(int)), n_res=0;
-	__VERBOSE_FLAG(log_hamiltonian, "n_v %d \n", n_v);
-	for(int i = 0; i < n_v ; i++) {
-		__VERBOSE_FLAG(log_hamiltonian, "list v i %d ", listV[i]);
-	}
 	algo_find_hamiltonian(out_file, g,E, n_v, res, &n_res, listV, avg_bin_hash);
 	free(E);
 	free(list_one_dir_E);
@@ -1181,16 +1145,8 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 		add_contig_edge(g, listE, n_e-1, src, des, score);
 	}
 	qsort(listE, n_e, sizeof(struct contig_edge), less_contig_edge);
-	__VERBOSE_FLAG(log_graph, "after sort");
-	for (int i = 0; i < n_e; i++){
-		__VERBOSE_FLAG(log_graph, "%d %d %d %d\n",listE[i].src, listE[i].des, listE[i].rv_src, listE[i].rv_des);
-	}
 	unique_edge(listE, &n_e);
 	print_gfa_from_E(g, n_e, listE, n_v, listV, out_graph);
-	__VERBOSE_FLAG(log_graph, "after unique");
-	for (int i = 0; i < n_e; i++){
-		__VERBOSE_FLAG(log_graph, "%d %d %d %d\n",listE[i].src, listE[i].des, listE[i].rv_src, listE[i].rv_des);
-	}
 
 	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV, avg_bin_hash);
 	free(listE);
