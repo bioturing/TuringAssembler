@@ -14,7 +14,7 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 			return 0;
 		return 1;
 	}
-	__VERBOSE("dfs %d %d\n", x, depth);
+// #########################      BEGIN FUNCTION      ########################
 	remain_unvisited[x]--;
 	remain_unvisited[x^1]--;
 	assert(remain_unvisited[x]>=0 && remain_unvisited[x^1]>=0);
