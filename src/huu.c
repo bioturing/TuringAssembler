@@ -488,7 +488,7 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash, float huu_1_score)
 	__VERBOSE_FLAG(log_check_contig, "check contig\n");
 	for (int i = 0; i < g->n_e; i++) {
 		__VERBOSE("edge %d leng %d ", i, get_edge_len(&g->edges[i]));
-		for (int j = 0; j < g->edges[i].n_holes; j++){
+		for (uint32_t j = 0; j < g->edges[i].n_holes; j++){
 			__VERBOSE("hole %d ", g->edges[i].p_holes[j]);
 		}
 		__VERBOSE("\n");
@@ -958,20 +958,35 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		}
 	}
 
+	void dfs_find_connected_component(int root, int *remain_unvisited, int
+			*connected_component)
+	{
+		connected_component[root] = 1;
+		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] && connected_component[i] == 0 
+				&& ((E[root * n_v + i]) || (E[i * n_v + root]))) {
+			dfs_find_connected_component(i, remain_unvisited, connected_component);
+		}
+	}
+
 	void iter_find_longest_path(int *remain_unvisited, int *best_n_hamiltonian_path, int *best_hamiltonian_path)
 	{
 		int *save_remain_unvisited = calloc(n_v, sizeof(int));
 		__VERBOSE("begin of iter find longest");
-		for(int i = 0; i< n_v; i++) 
+		for(int i = 0; i< n_v; i++) {
 			__VERBOSE("%d ", remain_unvisited[i]);
-		
+		}
 		__COPY_ARR(remain_unvisited, save_remain_unvisited, n_v);
 		__VERBOSE_FLAG(log_hamiltonian, "iter find longest path");
+		int *connected_component = calloc(n_v, sizeof(int));
 		for (int i = 0; i < n_v; i++) if (remain_unvisited[i]) {
-			assert(remain_unvisited[i] >0);
+			dfs_find_connected_component(i, remain_unvisited, connected_component);
+			break;
+		}
+		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] ){ //&& connected_component[i]) {
+			assert(remain_unvisited[i] > 0);
 			int *hamiltonian_path = calloc(n_v, sizeof(int)), n_hamiltonian_path = 0 ;
+			
 			find_longest_path_from_node(i, &n_hamiltonian_path, hamiltonian_path, remain_unvisited);
-
 			if (n_hamiltonian_path > *best_n_hamiltonian_path) {
 				*best_n_hamiltonian_path = n_hamiltonian_path;
 				__VERBOSE("new best hamilton iter %d %d\n", *best_n_hamiltonian_path, n_hamiltonian_path);
@@ -992,7 +1007,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		free(save_remain_unvisited);
 	}
 	
-//---------------------------------BEGIN OF FUNCTION--------------------------------------
+//#############################  BEGIN OF FUNCTION  ###########################
 	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
 	__VERBOSE_FLAG(log_hamiltonian, "xxxxxxx %d ", thres_len_min);
 
