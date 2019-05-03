@@ -3,8 +3,8 @@
 
 #include "assembly_graph.h"
 #include "fastq_producer.h"
-#include "k31_count.h"
 #include "k31hash.h"
+#include "kmer_count.h"
 #include "utils.h"
 #include "verbose.h"
 

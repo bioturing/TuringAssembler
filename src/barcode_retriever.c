@@ -6,8 +6,6 @@
 #include "io_utils.h"
 #include "k31hash.h"
 #include "k63hash.h"
-#include "k31_count.h"
-#include "k63_count.h"
 #include "khash.h"
 #include "utils.h"
 #include "time_utils.h"
@@ -295,7 +293,7 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 		}
 	}
 }
-void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt)
+void construct_barcode_map(struct opt_build_t *opt, struct asm_graph_t *g)
 {
 	init_barcode_map(g, opt->split_len);
 	if (g->ksize < 32) {

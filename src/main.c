@@ -11,9 +11,9 @@
 #include "get_buffer.h"
 #include "io_utils.h"
 #include "khash.h"
-#include "k31_count.h"
-#include "k63_count.h"
+#include "kmer_count.h"
 #include "process.h"
+#include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -62,6 +62,8 @@ void print_usage_build(const char *prog)
 
 void print_usage(const char *prog)
 {
+	__VERBOSE("Skipping assembly\n");
+	__VERBOSE("Version: %s%s\n", VERSION_STRING, GIT_SHA);
 	__VERBOSE("Usage: %s\n", prog);
 	__VERBOSE("          assembly [options] -1 read_1.fq -2 read_2.fq\n");
 	__VERBOSE("          build_x_y [options]\n");
@@ -289,36 +291,6 @@ void print_opt_build_info(struct opt_build_t *opt, int argc, char *argv[])
 	free(cmd);
 }
 
-void assembly_opt_process63(int argc, char *argv[])
-{
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char log_dir[1024];
-	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
-	init_log(log_dir);
-	print_opt_count_info(opt, argc, argv);
-	// k63_process(opt);
-}
-
-void assembly_opt_process31(int argc, char *argv[])
-{
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char log_dir[1024];
-	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
-	init_log(log_dir);
-	print_opt_count_info(opt, argc, argv);
-	// k31_process(opt);
-}
-
 void assembly_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
@@ -328,55 +300,11 @@ void assembly_opt_process(int argc, char *argv[])
 		__ERROR("Error parsing arguments");
 	}
 	char log_dir[1024];
-	strcpy(log_dir, opt->out_dir); strcat(log_dir, "/assembly.log");
+	snprintf(log_dir, 1024, "%s/assembly.log", opt->out_dir);
 	init_log(log_dir);
+	init_clock();
 	print_opt_count_info(opt, argc, argv);
 	assembly_process(opt);
-}
-
-void test_opt_process(int argc, char *argv[])
-{
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
-	init_log(tmp_dir);
-	print_opt_count_info(opt, argc, argv);
-	// kmer_test_process(opt);
-}
-
-void test63_opt_process(int argc, char *argv[])
-{
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
-	init_log(tmp_dir);
-	print_opt_count_info(opt, argc, argv);
-	k63_test_process(opt);
-}
-
-void test31_opt_process(int argc, char *argv[])
-{
-	struct opt_count_t *opt;
-	opt = parse_count_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/count.log");
-	init_log(tmp_dir);
-	print_opt_count_info(opt, argc, argv);
-	k31_test_process(opt);
 }
 
 void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_build_t *))
@@ -388,26 +316,14 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 		__ERROR("Error parsing arguments");
 	}
 	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
+	snprintf(tmp_dir, 1024, "%s/assembly.log", opt->out_dir);
+	init_log(tmp_dir);
+	init_clock();
 	print_opt_build_info(opt, argc, argv);
 	build_process(opt);
 }
 
-void clean_opt_process(int argc, char *argv[])
-{
-	struct opt_build_t *opt;
-	opt = parse_build_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_build(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build.log");
-	init_log(tmp_dir);
-	clean_process(opt);
-}
-
-void build0_opt_process(int argc, char *argv[])
+void build_0_opt_process(int argc, char *argv[])
 {
 	struct opt_count_t *opt;
 	opt = parse_count_option(argc - 2, argv + 2);
@@ -416,10 +332,11 @@ void build0_opt_process(int argc, char *argv[])
 		__ERROR("Error parsing arguments");
 	}
 	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build0.log");
+	snprintf(tmp_dir, 1024, "%s/build.log", opt->out_dir);
 	init_log(tmp_dir);
+	init_clock();
 	print_opt_count_info(opt, argc, argv);
-	build0_process(opt);
+	build_0_process(opt);
 }
 
 void graph_query_opt_process(int argc, char *argv[])
@@ -433,6 +350,7 @@ void graph_query_opt_process(int argc, char *argv[])
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/query.log");
 	init_log(tmp_dir);
+	init_clock();
 	graph_query_process(opt);
 }
 
@@ -445,8 +363,9 @@ void graph_convert_opt_process(int argc, char *argv[])
 		__ERROR("Error parsing arguments");
 	}
 	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/convert.log");
+	snprintf(tmp_dir, 1024, "%s/convert.log", opt->out_dir);
 	init_log(tmp_dir);
+	init_clock();
 	graph_convert_process(opt);
 }
 
@@ -458,51 +377,26 @@ int main(int argc, char *argv[])
 		print_usage(argv[0]);
 		return -1;
 	}
-
-	if (!strcmp(argv[1], "assembly31"))
-		assembly_opt_process31(argc, argv);
-	else if (!strcmp(argv[1], "assembly63"))
-		assembly_opt_process63(argc, argv);
-	else if (!strcmp(argv[1], "assembly"))
+	if (!strcmp(argv[1], "assembly"))
 		assembly_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "test63"))
-		test63_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "test31"))
-		test31_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "build0"))
-		build0_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_0"))
+		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
-		// build_barcode_opt_process(argc, argv);
 		build_opt_process(argc, argv, &build_barcode_process);
 	else if (!strcmp(argv[1], "build_0_1"))
-		// build0_1_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build0_1_process);
+		build_opt_process(argc, argv, &build_0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))
-		// build1_2_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build1_2_process);
+		build_opt_process(argc, argv, &build_1_2_process);
 	else if (!strcmp(argv[1], "build_2_3"))
-		// build2_3_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build2_3_process);
+		build_opt_process(argc, argv, &build_2_3_process);
 	else if (!strcmp(argv[1], "build_3_4"))
-		// build3_4_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build3_4_process);
-	else if (!strcmp(argv[1], "build_4_5"))
-		// build4_5_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build4_5_process);
-	else if (!strcmp(argv[1], "build_5_6"))
-		// build5_6_opt_process(argc, argv);
-		build_opt_process(argc, argv, &build5_6_process);
-	else if (!strcmp(argv[1], "build_6_7"))
-		build_opt_process(argc, argv, &build6_7_process);
+		build_opt_process(argc, argv, &build_3_4_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "clean"))
-		clean_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
-
 	return 0;
 }
 

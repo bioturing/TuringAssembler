@@ -4,13 +4,19 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include "pthread_barrier.h"
+
 #define SIZE_1MB		1048576
 #define SIZE_2MB		2097152
 #define SIZE_4MB		4194304
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
 
-#include "pthread_barrier.h"
+#if !defined(GIT_SHA)
+#define GIT_SHA			"unknown"
+#endif
+
+#define VERSION_STRING		"0.9-"
 
 typedef int64_t gint_t;
 

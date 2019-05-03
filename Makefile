@@ -4,8 +4,12 @@ CPP = cpp
 
 LIBS = -pthread -flto -lm -lz
 
-CFLAGS = -Wfatal-errors -Wall -Wextra -Wno-unused-function \
-	-Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -fPIC -std=gnu99 -g
+GIT_SHA := $(shell git rev-parse --short HEAD)
+
+CFLAGS = -std=gnu99 -Wfatal-errors -Wall -Wextra \
+	-Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
+	-DGIT_SHA='"$(GIT_SHA)"' \
+	-g
 
 EXEC = skipping
 
@@ -20,11 +24,10 @@ SRC = src/assembly_graph.c 				\
       src/get_buffer.c 					\
       src/io_utils.c 					\
       src/k31_build.c 					\
-      src/k31_count.c 					\
       src/k31hash.c 					\
       src/k63_build.c 					\
-      src/k63_count.c 					\
       src/k63hash.c 					\
+      src/kmer_count.c 					\
       src/process.c 					\
       src/pthread_barrier.c 				\
       src/semaphore_wrapper.c 				\
