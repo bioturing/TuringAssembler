@@ -41,15 +41,6 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
 }
 
-void print_usage_count(const char *prog)
-{
-	__VERBOSE("Usage: %s count [options] read.[fq|fq]\n", prog);
-	__VERBOSE("Options: -t                     <number of threads>\n");
-	__VERBOSE("         -s                     <pre-alloc size>\n");
-	__VERBOSE("         -o                     <output directory>\n");
-	__VERBOSE("         --kmer                 <small kmer size>\n");
-}
-
 void print_usage_build(const char *prog)
 {
 	__VERBOSE("Usage: %s build_x_y [options] -1 read_1.fq -2 read_2.fq\n", prog);
@@ -234,48 +225,10 @@ void print_opt_count_info(struct opt_count_t *opt, int argc, char *argv[])
 	cmd_len = 0;
 	for (i = 0; i < argc; ++i)
 		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
+	__VERBOSE_LOG("INFO", "Skipping assembly\n");
+	__VERBOSE_LOG("INFO", "Version: %s%s\n", VERSION_STRING, GIT_SHA);
 	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
 	free(cmd);
-
-	__VERBOSE_LOG("INFO", "k0: %d\n", opt->k0);
-	__VERBOSE_LOG("INFO", "k1: %d\n", opt->k1);
-	__VERBOSE_LOG("INFO", "k2: %d\n", opt->k2);
-	__VERBOSE_LOG("INFO", "pre-allocated hash table size: %d\n", opt->hash_size);
-	__VERBOSE_LOG("INFO", "number of threads: %d\n", opt->n_threads);
-	__VERBOSE_LOG("INFO", "split bucket length: %d\n", opt->split_len);
-	if (opt->n_files == 0) {
-		__VERBOSE_LOG("INFO", "input: { stdin }\n");
-	} else {
-		if (opt->files_2 == NULL) {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + 2;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "%s" : "%s, ",
-						opt->files_1[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		} else {
-			int len = 10, i;
-			for (i = 0; i < opt->n_files; ++i)
-				len += strlen(opt->files_1[i]) + strlen(opt->files_2[i]) + 6;
-			char *list_files = malloc(len);
-			len = 0;
-			len += sprintf(list_files, "{ ");
-			for (i = 0; i < opt->n_files; ++i)
-				len += sprintf(list_files + len,
-						i + 1 == opt->n_files ? "(%s, %s)" : "(%s, %s), ",
-						opt->files_1[i], opt->files_2[i]);
-			sprintf(list_files + len, " }");
-			__VERBOSE_LOG("INFO", "input: %s\n", list_files);
-			free(list_files);
-		}
-	}
 }
 
 void print_opt_build_info(struct opt_build_t *opt, int argc, char *argv[])
@@ -287,6 +240,8 @@ void print_opt_build_info(struct opt_build_t *opt, int argc, char *argv[])
 	cmd_len = 0;
 	for (i = 0; i < argc; ++i)
 		cmd_len += sprintf(cmd + cmd_len, i + 1 == argc ? "%s" : "%s ", argv[i]);
+	__VERBOSE_LOG("INFO", "Skipping assembly\n");
+	__VERBOSE_LOG("INFO", "Version: %s%s\n", VERSION_STRING, GIT_SHA);
 	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
 	free(cmd);
 }
