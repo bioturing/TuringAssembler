@@ -618,6 +618,8 @@ void k31hash_init(struct k31hash_t *h, kmint_t size, int n_threads, int adj_incl
 	h->size = size;
 	__round_up_kmint(h->size);
 	h->n_probe = estimate_probe_3(h->size);
+	h->old_size = 0;
+	h->n_item = 0;
 	h->keys = malloc(h->size * sizeof(k31key_t));
 	h->sgts = calloc(h->size >> 5, sizeof(uint32_t));
 	if (adj_included)

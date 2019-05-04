@@ -43,7 +43,7 @@ struct kmer_count_bundle_t {
  * Move the kmer window along reads and add kmer to hash table
  */
 
-static void k31_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
+void k31_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k31hash_t *dst, *src;
 	int ksize_src, ksize_dst, ksize_edge;
@@ -122,7 +122,7 @@ static void k31_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bun
 	}
 }
 
-static void k31_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t *bundle)
+void k31_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k31hash_t *h = (struct k31hash_t *)bundle->dst;
 	int ksize = bundle->ksize_dst;
@@ -173,7 +173,7 @@ static void k31_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t 
 	}
 }
 
-static void k63_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t *bundle)
+void k63_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k63hash_t *h = (struct k63hash_t *)bundle->dst;
 	int ksize = bundle->ksize_dst;
@@ -227,7 +227,7 @@ static void k63_count_from_scratch(struct read_t *r, struct kmer_count_bundle_t 
 	}
 }
 
-static void k63_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
+void k63_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k31hash_t *src;
 	struct k63hash_t *dst;
@@ -309,7 +309,7 @@ static void k63_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bun
 	}
 }
 
-static void k63_count_from_k63(struct read_t *r, struct kmer_count_bundle_t *bundle)
+void k63_count_from_k63(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k63hash_t *src;
 	struct k63hash_t *dst;
@@ -475,6 +475,7 @@ static void k31_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t 
 		worker_bundles[i].ksize_src = dummy->ksize_src;
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].lock_hash = dst->locks + i;
+		worker_bundles[i].read_process_func = dummy->read_process_func;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -529,6 +530,7 @@ static void k63_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t 
 		worker_bundles[i].ksize_src = dummy->ksize_src;
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].lock_hash = dst->locks + i;
+		worker_bundles[i].read_process_func = dummy->read_process_func;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
