@@ -197,10 +197,9 @@ int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct ba
 float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1)
 {
 	const int thres_cnt = global_thres_count_kmer;
-	int cnt0 = 0, cnt1 = 0, res2 = 0, cntss = 0;
+	int cnt0 = 0, cnt1 = 0, res2 = 0;
 
 	for (uint32_t i = 0; i < buck1->size; ++i) {
-		cntss++;
 		if (buck1->cnts[i] != (uint32_t)(-1)) {
 			if (buck1->cnts[i] >= (uint32_t)thres_cnt) 
 				cnt1+= buck1->cnts[i];
@@ -208,9 +207,7 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	}
 
 	for (uint32_t i = 0; i < buck0->size; ++i) {
-		cntss++;
 		if ((buck0->keys[i]) != (uint64_t)(-1)){
-			cntss++;
 			if (buck0->cnts[i] >= (uint32_t)thres_cnt) {
 				cnt0 += buck0->cnts[i];
 				uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
