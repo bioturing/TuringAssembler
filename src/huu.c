@@ -23,7 +23,7 @@
 	X(float, global_thres_coefficent, -1); 
 
 // constant for logging
-int log_level = 0;
+int log_level = 1;
 
 #define X(type, name, default_value) type name=default_value;
 LIST_GLOBAL_PARAMS
@@ -894,7 +894,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			if (count_adj == 0)
 				break;
-			__VERBOSE_FLAG(0, "count_adj %d\n", count_adj);
+			__VERBOSE_FLAG(0, "node %d count_adj %d\n", listV[last_pos], count_adj);
 			int best_n_local_path = 0 , *best_local_path = calloc(n_v, sizeof(int)), best_add_len = 0;
 			for (int i_adj = 0; i_adj < count_adj; i_adj++) {
 				int adj = list_adj[i_adj];
