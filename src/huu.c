@@ -9,6 +9,7 @@
 #include "compare.h"
 #include "contig_graph.h"
 #include "math.h"
+#include "attribute.h"
 
 #define LIST_GLOBAL_PARAMS \
 	X(float, global_thres_bucks_score, -1)\
@@ -576,7 +577,7 @@ void *process_check_edge(void *data)
 	return NULL;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score) 
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score, struct opt_build_t *opt) 
 {
 	init_global_params(g, huu_1_score);
 	check_global_params(g);
@@ -604,7 +605,7 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score)
 	__VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE_FLAG(1, "n_e: %d\n", n_e);
 
-	int n_threads = 4;
+	int n_threads = opt->n_threads;
 	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
