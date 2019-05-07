@@ -51,6 +51,39 @@ void build_0_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src, stru
 	test_asm_graph(g);
 }
 
+void build_0_multi_kmer(struct opt_proc_t *opt, int k0, int k1, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building assembly graph from read using kmer size %d\n", k1);
+	char path[1024];
+	if (k0 < 32) {
+		struct k31hash_t table;
+		__VERBOSE("Pre-estimate small kmer\n");
+		build_k31_table_from_scratch(opt, &table, k0);
+		__VERBOSE("\n");
+		__VERBOSE_LOG("TIMER", "Pre-estimate time: %.3f\n", sec_from_prev_time());
+		set_time_now();
+		snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, k0);
+		save_k31hash(&table, path);
+		k31hash_destroy(&table);
+	} else {
+		struct k63hash_t table;
+		__VERBOSE("Pre-estimate small kmer\n");
+		build_k63_table_from_scratch(opt, &table, k0);
+		__VERBOSE("\n");
+		__VERBOSE_LOG("TIMER", "Pre-estimate time: %.3f\n", sec_from_prev_time());
+		set_time_now();
+		snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, k0);
+		save_k63hash(&table, path);
+		k63hash_destroy(&table);
+	}
+	if (k1 < 32)
+		k31_build_precount(opt, k1, k0, g);
+	else
+		k63_build_precount(opt, k1, k0, g);
+	test_asm_graph(g);
+}
+
 void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -167,6 +200,33 @@ void assembly_process(struct opt_proc_t *opt)
 
 	/* Count k0-mer and build graph */
 	build_0_scratch(opt, opt->k0, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_0", 1);
+
+	build_0_1(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_1", 1);
+	asm_graph_destroy(&g1);
+
+	build_1_2(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_2", 1);
+	asm_graph_destroy(&g2);
+
+	build_2_3(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_3", 1);
+	asm_graph_destroy(&g1);
+
+	build_barcode(opt, &g2);
+	build_3_4(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4", 1);
+	asm_graph_destroy(&g1);
+	asm_graph_destroy(&g2);
+}
+
+void assembly2_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+	/* Count k0-mer and build graph */
+	build_0_multi_kmer(opt, opt->k0, opt->k1, &g1);
+	// build_0_scratch(opt, opt->k0, &g1);
 	save_graph_info(opt->out_dir, &g1, "level_0", 1);
 
 	build_0_1(&g1, &g2);
