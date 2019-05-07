@@ -1241,6 +1241,11 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	}
 }
 
+void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
+{
+	g->ksize = ksize;
+}
+
 void load_asm_graph(struct asm_graph_t *g, const char *path)
 {
 	FILE *fp = xfopen(path, "rb");

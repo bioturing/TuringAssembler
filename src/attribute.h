@@ -40,6 +40,7 @@ struct opt_proc_t {
 	char **files_1, **files_2;
 	char *out_dir;
 	char *in_file;
+	char *in_fasta;
 };
 
 struct opt_count_t {

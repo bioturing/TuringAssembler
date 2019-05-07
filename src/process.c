@@ -316,3 +316,10 @@ void build_barcode_process(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g, "added_barcode", 0);
 	asm_graph_destroy(&g);
 }
+
+void build_barcode_fasta(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
+	build_barcode(opt, &g);
+}

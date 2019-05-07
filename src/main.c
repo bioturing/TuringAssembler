@@ -77,6 +77,7 @@ struct opt_proc_t *init_opt_proc()
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->in_file = NULL;
+	opt->in_fasta = NULL;
 	opt->out_dir = ".";
 	return opt;
 }
@@ -255,6 +256,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-i")) {
 			opt->in_file = argv[pos + 1];
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-f")) {
+			opt->in_fasta = argv[pos + 1];
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-1")) {
 			n = opt_count_list(argc - pos, argv + pos);

@@ -368,12 +368,12 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 			continue;
 		uint32_t p = 0;
 		gint_t slen = get_edge_len(g->edges + e);
-		for (i = k = last = 0; i + 1 < g->edges[e].seq_len; ++i, ++k) {
+		for (i = k = last = 0; i < g->edges[e].seq_len; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			knum = ((knum << 2) & kmask) | c;
 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
 			++last;
-			if (last >= g->ksize && i >= g->ksize) {
+			if (last >= g->ksize) {
 				khiter_t it;
 				int ret;
 				if (knum <= krev)
@@ -392,10 +392,6 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 				coor->pos = slen - k - 1;
 				coor->next = kh_value(dict, it);
 				kh_value(dict, it) = coor;
-				// if (ret == 1) {
-				// 	kh_value(dict, it) = (struct edge_coor_t){e, k};
-				// } else
-				// 	kh_value(dict, it) = (struct edge_coor_t){(gint_t)-1, (gint_t)-1};
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
