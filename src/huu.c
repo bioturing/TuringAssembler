@@ -130,7 +130,7 @@ void init_global_params(struct asm_graph_t *g, float huu_1_score)
 	if (huu_1_score != -1) {
 		global_thres_coefficent = huu_1_score;
 	} else {
-		global_thres_coefficent = 0.3;
+		global_thres_coefficent = 0.17;
 	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
@@ -223,7 +223,7 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	__VERBOSE_FLAG(3, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	if (min(cnt0, cnt1) == 0) 
 		return 0;
-	return 1.0 * res2 / min(cnt0 , cnt1);
+	return 1.0 * res2 / (cnt0 + cnt1 - res2);
 }
 
 struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash)
