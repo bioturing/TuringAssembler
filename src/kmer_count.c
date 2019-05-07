@@ -448,7 +448,7 @@ static void *buffer_process(void *data)
 	pthread_exit(NULL);
 }
 
-static void k31_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t *dummy)
+static void k31_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *dummy)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -503,7 +503,7 @@ static void k31_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t 
 	free(producer_threads);
 }
 
-static void k63_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t *dummy)
+static void k63_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *dummy)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -558,7 +558,7 @@ static void k63_start_count(struct opt_count_t *opt, struct kmer_count_bundle_t 
 	free(producer_threads);
 }
 
-static void count_k31_from_scratch(struct opt_count_t *opt,
+static void count_k31_from_scratch(struct opt_proc_t *opt,
 				struct k31hash_t *h, int ksize)
 {
 	struct kmer_count_bundle_t skeleton;
@@ -568,7 +568,7 @@ static void count_k31_from_scratch(struct opt_count_t *opt,
 	k31_start_count(opt, &skeleton);
 }
 
-static void count_k31_from_k31(struct opt_count_t *opt, struct k31hash_t *dst,
+static void count_k31_from_k31(struct opt_proc_t *opt, struct k31hash_t *dst,
 			struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
@@ -580,7 +580,7 @@ static void count_k31_from_k31(struct opt_count_t *opt, struct k31hash_t *dst,
 	k31_start_count(opt, &skeleton);
 }
 
-static void count_k63_from_scratch(struct opt_count_t *opt,
+static void count_k63_from_scratch(struct opt_proc_t *opt,
 				struct k63hash_t *h, int ksize)
 {
 	struct kmer_count_bundle_t skeleton;
@@ -590,7 +590,7 @@ static void count_k63_from_scratch(struct opt_count_t *opt,
 	k63_start_count(opt, &skeleton);
 }
 
-static void count_k63_from_k31(struct opt_count_t *opt, struct k63hash_t *dst,
+static void count_k63_from_k31(struct opt_proc_t *opt, struct k63hash_t *dst,
 			struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
@@ -602,7 +602,7 @@ static void count_k63_from_k31(struct opt_count_t *opt, struct k63hash_t *dst,
 	k63_start_count(opt, &skeleton);
 }
 
-static void count_k63_from_k63(struct opt_count_t *opt, struct k63hash_t *dst,
+static void count_k63_from_k63(struct opt_proc_t *opt, struct k63hash_t *dst,
 			struct k63hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
@@ -696,7 +696,7 @@ void k63_correct_edge(struct k63hash_t *h, int ksize)
 	}
 }
 
-void build_k31_table_from_scratch(struct opt_count_t *opt, struct k31hash_t *h, int ksize)
+void build_k31_table_from_scratch(struct opt_proc_t *opt, struct k31hash_t *h, int ksize)
 {
 	__VERBOSE("\nCounting %d-mer\n", ksize);
 	count_k31_from_scratch(opt, h, ksize);
@@ -714,7 +714,7 @@ void build_k31_table_from_scratch(struct opt_count_t *opt, struct k31hash_t *h, 
 	k31_correct_edge(h, ksize);
 }
 
-void build_k31_table_from_k31_table(struct opt_count_t *opt,
+void build_k31_table_from_k31_table(struct opt_proc_t *opt,
 	struct k31hash_t *dst, struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);
@@ -730,7 +730,7 @@ void build_k31_table_from_k31_table(struct opt_count_t *opt,
 	k31_correct_edge(dst, ksize_dst);
 }
 
-void build_k63_table_from_scratch(struct opt_count_t *opt, struct k63hash_t *h, int ksize)
+void build_k63_table_from_scratch(struct opt_proc_t *opt, struct k63hash_t *h, int ksize)
 {
 	__VERBOSE("\nCounting %d-mer\n", ksize);
 	count_k63_from_scratch(opt, h, ksize);
@@ -748,7 +748,7 @@ void build_k63_table_from_scratch(struct opt_count_t *opt, struct k63hash_t *h, 
 	k63_correct_edge(h, ksize);
 }
 
-void build_k63_table_from_k31_table(struct opt_count_t *opt,
+void build_k63_table_from_k31_table(struct opt_proc_t *opt,
 	struct k63hash_t *dst, struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);
@@ -764,7 +764,7 @@ void build_k63_table_from_k31_table(struct opt_count_t *opt,
 	k63_correct_edge(dst, ksize_dst);
 }
 
-void build_k63_table_from_k63_table(struct opt_count_t *opt,
+void build_k63_table_from_k63_table(struct opt_proc_t *opt,
 	struct k63hash_t *dst, struct k63hash_t *src, int ksize_dst, int ksize_src)
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);

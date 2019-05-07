@@ -52,10 +52,10 @@ static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t l
 static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 			struct k63_idhash_t *ndict, struct asm_graph_t *g);
 
-static void k63_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+static void k63_count_edge(struct opt_proc_t *opt, struct asm_graph_t *graph,
 		struct k63_idhash_t *edict, struct k63_idhash_t *ndict);
 
-void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
+void build_asm_graph_from_k63(struct opt_proc_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g)
 {
 	struct k63_idhash_t *edict, *ndict;
@@ -483,7 +483,7 @@ static void *count_edge_worker(void *data)
 	pthread_exit(NULL);
 }
 
-static void k63_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+static void k63_count_edge(struct opt_proc_t *opt, struct asm_graph_t *graph,
 		struct k63_idhash_t *edict, struct k63_idhash_t *ndict)
 {
 	pthread_attr_t attr;

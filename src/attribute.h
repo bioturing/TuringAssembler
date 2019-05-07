@@ -29,6 +29,19 @@ struct read_t {
 	int len;
 };
 
+struct opt_proc_t {
+	int n_threads;
+	int hash_size;
+	int k0;
+	int k1;
+	int k2;
+	int split_len;
+	int n_files;
+	char **files_1, **files_2;
+	char *out_dir;
+	char *in_file;
+};
+
 struct opt_count_t {
 	int n_threads;
 	int hash_size;

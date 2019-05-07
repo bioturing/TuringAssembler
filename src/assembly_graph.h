@@ -54,16 +54,16 @@ struct asm_graph_t {
 /******************************************************************************/
 
 /* Build graph using kmer with length smaller than 32 */
-void k31_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0);
-void k31_build_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src,
+void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
+void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 							struct asm_graph_t *g);
-void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
+void build_asm_graph_from_k31(struct opt_proc_t *opt, int ksize,
 			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
 /* Build graph using kmer with length from 33 to 63 */
-void k63_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0);
-void k63_build_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src,
+void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
+void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 							struct asm_graph_t *g);
-void build_asm_graph_from_k63(struct opt_count_t *opt, int ksize,
+void build_asm_graph_from_k63(struct opt_proc_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 
 /*************************** Barcoding ultilities *****************************/
@@ -171,7 +171,7 @@ void load_asm_graph_simple(struct asm_graph_t *g, const char *path);
 /* Load graph and barcode info */
 void load_asm_graph_complex(struct asm_graph_t *g, const char *path);
 /* Construct barcode information from reads */
-void construct_barcode_map(struct opt_build_t *opt, struct asm_graph_t *g);
+void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g);
 
 /************************** Testing functions *********************************/
 /******************************************************************************/

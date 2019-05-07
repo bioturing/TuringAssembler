@@ -32,13 +32,13 @@ struct bctrie_bundle_t {
 };
 
 void init_barcode_map(struct asm_graph_t *g, int buck_len);
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k31_dict) *dict);
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k63_dict) *dict);
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict);
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k63_dict) *dict);
 
 gint_t count_bc(struct barcode_hash_t *t)
@@ -293,7 +293,7 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 		}
 	}
 }
-void construct_barcode_map(struct opt_build_t *opt, struct asm_graph_t *g)
+void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	init_barcode_map(g, opt->split_len);
 	if (g->ksize < 32) {
@@ -354,7 +354,7 @@ void test_bucket(khash_t(k31_dict) *dict)
 	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
 }
 
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k31_dict) *dict)
 {
 	gint_t e, i, k, last;
@@ -408,7 +408,7 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 	test_bucket(dict);
 }
 
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 							khash_t(k63_dict) *dict)
 {
 	gint_t e, i, k, last;
@@ -591,7 +591,7 @@ static void *k31_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict)
 {
 	pthread_attr_t attr;
@@ -754,7 +754,7 @@ static void *k63_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k63_dict) *dict)
 {
 	pthread_attr_t attr;

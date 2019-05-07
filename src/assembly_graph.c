@@ -51,7 +51,7 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 	g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
 }
 
-void k63_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
 	set_time_now();
 	struct k63hash_t table;
@@ -69,7 +69,7 @@ void k63_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g
 	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
-void k31_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g0)
+void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
 	set_time_now();
 	struct k31hash_t table;
@@ -87,7 +87,7 @@ void k31_build_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g
 	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
-void k31_build_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src,
+void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 							struct asm_graph_t *g)
 {
 	char path[1024];
@@ -115,7 +115,7 @@ void k31_build_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src,
 	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
-void k63_build_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src,
+void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 							struct asm_graph_t *g)
 {
 	char path[1024];

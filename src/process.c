@@ -12,14 +12,14 @@
 #include "time_utils.h"
 #include "verbose.h"
 
-void graph_convert_process(struct opt_build_t *opt)
+void graph_convert_process(struct opt_proc_t *opt)
 {
 	char path[1024];
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Dump graph from bin archive\n");
 	struct asm_graph_t *g;
 	g = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g, opt->in_path);
+	load_asm_graph(g, opt->in_file);
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g->ksize);
 	test_asm_graph(g);
@@ -29,7 +29,7 @@ void graph_convert_process(struct opt_build_t *opt)
 	write_fasta(g, path);
 }
 
-void build_0_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g)
+void build_0_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize);
@@ -40,7 +40,7 @@ void build_0_scratch(struct opt_count_t *opt, int ksize, struct asm_graph_t *g)
 	test_asm_graph(g);
 }
 
-void build_0_precount(struct opt_count_t *opt, int ksize_dst, int ksize_src, struct asm_graph_t *g)
+void build_0_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize_dst);
@@ -84,6 +84,17 @@ void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 3 time: %.3f\n", sec_from_prev_time());
 }
 
+void build_3_4a(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Resolve small bridge\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	set_time_now();
+	// resolve_small_bridge(g0, g);
+	test_asm_graph(g);
+	__VERBOSE_LOG("TIMER", "Build graph level 3 time: %.3f\n", sec_from_prev_time());
+}
+
 void build_3_4(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -95,7 +106,7 @@ void build_3_4(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 3 time: %.3f\n", sec_from_prev_time());
 }
 
-void build_barcode(struct opt_build_t *opt, struct asm_graph_t *g)
+void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Building barcode information\n");
@@ -105,34 +116,11 @@ void build_barcode(struct opt_build_t *opt, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
-void get_opt_build(struct opt_build_t *opt_b, struct opt_count_t *opt_c)
-{
-	opt_b->n_threads = opt_c->n_threads;
-	opt_b->hash_size = opt_c->hash_size;
-	opt_b->n_files = opt_c->n_files;
-	opt_b->files_1 = opt_c->files_1;
-	opt_b->files_2 = opt_c->files_2;
-	opt_b->out_dir = opt_c->out_dir;
-	opt_b->split_len = opt_c->split_len;
-}
-
-void build_barcode_opt_count(struct opt_count_t *opt, struct asm_graph_t *g)
-{
-	struct opt_build_t opt_b;
-	get_opt_build(&opt_b, opt);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building barcode information\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
-	set_time_now();
-	construct_barcode_map(&opt_b, g);
-	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
-}
-
-void graph_query_process(struct opt_build_t *opt)
+void graph_query_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
+	load_asm_graph(g0, opt->in_file);
 	fprintf(stderr, "bin size = %d\n", g0->bin_size);
 	test_asm_graph(g0);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
@@ -173,7 +161,7 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 		save_asm_graph_barcode(g, path);
 }
 
-void assembly_process(struct opt_count_t *opt)
+void assembly_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 
@@ -193,14 +181,14 @@ void assembly_process(struct opt_count_t *opt)
 	save_graph_info(opt->out_dir, &g2, "level_3", 1);
 	asm_graph_destroy(&g1);
 
-	build_barcode_opt_count(opt, &g2);
+	build_barcode(opt, &g2);
 	build_3_4(&g2, &g1);
 	save_graph_info(opt->out_dir, &g1, "level_4", 1);
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
 }
 
-void build_0_process(struct opt_count_t *opt)
+void build_0_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 
@@ -209,7 +197,7 @@ void build_0_process(struct opt_count_t *opt)
 	asm_graph_destroy(&g);
 }
 
-void build_0_1_process(struct opt_build_t *opt)
+void build_0_1_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
@@ -219,7 +207,7 @@ void build_0_1_process(struct opt_build_t *opt)
 	asm_graph_destroy(&g2);
 }
 
-void build_1_2_process(struct opt_build_t *opt)
+void build_1_2_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
@@ -229,7 +217,7 @@ void build_1_2_process(struct opt_build_t *opt)
 	asm_graph_destroy(&g2);
 }
 
-void build_2_3_process(struct opt_build_t *opt)
+void build_2_3_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
@@ -239,7 +227,7 @@ void build_2_3_process(struct opt_build_t *opt)
 	asm_graph_destroy(&g2);
 }
 
-void build_3_4_process(struct opt_build_t *opt)
+void build_3_4_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
@@ -250,7 +238,7 @@ void build_3_4_process(struct opt_build_t *opt)
 	asm_graph_destroy(&g2);
 }
 
-void build_3_4_no_bc_rebuild_process(struct opt_build_t *opt)
+void build_3_4_no_bc_rebuild_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
@@ -260,7 +248,7 @@ void build_3_4_no_bc_rebuild_process(struct opt_build_t *opt)
 	asm_graph_destroy(&g2);
 }
 
-void build_barcode_process(struct opt_build_t *opt)
+void build_barcode_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
