@@ -9,6 +9,7 @@
 #include "compare.h"
 #include "contig_graph.h"
 #include "math.h"
+#include "attribute.h"
 
 #define LIST_GLOBAL_PARAMS \
 	X(float, global_thres_bucks_score, -1)\
@@ -22,7 +23,7 @@
 	X(float, global_thres_coefficent, -1); 
 
 // constant for logging
-int log_level = 0;
+int log_level = 1;
 
 #define X(type, name, default_value) type name=default_value;
 LIST_GLOBAL_PARAMS
@@ -129,7 +130,7 @@ void init_global_params(struct asm_graph_t *g, float huu_1_score)
 	if (huu_1_score != -1) {
 		global_thres_coefficent = huu_1_score;
 	} else {
-		global_thres_coefficent = 0.2;
+		global_thres_coefficent = 0.17;
 	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
@@ -197,33 +198,32 @@ int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct ba
 float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1)
 {
 	const int thres_cnt = global_thres_count_kmer;
-	int cnt0 = 0, cnt1 = 0, res2 = 0, cntss = 0;
+	int cnt0 = 0, cnt1 = 0, res2 = 0;
 
 	for (uint32_t i = 0; i < buck1->size; ++i) {
-		cntss++;
 		if (buck1->cnts[i] != (uint32_t)(-1)) {
-			if (buck1->cnts[i] >= (uint32_t)thres_cnt) 
+			if (buck1->cnts[i] >= (uint32_t)thres_cnt) {
 				cnt1+= buck1->cnts[i];
+			}
 		}
 	}
 
 	for (uint32_t i = 0; i < buck0->size; ++i) {
-		cntss++;
 		if ((buck0->keys[i]) != (uint64_t)(-1)){
-			cntss++;
 			if (buck0->cnts[i] >= (uint32_t)thres_cnt) {
 				cnt0 += buck0->cnts[i];
 				uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
 				if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= (uint32_t)thres_cnt) {
 					res2+= min(buck0->cnts[i] , buck1->cnts[tmp]);
+//					__VERBOSE_FLAG(3, "min %d\n", min(buck0->cnts[i], buck1->cnts[tmp]));
 				}
 			}
 		}
 	}
-	__VERBOSE_FLAG(2, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
+	__VERBOSE_FLAG(3, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	if (min(cnt0, cnt1) == 0) 
 		return 0;
-	return 1.0 * res2 / min(cnt0 , cnt1);
+	return 1.0 * res2 / (cnt0 + cnt1 - res2);
 }
 
 struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash)
@@ -235,6 +235,8 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
 	int n0_bucks = (get_edge_len(rev_e0) + g->bin_size-1) / g->bin_size;
 	int n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
+	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
+	__VERBOSE_FLAG(3, "len e0, e1: %d %d \n" , e0_len, e1_len);
 	assert(n0_bucks > n_bucks);
 	assert(n1_bucks > n_bucks);
 
@@ -462,13 +464,13 @@ void check_contig(struct asm_graph_t *g, float avg_bin_hash, float huu_1_score)
 	init_global_params(g, huu_1_score);
 	check_global_params(g);
 	__VERBOSE_FLAG(1, "check contig\n");
-	for (int i = 0; i < g->n_e; i++) {
-		__VERBOSE_FLAG(3, "edge %d leng %d ", i, get_edge_len(&g->edges[i]));
-		for (uint32_t j = 0; j < g->edges[i].n_holes; j++){
-			__VERBOSE_FLAG(3, "hole %d ", g->edges[i].p_holes[j]);
-		}
-		__VERBOSE_FLAG(3, "\n");
-
+	FILE *f = fopen("list_edge.txt", "r");
+	int n_bucks = global_n_buck;
+	for (int i =0 ; i < 100; i++) {
+		int x, y;
+		fscanf(f, "%d %d\n", &x,&y);
+		__VERBOSE_FLAG(0, "x,y : %d %d\n", x, y);
+		get_score_edges_matrix(g, x, y, n_bucks, avg_bin_hash);
 	}
 
 //	int n_threads = 5;
@@ -546,7 +548,6 @@ void *process_check_edge(void *data)
 				pa_check_edge->j = 0;
 			}
 		}
-		assert(i < n_listE && j < n_listE);
 		pthread_mutex_unlock(&lock_id);
 		int e0 = listE[i];
 		int e1 = listE[j];
@@ -579,7 +580,7 @@ void *process_check_edge(void *data)
 	return NULL;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score) 
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score, struct opt_build_t *opt) 
 {
 	init_global_params(g, huu_1_score);
 	check_global_params(g);
@@ -607,7 +608,7 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score)
 	__VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE_FLAG(1, "n_e: %d\n", n_e);
 
-	int n_threads = 56;
+	int n_threads = opt->n_threads;
 	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -896,7 +897,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			if (count_adj == 0)
 				break;
-			__VERBOSE_FLAG(0, "count_adj %d\n", count_adj);
+			__VERBOSE_FLAG(0, "node %d count_adj %d\n", listV[last_pos], count_adj);
 			int best_n_local_path = 0 , *best_local_path = calloc(n_v, sizeof(int)), best_add_len = 0;
 			for (int i_adj = 0; i_adj < count_adj; i_adj++) {
 				int adj = list_adj[i_adj];
@@ -966,7 +967,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			free(hamiltonian_path);
 		}
-		__VERBOSE_FLAG(0, "count connected component %d\n", count_connected_compoent);
+		__VERBOSE_FLAG(3, "count connected component %d\n", count_connected_compoent);
 		for(int i = 0 ; i < *best_n_hamiltonian_path; i++) 
 			__VERBOSE_FLAG(3, "best ham path %d ", best_hamiltonian_path[i]);
 		for (int i = 0 ; i < n_v; i++){

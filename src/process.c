@@ -209,7 +209,7 @@ void build_huu_process(struct opt_build_t *opt)
 	char *tmp = "/list_contig";
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
-	build_list_contig(g0, fp, opt->huu_1_score);
+	build_list_contig(g0, fp, opt->huu_1_score, opt);
 	fclose(fp);
 	free(out_name);
 }
