@@ -130,7 +130,7 @@ void init_global_params(struct asm_graph_t *g, float huu_1_score)
 	if (huu_1_score != -1) {
 		global_thres_coefficent = huu_1_score;
 	} else {
-		global_thres_coefficent = 0.17;
+		global_thres_coefficent = 0.14;
 	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
