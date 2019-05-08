@@ -21,7 +21,9 @@
 	X(int, global_n_buck , -1)\
 	X(float, global_genome_coverage, -1)\
 	X(int, global_molecule_length, -1)\
+	X(float, global_avg_sum_bin_hash, -1)\
 	X(float, global_thres_coefficent, -1); 
+
 
 // constant for logging
 int log_level = 1;
@@ -114,6 +116,68 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	return res;
 }
 
+float count_unique_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
+{
+	const int thres_cnt = global_thres_count_kmer;
+	int cnt = 0;
+	
+	for (uint32_t i = 0; i < buck->size; ++i) {
+		if (buck->cnts[i] != (uint32_t)(-1)) {
+			if (buck->cnts[i] >= (uint32_t)thres_cnt)
+				cnt++;
+		}
+	}
+	return cnt;
+}
+
+float count_sum_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
+{
+	const int thres_cnt = global_thres_count_kmer;
+	int cnt = 0;
+	
+	for (uint32_t i = 0; i < buck->size; ++i) {
+		if (buck->cnts[i] != (uint32_t)(-1)) {
+			cnt += buck->cnts[i];
+		}
+	}
+	return cnt;
+}
+
+float get_avg_unique_bin_hash(struct asm_graph_t *g)
+{
+	int count = 0;
+	long long sum = 0;
+	for (int i = 0; i < g->n_e; ++i) {
+		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
+		for (int j = 0; j < n_bucks - 1; j++){
+			int tmp = count_unique_bin_hash(g, &g->edges[i].bucks[j]);
+			if (tmp > 0) {
+				count++;
+				sum += tmp;
+			}
+		}
+	}
+	return 1.0*sum/count;
+}
+
+float get_avg_sum_bin_hash(struct asm_graph_t *g)
+{
+	int count = 0;
+	long long sum = 0;
+	for (int i = 0; i < g->n_e; ++i) {
+		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
+		for (int j = 0; j < n_bucks - 1; j++){
+			int tmp = count_sum_bin_hash(g, &g->edges[i].bucks[j]);
+			if (tmp > 0) {
+				count++;
+				sum += tmp;
+			}
+		}
+	}
+	return 1.0*sum/count;
+}
+
+
 void init_global_params(struct asm_graph_t *g, float huu_1_score)
 {
 	global_thres_length = 10000;
@@ -122,10 +186,11 @@ void init_global_params(struct asm_graph_t *g, float huu_1_score)
 	global_n_buck = 6;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  1;//get_global_count_kmer(g);
+	global_avg_sum_bin_hash = get_avg_sum_bin_hash(g);
 	if (huu_1_score != -1) {
 		global_thres_coefficent = huu_1_score;
 	} else {
-		global_thres_coefficent = 0.10;
+		global_thres_coefficent = 0.20;
 	}
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
@@ -149,6 +214,7 @@ int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, int b)
 	}
 	return res;
 }
+
 
 int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash)
 {
@@ -221,7 +287,7 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	__VERBOSE_FLAG(3, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	if (MIN(cnt0, cnt1) == 0) 
 		return 0;
-	return 1.0 * res2 / ((cnt0*ratio0 + cnt1*ratio1)/2); 
+	return 1.0 * res2 / global_avg_sum_bin_hash; 
 }
 
 struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash)
@@ -363,40 +429,10 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_has
 	return score;
 }
 
-float count_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
-{
-	const int thres_cnt = global_thres_count_kmer;
-	int cnt = 0;
-	
-	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->cnts[i] != (uint32_t)(-1)) {
-			if (buck->cnts[i] >= (uint32_t)thres_cnt)
-				cnt++;
-		}
-	}
-	return cnt;
-}
-
-float get_avg_bin_hash(struct asm_graph_t *g)
-{
-	int count = 0;
-	long long sum = 0;
-	for (int i = 0; i < g->n_e; ++i) {
-		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-		for (int j = 0; j < n_bucks - 1; j++){
-			int tmp = count_bin_hash(g, &g->edges[i].bucks[j]);
-			if (tmp > 0) {
-				count++;
-				sum += tmp;
-			}
-		}
-	}
-	return 1.0*sum/count;
-}
 
 float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct barcode_hash_t *b_left, struct barcode_hash_t *b_right)
 {
-	float avg_bin_hash = get_avg_bin_hash(g);
+	float avg_bin_hash = get_avg_unique_bin_hash(g);
 	float res = 0;
 	int count = 0;
 	float cov_e = __get_edge_cov(e, g->ksize);
@@ -609,7 +645,7 @@ void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score,
 		fprintf(out_file, "vertex:%d\n", e);
 	}
 
-	float avg_bin_hash = get_avg_bin_hash(g);
+	float avg_bin_hash = get_avg_unique_bin_hash(g);
 	__VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
 	__VERBOSE_FLAG(1, "n_e: %d\n", n_e);
 
@@ -1144,7 +1180,7 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 	int src, des;
 	struct contig_edge *listE = NULL;
 	int n_e=0;
-	float avg_bin_hash = get_avg_bin_hash(g);
+	float avg_bin_hash = get_avg_unique_bin_hash(g);
 	while (fscanf(fp,"score: %f edge: %d %d\n", &score, &src, &des) !=EOF) {
 		n_e += 1;
 		listE = realloc(listE, n_e*sizeof(struct contig_edge));
