@@ -29,13 +29,15 @@ void save_k63hash(struct k63hash_t *h, const char *path)
 	fclose(fp);
 }
 
-void load_k63hash(struct k63hash_t *h, const char *path)
+int load_k63hash(struct k63hash_t *h, const char *path)
 {
 	FILE *fp = xfopen(path, "rb");
+	if (!fp)
+		return 0;
 	char sig[5];
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, "kh63", 4))
-		__ERROR("Not k63 hash table file format");
+		return 0;
 	xfread(&h->size, sizeof(kmint_t), 1, fp);
 	xfread(&h->n_item, sizeof(kmint_t), 1, fp);
 	h->n_probe = estimate_probe_3(h->size);
@@ -45,6 +47,7 @@ void load_k63hash(struct k63hash_t *h, const char *path)
 	xfread(h->adjs, sizeof(uint8_t), h->size, fp);
 	xfread(h->flag, sizeof(uint8_t), h->size, fp);
 	fclose(fp);
+	return 1;
 }
 
 struct k63resize_bundle_t {

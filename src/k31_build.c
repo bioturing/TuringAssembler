@@ -3,8 +3,8 @@
 
 #include "assembly_graph.h"
 #include "fastq_producer.h"
-#include "k31_count.h"
 #include "k31hash.h"
+#include "kmer_count.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -39,10 +39,10 @@ static inline uint32_t *k31_init_binseq(k31key_t key, int l)
 static void k31_internal_build(int ksize, struct k31_idhash_t *edict,
 			struct k31_idhash_t *ndict, struct asm_graph_t *g);
 
-static void k31_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+static void k31_count_edge(struct opt_proc_t *opt, struct asm_graph_t *graph,
 		struct k31_idhash_t *edict, struct k31_idhash_t *ndict);
 
-void build_asm_graph_from_k31(struct opt_count_t *opt, int ksize,
+void build_asm_graph_from_k31(struct opt_proc_t *opt, int ksize,
 			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g)
 {
 	struct k31_idhash_t *edict, *ndict;
@@ -469,7 +469,7 @@ static void *count_edge_worker(void *data)
 	pthread_exit(NULL);
 }
 
-static void k31_count_edge(struct opt_count_t *opt, struct asm_graph_t *graph,
+static void k31_count_edge(struct opt_proc_t *opt, struct asm_graph_t *graph,
 		struct k31_idhash_t *edict, struct k31_idhash_t *ndict)
 {
 	pthread_attr_t attr;

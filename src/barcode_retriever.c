@@ -6,8 +6,6 @@
 #include "io_utils.h"
 #include "k31hash.h"
 #include "k63hash.h"
-#include "k31_count.h"
-#include "k63_count.h"
 #include "khash.h"
 #include "utils.h"
 #include "time_utils.h"
@@ -34,13 +32,13 @@ struct bctrie_bundle_t {
 };
 
 void init_barcode_map(struct asm_graph_t *g, int buck_len);
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k31_dict) *dict);
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k63_dict) *dict);
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict);
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k63_dict) *dict);
 
 gint_t count_bc(struct barcode_hash_t *t)
@@ -295,7 +293,7 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 		}
 	}
 }
-void construct_barcode_map(struct asm_graph_t *g, struct opt_build_t *opt)
+void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	init_barcode_map(g, opt->split_len);
 	if (g->ksize < 32) {
@@ -356,7 +354,7 @@ void test_bucket(khash_t(k31_dict) *dict)
 	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
 }
 
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 						khash_t(k31_dict) *dict)
 {
 	gint_t e, i, k, last;
@@ -370,12 +368,12 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 			continue;
 		uint32_t p = 0;
 		gint_t slen = get_edge_len(g->edges + e);
-		for (i = k = last = 0; i + 1 < g->edges[e].seq_len; ++i, ++k) {
+		for (i = k = last = 0; i < g->edges[e].seq_len; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			knum = ((knum << 2) & kmask) | c;
 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
 			++last;
-			if (last >= g->ksize && i >= g->ksize) {
+			if (last >= g->ksize) {
 				khiter_t it;
 				int ret;
 				if (knum <= krev)
@@ -394,10 +392,6 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 				coor->pos = slen - k - 1;
 				coor->next = kh_value(dict, it);
 				kh_value(dict, it) = coor;
-				// if (ret == 1) {
-				// 	kh_value(dict, it) = (struct edge_coor_t){e, k};
-				// } else
-				// 	kh_value(dict, it) = (struct edge_coor_t){(gint_t)-1, (gint_t)-1};
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
@@ -410,7 +404,7 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
 	test_bucket(dict);
 }
 
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_build_t *opt,
+void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 							khash_t(k63_dict) *dict)
 {
 	gint_t e, i, k, last;
@@ -593,7 +587,7 @@ static void *k31_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict)
 {
 	pthread_attr_t attr;
@@ -756,7 +750,7 @@ static void *k63_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_build_t *opt,
+static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k63_dict) *dict)
 {
 	pthread_attr_t attr;

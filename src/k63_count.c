@@ -13,14 +13,6 @@
 #include "utils.h"
 #include "verbose.h"
 
-struct precount_bundle_t {
-	struct dqueue_t *q;
-	struct k63hash_t *h;
-	int ksize;
-	int64_t *n_reads;
-	pthread_mutex_t *lock_hash;
-};
-
 struct maincount_bundle_t {
 	struct dqueue_t *q;
 	struct k63hash_t *h;
@@ -41,59 +33,13 @@ static void k63_dump_kmer(k63key_t key, char *seq, int l)
 	}
 }
 
+
 /*
  * Move the kmer window along reads and add kmer to hash table
  */
 static void count_lazy_from_read(struct read_t *r, struct k63hash_t *h,
 					int ksize, pthread_mutex_t *lock_hash)
 {
-	int i, last, ci, ck, len, lmc, kedge;
-	char *seq;
-	len = r->len;
-	seq = r->seq;
-
-	k63key_t knum, krev, pknum, pkrev, kmask;
-	kmask.bin[0] = (uint64_t)-1;
-	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
-	knum = krev = pknum = pkrev = (k63key_t){{0ull, 0ull}};
-	last = 0;
-	lmc = (ksize - 1) << 1;
-	kedge = ksize + 1;
-	for (i = 0; i < len; ++i) {
-		ci = nt4_table[(int)seq[i]];
-		__k63_lshift2(knum); __k63_and(knum, kmask);
-		__k63_rshift2(krev);
-		if (ci < 4) {
-			knum.bin[0] |= ci;
-			/* please make sure 128 < lmc <= 64 */
-			krev.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
-			++last;
-		} else {
-			last = 0;
-		}
-		if (last >= ksize) {
-			if (__k63_lt(knum, krev))
-				k63hash_put_adj(h, knum, lock_hash);
-			else
-				k63hash_put_adj(h, krev, lock_hash);
-		}
-
-		if (last >= kedge) {
-			ck = nt4_table[(int)seq[i - ksize]] ^ 3;
-
-			if (__k63_lt(pknum, pkrev))
-				k63hash_add_edge(h, pknum, ci, lock_hash);
-			else
-				k63hash_add_edge(h, pkrev, ci + 4, lock_hash);
-
-			if (__k63_lt(knum, krev))
-				k63hash_add_edge(h, knum, ck + 4, lock_hash);
-			else
-				k63hash_add_edge(h, krev, ck, lock_hash);
-		}
-		pknum = knum;
-		pkrev = krev;
-	}
 }
 
 /*
