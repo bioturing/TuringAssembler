@@ -304,6 +304,17 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	}
 }
 
+void debug_build_index(khash_t(k31_dict) *dict)
+{
+	gint_t s = 0;
+	khiter_t it;
+	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
+		if (kh_exist(dict, it))
+			s += kh_value(dict, it).n;
+	}
+	__VERBOSE("Number of indexed position: %ld\n", s);
+}
+
 void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 					int is_small, int need_count)
 {
@@ -311,7 +322,7 @@ void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct bccount_bundle_t ske;
 	ske.g = g;
 	ske.barcode_calculator = ust_get_barcode;
-	ske.need_count = 0;
+	ske.need_count = need_count;
 	if (g->ksize < 32) {
 		khash_t(k31_dict) *edict = kh_init(k31_dict);
 		k31_build_index(g, opt, edict, is_small);
@@ -414,6 +425,7 @@ void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
 				b->e[b->n].idx = e;
 				b->e[b->n].pos = k;
+				++b->n;
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
@@ -463,6 +475,7 @@ void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
 				b->e[b->n].idx = e;
 				b->e[b->n].pos = k;
+				++b->n;
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
