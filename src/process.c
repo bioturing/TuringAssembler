@@ -40,14 +40,14 @@ void build_0_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 	test_asm_graph(g);
 }
 
-void build_0_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src, struct asm_graph_t *g)
+void build_0_precount(struct opt_proc_t *opt, int k0, int k1, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize_dst);
-	if (ksize_dst < 32)
-		k31_build_precount(opt, ksize_dst, ksize_src, g);
-	else if (ksize_dst > 32 && ksize_dst < 64)
-		k63_build_precount(opt, ksize_dst, ksize_src, g);
+	__VERBOSE("Building assembly graph from read using kmer size %d\n", k1);
+	if (k1 < 32)
+		k31_build_precount(opt, k1, k0, g, opt->in_file);
+	else
+		k63_build_precount(opt, k1, k0, g, opt->in_file);
 	test_asm_graph(g);
 }
 
@@ -78,9 +78,9 @@ void build_0_multi_kmer(struct opt_proc_t *opt, int k0, int k1, struct asm_graph
 		k63hash_destroy(&table);
 	}
 	if (k1 < 32)
-		k31_build_precount(opt, k1, k0, g);
+		k31_build_precount(opt, k1, k0, g, path);
 	else
-		k63_build_precount(opt, k1, k0, g);
+		k63_build_precount(opt, k1, k0, g, path);
 	test_asm_graph(g);
 }
 

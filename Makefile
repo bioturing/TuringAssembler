@@ -6,7 +6,7 @@ LIBS = -pthread -flto -lm -lz
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -O2 -Wfatal-errors -Wall -Wextra \
 	-Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
 	-DGIT_SHA='"$(GIT_SHA)"' \
 	-g

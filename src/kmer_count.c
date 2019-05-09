@@ -604,15 +604,32 @@ static void count_k63_from_k63(struct opt_proc_t *opt, struct k63hash_t *dst,
 	kmer_start_count(opt, &skeleton);
 }
 
-static void k31_correct_edge(struct k31hash_t *h, int ksize)
+struct ce_bundle_t {
+	void *h;
+	int ksize;
+	int thread_no;
+	int n_threads;
+};
+
+void *k31_correct_edge(void *data)
 {
+	struct ce_bundle_t *bundles = (struct ce_bundle_t *)data;
+	struct k31hash_t *h = bundles->h;
+	int ksize = bundles->ksize;
+	int thread_no = bundles->thread_no;
+	int n_threads = bundles->n_threads;
+	kmint_t cap, l, r;
+	cap = h->size / n_threads + 1;
+	l = cap * thread_no;
+	r = __min(cap * (thread_no + 1), h->size);
+
 	k31key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
 	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
 	lmc = (ksize - 1) << 1;
 
-	for (i = 0; i < h->size; ++i) {
+	for (i = l; i < r; ++i) {
 		if (h->keys[i] == K31_NULL)
 			continue;
 		knum = h->keys[i];
@@ -625,7 +642,7 @@ static void k31_correct_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << c);
 			}
 			if ((h->adjs[i] >> (c + 4)) & 1) {
@@ -635,15 +652,26 @@ static void k31_correct_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
 		}
 	}
+	return NULL;
 }
 
-static void k63_correct_edge(struct k63hash_t *h, int ksize)
+void *k63_correct_edge(void *data)
 {
+	struct ce_bundle_t *bundles = (struct ce_bundle_t *)data;
+	struct k63hash_t *h = bundles->h;
+	int ksize = bundles->ksize;
+	int thread_no = bundles->thread_no;
+	int n_threads = bundles->n_threads;
+	kmint_t cap, l, r;
+	cap = h->size / n_threads + 1;
+	l = cap * thread_no;
+	r = __min(cap * (thread_no + 1), h->size);
+
 	k63key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
@@ -652,7 +680,7 @@ static void k63_correct_edge(struct k63hash_t *h, int ksize)
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	lmc = (ksize - 1) << 1;
 
-	for (i = 0; i < h->size; ++i) {
+	for (i = l; i < r; ++i) {
 		if (h->flag[i] == KMFLAG_EMPTY)
 			continue;
 		knum = h->keys[i];
@@ -667,7 +695,7 @@ static void k63_correct_edge(struct k63hash_t *h, int ksize)
 					k = k63hash_get(h, nknum);
 				else
 					k = k63hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << c);
 			}
 			if ((h->adjs[i] >> (c + 4)) & 1) {
@@ -679,11 +707,42 @@ static void k63_correct_edge(struct k63hash_t *h, int ksize)
 					k = k63hash_get(h, nknum);
 				else
 					k = k63hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
 		}
 	}
+	return NULL;
+}
+
+static void kmer_correct_edge(void *h, int ksize, int n_threads,
+						void *(*correct_func)(void *))
+{
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct ce_bundle_t *worker_bundles;
+	worker_bundles = malloc(n_threads * sizeof(struct ce_bundle_t));
+	int i;
+	for (i = 0; i < n_threads; ++i) {
+		worker_bundles[i].h = h;
+		worker_bundles[i].ksize = ksize;
+		worker_bundles[i].n_threads = n_threads;
+		worker_bundles[i].thread_no = i;
+	}
+	pthread_t *threads;
+	threads = calloc(n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < n_threads; ++i)
+		pthread_create(threads + i, &attr, correct_func,
+							worker_bundles + i);
+	for (i = 0; i < n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	free(worker_bundles);
+	free(threads);
 }
 
 void build_k31_table_from_scratch(struct opt_proc_t *opt, struct k31hash_t *h, int ksize)
@@ -701,7 +760,7 @@ void build_k31_table_from_scratch(struct opt_proc_t *opt, struct k31hash_t *h, i
 					ksize, (long long unsigned)h->n_item);
 
 	/* Correct edges */
-	k31_correct_edge(h, ksize);
+	kmer_correct_edge(h, ksize, opt->n_threads, k31_correct_edge);
 }
 
 void build_k31_table_from_k31_table(struct opt_proc_t *opt,
@@ -717,8 +776,27 @@ void build_k31_table_from_k31_table(struct opt_proc_t *opt,
 		ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k31_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k31_correct_edge);
 }
+
+// void build_k31_2step(struct opt_proc_t *opt, struct k31hash_t *h,
+// 						int ksize_dst, int ksize_src)
+// {
+// 	if (ksize_src >= ksize_dst) {
+// 		build_k31_table_from_scratch(opt, h, ksize_dst);
+// 		return;
+// 	}
+// 	k31hash_t tmp;
+// 	__VERBOSE("\n2-step counting %d-mer (from %d-mer)\n", ksize_dst, ksize_src);
+// 	count_k31_from_scratch(opt, &tmp, ksize);
+// 	__VERBOSE("\n");
+// 	__VERBOSE_LOG("KMER COUNT" "Number of %d-mer: %llu\n", ksize_src,
+// 						(long long unsigned)h->n_item);
+// 	__VERBOSE("Filtering singleton %d-mer\n", ksize_src);
+// 	k31hash_filter(&tmp, 1);
+// 	__VEROBSE("Number of non-singleton %d-mer: %lu\n", 
+
+// }
 
 void build_k63_table_from_scratch(struct opt_proc_t *opt, struct k63hash_t *h, int ksize)
 {
@@ -735,7 +813,7 @@ void build_k63_table_from_scratch(struct opt_proc_t *opt, struct k63hash_t *h, i
 							ksize, h->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(h, ksize);
+	kmer_correct_edge(h, ksize, opt->n_threads, k63_correct_edge);
 }
 
 void build_k63_table_from_k31_table(struct opt_proc_t *opt,
@@ -751,7 +829,7 @@ void build_k63_table_from_k31_table(struct opt_proc_t *opt,
 							ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k63_correct_edge);
 }
 
 void build_k63_table_from_k63_table(struct opt_proc_t *opt,
@@ -767,7 +845,7 @@ void build_k63_table_from_k63_table(struct opt_proc_t *opt,
 							ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k63_correct_edge);
 }
 
 static void k31_test_hash(struct k31hash_t *h)

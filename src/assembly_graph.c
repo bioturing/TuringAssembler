@@ -91,7 +91,7 @@ void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0
 }
 
 void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-							struct asm_graph_t *g)
+				struct asm_graph_t *g, const char *preload_path)
 {
 	char path[1024];
 	if (ksize_src >= ksize_dst) {
@@ -101,8 +101,8 @@ void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 	set_time_now();
 	struct k31hash_t table_src, table_dst;
 	__VERBOSE("|----Estimating kmer\n");
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	if (load_k31hash(&table_src, path))
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	if (load_k31hash(&table_src, preload_path))
 		build_k31_table_from_k31_table(opt, &table_dst, &table_src,
 							ksize_dst, ksize_src);
 	else
@@ -119,7 +119,7 @@ void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 }
 
 void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-							struct asm_graph_t *g)
+				struct asm_graph_t *g, const char *preload_path)
 {
 	char path[1024];
 	if (ksize_src >= ksize_dst) {
@@ -129,10 +129,10 @@ void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 	set_time_now();
 	struct k63hash_t table_dst;
 	__VERBOSE("|----Estimating kmer\n");
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
 	if (ksize_src < 32) {
 		struct k31hash_t table_src;
-		if (load_k31hash(&table_src, path))
+		if (load_k31hash(&table_src, preload_path))
 			build_k63_table_from_k31_table(opt, &table_dst, &table_src,
 							ksize_dst, ksize_src);
 		else
