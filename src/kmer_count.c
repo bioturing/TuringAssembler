@@ -581,6 +581,7 @@ static void count_k63_from_k31(struct opt_proc_t *opt, struct k63hash_t *dst,
 			struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
+	k63hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
