@@ -39,7 +39,6 @@ struct bccount_bundle_t {
 	int need_count;
 };
 
-uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2);
 void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small);
 void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict, int is_small);
@@ -321,7 +320,9 @@ void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 	init_barcode_map(g, opt->split_len, is_small);
 	struct bccount_bundle_t ske;
 	ske.g = g;
-	ske.barcode_calculator = ust_get_barcode;
+	extern uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *);
+	ske.barcode_calculator = barcode_calculators[opt->lib_type];
+	// ske.barcode_calculator = ust_get_barcode;
 	ske.need_count = need_count;
 	if (g->ksize < 32) {
 		khash_t(k31_dict) *edict = kh_init(k31_dict);
@@ -485,28 +486,6 @@ void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 			}
 		}
 	}
-}
-
-uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
-{
-	char *s = r1->info;
-	int i, k, len = 0;
-	uint64_t ret = 0;
-	for (i = 0; s[i]; ++i) {
-		if (strncmp(s + i, "BX:Z:", 5) == 0) {
-			for (k = i + 5; s[k] && !__is_sep(s[k]); ++k) {
-				ret = ret * 5 + nt4_table[(int)s[k]];
-				++len;
-			}
-		}
-	}
-	assert(len == 18);
-	return ret;
-}
-
-uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
-{
-	return 0;
 }
 
 void k31_read_iterator(struct read_t *r, uint64_t barcode,
