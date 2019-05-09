@@ -406,6 +406,8 @@ int main(int argc, char *argv[])
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
 		build_opt_process(argc, argv, &build_barcode_process);
+	else if (!strcmp(argv[1], "build_barcode_fasta"))
+		build_opt_process(argc, argv, &build_barcode_process_fasta);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build_opt_process(argc, argv, &build_0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))

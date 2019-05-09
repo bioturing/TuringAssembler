@@ -75,6 +75,8 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_small(struct asm_graph_t *g, gint_t e1, gint_t e2);
+void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
+					int is_small, int need_count);
 
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
@@ -170,8 +172,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path);
 void load_asm_graph_simple(struct asm_graph_t *g, const char *path);
 /* Load graph and barcode info */
 void load_asm_graph_complex(struct asm_graph_t *g, const char *path);
-/* Construct barcode information from reads */
-void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g);
+void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize);
 
 /************************** Testing functions *********************************/
 /******************************************************************************/

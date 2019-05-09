@@ -7,9 +7,12 @@
 #include "k31hash.h"
 #include "k63hash.h"
 #include "kmer_count.h"
+#include "kseq.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+
+KSEQ_INIT(gzFile, gzread);
 
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
@@ -1241,9 +1244,93 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	}
 }
 
+void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
+{
+	uint32_t *p_holes, *l_holes, *bseq;
+	uint32_t n_holes, i, j, k, c, last_c, m_seq;
+	p_holes = NULL;
+	l_holes = NULL;
+	m_seq = 0x100;
+	bseq = calloc(m_seq, sizeof(uint32_t));
+	last_c = 0;
+	n_holes = 0;
+	for (i = k = 0; i < seq->seq.l; ++i) {
+		c = nt4_table[(int)seq->seq.s[i]];
+		if (c >= 4) {
+			if (last_c >= 4) {
+				++l_holes[j];
+			} else {
+				p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
+				l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
+				j = n_holes;
+				++n_holes;
+				p_holes[j] = k - 1;
+				l_holes[j] = 1;
+			}
+		} else {
+			/* append new char */
+			if ((k >> 4) >= m_seq) {
+				uint32_t new_m = m_seq << 1;
+				bseq = realloc(bseq, new_m * sizeof(uint32_t));
+				memset(bseq + m_seq, 0, m_seq * sizeof(uint32_t));
+				m_seq = new_m;
+			}
+			__binseq_set(bseq, k, c);
+			++k;
+		}
+		last_c = c;
+	}
+	g->edges[e].seq_len = k;
+	g->edges[e].seq = realloc(bseq, (k >> 4) * sizeof(uint32_t));
+	g->edges[e].count = 0;
+	g->edges[e].n_holes = n_holes;
+	g->edges[e].l_holes = l_holes;
+	g->edges[e].p_holes = p_holes;
+}
+
 void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 {
 	g->ksize = ksize;
+	g->edges = NULL;
+	g->nodes = NULL;
+	g->n_v = g->n_e = 0;
+	gzFile fp = gzopen(path, "r");
+	kseq_t *seq = kseq_init(fp);
+	while (kseq_read(seq) >= 0) {
+		/* add new edge */
+		g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+		g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
+
+		asm_fasta_edge_convert(g, g->n_e, seq);
+		asm_clone_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
+		g->edges[g->n_e].rc_id = g->n_e + 1;
+		g->edges[g->n_e + 1].rc_id = g->n_e;
+
+		g->edges[g->n_e].source = g->n_v;
+		g->edges[g->n_e].target = g->n_v + 1;
+		g->nodes[g->n_v].adj = malloc(sizeof(gint_t));
+		g->nodes[g->n_v].adj[0] = g->n_e;
+		g->nodes[g->n_v].deg = 1;
+		g->nodes[g->n_v + 1].adj = NULL;
+		g->nodes[g->n_v + 1].deg = 0;
+
+		g->edges[g->n_e + 1].source = g->n_v + 2;
+		g->edges[g->n_e + 1].target = g->n_v + 3;
+		g->nodes[g->n_v + 2].adj = malloc(sizeof(gint_t));
+		g->nodes[g->n_v + 2].adj[0] = g->n_e + 1;
+		g->nodes[g->n_v + 2].deg = 1;
+		g->nodes[g->n_v + 3].adj = NULL;
+		g->nodes[g->n_v + 3].deg = 0;
+
+		g->nodes[g->n_v].rc_id = g->n_v + 2;
+		g->nodes[g->n_v + 2].rc_id = g->n_v;
+		g->nodes[g->n_v + 1].rc_id = g->n_v + 3;
+		g->nodes[g->n_v + 3].rc_id = g->n_v + 1;
+		g->n_e += 2;
+		g->n_v += 4;
+	}
+	kseq_destroy(seq);
+	gzclose(fp);
 }
 
 void load_asm_graph(struct asm_graph_t *g, const char *path)

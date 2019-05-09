@@ -145,7 +145,17 @@ void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_barcode_map(opt, g);
+	construct_barcode_map_ust(opt, g, 0, 0);
+	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
+}
+
+void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building barcode information\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
+	set_time_now();
+	construct_barcode_map_ust(opt, g, 0, 1);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
@@ -317,9 +327,11 @@ void build_barcode_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
-void build_barcode_fasta(struct opt_proc_t *opt)
+void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
-	build_barcode(opt, &g);
+	build_barcode_read(opt, &g);
+	save_graph_info(opt->out_dir, &g, "added_barcode", 0);
+	asm_graph_destroy(&g);
 }
