@@ -422,6 +422,8 @@ int main(int argc, char *argv[])
 		assembly_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "assembly2"))
 		build_opt_process(argc, argv, &assembly2_process);
+	else if (!strcmp(argv[1], "assembly_precount"))
+		build_opt_process(argc, argv, &assembly_precount_process);
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))

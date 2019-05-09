@@ -231,6 +231,33 @@ void assembly_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g2);
 }
 
+void assembly_precount_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+
+	/* Count k0-mer and build graph */
+	build_0_precount(opt, opt->k0, opt->k1, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_0", 1);
+
+	build_0_1(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_1", 1);
+	asm_graph_destroy(&g1);
+
+	build_1_2(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_2", 1);
+	asm_graph_destroy(&g2);
+
+	build_2_3(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_3", 1);
+	asm_graph_destroy(&g1);
+
+	build_barcode(opt, &g2);
+	build_3_4(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4", 1);
+	asm_graph_destroy(&g1);
+	asm_graph_destroy(&g2);
+}
+
 void assembly2_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
