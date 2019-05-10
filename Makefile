@@ -42,12 +42,12 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 -include $(DEP)
 
 %.d: %.c
-	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
+	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
 debug: LIBS += -fsanitize=undefined,address
