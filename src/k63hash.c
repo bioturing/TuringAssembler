@@ -43,6 +43,7 @@ int load_k63hash(struct k63hash_t *h, const char *path)
 	h->n_probe = estimate_probe_3(h->size);
 	h->keys = malloc(h->size * sizeof(k63key_t));
 	h->adjs = malloc(h->size * sizeof(uint8_t));
+	h->flag = malloc(h->size * sizeof(uint8_t));
 	xfread(h->keys, sizeof(k63key_t), h->size, fp);
 	xfread(h->adjs, sizeof(uint8_t), h->size, fp);
 	xfread(h->flag, sizeof(uint8_t), h->size, fp);

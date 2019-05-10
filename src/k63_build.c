@@ -114,7 +114,7 @@ static void k63_internal_build(int ksize, struct k63_idhash_t *edict,
 		adj_rv = IDHASH_ADJ(edict, i) >> 4;
 		deg_fw = __bin_degree4(adj_fw);
 		deg_rv = __bin_degree4(adj_rv);
-		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0)
+		if (deg_fw == 1 && deg_rv == 1)
 			continue;
 		kmint_t k = k63_idhash_put(ndict, IDHASH_KEY(edict, i));
 		IDHASH_ID(ndict, k) = n_v++;

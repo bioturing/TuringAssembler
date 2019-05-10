@@ -139,7 +139,7 @@ void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
 	} else if (ksize_src > 32 && ksize_src < 64) {
 		struct k63hash_t table_src;
-		if (load_k63hash(&table_src, path))
+		if (load_k63hash(&table_src, preload_path))
 			build_k63_table_from_k63_table(opt, &table_dst, &table_src,
 							ksize_dst, ksize_src);
 		else
