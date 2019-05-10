@@ -82,6 +82,7 @@ struct k63hash_t {
 	pthread_mutex_t *locks;
 };
 
+void k63hash_test(struct k63hash_t *h);
 /* Save binary hash table to file */
 void save_k63hash(struct k63hash_t *h, const char *path);
 
