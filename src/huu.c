@@ -833,9 +833,7 @@ gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	return dump_edge_seq(seq, m_seq, e);
 }
 
-void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, int *res, int *n_res, int *listV, float avg_bin_hash)
-{
-	void print_contig(int index, int n_contig, int *list_contig)
+	void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig, int *list_contig)
 	{
 		char *seq = NULL, *total_seq = NULL, *NNN = NULL;
 		const int len_NNN = 300;
@@ -861,6 +859,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		free(NNN);
 	}
 
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, int *res, int *n_res, int *listV, float avg_bin_hash)
+{
 	// deprecated due to low performance
 	void insert_short_contigs(int n_big_contigs, int *big_contigs, int n_insert, int *arr_insert, 
 			int n_short, int *arr_i_short, int *mark_short)
@@ -1069,7 +1069,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 //		insert_short_contigs(best_n_hamiltonian_path, best_hamiltonian_path, n_insert, arr_insert, n_arr_short, arr_i_short, mark_short);
 		merge_big_and_small(&best_n_hamiltonian_path, &best_hamiltonian_path, n_insert, arr_insert);
 
-		print_contig(count, best_n_hamiltonian_path, best_hamiltonian_path);
+		print_contig(g, out_file, count, best_n_hamiltonian_path, best_hamiltonian_path);
 		__VERBOSE_FLAG(3, "contig path ");
 		for (int i = 0; i < best_n_hamiltonian_path; i++) 
 			__VERBOSE_FLAG(3, "%d " , best_hamiltonian_path[i]);
