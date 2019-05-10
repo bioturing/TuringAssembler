@@ -41,14 +41,14 @@ void build_0_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 	test_asm_graph(g);
 }
 
-void build_0_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src, struct asm_graph_t *g)
+void build_0_precount(struct opt_proc_t *opt, int k0, int k1, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize_dst);
-	if (ksize_dst < 32)
-		k31_build_precount(opt, ksize_dst, ksize_src, g);
-	else if (ksize_dst > 32 && ksize_dst < 64)
-		k63_build_precount(opt, ksize_dst, ksize_src, g);
+	__VERBOSE("Building assembly graph from read using kmer size %d\n", k1);
+	if (k1 < 32)
+		k31_build_precount(opt, k1, k0, g, opt->in_file);
+	else
+		k63_build_precount(opt, k1, k0, g, opt->in_file);
 	test_asm_graph(g);
 }
 
@@ -79,9 +79,9 @@ void build_0_multi_kmer(struct opt_proc_t *opt, int k0, int k1, struct asm_graph
 		k63hash_destroy(&table);
 	}
 	if (k1 < 32)
-		k31_build_precount(opt, k1, k0, g);
+		k31_build_precount(opt, k1, k0, g, path);
 	else
-		k63_build_precount(opt, k1, k0, g);
+		k63_build_precount(opt, k1, k0, g, path);
 	test_asm_graph(g);
 }
 
@@ -210,7 +210,17 @@ void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_barcode_map(opt, g);
+	construct_barcode_map_ust(opt, g, 0, 0);
+	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
+}
+
+void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building barcode information\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
+	set_time_now();
+	construct_barcode_map_ust(opt, g, 0, 1);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
@@ -265,6 +275,33 @@ void assembly_process(struct opt_proc_t *opt)
 
 	/* Count k0-mer and build graph */
 	build_0_scratch(opt, opt->k0, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_0", 1);
+
+	build_0_1(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_1", 1);
+	asm_graph_destroy(&g1);
+
+	build_1_2(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_2", 1);
+	asm_graph_destroy(&g2);
+
+	build_2_3(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_3", 1);
+	asm_graph_destroy(&g1);
+
+	build_barcode(opt, &g2);
+	build_3_4(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4", 1);
+	asm_graph_destroy(&g1);
+	asm_graph_destroy(&g2);
+}
+
+void assembly_precount_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+
+	/* Count k0-mer and build graph */
+	build_0_precount(opt, opt->k0, opt->k1, &g1);
 	save_graph_info(opt->out_dir, &g1, "level_0", 1);
 
 	build_0_1(&g1, &g2);
@@ -382,9 +419,11 @@ void build_barcode_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
-void build_barcode_fasta(struct opt_proc_t *opt)
+void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
-	build_barcode(opt, &g);
+	build_barcode_read(opt, &g);
+	save_graph_info(opt->out_dir, &g, "added_barcode", 0);
+	asm_graph_destroy(&g);
 }

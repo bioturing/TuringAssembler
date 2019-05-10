@@ -22,6 +22,7 @@ struct kmer_count_bundle_t {
 	int64_t *n_reads;
 	pthread_mutex_t *lock_hash;
 	void (*read_process_func)(struct read_t *, struct kmer_count_bundle_t *);
+	uint64_t (*barcode_calculator)(struct read_t *, struct read_t *);
 };
 
 #define __reverse_bit_order64(x)					       \
@@ -38,6 +39,38 @@ struct kmer_count_bundle_t {
 	(x) = (y) << (64 - ((l) << 1)),					       \
 	__reverse_bit_order64(x), (x) ^= 0xffffffffffffffffull, (x) &= (mask)  \
 )
+
+uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
+{
+	char *s = r1->info;
+	int i, k, len = 0;
+	uint64_t ret = 0;
+	for (i = 0; s[i]; ++i) {
+		if (strncmp(s + i, "BX:Z:", 5) == 0) {
+			for (k = i + 5; s[k] && !__is_sep(s[k]); ++k) {
+				ret = ret * 5 + nt4_table[(int)s[k]];
+				++len;
+			}
+			break;
+		}
+	}
+	assert(len == 18);
+	return ret;
+}
+
+uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
+{
+	char *s = r1->seq;
+	assert(r1->len >= 23); /* 16 bp barcode and 7 bp UMI */
+	uint64_t ret = 0;
+	int i;
+	for (i = 0; i < 16; ++i)
+		ret = ret * 5 + nt4_table[(int)s[i]];
+	r1->seq += 23;
+	return ret;
+}
+
+uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_barcode, x10_get_barcode};
 
 /*
  * Move the kmer window along reads and add kmer to hash table
@@ -407,6 +440,7 @@ static void *buffer_process(void *data)
 	int64_t *gcnt_reads;
 	gcnt_reads = bundle->n_reads;
 	void (*read_process)(struct read_t *, struct kmer_count_bundle_t *) = bundle->read_process_func;
+	uint64_t (*barcode_calculator)(struct read_t *, struct read_t *) = bundle->barcode_calculator;
 
 	while (1) {
 		ext_buf = d_dequeue_in(q);
@@ -434,6 +468,7 @@ static void *buffer_process(void *data)
 				__ERROR("\nWrong format file\n");
 
 			++n_reads;
+			barcode_calculator(&read1, &read2);
 			read_process(&read1, bundle);
 			read_process(&read2, bundle);
 
@@ -448,7 +483,7 @@ static void *buffer_process(void *data)
 	pthread_exit(NULL);
 }
 
-static void k31_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *dummy)
+static void kmer_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *dummy)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -466,7 +501,7 @@ static void k31_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *
 	worker_bundles = malloc(opt->n_threads * sizeof(struct kmer_count_bundle_t));
 
 	struct k31hash_t *dst = dummy->dst;
-	k31hash_init(dst, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
+	// k31hash_init(dst, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].src = dummy->src;
@@ -476,61 +511,7 @@ static void k31_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].lock_hash = dst->locks + i;
 		worker_bundles[i].read_process_func = dummy->read_process_func;
-	}
-
-	pthread_t *producer_threads, *worker_threads;
-	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
-				producer_bundles + i);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, buffer_process,
-				worker_bundles + i);
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i], NULL);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_join(worker_threads[i], NULL);
-
-	free_fastq_PE(producer_bundles, opt->n_files);
-	free(worker_bundles);
-
-	free(worker_threads);
-	free(producer_threads);
-}
-
-static void k63_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t *dummy)
-{
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	int64_t n_reads = 0;
-	int i;
-
-	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
-						opt->files_1, opt->files_2);
-
-	struct kmer_count_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct kmer_count_bundle_t));
-
-	struct k63hash_t *dst = (struct k63hash_t *)dummy->dst;
-	k63hash_init(dst, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
-	for (i = 0; i < opt->n_threads; ++i) {
-		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].src = dummy->src;
-		worker_bundles[i].dst = dummy->dst;
-		worker_bundles[i].ksize_dst = dummy->ksize_dst;
-		worker_bundles[i].ksize_src = dummy->ksize_src;
-		worker_bundles[i].n_reads = &n_reads;
-		worker_bundles[i].lock_hash = dst->locks + i;
-		worker_bundles[i].read_process_func = dummy->read_process_func;
+		worker_bundles[i].barcode_calculator = dummy->barcode_calculator;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -562,67 +543,94 @@ static void count_k31_from_scratch(struct opt_proc_t *opt,
 				struct k31hash_t *h, int ksize)
 {
 	struct kmer_count_bundle_t skeleton;
+	k31hash_init(h, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)h;
 	skeleton.ksize_dst = ksize;
 	skeleton.read_process_func = k31_count_from_scratch;
-	k31_start_count(opt, &skeleton);
+	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
+	kmer_start_count(opt, &skeleton);
 }
 
 static void count_k31_from_k31(struct opt_proc_t *opt, struct k31hash_t *dst,
 			struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
+	k31hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
 	skeleton.read_process_func = k31_count_from_k31;
-	k31_start_count(opt, &skeleton);
+	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
+	kmer_start_count(opt, &skeleton);
 }
 
 static void count_k63_from_scratch(struct opt_proc_t *opt,
 				struct k63hash_t *h, int ksize)
 {
 	struct kmer_count_bundle_t skeleton;
+	k63hash_init(h, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)h;
 	skeleton.ksize_dst = ksize;
 	skeleton.read_process_func = k63_count_from_scratch;
-	k63_start_count(opt, &skeleton);
+	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
+	kmer_start_count(opt, &skeleton);
 }
 
 static void count_k63_from_k31(struct opt_proc_t *opt, struct k63hash_t *dst,
 			struct k31hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
+	k63hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
 	skeleton.read_process_func = k63_count_from_k31;
-	k63_start_count(opt, &skeleton);
+	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
+	kmer_start_count(opt, &skeleton);
 }
 
 static void count_k63_from_k63(struct opt_proc_t *opt, struct k63hash_t *dst,
 			struct k63hash_t *src, int ksize_dst, int ksize_src)
 {
 	struct kmer_count_bundle_t skeleton;
+	k63hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
 	skeleton.read_process_func = k63_count_from_k63;
-	k63_start_count(opt, &skeleton);
+	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
+	kmer_start_count(opt, &skeleton);
 }
 
-static void k31_correct_edge(struct k31hash_t *h, int ksize)
+struct ce_bundle_t {
+	void *h;
+	int ksize;
+	int thread_no;
+	int n_threads;
+};
+
+void *k31_correct_edge(void *data)
 {
+	struct ce_bundle_t *bundles = (struct ce_bundle_t *)data;
+	struct k31hash_t *h = bundles->h;
+	int ksize = bundles->ksize;
+	int thread_no = bundles->thread_no;
+	int n_threads = bundles->n_threads;
+	kmint_t cap, l, r;
+	cap = h->size / n_threads + 1;
+	l = cap * thread_no;
+	r = __min(cap * (thread_no + 1), h->size);
+
 	k31key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
 	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
 	lmc = (ksize - 1) << 1;
 
-	for (i = 0; i < h->size; ++i) {
+	for (i = l; i < r; ++i) {
 		if (h->keys[i] == K31_NULL)
 			continue;
 		knum = h->keys[i];
@@ -635,7 +643,7 @@ static void k31_correct_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << c);
 			}
 			if ((h->adjs[i] >> (c + 4)) & 1) {
@@ -645,15 +653,26 @@ static void k31_correct_edge(struct k31hash_t *h, int ksize)
 					k = k31hash_get(h, nknum);
 				else
 					k = k31hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
 		}
 	}
+	return NULL;
 }
 
-void k63_correct_edge(struct k63hash_t *h, int ksize)
+void *k63_correct_edge(void *data)
 {
+	struct ce_bundle_t *bundles = (struct ce_bundle_t *)data;
+	struct k63hash_t *h = bundles->h;
+	int ksize = bundles->ksize;
+	int thread_no = bundles->thread_no;
+	int n_threads = bundles->n_threads;
+	kmint_t cap, l, r;
+	cap = h->size / n_threads + 1;
+	l = cap * thread_no;
+	r = __min(cap * (thread_no + 1), h->size);
+
 	k63key_t knum, krev, nknum, nkrev, kmask;
 	kmint_t i, k;
 	int c, lmc;
@@ -662,7 +681,7 @@ void k63_correct_edge(struct k63hash_t *h, int ksize)
 	knum = krev = (k63key_t){{0ull, 0ull}};
 	lmc = (ksize - 1) << 1;
 
-	for (i = 0; i < h->size; ++i) {
+	for (i = l; i < r; ++i) {
 		if (h->flag[i] == KMFLAG_EMPTY)
 			continue;
 		knum = h->keys[i];
@@ -677,7 +696,7 @@ void k63_correct_edge(struct k63hash_t *h, int ksize)
 					k = k63hash_get(h, nknum);
 				else
 					k = k63hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << c);
 			}
 			if ((h->adjs[i] >> (c + 4)) & 1) {
@@ -689,11 +708,42 @@ void k63_correct_edge(struct k63hash_t *h, int ksize)
 					k = k63hash_get(h, nknum);
 				else
 					k = k63hash_get(h, nkrev);
-				if (k == KMHASH_MAX_SIZE)
+				if (k == KMHASH_END(h))
 					h->adjs[i] &= ~((uint8_t)1 << (c + 4));
 			}
 		}
 	}
+	return NULL;
+}
+
+static void kmer_correct_edge(void *h, int ksize, int n_threads,
+						void *(*correct_func)(void *))
+{
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct ce_bundle_t *worker_bundles;
+	worker_bundles = malloc(n_threads * sizeof(struct ce_bundle_t));
+	int i;
+	for (i = 0; i < n_threads; ++i) {
+		worker_bundles[i].h = h;
+		worker_bundles[i].ksize = ksize;
+		worker_bundles[i].n_threads = n_threads;
+		worker_bundles[i].thread_no = i;
+	}
+	pthread_t *threads;
+	threads = calloc(n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < n_threads; ++i)
+		pthread_create(threads + i, &attr, correct_func,
+							worker_bundles + i);
+	for (i = 0; i < n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	free(worker_bundles);
+	free(threads);
 }
 
 void build_k31_table_from_scratch(struct opt_proc_t *opt, struct k31hash_t *h, int ksize)
@@ -711,7 +761,7 @@ void build_k31_table_from_scratch(struct opt_proc_t *opt, struct k31hash_t *h, i
 					ksize, (long long unsigned)h->n_item);
 
 	/* Correct edges */
-	k31_correct_edge(h, ksize);
+	kmer_correct_edge(h, ksize, opt->n_threads, k31_correct_edge);
 }
 
 void build_k31_table_from_k31_table(struct opt_proc_t *opt,
@@ -727,8 +777,27 @@ void build_k31_table_from_k31_table(struct opt_proc_t *opt,
 		ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k31_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k31_correct_edge);
 }
+
+// void build_k31_2step(struct opt_proc_t *opt, struct k31hash_t *h,
+// 						int ksize_dst, int ksize_src)
+// {
+// 	if (ksize_src >= ksize_dst) {
+// 		build_k31_table_from_scratch(opt, h, ksize_dst);
+// 		return;
+// 	}
+// 	k31hash_t tmp;
+// 	__VERBOSE("\n2-step counting %d-mer (from %d-mer)\n", ksize_dst, ksize_src);
+// 	count_k31_from_scratch(opt, &tmp, ksize);
+// 	__VERBOSE("\n");
+// 	__VERBOSE_LOG("KMER COUNT" "Number of %d-mer: %llu\n", ksize_src,
+// 						(long long unsigned)h->n_item);
+// 	__VERBOSE("Filtering singleton %d-mer\n", ksize_src);
+// 	k31hash_filter(&tmp, 1);
+// 	__VEROBSE("Number of non-singleton %d-mer: %lu\n", 
+
+// }
 
 void build_k63_table_from_scratch(struct opt_proc_t *opt, struct k63hash_t *h, int ksize)
 {
@@ -745,7 +814,7 @@ void build_k63_table_from_scratch(struct opt_proc_t *opt, struct k63hash_t *h, i
 							ksize, h->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(h, ksize);
+	kmer_correct_edge(h, ksize, opt->n_threads, k63_correct_edge);
 }
 
 void build_k63_table_from_k31_table(struct opt_proc_t *opt,
@@ -761,7 +830,7 @@ void build_k63_table_from_k31_table(struct opt_proc_t *opt,
 							ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k63_correct_edge);
 }
 
 void build_k63_table_from_k63_table(struct opt_proc_t *opt,
@@ -777,7 +846,7 @@ void build_k63_table_from_k63_table(struct opt_proc_t *opt,
 							ksize_dst, dst->n_item);
 
 	/* Correct edges */
-	k63_correct_edge(dst, ksize_dst);
+	kmer_correct_edge(dst, ksize_dst, opt->n_threads, k63_correct_edge);
 }
 
 static void k31_test_hash(struct k31hash_t *h)
@@ -798,75 +867,75 @@ static void k31_test_hash(struct k31hash_t *h)
 	fprintf(stderr, "test hash relocate done\n");
 }
 
-static void k31_check_sum(struct k31hash_t *h)
-{
-	kmint_t i;
-	uint64_t sum = 0;
-	for (i = 0; i < h->size; ++i) {
-		if (h->keys[i] != K31_NULL) {
-			sum += h->keys[i];
-		}
-	}
-	fprintf(stderr, "check sum = %lu\n", sum);
-}
+// static void k31_check_sum(struct k31hash_t *h)
+// {
+// 	kmint_t i;
+// 	uint64_t sum = 0;
+// 	for (i = 0; i < h->size; ++i) {
+// 		if (h->keys[i] != K31_NULL) {
+// 			sum += h->keys[i];
+// 		}
+// 	}
+// 	fprintf(stderr, "check sum = %lu\n", sum);
+// }
 
-static void k31_check_edge(struct k31hash_t *h, int ksize)
-{
-	kmint_t i, k;
-	k31key_t knum, krev, nknum, nkrev, kmask;
-	int c, lmc, rc;
+// static void k31_check_edge(struct k31hash_t *h, int ksize)
+// {
+// 	kmint_t i, k;
+// 	k31key_t knum, krev, nknum, nkrev, kmask;
+// 	int c, lmc, rc;
 
-	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
-	lmc = (ksize - 1) << 1;
-	kmint_t sum_deg = 0;
-	for (i = 0; i < h->size; ++i) {
-		if (h->keys[i] == K31_NULL)
-			continue;
-		knum = h->keys[i];
-		__k31_revc_num(knum, krev, ksize, kmask);
-		for (c = 0; c < 4; ++c) {
-			if ((h->adjs[i] >> c) & 1) {
-				nknum = ((knum << 2) & kmask) | c;
-				nkrev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
-				if (nknum < nkrev)
-					k = k31hash_get(h, nknum);
-				else
-					k = k31hash_get(h, nkrev);
-				assert(k != KMHASH_END(h));
-				if (nknum == krev) {
-					assert(nkrev == knum);
-				}
-				rc = knum >> lmc;
-				assert(rc >= 0 && rc < 4);
-				if (nknum < nkrev)
-					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
-				else
-					assert((h->adjs[k] >> (rc ^ 3)) & 1);
-				++sum_deg;
-			}
+// 	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
+// 	lmc = (ksize - 1) << 1;
+// 	kmint_t sum_deg = 0;
+// 	for (i = 0; i < h->size; ++i) {
+// 		if (h->keys[i] == K31_NULL)
+// 			continue;
+// 		knum = h->keys[i];
+// 		__k31_revc_num(knum, krev, ksize, kmask);
+// 		for (c = 0; c < 4; ++c) {
+// 			if ((h->adjs[i] >> c) & 1) {
+// 				nknum = ((knum << 2) & kmask) | c;
+// 				nkrev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
+// 				if (nknum < nkrev)
+// 					k = k31hash_get(h, nknum);
+// 				else
+// 					k = k31hash_get(h, nkrev);
+// 				assert(k != KMHASH_END(h));
+// 				if (nknum == krev) {
+// 					assert(nkrev == knum);
+// 				}
+// 				rc = knum >> lmc;
+// 				assert(rc >= 0 && rc < 4);
+// 				if (nknum < nkrev)
+// 					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+// 				else
+// 					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+// 				++sum_deg;
+// 			}
 
-			if ((h->adjs[i] >> (c + 4)) & 1) {
-				nknum = ((krev << 2) & kmask) | c;
-				nkrev = (knum >> 2) | ((k31key_t)(c ^ 3) << lmc);
-				if (nknum < nkrev)
-					k = k31hash_get(h, nknum);
-				else
-					k = k31hash_get(h, nkrev);
-				assert(k != KMHASH_END(h));
-				if (nknum == knum) {
-					assert(nkrev == krev);
-				}
-				rc = krev >> lmc;
-				assert(rc >= 0 && rc < 4);
-				if (nknum < nkrev)
-					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
-				else
-					assert((h->adjs[k] >> (rc ^ 3)) & 1);
-				++sum_deg;
-			}
-		}
-	}
+// 			if ((h->adjs[i] >> (c + 4)) & 1) {
+// 				nknum = ((krev << 2) & kmask) | c;
+// 				nkrev = (knum >> 2) | ((k31key_t)(c ^ 3) << lmc);
+// 				if (nknum < nkrev)
+// 					k = k31hash_get(h, nknum);
+// 				else
+// 					k = k31hash_get(h, nkrev);
+// 				assert(k != KMHASH_END(h));
+// 				if (nknum == knum) {
+// 					assert(nkrev == krev);
+// 				}
+// 				rc = krev >> lmc;
+// 				assert(rc >= 0 && rc < 4);
+// 				if (nknum < nkrev)
+// 					assert((h->adjs[k] >> ((rc ^ 3) + 4)) & 1);
+// 				else
+// 					assert((h->adjs[k] >> (rc ^ 3)) & 1);
+// 				++sum_deg;
+// 			}
+// 		}
+// 	}
 
-	__VERBOSE("Check edge kmhash done. Sum degree = %lu\n", sum_deg);
-}
+// 	__VERBOSE("Check edge kmhash done. Sum degree = %lu\n", sum_deg);
+// }
 

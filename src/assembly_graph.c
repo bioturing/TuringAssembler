@@ -7,9 +7,12 @@
 #include "k31hash.h"
 #include "k63hash.h"
 #include "kmer_count.h"
+#include "kseq.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+
+KSEQ_INIT(gzFile, gzread);
 
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
@@ -88,7 +91,7 @@ void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0
 }
 
 void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-							struct asm_graph_t *g)
+				struct asm_graph_t *g, const char *preload_path)
 {
 	char path[1024];
 	if (ksize_src >= ksize_dst) {
@@ -98,8 +101,8 @@ void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 	set_time_now();
 	struct k31hash_t table_src, table_dst;
 	__VERBOSE("|----Estimating kmer\n");
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	if (load_k31hash(&table_src, path))
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	if (load_k31hash(&table_src, preload_path))
 		build_k31_table_from_k31_table(opt, &table_dst, &table_src,
 							ksize_dst, ksize_src);
 	else
@@ -116,7 +119,7 @@ void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 }
 
 void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-							struct asm_graph_t *g)
+				struct asm_graph_t *g, const char *preload_path)
 {
 	char path[1024];
 	if (ksize_src >= ksize_dst) {
@@ -126,10 +129,10 @@ void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 	set_time_now();
 	struct k63hash_t table_dst;
 	__VERBOSE("|----Estimating kmer\n");
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
 	if (ksize_src < 32) {
 		struct k31hash_t table_src;
-		if (load_k31hash(&table_src, path))
+		if (load_k31hash(&table_src, preload_path))
 			build_k63_table_from_k31_table(opt, &table_dst, &table_src,
 							ksize_dst, ksize_src);
 		else
@@ -706,16 +709,17 @@ void asm_append_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
 
 void asm_clean_edge_seq2(struct asm_graph_t *g, gint_t e)
 {
-	asm_clean_edge_seq(g->edges + e);
 	uint32_t len, n_bin, i;
 	if (g->edges[e].bucks != NULL && g->bin_size != 0) {
 		len = get_edge_len(g->edges + e);
-		n_bin = (len + 15) >> 4;
-		for (i = 0; i < n_bin; ++i)
+		n_bin = (len + g->bin_size - 1) / g->bin_size;
+		for (i = 0; i < n_bin; ++i) {
 			barcode_hash_clean(g->edges[e].bucks + i);
+		}
 		free(g->edges[e].bucks);
 		g->edges[e].bucks = NULL;
 	}
+	asm_clean_edge_seq(g->edges + e);
 }
 
 void asm_clean_edge_seq(struct asm_edge_t *e)
@@ -1241,9 +1245,93 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	}
 }
 
+void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
+{
+	uint32_t *p_holes, *l_holes, *bseq;
+	uint32_t n_holes, i, j, k, c, last_c, m_seq;
+	p_holes = NULL;
+	l_holes = NULL;
+	m_seq = 0x100;
+	bseq = calloc(m_seq, sizeof(uint32_t));
+	last_c = 0;
+	n_holes = 0;
+	for (i = k = 0; i < seq->seq.l; ++i) {
+		c = nt4_table[(int)seq->seq.s[i]];
+		if (c >= 4) {
+			if (last_c >= 4) {
+				++l_holes[j];
+			} else {
+				p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
+				l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
+				j = n_holes;
+				++n_holes;
+				p_holes[j] = k - 1;
+				l_holes[j] = 1;
+			}
+		} else {
+			/* append new char */
+			if ((k >> 4) >= m_seq) {
+				uint32_t new_m = m_seq << 1;
+				bseq = realloc(bseq, new_m * sizeof(uint32_t));
+				memset(bseq + m_seq, 0, m_seq * sizeof(uint32_t));
+				m_seq = new_m;
+			}
+			__binseq_set(bseq, k, c);
+			++k;
+		}
+		last_c = c;
+	}
+	g->edges[e].seq_len = k;
+	g->edges[e].seq = realloc(bseq, (k >> 4) * sizeof(uint32_t));
+	g->edges[e].count = 0;
+	g->edges[e].n_holes = n_holes;
+	g->edges[e].l_holes = l_holes;
+	g->edges[e].p_holes = p_holes;
+}
+
 void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 {
 	g->ksize = ksize;
+	g->edges = NULL;
+	g->nodes = NULL;
+	g->n_v = g->n_e = 0;
+	gzFile fp = gzopen(path, "r");
+	kseq_t *seq = kseq_init(fp);
+	while (kseq_read(seq) >= 0) {
+		/* add new edge */
+		g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+		g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
+
+		asm_fasta_edge_convert(g, g->n_e, seq);
+		asm_clone_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
+		g->edges[g->n_e].rc_id = g->n_e + 1;
+		g->edges[g->n_e + 1].rc_id = g->n_e;
+
+		g->edges[g->n_e].source = g->n_v;
+		g->edges[g->n_e].target = g->n_v + 1;
+		g->nodes[g->n_v].adj = malloc(sizeof(gint_t));
+		g->nodes[g->n_v].adj[0] = g->n_e;
+		g->nodes[g->n_v].deg = 1;
+		g->nodes[g->n_v + 1].adj = NULL;
+		g->nodes[g->n_v + 1].deg = 0;
+
+		g->edges[g->n_e + 1].source = g->n_v + 2;
+		g->edges[g->n_e + 1].target = g->n_v + 3;
+		g->nodes[g->n_v + 2].adj = malloc(sizeof(gint_t));
+		g->nodes[g->n_v + 2].adj[0] = g->n_e + 1;
+		g->nodes[g->n_v + 2].deg = 1;
+		g->nodes[g->n_v + 3].adj = NULL;
+		g->nodes[g->n_v + 3].deg = 0;
+
+		g->nodes[g->n_v].rc_id = g->n_v + 2;
+		g->nodes[g->n_v + 2].rc_id = g->n_v;
+		g->nodes[g->n_v + 1].rc_id = g->n_v + 3;
+		g->nodes[g->n_v + 3].rc_id = g->n_v + 1;
+		g->n_e += 2;
+		g->n_v += 4;
+	}
+	kseq_destroy(seq);
+	gzclose(fp);
 }
 
 void load_asm_graph(struct asm_graph_t *g, const char *path)

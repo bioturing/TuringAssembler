@@ -17,6 +17,18 @@
 #include "utils.h"
 #include "verbose.h"
 
+char *lib_str[] = {"ust", "10x"};
+int n_lib = 2;
+
+int get_library_index(const char *str)
+{
+	int i;
+	for (i = 0; i < n_lib; ++i)
+		if (!strcmp(str, lib_str[i]))
+			return i;
+	return -1;
+}
+
 void print_usage_assembly(const char *prog)
 {
 	__VERBOSE("Usage: %s assembly [options] -1 read_1.fq -2 read_2.fq\n", prog);
@@ -27,6 +39,7 @@ void print_usage_assembly(const char *prog)
 	__VERBOSE("         -k0                    <1st kmer size>\n");
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
+	__VERBOSE("         -l                     <lib type [ust, 10x]>\n");
 }
 
 void print_usage_build0(const char *prog)
@@ -39,6 +52,7 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("         -k0                    <1st kmer size>\n");
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
+	__VERBOSE("         -l                     <lib type [ust, 10x]>\n");
 }
 
 void print_usage_build(const char *prog)
@@ -79,6 +93,7 @@ struct opt_proc_t *init_opt_proc()
 	opt->in_file = NULL;
 	opt->in_fasta = NULL;
 	opt->out_dir = ".";
+	opt->lib_type = 0;
 	return opt;
 }
 
@@ -268,6 +283,11 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-l")) {
+			opt->lib_type = get_library_index(argv[pos + 1]);
+			if (opt->lib_type == -1)
+				__ERROR("Unknown library %s", argv[pos + 1]);
+			pos += 2;
 		} else if (!strcmp(argv[pos], "-1")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)
@@ -410,10 +430,14 @@ int main(int argc, char *argv[])
 		assembly_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "assembly2"))
 		build_opt_process(argc, argv, &assembly2_process);
+	else if (!strcmp(argv[1], "assembly_precount"))
+		build_opt_process(argc, argv, &assembly_precount_process);
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
 		build_opt_process(argc, argv, &build_barcode_process);
+	else if (!strcmp(argv[1], "build_barcode_fasta"))
+		build_opt_process(argc, argv, &build_barcode_process_fasta);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build_opt_process(argc, argv, &build_0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))

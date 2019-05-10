@@ -11,35 +11,44 @@
 #include "time_utils.h"
 #include "verbose.h"
 
-struct edge_coor_t {
+struct edge_idx_t {
 	gint_t idx;
 	gint_t pos;
-	struct edge_coor_t *next;
+};
+
+struct edge_data_t {
+	struct edge_idx_t *e;
+	gint_t n;
 };
 
 #define __not_null(x) ((x).idx != -1)
 #define MIN_HEAD_LEN 5
+#define MAX_N_BUCK		6
 
-KHASH_INIT(k63_dict, k63key_t, struct edge_coor_t *, 1, __hash_k63, __k63_equal)
+KHASH_INIT(k63_dict, k63key_t, struct edge_data_t, 1, __hash_k63, __k63_equal)
 
-KHASH_INIT(k31_dict, k31key_t, struct edge_coor_t *, 1, __hash_k31, __k31_equal)
+KHASH_INIT(k31_dict, k31key_t, struct edge_data_t, 1, __hash_k31, __k31_equal)
 
-struct bctrie_bundle_t {
+struct bccount_bundle_t {
+	struct asm_graph_t *g;
 	struct dqueue_t *q;
-	struct asm_graph_t *graph;
-	void *dict;
 	int64_t *n_reads;
+	void *dict;
+	void (*read_process_func)(struct read_t *, uint64_t, struct bccount_bundle_t *);
+	uint64_t (*barcode_calculator)(struct read_t *, struct read_t *);
+	int need_count;
 };
 
-void init_barcode_map(struct asm_graph_t *g, int buck_len);
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-						khash_t(k31_dict) *dict);
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-						khash_t(k63_dict) *dict);
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k31_dict) *dict);
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k63_dict) *dict);
+void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small);
+void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+					khash_t(k31_dict) *dict, int is_small);
+void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+					khash_t(k63_dict) *dict, int is_small);
+void k31_read_iterator(struct read_t *r, uint64_t barcode,
+					struct bccount_bundle_t *bundle);
+void k63_read_iterator(struct read_t *r, uint64_t barcode,
+					struct bccount_bundle_t *bundle);
+void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske);
 
 gint_t count_bc(struct barcode_hash_t *t)
 {
@@ -127,7 +136,7 @@ double get_barcode_ratio_small(struct asm_graph_t *g, gint_t e1, gint_t e2)
 				continue;
 			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
 							g->edges[e2].bucks + k);
-			s += ret * 1.0 / (s1[i] + s2[k]);
+			s += ret * 1.0 / (s1[i] + s2[k] - ret);
 			++cnt;
 		}
 	}
@@ -166,7 +175,7 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
 				continue;
 			gint_t ret = count_shared_bc(g->edges[e1].bucks + i,
 						g->edges[e2].bucks + k);
-			s += ret * 1.0 / (s1[i] + s2[k]);
+			s += ret * 1.0 / (s1[i] + s2[k] - ret);
 			++cnt;
 		}
 	}
@@ -293,69 +302,97 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 		}
 	}
 }
-void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g)
+
+void debug_build_index(khash_t(k31_dict) *dict)
 {
-	init_barcode_map(g, opt->split_len);
+	gint_t s = 0;
+	khiter_t it;
+	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
+		if (kh_exist(dict, it))
+			s += kh_value(dict, it).n;
+	}
+	__VERBOSE("Number of indexed position: %ld\n", s);
+}
+
+void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
+					int is_small, int need_count)
+{
+	init_barcode_map(g, opt->split_len, is_small);
+	struct bccount_bundle_t ske;
+	ske.g = g;
+	extern uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *);
+	ske.barcode_calculator = barcode_calculators[opt->lib_type];
+	// ske.barcode_calculator = ust_get_barcode;
+	ske.need_count = need_count;
 	if (g->ksize < 32) {
 		khash_t(k31_dict) *edict = kh_init(k31_dict);
-		k31_build_naive_index(g, opt, edict);
-		k31_retrieve_barcode(g, opt, edict);
-		kh_destroy(k31_dict, edict);
+		k31_build_index(g, opt, edict, is_small);
+		ske.dict = edict;
+		ske.read_process_func = k31_read_iterator;
 	} else if (g->ksize >= 32 && g->ksize < 64) {
 		khash_t(k63_dict) *edict = kh_init(k63_dict);
-		k63_build_naive_index(g, opt, edict);
-		k63_retrieve_barcode(g, opt, edict);
+		k63_build_index(g, opt, edict, is_small);
+		ske.dict = edict;
+		ske.read_process_func = k63_read_iterator;
+	}
+	barcode_start_count(opt, &ske);
+	if (g->ksize < 32) {
+		khash_t(k31_dict) *edict = ske.dict;
+		khiter_t it;
+		for (it = kh_begin(edict); it != kh_end(edict); ++it) {
+			if (kh_exist(edict, it))
+				free(kh_value(edict, it).e);
+		}
+		kh_destroy(k31_dict, edict);
+	} else {
+		khash_t(k63_dict) *edict = ske.dict;
+		khiter_t it;
+		for (it = kh_begin(edict); it != kh_end(edict); ++it) {
+			if (kh_exist(edict, it))
+				free(kh_value(edict, it).e);
+		}
 		kh_destroy(k63_dict, edict);
 	}
 }
 
-void init_barcode_map(struct asm_graph_t *g, int buck_len)
+void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small)
 {
 	gint_t i, e;
 	g->bin_size = buck_len;
 	for (e = 0; e < g->n_e; ++e) {
-		// gint_t e_rc = g->edges[e].rc_id;
-		// if (e > e_rc) {
-		// 	/* at first, we imaginarily ceil the length of edges to
-		// 	 *                        nearest multiple of split_len
-		// 	 * then we can share the barcode hash between the two
-		// 	 *                        reverse complemented sequences
-		// 	 */
-		// 	g->edges[e].bucks = g->edges[e_rc].bucks;
-		// 	continue;
-		// }
 		pthread_mutex_init(&(g->edges[e].lock), NULL);
 		uint32_t len = get_edge_len(g->edges + e);
 		gint_t n_bucks = (len + buck_len - 1) / buck_len;
+		if (is_small)
+			n_bucks = __min(n_bucks, MAX_N_BUCK);
 		g->edges[e].bucks = calloc(n_bucks, sizeof(struct barcode_hash_t));
 		for (i = 0; i < n_bucks; ++i) {
 			barcode_hash_init(g->edges[e].bucks + i, 4);
-			// g->edges[e].bucks[i].lock = &(g->edges[e].lock);
 		}
 	}
 }
 
-void test_bucket(khash_t(k31_dict) *dict)
-{
-	khiter_t it;
-	uint32_t sum = 0;
-	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
-		if (!kh_exist(dict, it))
-			continue;
-		struct edge_coor_t *p;
-		p = kh_value(dict, it);
-		while (p != NULL) {
-			++sum;
-			p = p->next;
-		}
-	}
-	fprintf(stderr, "Number of kmer: %u\n", kh_size(dict));
-	fprintf(stderr, "Number of position: %u\n", sum);
-	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
-}
+// void test_bucket(khash_t(k31_dict) *dict)
+// {
+// 	khiter_t it;
+// 	uint32_t sum = 0;
+// 	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
+// 		if (!kh_exist(dict, it))
+// 			continue;
+// 		struct edge_coor_t *p;
+// 		p = kh_value(dict, it);
+// 		while (p != NULL) {
+// 			++sum;
+// 			p = p->next;
+// 		}
+// 	}
+// 	fprintf(stderr, "Number of kmer: %u\n", kh_size(dict));
+// 	fprintf(stderr, "Number of position: %u\n", sum);
+// 	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
+// }
 
-void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-						khash_t(k31_dict) *dict)
+void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+					khash_t(k31_dict) *dict, int is_small)
 {
 	gint_t e, i, k, last;
 	k31key_t knum, krev, kmask;
@@ -363,12 +400,13 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 	kmask = ((k31key_t)1 << (g->ksize << 1)) - 1;
 	int lmc = (g->ksize << 1) - 2;
 	for (e = 0; e < g->n_e; ++e) {
-		gint_t e_rc = g->edges[e].rc_id;
-		if (e > e_rc)
-			continue;
 		uint32_t p = 0;
-		gint_t slen = get_edge_len(g->edges + e);
-		for (i = k = last = 0; i < g->edges[e].seq_len; ++i, ++k) {
+		gint_t slen, seq_len;
+		slen = get_edge_len(g->edges + e);
+		if (is_small)
+			slen = __min(slen, g->bin_size * MAX_N_BUCK);
+		seq_len = g->edges[e].seq_len;
+		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			knum = ((knum << 2) & kmask) | c;
 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
@@ -380,18 +418,15 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 					it = kh_put(k31_dict, dict, knum, &ret);
 				else
 					it = kh_put(k31_dict, dict, krev, &ret);
-				if (ret == 1)
-					kh_value(dict, it) = NULL;
-				struct edge_coor_t *coor = calloc(1, sizeof(struct edge_coor_t));
-				coor->idx = e;
-				coor->pos = k;
-				coor->next = kh_value(dict, it);
-				kh_value(dict, it) = coor;
-				coor = calloc(1, sizeof(struct edge_coor_t));
-				coor->idx = e_rc;
-				coor->pos = slen - k - 1;
-				coor->next = kh_value(dict, it);
-				kh_value(dict, it) = coor;
+				struct edge_data_t *b = &kh_value(dict, it);
+				if (ret == 1) {
+					b->e = NULL;
+					b->n = 0;
+				}
+				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
+				b->e[b->n].idx = e;
+				b->e[b->n].pos = k;
+				++b->n;
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
@@ -401,25 +436,25 @@ void k31_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 			}
 		}
 	}
-	test_bucket(dict);
 }
 
-void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-							khash_t(k63_dict) *dict)
+void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+					khash_t(k63_dict) *dict, int is_small)
 {
 	gint_t e, i, k, last;
 	k63key_t knum, krev, kmask;
 	kmask.bin[0] = (uint64_t)-1;
 	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
 	knum = krev = (k63key_t){{0ull, 0ull}};
-	int lmc = (g->ksize - 1) << 1;
+	int lmc = (g->ksize << 1) - 2;
 	for (e = 0; e < g->n_e; ++e) {
-		gint_t e_rc = g->edges[e].rc_id;
-		if (e > e_rc)
-			continue;
 		uint32_t p = 0;
-		gint_t slen = get_edge_len(g->edges + e);
-		for (i = k = last = 0; i < g->edges[e].seq_len; ++i, ++k) {
+		gint_t slen, seq_len;
+		slen = get_edge_len(g->edges + e);
+		if (is_small)
+			slen = __min(slen, g->bin_size * MAX_N_BUCK);
+		seq_len = g->edges[e].seq_len;
+		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			__k63_lshift2(knum); __k63_and(knum, kmask);
 			knum.bin[0] |= c;
@@ -433,22 +468,15 @@ void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 					it = kh_put(k63_dict, dict, knum, &ret);
 				else
 					it = kh_put(k63_dict, dict, krev, &ret);
-				if (ret == 1)
-					kh_value(dict, it) = NULL;
-				struct edge_coor_t *coor = calloc(1, sizeof(struct edge_coor_t));
-				coor->idx = e;
-				coor->pos = k;
-				coor->next = kh_value(dict, it);
-				kh_value(dict, it) = coor;
-				coor = calloc(1, sizeof(struct edge_coor_t));
-				coor->idx = e_rc;
-				coor->pos = slen - k - 1;
-				coor->next = kh_value(dict, it);
-				kh_value(dict, it) = coor;
-				// if (ret == 1)
-				// 	kh_value(dict, it) = (struct edge_coor_t){e, k};
-				// else
-				// 	kh_value(dict, it) = (struct edge_coor_t){(gint_t)-1, (gint_t)-1};
+				struct edge_data_t *b = &kh_value(dict, it);
+				if (ret == 1) {
+					b->e = NULL;
+					b->n = 0;
+				}
+				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
+				b->e[b->n].idx = e;
+				b->e[b->n].pos = k;
+				++b->n;
 			}
 			if (p < g->edges[e].n_holes &&
 				i == g->edges[e].p_holes[p]) {
@@ -460,28 +488,11 @@ void k63_build_naive_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 	}
 }
 
-static inline uint64_t convert_barcode_info(struct read_t *r)
+void k31_read_iterator(struct read_t *r, uint64_t barcode,
+						struct bccount_bundle_t *bundle)
 {
-	char *s = r->info;
-	int i, k, len = 0;
-	uint64_t ret = 0;
-	for (i = 0; s[i]; ++i) {
-		if (strncmp(s + i, "BX:Z:", 5) == 0) {
-			for (k = i + 5; s[k] && !__is_sep(s[k]); ++k) {
-				ret = ret * 5 + nt4_table[(int)s[k]];
-				++len;
-			}
-		}
-	}
-	assert(len == 18);
-	return ret;
-}
-
-static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
-					khash_t(k31_dict) *dict)
-{
-	uint64_t barcode;
-	barcode = convert_barcode_info(r);
+	struct asm_graph_t *g = bundle->g;
+	khash_t(k31_dict) *dict = bundle->dict;
 	int i, last, ci, len, lmc, ksize;
 	char *seq;
 	len = r->len;
@@ -512,138 +523,35 @@ static void k31_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
 				k = kh_get(k31_dict, dict, krev);
 			}
 			if (k != kh_end(dict)) {
-				struct edge_coor_t *coor;
-				gint_t e, pos, bin_pos;
-				coor = kh_value(dict, k);
-				while (coor) {
-					e = coor->idx;
-					pos = coor->pos;
-					bin_pos = pos / g->bin_size;
+				struct edge_idx_t *p = kh_value(dict, k).e;
+				gint_t n, e, bin, j;
+				n = kh_value(dict, k).n;
+				for (j = 0; j < n; ++j) {
+					e = p[j].idx;
+					bin = p[j].pos / g->bin_size;
 					pthread_mutex_lock(&(g->edges[e].lock));
-					barcode_hash_inc_count(g->edges[e].bucks + bin_pos, barcode);
+					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
 					pthread_mutex_unlock(&(g->edges[e].lock));
-					coor = coor->next;
+				}
+				if (bundle->need_count) {
+					gint_t prev_e = -1;
+					for (j = 0; j < n; ++j) {
+						e = p[j].idx;
+						if (e != prev_e)
+							atomic_add_and_fetch64(&(g->edges[e].count), 1);
+						prev_e = e;
+					}
 				}
 			}
 		}
 	}
 }
 
-static void *k31_barcode_retriever(void *data)
+void k63_read_iterator(struct read_t *r, uint64_t barcode,
+						struct bccount_bundle_t *bundle)
 {
-	struct bctrie_bundle_t *bundle = (struct bctrie_bundle_t *)data;
-	struct dqueue_t *q = bundle->q;
-	struct asm_graph_t *graph = bundle->graph;
-	khash_t(k31_dict) *dict = (khash_t(k31_dict) *)(bundle->dict);
-
-	struct read_t read1, read2;
-	struct pair_buffer_t *own_buf, *ext_buf;
-	own_buf = init_pair_buffer();
-
-	char *buf1, *buf2;
-	int pos1, pos2, rc1, rc2, input_format;
-
-	int64_t n_reads;
-	int64_t *gcnt_reads;
-	gcnt_reads = bundle->n_reads;
-
-	while (1) {
-		ext_buf = d_dequeue_in(q);
-		if (!ext_buf)
-			break;
-		d_enqueue_out(q, own_buf);
-		own_buf = ext_buf;
-		pos1 = pos2 = 0;
-		buf1 = ext_buf->buf1;
-		buf2 = ext_buf->buf2;
-		input_format = ext_buf->input_format;
-
-		n_reads = 0;
-		while (1) {
-			rc1 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read1, buf1, &pos1) :
-				get_read_from_fa(&read1, buf1, &pos1);
-
-			rc2 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read2, buf2, &pos2) :
-				get_read_from_fa(&read2, buf2, &pos2);
-
-
-			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
-
-			++n_reads;
-			k31_barcode_retrieve_read(&read1, graph, dict);
-			k31_barcode_retrieve_read(&read2, graph, dict);
-
-			if (rc1 == READ_END)
-				break;
-		}
-		n_reads = atomic_add_and_fetch64(gcnt_reads, n_reads);
-		__VERBOSE("\rNumber of process read:    %lld", (long long)n_reads);
-	}
-
-	free_pair_buffer(own_buf);
-	pthread_exit(NULL);
-}
-
-static void k31_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k31_dict) *dict)
-{
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-	int i;
-
-	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
-						opt->files_1, opt->files_2);
-
-	struct bctrie_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
-
-	int64_t n_reads;
-	n_reads = 0;
-
-	for (i = 0; i < opt->n_threads; ++i) {
-		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].graph = g;
-		worker_bundles[i].dict = dict;
-		worker_bundles[i].n_reads = &n_reads;
-	}
-
-	pthread_t *producer_threads, *worker_threads;
-	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
-				producer_bundles + i);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, k31_barcode_retriever,
-				worker_bundles + i);
-
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i], NULL);
-
-	for (i = 0; i < opt->n_threads; ++i)
-		pthread_join(worker_threads[i], NULL);
-
-	free_fastq_PE(producer_bundles, opt->n_files);
-	free(worker_bundles);
-
-	free(producer_threads);
-	free(worker_threads);
-}
-
-static void k63_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
-					khash_t(k63_dict) *dict)
-{
-	uint64_t barcode;
-	barcode = convert_barcode_info(r);
+	struct asm_graph_t *g = bundle->g;
+	khash_t(k63_dict) *dict = bundle->dict;
 	int i, last, ci, len, lmc, ksize;
 	char *seq;
 	len = r->len;
@@ -675,30 +583,34 @@ static void k63_barcode_retrieve_read(struct read_t *r, struct asm_graph_t *g,
 				k = kh_get(k63_dict, dict, krev);
 			}
 			if (k != kh_end(dict)) {
-				struct edge_coor_t *coor;
-				gint_t e, pos, bin_pos;
-				coor = kh_value(dict, k);
-				while (coor) {
-					e = coor->idx;
-					pos = coor->pos;
-					bin_pos = pos / g->bin_size;
+				struct edge_idx_t *p = kh_value(dict, k).e;
+				gint_t n, e, bin, j;
+				n = kh_value(dict, k).n;
+				for (j = 0; j < n; ++j) {
+					e = p[j].idx;
+					bin = p[j].pos / g->bin_size;
 					pthread_mutex_lock(&(g->edges[e].lock));
-					barcode_hash_inc_count(g->edges[e].bucks + bin_pos, barcode);
+					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
 					pthread_mutex_unlock(&(g->edges[e].lock));
-					coor = coor->next;
+				}
+				if (bundle->need_count) {
+					gint_t prev_e = -1;
+					for (j = 0; j < n; ++j) {
+						e = p[j].idx;
+						if (e != prev_e)
+							atomic_add_and_fetch64(&(g->edges[e].count), 1);
+						prev_e = e;
+					}
 				}
 			}
 		}
 	}
 }
 
-static void *k63_barcode_retriever(void *data)
+void *barcode_retriever(void *data)
 {
-	struct bctrie_bundle_t *bundle = (struct bctrie_bundle_t *)data;
+	struct bccount_bundle_t *bundle = (struct bccount_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
-	struct asm_graph_t *graph = bundle->graph;
-	khash_t(k63_dict) *dict = (khash_t(k63_dict) *)(bundle->dict);
-
 	struct read_t read1, read2;
 	struct pair_buffer_t *own_buf, *ext_buf;
 	own_buf = init_pair_buffer();
@@ -708,7 +620,10 @@ static void *k63_barcode_retriever(void *data)
 
 	int64_t n_reads;
 	int64_t *gcnt_reads;
+	uint64_t barcode;
 	gcnt_reads = bundle->n_reads;
+	void (*read_process)(struct read_t *, uint64_t, struct bccount_bundle_t *) = bundle->read_process_func;
+	uint64_t (*barcode_calculator)(struct read_t *, struct read_t *) = bundle->barcode_calculator;
 
 	while (1) {
 		ext_buf = d_dequeue_in(q);
@@ -736,8 +651,9 @@ static void *k63_barcode_retriever(void *data)
 				__ERROR("\nWrong format file\n");
 
 			++n_reads;
-			k63_barcode_retrieve_read(&read1, graph, dict);
-			k63_barcode_retrieve_read(&read2, graph, dict);
+			barcode = barcode_calculator(&read1, &read2);
+			read_process(&read1, barcode, bundle);
+			read_process(&read2, barcode, bundle);
 
 			if (rc1 == READ_END)
 				break;
@@ -750,32 +666,28 @@ static void *k63_barcode_retriever(void *data)
 	pthread_exit(NULL);
 }
 
-static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k63_dict) *dict)
+void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
 	int i;
-
 	struct producer_bundle_t *producer_bundles;
-	// producer_bundles = init_fastq_PE(opt);
 	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
 						opt->files_1, opt->files_2);
 
-	struct bctrie_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct bctrie_bundle_t));
-
-	int64_t n_reads;
-	n_reads = 0;
-
+	struct bccount_bundle_t *worker_bundles;
+	worker_bundles = malloc(opt->n_threads * sizeof(struct bccount_bundle_t));
+	int64_t n_reads = 0;
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].graph = g;
-		worker_bundles[i].dict = dict;
 		worker_bundles[i].n_reads = &n_reads;
+		worker_bundles[i].g = ske->g;
+		worker_bundles[i].dict = ske->dict;
+		worker_bundles[i].read_process_func = ske->read_process_func;
+		worker_bundles[i].barcode_calculator = ske->barcode_calculator;
+		worker_bundles[i].need_count = ske->need_count;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -787,7 +699,7 @@ static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 				producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, k63_barcode_retriever,
+		pthread_create(worker_threads + i, &attr, barcode_retriever,
 				worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
@@ -802,3 +714,4 @@ static void k63_retrieve_barcode(struct asm_graph_t *g, struct opt_proc_t *opt,
 	free(producer_threads);
 	free(worker_threads);
 }
+
