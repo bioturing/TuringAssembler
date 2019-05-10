@@ -2,7 +2,7 @@ CC = gcc
 
 CPP = cpp
 
-LIBS = -pthread -flto -lm -lz
+LIBS = -pthread -flto -lm -lz 
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
@@ -35,6 +35,9 @@ SRC = src/assembly_graph.c 				\
       src/time_utils.c 					\
       src/utils.c 					\
       src/verbose.c 					\
+      src/huu.c 						\
+      src/algorithm.c 						\
+      src/compare.c 						\
       src/main.c
 
 OBJ = $(SRC:.c=.o)
@@ -42,12 +45,12 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 -include $(DEP)
 
 %.d: %.c
-	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
+	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
 debug: LIBS += -fsanitize=undefined,address

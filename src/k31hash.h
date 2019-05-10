@@ -5,6 +5,7 @@
 
 #include "atomic.h"
 #include "asm_hash.h"
+#include "pthread.h"
 
 typedef uint64_t k31key_t;
 

@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "huu.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -104,6 +105,70 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	remove_tips_topology(g0, g);
 	test_asm_graph(g);
 	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
+}
+
+void build_huu_process(struct opt_build_t *opt)
+{
+	init_clock();
+
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("huuuuuuuuuuuuuuuu\n");
+	FILE *fp;
+	char *out_name = calloc(100, 1); 
+	strcat(out_name, opt->out_dir);
+	char *tmp = "/list_contig";
+	strcat(out_name , tmp);
+	fp = fopen(out_name, "w");
+	build_list_contig(g0, fp, opt->huu_1_score, opt);
+	fclose(fp);
+	free(out_name);
+}
+
+void build_huu_2_process(struct opt_build_t *opt)
+{
+	init_clock();
+	FILE *fp;
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+
+	load_asm_graph(g0, opt->in_path);
+	if ((fp = fopen(opt->in_file,"r")) == NULL){
+		__VERBOSE("openfile error");
+	}
+
+	char *out_name = calloc(100, 1); 
+	strcat(out_name, opt->out_dir);
+	char *tmp = "/scaffolds.fasta";
+	strcat(out_name , tmp);
+	FILE *out_file = fopen(out_name, "w");
+
+	char *out_graph_name = calloc(100, 1); 
+	strcat(out_graph_name, opt->out_dir);
+	char *tmp2 = "/tengicungduoc";
+	strcat(out_graph_name , tmp2);
+	FILE *out_graph = fopen(out_graph_name, "w");
+	
+	connect_contig(fp, out_file, out_graph, g0, opt->huu_1_score);
+	free(out_name);
+	fclose(out_file);
+	fclose(out_graph);
+//	asm_graph_destroy(g0);
+}
+
+void build_huu_3_process(struct opt_build_t *opt)
+{
+	init_clock();
+	FILE *fp;
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+
+	load_asm_graph(g0, opt->in_path);
+	check_contig(g0, opt->huu_1_score);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
