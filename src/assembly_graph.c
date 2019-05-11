@@ -1270,7 +1270,7 @@ void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 			}
 		} else {
 			/* append new char */
-			if ((k >> 4) >= m_seq) {
+			if (((k + 15) >> 4) >= m_seq) {
 				uint32_t new_m = m_seq << 1;
 				bseq = realloc(bseq, new_m * sizeof(uint32_t));
 				memset(bseq + m_seq, 0, m_seq * sizeof(uint32_t));
@@ -1282,7 +1282,7 @@ void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 		last_c = c;
 	}
 	g->edges[e].seq_len = k;
-	g->edges[e].seq = realloc(bseq, (k >> 4) * sizeof(uint32_t));
+	g->edges[e].seq = realloc(bseq, ((k + 15) >> 4) * sizeof(uint32_t));
 	g->edges[e].count = 0;
 	g->edges[e].n_holes = n_holes;
 	g->edges[e].l_holes = l_holes;
@@ -1296,6 +1296,8 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	g->nodes = NULL;
 	g->n_v = g->n_e = 0;
 	gzFile fp = gzopen(path, "r");
+	if (!fp)
+		__ERROR("Unable to open file [%s] to read", path);
 	kseq_t *seq = kseq_init(fp);
 	while (kseq_read(seq) >= 0) {
 		/* add new edge */
@@ -1323,15 +1325,16 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 		g->nodes[g->n_v + 3].adj = NULL;
 		g->nodes[g->n_v + 3].deg = 0;
 
-		g->nodes[g->n_v].rc_id = g->n_v + 2;
-		g->nodes[g->n_v + 2].rc_id = g->n_v;
-		g->nodes[g->n_v + 1].rc_id = g->n_v + 3;
-		g->nodes[g->n_v + 3].rc_id = g->n_v + 1;
+		g->nodes[g->n_v].rc_id = g->n_v + 3;
+		g->nodes[g->n_v + 3].rc_id = g->n_v;
+		g->nodes[g->n_v + 1].rc_id = g->n_v + 2;
+		g->nodes[g->n_v + 2].rc_id = g->n_v + 1;
 		g->n_e += 2;
 		g->n_v += 4;
 	}
 	kseq_destroy(seq);
 	gzclose(fp);
+	test_asm_graph(g);
 }
 
 void load_asm_graph(struct asm_graph_t *g, const char *path)
