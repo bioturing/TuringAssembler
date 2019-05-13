@@ -1245,7 +1245,7 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	}
 }
 
-void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
+int asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 {
 	uint32_t *p_holes, *l_holes, *bseq;
 	uint32_t n_holes, i, j, k, c, last_c, m_seq;
@@ -1261,6 +1261,10 @@ void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 			if (last_c >= 4) {
 				++l_holes[j];
 			} else {
+				if (k == 0) {
+					free(bseq);
+					return 0;
+				}
 				p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
 				l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
 				j = n_holes;
@@ -1287,6 +1291,7 @@ void asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 	g->edges[e].n_holes = n_holes;
 	g->edges[e].l_holes = l_holes;
 	g->edges[e].p_holes = p_holes;
+	return 1;
 }
 
 void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
@@ -1301,10 +1306,13 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	kseq_t *seq = kseq_init(fp);
 	while (kseq_read(seq) >= 0) {
 		/* add new edge */
+		if (seq->seq.l < ksize)
+			continue;
 		g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
 		g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
 
-		asm_fasta_edge_convert(g, g->n_e, seq);
+		if (!asm_fasta_edge_convert(g, g->n_e, seq))
+			continue;
 		asm_clone_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
 		g->edges[g->n_e].rc_id = g->n_e + 1;
 		g->edges[g->n_e + 1].rc_id = g->n_e;
