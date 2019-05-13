@@ -621,7 +621,7 @@ void *process_check_edge(void *data)
 	return NULL;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score, struct opt_build_t *opt) 
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, float huu_1_score, struct opt_proc_t *opt) 
 {
 	init_global_params(g, huu_1_score);
 	check_global_params(g);

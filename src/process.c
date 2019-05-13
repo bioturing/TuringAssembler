@@ -107,13 +107,13 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
 }
 
-void build_huu_process(struct opt_build_t *opt)
+void build_huu_process(struct opt_proc_t *opt)
 {
 	init_clock();
 
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
+	load_asm_graph(g0, opt->in_file);
 	test_asm_graph(g0);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -124,20 +124,20 @@ void build_huu_process(struct opt_build_t *opt)
 	char *tmp = "/list_contig";
 	strcat(out_name , tmp);
 	fp = fopen(out_name, "w");
-	build_list_contig(g0, fp, opt->huu_1_score, opt);
+	build_list_contig(g0, fp, -1, opt);
 	fclose(fp);
 	free(out_name);
 }
 
-void build_huu_2_process(struct opt_build_t *opt)
+void build_huu_2_process(struct opt_proc_t *opt)
 {
 	init_clock();
 	FILE *fp;
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
 
-	load_asm_graph(g0, opt->in_path);
-	if ((fp = fopen(opt->in_file,"r")) == NULL){
+	load_asm_graph(g0, opt->in_file);
+	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
 
@@ -153,22 +153,22 @@ void build_huu_2_process(struct opt_build_t *opt)
 	strcat(out_graph_name , tmp2);
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, out_graph, g0, opt->huu_1_score);
+	connect_contig(fp, out_file, out_graph, g0, -1);
 	free(out_name);
 	fclose(out_file);
 	fclose(out_graph);
 //	asm_graph_destroy(g0);
 }
 
-void build_huu_3_process(struct opt_build_t *opt)
+void build_huu_3_process(struct opt_proc_t *opt)
 {
 	init_clock();
 	FILE *fp;
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
 
-	load_asm_graph(g0, opt->in_path);
-	check_contig(g0, opt->huu_1_score);
+	load_asm_graph(g0, opt->in_file);
+	check_contig(g0, -1);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
