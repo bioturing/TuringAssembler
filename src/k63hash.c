@@ -43,6 +43,7 @@ int load_k63hash(struct k63hash_t *h, const char *path)
 	h->n_probe = estimate_probe_3(h->size);
 	h->keys = malloc(h->size * sizeof(k63key_t));
 	h->adjs = malloc(h->size * sizeof(uint8_t));
+	h->flag = malloc(h->size * sizeof(uint8_t));
 	xfread(h->keys, sizeof(k63key_t), h->size, fp);
 	xfread(h->adjs, sizeof(uint8_t), h->size, fp);
 	xfread(h->flag, sizeof(uint8_t), h->size, fp);
@@ -577,6 +578,20 @@ loop_refill:
 	h->sgts = NULL;
 }
 
+void k63hash_test(struct k63hash_t *h)
+{
+	kmint_t i, k;
+	for (i = 0; i < h->size; ++i) {
+		if (h->flag[i] == KMFLAG_EMPTY)
+			continue;
+		k = k63hash_get(h, h->keys[i]);
+		if (k != i) {
+			__ERROR("Hash fail at postion: get_hash_pos(h[%lu] = (%lu, %lu)) = %lu\n",
+				i, h->keys[i].bin[0], h->keys[i].bin[1], k);
+		}
+	}
+}
+
 void k63hash_init(struct k63hash_t *h, kmint_t size, int n_threads, int adj_included)
 {
 	int k;
@@ -587,6 +602,7 @@ void k63hash_init(struct k63hash_t *h, kmint_t size, int n_threads, int adj_incl
 	h->keys = malloc(h->size * sizeof(k63key_t));
 	h->sgts = calloc(h->size >> 5, sizeof(uint32_t));
 	h->flag = calloc(h->size, sizeof(uint8_t));
+	h->n_item = 0;
 	if (adj_included)
 		h->adjs = calloc(h->size, sizeof(uint8_t));
 	else

@@ -500,7 +500,7 @@ static void kmer_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t 
 	struct kmer_count_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct kmer_count_bundle_t));
 
-	struct k31hash_t *dst = dummy->dst;
+	// struct k31hash_t *dst = dummy->dst;
 	// k31hash_init(dst, (kmint_t)opt->hash_size - 1, opt->n_threads, 1);
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
@@ -509,7 +509,7 @@ static void kmer_start_count(struct opt_proc_t *opt, struct kmer_count_bundle_t 
 		worker_bundles[i].ksize_dst = dummy->ksize_dst;
 		worker_bundles[i].ksize_src = dummy->ksize_src;
 		worker_bundles[i].n_reads = &n_reads;
-		worker_bundles[i].lock_hash = dst->locks + i;
+		worker_bundles[i].lock_hash = dummy->lock_hash + i;
 		worker_bundles[i].read_process_func = dummy->read_process_func;
 		worker_bundles[i].barcode_calculator = dummy->barcode_calculator;
 	}
@@ -545,6 +545,7 @@ static void count_k31_from_scratch(struct opt_proc_t *opt,
 	struct kmer_count_bundle_t skeleton;
 	k31hash_init(h, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)h;
+	skeleton.lock_hash = h->locks;
 	skeleton.ksize_dst = ksize;
 	skeleton.read_process_func = k31_count_from_scratch;
 	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
@@ -557,6 +558,7 @@ static void count_k31_from_k31(struct opt_proc_t *opt, struct k31hash_t *dst,
 	struct kmer_count_bundle_t skeleton;
 	k31hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
+	skeleton.lock_hash = dst->locks;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
@@ -571,6 +573,7 @@ static void count_k63_from_scratch(struct opt_proc_t *opt,
 	struct kmer_count_bundle_t skeleton;
 	k63hash_init(h, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)h;
+	skeleton.lock_hash = h->locks;
 	skeleton.ksize_dst = ksize;
 	skeleton.read_process_func = k63_count_from_scratch;
 	skeleton.barcode_calculator = barcode_calculators[opt->lib_type];
@@ -583,6 +586,7 @@ static void count_k63_from_k31(struct opt_proc_t *opt, struct k63hash_t *dst,
 	struct kmer_count_bundle_t skeleton;
 	k63hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
+	skeleton.lock_hash = dst->locks;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
@@ -597,6 +601,7 @@ static void count_k63_from_k63(struct opt_proc_t *opt, struct k63hash_t *dst,
 	struct kmer_count_bundle_t skeleton;
 	k63hash_init(dst, opt->hash_size - 1, opt->n_threads, 1);
 	skeleton.dst = (void *)dst;
+	skeleton.lock_hash = dst->locks;
 	skeleton.src = (void *)src;
 	skeleton.ksize_dst = ksize_dst;
 	skeleton.ksize_src = ksize_src;
@@ -769,6 +774,8 @@ void build_k31_table_from_k31_table(struct opt_proc_t *opt,
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);
 	count_k31_from_k31(opt, dst, src, ksize_dst, ksize_src);
+	__VERBOSE("\n");
+	__VERBOSE("Number of pre-filtered %d-mer: %lu\n", ksize_dst, dst->n_item);
 
 	/* Filter singleton kmer */
 	__VERBOSE("Filtering singleton\n");
@@ -795,7 +802,7 @@ void build_k31_table_from_k31_table(struct opt_proc_t *opt,
 // 						(long long unsigned)h->n_item);
 // 	__VERBOSE("Filtering singleton %d-mer\n", ksize_src);
 // 	k31hash_filter(&tmp, 1);
-// 	__VEROBSE("Number of non-singleton %d-mer: %lu\n", 
+// 	__VERBOSE("Number of non-singleton %d-mer: %lu\n", 
 
 // }
 
@@ -822,10 +829,13 @@ void build_k63_table_from_k31_table(struct opt_proc_t *opt,
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);
 	count_k63_from_k31(opt, dst, src, ksize_dst, ksize_src);
+	__VERBOSE("\n");
+	__VERBOSE("Number of pre-filtered %d-mer: %lu\n", ksize_dst, dst->n_item);
 
 	/* Filter singleton kmer */
 	__VERBOSE("Filtering singleton %d-mer\n", ksize_dst);
 	k63hash_filter(dst, 1);
+	k63hash_test(dst);
 	__VERBOSE_LOG("KMER COUNT", "Number of non-singleton %d-mer: %lu\n",
 							ksize_dst, dst->n_item);
 
@@ -838,6 +848,8 @@ void build_k63_table_from_k63_table(struct opt_proc_t *opt,
 {
 	__VERBOSE("\nCounting %d-mer from pre-counted %d-mer\n", ksize_dst, ksize_src);
 	count_k63_from_k63(opt, dst, src, ksize_dst, ksize_src);
+	__VERBOSE("\n");
+	__VERBOSE("Number of pre-filtered %d-mer: %lu\n", ksize_dst, dst->n_item);
 
 	/* Filter singleton kmer */
 	__VERBOSE("Filtering singleton %d-mer\n", ksize_dst);
