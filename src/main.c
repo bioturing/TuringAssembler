@@ -309,10 +309,6 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			__ERROR("Unknown option %s", argv[pos]);
 		}
 	}
-	if (opt->n_files == 0) {
-		free(opt);
-		return NULL;
-	}
 	mkdir(opt->out_dir, 0755);
 	return opt;
 }

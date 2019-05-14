@@ -284,7 +284,7 @@ void k63_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
 	kmask_src = ((k31key_t)1 << (ksize_src << 1)) - 1;
 	knum_src = krev_src = 0;
 	kmask_dst.bin[0] = (uint64_t)-1;
-	kmask_dst.bin[1] = (1ull << ((ksize_dst - 1) - 64)) - 1;
+	kmask_dst.bin[1] = (1ull << ((ksize_dst << 1) - 64)) - 1;
 	knum_dst = krev_dst = pknum_dst = pkrev_dst = (k63key_t){{0ull, 0ull}};
 	last = cnt_small = 0;
 	num_kdst_diff = ksize_dst - ksize_src + 1;
@@ -364,7 +364,7 @@ void k63_count_from_k63(struct read_t *r, struct kmer_count_bundle_t *bundle)
 	seq = r->seq;
 
 	kmask_src.bin[0] = (uint64_t)-1;
-	kmask_src.bin[1] = (1ull << ((ksize_src - 1) - 64)) - 1;
+	kmask_src.bin[1] = (1ull << ((ksize_src << 1) - 64)) - 1;
 	knum_src = krev_src = (k63key_t){{0ull, 0ull}};
 	kmask_dst.bin[0] = (uint64_t)-1;
 	kmask_dst.bin[1] = (1ull << ((ksize_dst - 1) - 64)) - 1;

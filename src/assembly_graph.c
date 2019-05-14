@@ -730,6 +730,7 @@ void asm_clean_edge_seq(struct asm_edge_t *e)
 	e->seq = NULL;
 	e->l_holes = NULL;
 	e->p_holes = NULL;
+	e->n_holes = 0;
 }
 
 void asm_remove_edge(struct asm_graph_t *g, gint_t e)
