@@ -5,6 +5,8 @@
 #include <string.h>
 #include "assembly_graph.h"
 #include <stdlib.h>
+#include "scaffolding/edge.h"
+#include "scaffolding/contig.h"
 
 gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 {
@@ -61,5 +63,28 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 	free(seq);
 	free(total_seq);
 	free(NNN);
+}
+
+void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE, int n_v, int *listV, FILE *out_graph)
+{
+	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
+	for (int i = 0; i < n_e; i++) {
+		list_one_dir_E[i] = listE[i];
+		normalize_min_index(g, list_one_dir_E+i);
+	}
+	for (int i = 0; i < n_v; i++) {
+		struct asm_edge_t *e = &g->edges[listV[i]];
+		char *seq = NULL;
+		uint32_t seq_len = 0;
+		dump_edge_seq_reduce_N(&seq, &seq_len, e);
+		fprintf(out_graph,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
+	}
+
+	for (int i = 0; i < n_e; i++) {
+		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
+			list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'+':'-', list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'+':'-');
+		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
+			list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'-':'+', list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'-':'+');
+	}
 }
 

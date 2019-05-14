@@ -69,7 +69,6 @@ struct opt_build_t {
 	int n_files;
 	char **files_1, **files_2;
 	int split_len;
-	float huu_1_score;
 };
 
 struct producer_bundle_t {

@@ -148,7 +148,7 @@ void *process_check_edge(void *data)
 	return NULL;
 }
 
-void build_list_contig(struct asm_graph_t *g, FILE *out_file, struct opt_build_t *opt) 
+void build_list_contig(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *opt) 
 {
 	init_global_params(g);
 	check_global_params(g);
@@ -238,37 +238,13 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 	free(res);
 }
 
-void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE, int n_v, int *listV, FILE *out_graph)
-{
-	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
-	for (int i = 0; i < n_e; i++) {
-		list_one_dir_E[i] = listE[i];
-		normalize_min_index(g, list_one_dir_E+i);
-	}
-	for (int i = 0; i < n_v; i++) {
-		struct asm_edge_t *e = &g->edges[listV[i]];
-		char *seq = NULL;
-		uint32_t seq_len = 0;
-		dump_edge_seq_reduce_N(&seq, &seq_len, e);
-		fprintf(out_graph,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
-	}
-
-	for (int i = 0; i < n_e; i++) {
-		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
-			list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'+':'-', list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'+':'-');
-		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
-			list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'-':'+', list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'-':'+');
-	}
-}
-
 void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g)
 {
 	init_global_params(g);
 	check_global_params(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_v: %d\n", &n_v);
-	listV = realloc(listV , n_v * sizeof(int));
-	for (int i = 0; i < n_v; i++) {
+	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {
 		fscanf(fp, "vertex:%d\n", &listV[i]);
 	}
 	float score;

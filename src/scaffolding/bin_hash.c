@@ -1,5 +1,5 @@
 #include "attribute.h"
-#include "k31_count.h"
+#include "k31hash.h"
 #include "assembly_graph.h"
 
 #include "scaffolding/global_params.h"

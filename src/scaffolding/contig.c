@@ -1,9 +1,13 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include "scaffolding/edge.h"
 #include "assembly_graph.h"
 
 void normalize_min_index(struct asm_graph_t *g, struct contig_edge *e)
 {
-	assert(e->src < g->n_e && e->des < g->n_e);
+	char *message = calloc(100,1); 
+	printf("%d %d %d\n", e->src, e->des, g->n_e);
+	assert(e->src < g->n_e && e->des < g->n_e && message );
 	int rc_id_src = g->edges[e->src].rc_id;
 	if (rc_id_src < e->src) {
 		e->src = rc_id_src;
@@ -28,5 +32,4 @@ void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
 		e->rv_des = 0;
 	}
 }
-
 

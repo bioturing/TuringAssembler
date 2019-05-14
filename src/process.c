@@ -110,7 +110,7 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_path);
+	load_asm_graph(g0, opt->in_file);
 	test_asm_graph(g0);
 	return g0;
 }
@@ -120,7 +120,7 @@ void build_scaffolding_1_process(struct opt_proc_t *opt)
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	char *out_name = concat(opt->out_dir, "/list_contig");
+	char *out_name = str_concate(opt->out_dir, "/list_contig");
 	FILE *fp = fopen(out_name, "w");
 
 	build_list_contig(g0, fp, opt);
@@ -136,13 +136,13 @@ void build_scaffolding_2_process(struct opt_proc_t *opt)
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 
 	FILE *fp;
-	if ((fp = fopen(opt->in_file,"r")) == NULL){
+	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
 
-	char *out_name = concat(opt->out_dir, "/scaffolds.fasta");
+	char *out_name = str_concate(opt->out_dir, "/scaffolds.fasta");
 	FILE *out_file = fopen(out_name, "w");
-	char *out_graph_name = concat(opt->out_dir, "/tengicungduoc");
+	char *out_graph_name = str_concate(opt->out_dir, "/tengicungduoc");
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
 	connect_contig(fp, out_file, out_graph, g0);
@@ -159,7 +159,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	char *list_contig_fname = concat(opt->out_dir, "/list_contig");
+	char *list_contig_fname = str_concate(opt->out_dir, "/list_contig");
 	FILE *file_list_contig = fopen(list_contig_fname, "w");
 	build_list_contig(g0, file_list_contig, opt);
 
@@ -172,10 +172,10 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 		__VERBOSE("openfile error");
 	}
 
-	char *out_name = concat(opt->out_dir, "/scaffolds.fasta");
+	char *out_name = str_concate(opt->out_dir, "/scaffolds.fasta");
 	FILE *out_file = fopen(out_name, "w");
 
-	char *out_graph_name = concat(opt->out_dir, "/tengicungduoc");
+	char *out_graph_name = str_concate(opt->out_dir, "/tengicungduoc");
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
 	connect_contig(fp, out_file, out_graph, g0);

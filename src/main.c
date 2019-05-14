@@ -126,7 +126,6 @@ struct opt_build_t *init_opt_build()
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->out_dir = ".";
-	opt->huu_1_score = -1;
 	return opt;
 }
 
@@ -176,9 +175,6 @@ struct opt_build_t *parse_build_option(int argc, char *argv[])
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
 			pos += (n + 1);
-		} else if (!strcmp(argv[pos], "-zz")) {
-			opt->huu_1_score = atof(argv[pos+1]);
-			pos += 2;
 		}else {
 			__ERROR("Unknown option %s", argv[pos]);
 		}
@@ -449,13 +445,13 @@ int main(int argc, char *argv[])
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "build_huu")) 
+	else if (!strcmp(argv[1], "build_scaffolding_1")) 
 		build_opt_process(argc, argv, &build_scaffolding_1_process); 
-	else if (!strcmp(argv[1], "build_huu_2"))
+	else if (!strcmp(argv[1], "build_scaffolding_2"))
 		build_opt_process(argc, argv, &build_scaffolding_2_process); 
-	else if (!strcmp(argv[1], "build_huu_1_2"))
+	else if (!strcmp(argv[1], "build_scaffolding_1_2"))
 		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
-	else if (!strcmp(argv[1], "build_huu_3"))
+	else if (!strcmp(argv[1], "build_scaffolding_test"))
 		build_opt_process(argc, argv, &build_scaffolding_test_process); 
 	else
 		print_usage(argv[0]);

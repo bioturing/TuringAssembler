@@ -143,6 +143,7 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 
 void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, int pos, int src, int des, float score0)
 {
+	assert(src >= 0 && des >= 0 && src < g->n_e && des < g->n_e);
 	struct contig_edge e;
 	e.src = src;
 	e.des = des;
