@@ -11,5 +11,10 @@
 /src/execute/**
 !/src/execute/*.c
 
+!/src/scaffolding
+/src/scaffolding/**
+!/src/scaffolding/*.c
+!/src/scaffolding/*.h
+
 !Makefile
 !README.md

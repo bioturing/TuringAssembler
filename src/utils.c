@@ -111,3 +111,32 @@ char *num2seq(int64_t num, int len)
 	ret[len] = '\0';
 	return ret;
 }
+
+int *binary_search(int *list, int n, int value)
+{
+	int l = 0, r = n - 1;
+	while (l != r) {
+		int m = (l + r) / 2;
+		if (value > list[m]) 
+			l = m + 1;
+		else
+			r = m;
+	}
+	assert(list[l] == value);
+	if (list[l] != value)
+		return list-1;
+	return &list[l];
+}
+
+void unique(int *listV, int *n_v)
+{
+	int new_n_v = 0;
+	for (int i = 0; i < *n_v; ) {
+		int j = i;
+		while (j < *n_v && listV[i] == listV[j]) j++;
+		listV[new_n_v++] = listV[i];
+		i = j;
+	}
+	*n_v = new_n_v;
+}
+

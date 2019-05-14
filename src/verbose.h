@@ -1,4 +1,3 @@
-#undef huu_debug
 #ifndef _VERBOSE_H_
 #define _VERBOSE_H_
 
@@ -21,14 +20,7 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
-#ifndef huu_debug 
-#define __DEBUG_VERBOSE(fmt, ...) do {					       \
-	fprintf(stderr, fmt, __VA_ARGS__);				       \
-	fflush(stderr);							       \
-} while (0) /* VERBOSE */
-#else
-#define __DEBUG_VERBOSE(fmt, ...) 
-#endif
+#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
 
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
@@ -63,14 +55,7 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
-#ifndef huu_debug 
-#define __DEBUG_VERBOSE(fmt, args...) do {					       \
-	fprintf(stderr, fmt, ##args);					       \
-	fflush(stderr);							       \
-} while (0) /* VERBOSE */
-#else
-#define __DEBUG_VERBOSE(fmt, ...) 
-#endif
+#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
 
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0

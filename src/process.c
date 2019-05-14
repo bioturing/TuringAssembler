@@ -11,7 +11,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-#include "huu.h"
+#include "scaffolding/scaffolding.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -107,68 +107,94 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
 }
 
-void build_huu_process(struct opt_proc_t *opt)
+struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
 {
-	init_clock();
-
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_path);
 	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("huuuuuuuuuuuuuuuu\n");
-	FILE *fp;
-	char *out_name = calloc(100, 1); 
-	strcat(out_name, opt->out_dir);
-	char *tmp = "/list_contig";
-	strcat(out_name , tmp);
-	fp = fopen(out_name, "w");
-	build_list_contig(g0, fp, -1, opt);
-	fclose(fp);
-	free(out_name);
+	return g0;
 }
 
-void build_huu_2_process(struct opt_proc_t *opt)
+void build_scaffolding_1_process(struct opt_proc_t *opt)
 {
 	init_clock();
-	FILE *fp;
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	char *out_name = concat(opt->out_dir, "/list_contig");
+	FILE *fp = fopen(out_name, "w");
 
-	load_asm_graph(g0, opt->in_file);
-	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
+	build_list_contig(g0, fp, opt);
+
+	fclose(fp);
+	free(out_name);
+	asm_graph_destroy(g0);
+}
+
+void build_scaffolding_2_process(struct opt_proc_t *opt)
+{
+	init_clock();
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
+
+	FILE *fp;
+	if ((fp = fopen(opt->in_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
 
-	char *out_name = calloc(100, 1); 
-	strcat(out_name, opt->out_dir);
-	char *tmp = "/scaffolds.fasta";
-	strcat(out_name , tmp);
+	char *out_name = concat(opt->out_dir, "/scaffolds.fasta");
 	FILE *out_file = fopen(out_name, "w");
-
-	char *out_graph_name = calloc(100, 1); 
-	strcat(out_graph_name, opt->out_dir);
-	char *tmp2 = "/tengicungduoc";
-	strcat(out_graph_name , tmp2);
+	char *out_graph_name = concat(opt->out_dir, "/tengicungduoc");
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, out_graph, g0, -1);
+	connect_contig(fp, out_file, out_graph, g0);
+
 	free(out_name);
 	fclose(out_file);
 	fclose(out_graph);
-//	asm_graph_destroy(g0);
+	asm_graph_destroy(g0);
 }
 
-void build_huu_3_process(struct opt_proc_t *opt)
+void build_scaffolding_1_2_process(struct opt_proc_t *opt)
+{
+	//step 1:
+	init_clock();
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	char *list_contig_fname = concat(opt->out_dir, "/list_contig");
+	FILE *file_list_contig = fopen(list_contig_fname, "w");
+	build_list_contig(g0, file_list_contig, opt);
+
+	fclose(file_list_contig);
+	free(list_contig_fname);
+
+	//step 2:
+	FILE *fp;
+	if ((fp = fopen(opt->in_file,"r")) == NULL){
+		__VERBOSE("openfile error");
+	}
+
+	char *out_name = concat(opt->out_dir, "/scaffolds.fasta");
+	FILE *out_file = fopen(out_name, "w");
+
+	char *out_graph_name = concat(opt->out_dir, "/tengicungduoc");
+	FILE *out_graph = fopen(out_graph_name, "w");
+	
+	connect_contig(fp, out_file, out_graph, g0);
+
+	free(out_name);
+	fclose(out_file);
+	fclose(out_graph);
+	asm_graph_destroy(g0);
+}
+
+void build_scaffolding_test_process(struct opt_proc_t *opt)
 {
 	init_clock();
 	FILE *fp;
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
 
-	load_asm_graph(g0, opt->in_file);
-	check_contig(g0, -1);
+	check_contig(g0);
+
+	asm_graph_destroy(g0);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)

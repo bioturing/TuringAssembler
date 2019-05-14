@@ -450,11 +450,13 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_huu")) 
-		build_opt_process(argc, argv, &build_huu_process); 
+		build_opt_process(argc, argv, &build_scaffolding_1_process); 
 	else if (!strcmp(argv[1], "build_huu_2"))
-		build_opt_process(argc, argv, &build_huu_2_process); 
+		build_opt_process(argc, argv, &build_scaffolding_2_process); 
+	else if (!strcmp(argv[1], "build_huu_1_2"))
+		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
 	else if (!strcmp(argv[1], "build_huu_3"))
-		build_opt_process(argc, argv, &build_huu_3_process); 
+		build_opt_process(argc, argv, &build_scaffolding_test_process); 
 	else
 		print_usage(argv[0]);
 	return 0;
