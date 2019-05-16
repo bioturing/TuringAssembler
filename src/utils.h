@@ -123,7 +123,7 @@
 
 #define MAX(a, b) ((a)<(b) ?(b):(a))
 
-#define COPY_ARR(src, des, n) for(int i = 0; i < n; i++) des[i] = src[i]
+#define COPY_ARR(src, des, n) for(int i = 0; i < (n); i++) (des)[i] = (src)[i]
 /*
  * Built-in function
  */

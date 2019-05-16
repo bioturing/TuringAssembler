@@ -123,7 +123,7 @@ void build_scaffolding_1_process(struct opt_proc_t *opt)
 	char *out_name = str_concate(opt->out_dir, "/list_contig");
 	FILE *fp = fopen(out_name, "w");
 
-	build_list_contig(g0, fp, opt);
+	build_list_edges(g0, fp, opt);
 
 	fclose(fp);
 	free(out_name);
@@ -161,7 +161,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	char *list_contig_fname = str_concate(opt->out_dir, "/list_contig");
 	FILE *file_list_contig = fopen(list_contig_fname, "w");
-	build_list_contig(g0, file_list_contig, opt);
+	build_list_edges(g0, file_list_contig, opt);
 
 	fclose(file_list_contig);
 	free(list_contig_fname);
@@ -192,7 +192,7 @@ void build_scaffolding_test_process(struct opt_proc_t *opt)
 	FILE *fp;
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 
-	check_contig(g0);
+	scaffolding_test(g0, opt);
 
 	asm_graph_destroy(g0);
 }

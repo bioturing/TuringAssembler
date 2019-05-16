@@ -8,6 +8,10 @@ struct contig_edge {
 	float score0;
 };
 
+struct candidate_edge {
+	int src, des;
+};
+
 struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash);
 int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_hash);
 int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1, const int n_bucks, float threshold, float avg_bin_hash);
