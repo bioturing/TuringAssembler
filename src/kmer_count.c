@@ -76,8 +76,9 @@ uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_b
  * Move the kmer window along reads and add kmer to hash table
  */
 
-void k63_add_edge_str(struct k63hash_t *h, char *seq, int ksize)
+void k63_add_edge_str(void *p, const char *seq, int ksize)
 {
+	struct k63hash_t *h = (struct k63hash_t *)p;
 	int lmc, i, ci, ck;
 	k63key_t kmask, knum1, knum2, krev1, krev2;
 	kmask.bin[0] = (uint64_t)-1;
@@ -109,8 +110,9 @@ void k63_add_edge_str(struct k63hash_t *h, char *seq, int ksize)
 		k63hash_add_edge_simple(h, krev2, ck);
 }
 
-void k31_add_edge_str(struct k31hash_t *h, char *seq, int ksize)
+void k31_add_edge_str(void *p, const char *seq, int ksize)
 {
+	struct k31hash_t *h = (struct k31hash_t *)p;
 	int lmc, i, ci, ck;
 	k31key_t kmask, knum1, knum2, krev1, krev2;
 	lmc = (ksize - 1) << 1;

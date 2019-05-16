@@ -54,12 +54,14 @@ struct asm_graph_t {
 /******************************************************************************/
 
 /* Build graph using kmer with length smaller than 32 */
+void k31_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			struct asm_graph_t *g, const char *preload_path);
 void build_asm_graph_from_k31(struct opt_proc_t *opt, int ksize,
 			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
 /* Build graph using kmer with length from 33 to 63 */
+void k63_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			struct asm_graph_t *g, const char *preload_path);

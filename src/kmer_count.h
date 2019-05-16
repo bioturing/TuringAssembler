@@ -15,7 +15,7 @@ void build_k63_table_from_k31_table(struct opt_proc_t *opt, struct k63hash_t *ds
 void build_k63_table_from_k63_table(struct opt_proc_t *opt, struct k63hash_t *dst,
 		struct k63hash_t *src, int ksize_dst, int ksize_src);
 
-void k31_add_edge_str(struct k31hash_t *h, char *e, int ksize);
-void k63_add_edge_str(struct k63hash_t *h, char *e, int ksize);
+void k31_add_edge_str(void *h, const char *e, int ksize);
+void k63_add_edge_str(void *h, const char *e, int ksize);
 
 #endif
