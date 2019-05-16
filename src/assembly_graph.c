@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "../KMC/kmc_api/kmc_skipping.h"
 
 KSEQ_INIT(gzFile, gzread);
 
@@ -52,6 +53,52 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 	if (j == -1)
 		return;
 	g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
+}
+
+void k63_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	set_time_now();
+	__VERBOSE("|----Estimating kmer\n");
+	struct k63hash_t table;
+	k63hash_init(&table, opt->hash_size - 1, 1, 1);
+	char **tmp_files = alloca(opt->n_files * 2);
+	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+		opt->n_files * 2, tmp_files, &table, k63_add_edge_str);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+	char path[1024];
+	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	save_k63hash(&table, path);
+
+	__VERBOSE("\n|----Building assembly graph\n");
+	build_asm_graph_from_k63(opt, ksize, &table, g0);
+	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+}
+
+void k31_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
+{
+	set_time_now();
+	__VERBOSE("|----Estimating kmer\n");
+	struct k31hash_t table;
+	k31hash_init(&table, opt->hash_size - 1, 1, 1);
+	char **tmp_files = alloca(opt->n_files * 2);
+	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+		opt->n_files * 2, tmp_files, &table, k31_add_edge_str);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+	char path[1024];
+	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	save_k31hash(&table, path);
+
+	__VERBOSE("\n|----Building assembly graph\n");
+	build_asm_graph_from_k31(opt, ksize, &table, g0);
+	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)

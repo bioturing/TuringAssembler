@@ -1,14 +1,19 @@
 CC = gcc
 
+CXX = g++
+
 CPP = cpp
 
-LIBS = -pthread -flto -lm -lz
+LIBS = -pthread -lm -lz -static -O3 -std=c++11 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+
+KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -O2 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -static -O3 -Wfatal-errors -Wall -Wextra \
 	-Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
 	-DGIT_SHA='"$(GIT_SHA)"' \
+	-Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
 	-g
 
 EXEC = skipping
@@ -41,8 +46,8 @@ OBJ = $(SRC:.c=.o)
 
 DEP = $(OBJ:.o=.d)
 
-$(EXEC): $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+$(EXEC): $(OBJ) $(KMC_LIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS) $(KMC_LIBS)
 
 -include $(DEP)
 

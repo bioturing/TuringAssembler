@@ -42,6 +42,7 @@ struct opt_proc_t {
 	char *out_dir;
 	char *in_file;
 	char *in_fasta;
+	int mmem;
 };
 
 struct opt_count_t {

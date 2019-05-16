@@ -409,6 +409,17 @@ void k63hash_resize(struct k63hash_t *h, int adj_included)
 		pthread_mutex_unlock(h->locks + i);
 }
 
+kmint_t k63hash_put_single_thread(struct k63hash_t *h, k63key_t key);
+
+void k63hash_add_edge_simple(struct k63hash_t *h, k63key_t key, int c)
+{
+	kmint_t k;
+	k = k63hash_put_single_thread(h, key);
+	if (k == KMHASH_END(h))
+		__ERROR("Insert to hash failed\n");
+	atomic_set_bit8(h->adjs + k, c);
+}
+
 void k63hash_add_edge(struct k63hash_t *h, k63key_t key, int c, pthread_mutex_t *lock)
 {
 	kmint_t k;
@@ -417,6 +428,17 @@ void k63hash_add_edge(struct k63hash_t *h, k63key_t key, int c, pthread_mutex_t 
 	assert(k != KMHASH_END(h));
 	atomic_set_bit8(h->adjs + k, c);
 	pthread_mutex_unlock(lock);
+}
+
+kmint_t k63hash_put_single_thread(struct k63hash_t *h, k63key_t key)
+{
+	kmint_t k;
+	k = internal_k63hash_put(h, key);
+	while (k == KMHASH_END(h)) {
+		k63hash_resize(h, 1);
+		k = internal_k63hash_put(h, key);
+	}
+	return k;
 }
 
 void k63hash_put_adj(struct k63hash_t *h, k63key_t key, pthread_mutex_t *lock)

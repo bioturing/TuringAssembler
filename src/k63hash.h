@@ -91,6 +91,7 @@ int load_k63hash(struct k63hash_t *h, const char *path);
 
 /* Turn on adj bit of a kmer */
 void k63hash_add_edge(struct k63hash_t *h, k63key_t key, int c, pthread_mutex_t *lock);
+void k63hash_add_edge_simple(struct k63hash_t *h, k63key_t key, int c);
 
 /*
  * Put a kmer to hash table

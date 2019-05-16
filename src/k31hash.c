@@ -190,6 +190,8 @@ void *k31hash_resize_worker(void *data)
 	cap = (size - old_size) / bundle->n_threads + 1;
 	l = cap * bundle->thread_no;
 	r = __min(cap * (bundle->thread_no + 1), size - old_size);
+	// __VERBOSE("old_size = %lu; size = %lu; l = %lu; r = %lu\n", old_size, size, l, r);
+	// __VERBOSE("keys = %lu; adjs = %lu\n", keys, adjs);
 	for (i = l; i < r; ++i) {
 		keys[old_size + i] = K31_NULL;
 		if (adj_included)
@@ -199,6 +201,7 @@ void *k31hash_resize_worker(void *data)
 	cap = old_size / bundle->n_threads + 1;
 	l = cap * bundle->thread_no;
 	r = __min(cap * (bundle->thread_no + 1), old_size);
+	// __VERBOSE("old_size = %lu; size = %lu; l = %lu; r = %lu\n", old_size, size, l, r);
 	for (i = l; i < r; ++i) {
 		if (keys[i] != K31_NULL)
 			flag[i] = KMFLAG_OLD;
@@ -286,6 +289,7 @@ void k31hash_resize_multi(struct k31hash_t *h, int adj_included)
 	h->flag = calloc(h->size, sizeof(uint8_t));
 	memset(h->sgts + (h->old_size >> 5), 0,
 		((h->size >> 5) - (h->old_size >> 5)) * sizeof(uint32_t));
+	// __VERBOSE("h->size = %u; h->old_size = %u\n", h->size, h->old_size);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -437,6 +441,17 @@ void k31hash_resize(struct k31hash_t *h, int adj_included)
 		pthread_mutex_unlock(h->locks + i);
 }
 
+kmint_t k31hash_put_single_thread(struct k31hash_t *h, k31key_t key);
+
+void k31hash_add_edge_simple(struct k31hash_t *h, k31key_t key, int c)
+{
+	kmint_t k;
+	k = k31hash_put_single_thread(h, key);
+	if (k == KMHASH_END(h))
+		__ERROR("Insert to hash failed\n");
+	atomic_set_bit8(h->adjs + k, c);
+}
+
 void k31hash_add_edge(struct k31hash_t *h, k31key_t key, int c, pthread_mutex_t *lock)
 {
 	kmint_t k;
@@ -445,6 +460,17 @@ void k31hash_add_edge(struct k31hash_t *h, k31key_t key, int c, pthread_mutex_t 
 	assert(k != KMHASH_END(h));
 	atomic_set_bit8(h->adjs + k, c);
 	pthread_mutex_unlock(lock);
+}
+
+kmint_t k31hash_put_single_thread(struct k31hash_t *h, k31key_t key)
+{
+	kmint_t k;
+	k = internal_k31hash_put(h, key);
+	while (k == KMHASH_END(h)) {
+		k31hash_resize(h, 1);
+		k = internal_k31hash_put(h, key);
+	}
+	return k;
 }
 
 void k31hash_put_adj(struct k31hash_t *h, k31key_t key, pthread_mutex_t *lock)

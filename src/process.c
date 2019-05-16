@@ -29,6 +29,23 @@ void graph_convert_process(struct opt_proc_t *opt)
 	write_fasta(g, path);
 }
 
+void build_0_KMC_plugin(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize);
+	if (ksize < 32)
+		k31_build_KMC(opt, ksize, g);
+	else if (ksize > 32 && ksize < 64)
+		k63_build_KMC(opt, ksize, g);
+	test_asm_graph(g);
+	// KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+	// 	opt->n_files * 2, tmp_files, NULL, NULL);
+	// char *cmd[6] = {"./kmc", "-k45", "-m4",
+	// 	"/mnt/data/data/A512/run181214nx1_R1_A512.fastq.gz.corrected.fastq.err_barcode_removed.fastq.gz.added.fastq.gz",
+	// 	"kmc_res", "./"};
+	// KMC_arg_kmer_count(6, cmd);
+}
+
 void build_0_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -283,6 +300,12 @@ void assembly2_process(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g1, "level_4", 1);
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
+}
+
+void assembly3_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+	build_0_KMC_plugin(opt, opt->k0, &g1);
 }
 
 void build_0_process(struct opt_proc_t *opt)

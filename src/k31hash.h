@@ -60,6 +60,8 @@ int load_k31hash(struct k31hash_t *h, const char *path);
 /* Turn on adj bit of a kmer */
 void k31hash_add_edge(struct k31hash_t *h, k31key_t key, int c, pthread_mutex_t *lock);
 
+void k31hash_add_edge_simple(struct k31hash_t *h, k31key_t key, int c);
+
 /*
  * Put a kmer to hash table
  * auto-resize with doubling the adjs array

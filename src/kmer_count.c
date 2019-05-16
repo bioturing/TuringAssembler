@@ -76,6 +76,67 @@ uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_b
  * Move the kmer window along reads and add kmer to hash table
  */
 
+void k63_add_edge_str(struct k63hash_t *h, char *seq, int ksize)
+{
+	int lmc, i, ci, ck;
+	k63key_t kmask, knum1, knum2, krev1, krev2;
+	kmask.bin[0] = (uint64_t)-1;
+	kmask.bin[1] = (1ull << ((ksize << 1) - 64)) - 1;
+	knum1 = krev1 = (k63key_t){{0ull, 0ull}};
+	lmc = (ksize - 1) << 1;
+	for (i = 0; i < ksize; ++i) {
+		ci = nt4_table[(int)seq[i]];
+		__k63_lshift2(knum1);
+		knum1.bin[0] |= ci;
+		__k63_rshift2(krev1);
+		krev1.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
+	}
+	ci = nt4_table[(int)seq[ksize]];
+	ck = nt4_table[(int)seq[0]] ^ 3;
+	knum2 = knum1;
+	__k63_lshift2(knum2); __k63_and(knum2, kmask);
+	knum2.bin[0] |= ci;
+	krev2 = krev1;
+	__k63_rshift2(krev2);
+	krev2.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
+	if (__k63_lt(knum1, krev1))
+		k63hash_add_edge_simple(h, knum1, ci);
+	else
+		k63hash_add_edge_simple(h, krev1, ci + 4);
+	if (__k63_lt(knum2, krev2))
+		k63hash_add_edge_simple(h, knum2, ck + 4);
+	else
+		k63hash_add_edge_simple(h, krev2, ck);
+}
+
+void k31_add_edge_str(struct k31hash_t *h, char *seq, int ksize)
+{
+	int lmc, i, ci, ck;
+	k31key_t kmask, knum1, knum2, krev1, krev2;
+	lmc = (ksize - 1) << 1;
+	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
+	knum1 = krev1 = 0;
+	for (i = 0; i < ksize; ++i) {
+		ci = nt4_table[(int)seq[i]];
+		knum1 <<= 2;
+		knum1 |= ci;
+		krev1 >>= 2;
+		krev1 |= ((k31key_t)(ci ^ 3) << lmc);
+	}
+	ci = nt4_table[(int)seq[ksize]];
+	ck = nt4_table[(int)seq[0]] ^ 3;
+	knum2 = ((knum1 << 2) & kmask) | ci;
+	krev2 = (krev1 >> 2) | ((k31key_t)(ci ^ 3) << lmc);
+	if (knum1 < krev1)
+		k31hash_add_edge_simple(h, knum1, ci);
+	else
+		k31hash_add_edge_simple(h, krev1, ci + 4);
+	if (knum2 < krev2)
+		k31hash_add_edge_simple(h, knum2, ck + 4);
+	else
+		k31hash_add_edge_simple(h, krev2, ck);
+}
+
 void k31_count_from_k31(struct read_t *r, struct kmer_count_bundle_t *bundle)
 {
 	struct k31hash_t *dst, *src;
