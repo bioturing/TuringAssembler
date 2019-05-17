@@ -27,12 +27,9 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 	cur_path[depth-1] = x;
 	if (depth > *best_n_res) {
 		*best_n_res = depth;
-		__VERBOSE("new path depth %d\n", depth);
 		for (int i = 0; i < depth; i++){
 			best_res[i] = cur_path[i];
-			__VERBOSE("%d ", cur_path[i]);
 		}
-		__VERBOSE("\n");
 	} 
 
 	int *list_sort = calloc(n_adj, sizeof(int));
@@ -42,7 +39,7 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 	qsort(list_sort, n_adj, sizeof(int), cmp);
 	for (int i = 0; i < n_adj; i++) {
 		int adj = list_sort[i];
-		if (remain_unvisited[adj] && E[x * n_v + adj]) {
+		if (remain_unvisited[adj] && E[x * n_v + adj] > 0) {
 			dfs_hamiltonian(adj, depth+1, n_adj, list_adj, n_v, E, remain_unvisited, 
 				cur_path, best_n_res, best_res, listV);
 		}
@@ -131,7 +128,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			if (count_adj == 0)
 				break;
-			VERBOSE_FLAG(0, "node %d count_adj %d\n", listV[last_pos], count_adj);
+			VERBOSE_FLAG(3, "node %d count_adj %d\n", listV[last_pos], count_adj);
 			int best_n_local_path = 0 , *best_local_path = calloc(n_v, sizeof(int)), best_add_len = 0;
 			for (int i_adj = 0; i_adj < count_adj; i_adj++) {
 				int adj = list_adj[i_adj];
@@ -143,19 +140,15 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 				);
 				free(cur_path);
 			}
-			assert(best_add_len != 0);
-			VERBOSE_FLAG(1, "best n hamiltonian path n_v best add len %d %d %d\n", *best_n_hamiltonian_path, n_v, best_add_len);
+			VERBOSE_FLAG(3, "best n from node n_v best add len %d %d %d\n", *best_n_hamiltonian_path, n_v, best_add_len);
 			for (int i = 0; i < *best_n_hamiltonian_path + best_add_len ; i++) {
 				VERBOSE_FLAG(3, "%d ", best_hamiltonian_path[i]);
 			}
 			for (int i_path = *best_n_hamiltonian_path; i_path < *best_n_hamiltonian_path + best_add_len; i_path++){
-				assert(remain_unvisited[best_hamiltonian_path[i_path]] >0);
-				assert(remain_unvisited[best_hamiltonian_path[i_path]^1] >0);
 				remain_unvisited[best_hamiltonian_path[i_path]]--;
 				remain_unvisited[best_hamiltonian_path[i_path]^1]--;
 			}
 			*best_n_hamiltonian_path += best_add_len;
-			assert(*best_n_hamiltonian_path <= n_v);
 			free(best_local_path);
 			free(list_adj);
 		}
@@ -193,7 +186,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			find_longest_path_from_node(i, &n_hamiltonian_path, hamiltonian_path, remain_unvisited);
 			if (n_hamiltonian_path > *best_n_hamiltonian_path) {
 				*best_n_hamiltonian_path = n_hamiltonian_path;
-				VERBOSE_FLAG(2, "new best hamilton iter %d %d\n", *best_n_hamiltonian_path, n_hamiltonian_path);
+				VERBOSE_FLAG(3, "new best hamilton iter %d %d\n", *best_n_hamiltonian_path, n_hamiltonian_path);
 				for(int i_path = 0; i_path < n_hamiltonian_path; i_path++) {
 					best_hamiltonian_path[i_path] = hamiltonian_path[i_path];
 					VERBOSE_FLAG(3, "%d ", best_hamiltonian_path[i_path]);
@@ -202,11 +195,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			free(hamiltonian_path);
 		}
 		VERBOSE_FLAG(3, "count connected component %d\n", count_connected_compoent);
-		for(int i = 0 ; i < *best_n_hamiltonian_path; i++) 
-			VERBOSE_FLAG(3, "best ham path %d ", best_hamiltonian_path[i]);
-		for (int i = 0 ; i < n_v; i++){
+		VERBOSE_FLAG(1, "\n");
+		for (int i = 0 ; i < n_v; i++)
 			assert(save_remain_unvisited[i] ==  remain_unvisited[i]);
-		}
 		free(save_remain_unvisited);
 	}
 	
@@ -259,6 +250,9 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		for (int i = 0; i < n_insert; i++) arr_insert[i] = -1;
 		for (int i = 0; i < best_n_hamiltonian_path; i++) 
 			best_hamiltonian_path[i] = listV[best_hamiltonian_path[i]];
+		VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
+		for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
+			VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
 //		insert_short_contigs(best_n_hamiltonian_path, best_hamiltonian_path, n_insert, arr_insert, n_arr_short, arr_i_short, mark_short);
 		merge_big_and_small(&best_n_hamiltonian_path, &best_hamiltonian_path, n_insert, arr_insert);
 
@@ -301,10 +295,5 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	free(remain_unvisited);
 	free(arr_i_short);
 	free(mark_short);
-}
-
-void abc()
-{
-	int x= 1;
 }
 

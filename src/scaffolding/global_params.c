@@ -9,7 +9,7 @@
 LIST_GLOBAL_PARAMS
 #undef X
 
-int log_level = 1;
+int log_level = 2;
 
 void check_global_params()
 {
@@ -66,7 +66,7 @@ int get_global_count_kmer(struct asm_graph_t *g)
 void init_global_params(struct asm_graph_t *g)
 {
 	global_thres_length = 10000;
-	global_thres_length_min = 5000;
+	global_thres_length_min = 10000;
 	global_thres_n_buck_big_small = 5;
 	global_n_buck = 6;
 	global_molecule_length = 20000;

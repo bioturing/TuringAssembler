@@ -99,7 +99,6 @@ void *process_check_edge(void *data)
 		pthread_mutex_unlock(&lock_id);
 		int e0 = list_candidate_edges[i].src;
 		int e1 = list_candidate_edges[i].des;
-		VERBOSE_FLAG(0, "edge: %d %d\n", e0, e1); 
 		assert(e1 < g->n_e && e0 < g->n_e);
 		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
 		int check = 0;
@@ -175,18 +174,53 @@ struct params_build_candidate_edges{
 	khash_t(big_table) *big_table;
 };
 
-void find_local_nearby_contig(int e, struct params_build_candidate_edges *params, int *n_local_edges, 
+void count_pos(int *count, struct list_position *pos)
+{
+	assert(pos != NULL && count != NULL);
+	VERBOSE_FLAG(3, "n pos %d\n", pos->n_pos);
+	if (pos->n_pos > 10)
+		return;
+	for (int i = 0; i < pos->n_pos; i++){
+		count[pos->i_contig[i]] += pos->count[i];
+	}
+}
+
+void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *params, int *n_local_edges, 
 		struct candidate_edge **list_local_edges)
 {
-	for (int i = 0; i < params->n_long_contig; i++){
-		VERBOSE_FLAG(0, "%d %ld\n ", i, (*n_local_edges+1) * sizeof(struct candidate_edge));
+	int *count = calloc(params->g->n_e, sizeof(int));
+	struct asm_edge_t *e = &params->g->edges[i_edge];
+	khash_t(big_table) *big_table = params->big_table;
+	int n_bucks = (get_edge_len(e) + 1000-1) / 1000;
+	for (int i = n_bucks/2 -1 ; i <  n_bucks/2 +1; i++) {
+		struct barcode_hash_t *buck = &e->bucks[i];
+		for (int j = 0; j < buck->n_item; j++){
+			if (buck->cnts[j] > 20) {
+				uint64_t barcode = buck->keys[j];
+				khint_t k = kh_get(big_table, big_table, barcode);
+				if (k == kh_end(big_table))
+					continue;
+				struct list_position *pos = kh_value(big_table, k);
+				count_pos(count, pos);
+			}
+		} 
+	}
 
-		VERBOSE_FLAG(0, "a\n");
+	
+	VERBOSE_FLAG(3, "from edge %d\n", i_edge);
+	for (int i = 0; i < params->n_long_contig; i++){
+
+		int long_contig = params->list_long_contig[i];
+
+		float edge_cov  = __get_edge_cov(&params->g->edges[long_contig], params->g->ksize);
+		float value = count[long_contig] / edge_cov;
+		VERBOSE_FLAG(3, "count %d %f\n", long_contig, value);
+		if (value < 30)
+			continue;
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
-		VERBOSE_FLAG(0, "b\n");
 		struct candidate_edge *new_candidate_edge = calloc(1, sizeof(struct candidate_edge));
-		new_candidate_edge->src = e;
+		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = params->list_long_contig[i];
 
 		(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
@@ -355,7 +389,6 @@ void *process_build_candidate_edges(void *data)
 		COPY_ARR(list_local_edges, params_candidate->list_candidate_edges+n,
 				n_local_edges);
 		params_candidate->n_candidate_edges += n_local_edges; 
-		VERBOSE_FLAG(1, "n local edge %d", n_local_edges);
 		pthread_mutex_unlock(&lock_append_edges);
 	} while(1);
 	pthread_exit(NULL);
@@ -437,21 +470,22 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct 
 			VERBOSE_FLAG(3, "%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 		}
 		E[u * n_v + v] = list_one_dir_E[i].score0;
+		E[(v^1) * n_v + (u^1)] = list_one_dir_E[i].score0;
 	}
 	int *res = calloc(n_v, sizeof(int)), n_res=0;
-	abc();
 	algo_find_hamiltonian(out_file, g, E, n_v, res, &n_res, listV, avg_bin_hash);
 	free(E);
 	free(list_one_dir_E);
 	free(res);
 }
 
-void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g)
+void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_t *g, struct
+		opt_proc_t *opt)
 {
 	init_global_params(g);
 	check_global_params(g);
 	int n_v, *listV = NULL;
-	fscanf(fp, "n_v: %d\n", &n_v);
+	fscanf(fp, "n_long_contig: %d\n", &n_v);
 	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {
 		fscanf(fp, "vertex:%d\n", &listV[i]);
 	}
@@ -467,6 +501,16 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 	}
 	qsort(listE, n_e, sizeof(struct contig_edge), less_contig_edge);
 	unique_edge(listE, &n_e);
+
+	char *tmp = str_concate(opt->out_dir, "/list_unique_contig");
+	FILE *f_unique = fopen(tmp, "w");
+	for (int i = 0; i < n_e; i++) {
+		normalize_one_dir(g, &listE[i]);
+		fprintf(f_unique, "%d %d\n", listE[i].src, listE[i].des);
+	}
+	fclose(f_unique);
+
+
 	print_gfa_from_E(g, n_e, listE, n_v, listV, out_graph);
 
 	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV, avg_bin_hash);
@@ -477,7 +521,11 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 	init_global_params(g);
+	__VERBOSE("n_e: %ld\n", g->n_e);
+	for (int i = 0; i < g->n_e; i++)
+		__VERBOSE("edge %d length %d\n", i, g->edges[i].seq_len);
+
 	check_global_params(g);
-	build_big_table(g, opt);
+	//build_big_table(g, opt);
 }
 

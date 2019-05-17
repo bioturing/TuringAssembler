@@ -69,7 +69,6 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	int cnt0 = 0, cnt1 = 0, res2 = 0;
 	float ratio0 = edge0_cov / global_genome_coverage, ratio1 = edge1_cov / global_genome_coverage;
 
-//	VERBOSE_FLAG(0, "ratio %f %f\n" , ratio0, ratio1);
 	for (uint32_t i = 0; i < buck1->size; ++i) {
 		if (buck1->cnts[i] != (uint32_t)(-1)) {
 			if (buck1->cnts[i] >= (uint32_t)thres_cnt) {

@@ -145,7 +145,7 @@ void build_scaffolding_2_process(struct opt_proc_t *opt)
 	char *out_graph_name = str_concate(opt->out_dir, "/tengicungduoc");
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, out_graph, g0);
+	connect_contig(fp, out_file, out_graph, g0, opt);
 
 	free(out_name);
 	fclose(out_file);
@@ -168,7 +168,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 
 	//step 2:
 	FILE *fp;
-	if ((fp = fopen(opt->in_file,"r")) == NULL){
+	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
 
@@ -178,7 +178,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	char *out_graph_name = str_concate(opt->out_dir, "/tengicungduoc");
 	FILE *out_graph = fopen(out_graph_name, "w");
 	
-	connect_contig(fp, out_file, out_graph, g0);
+	connect_contig(fp, out_file, out_graph, g0, opt);
 
 	free(out_name);
 	fclose(out_file);
