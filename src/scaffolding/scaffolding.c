@@ -22,6 +22,7 @@
 static pthread_mutex_t lock_merge = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_table = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t lock_put_table = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_append_edges = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_write_file = PTHREAD_MUTEX_INITIALIZER;
 
@@ -161,6 +162,7 @@ pthread_attr_t init_thread_attr()
 struct list_position{
 	int n_pos;
 	int *i_contig, *i_bin, *count;
+	pthread_mutex_t lock_entry ;
 } ;
 
 KHASH_MAP_INIT_INT64(big_table, struct list_position*)
@@ -215,7 +217,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		float edge_cov  = __get_edge_cov(&params->g->edges[long_contig], params->g->ksize);
 		float value = count[long_contig] / edge_cov;
 		VERBOSE_FLAG(3, "count %d %f\n", long_contig, value);
-		if (value < 30)
+		if (value < 0)
 			continue;
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
@@ -232,6 +234,7 @@ struct params_build_big_table {
 	int i,j;
 	struct asm_graph_t *g;
 	khash_t(big_table) *big_table;
+	int n_long_contig, *list_long_contig;
 };
 
 void *process_build_big_table(void *data)
@@ -239,7 +242,7 @@ void *process_build_big_table(void *data)
 	void next_index(struct params_build_big_table *params, struct asm_graph_t *g)
 	{
 		int len = 0;
-		struct asm_edge_t *e = &g->edges[params->i];
+		struct asm_edge_t *e = &g->edges[params->list_long_contig[params->i]];
 		int n_bucks = (get_edge_len(e) + 1000-1) / 1000;
 		(params->j)++;
 		if (params->j == n_bucks) {
@@ -247,21 +250,22 @@ void *process_build_big_table(void *data)
 			params->j = 0;
 		}
 		if (params->j == 3)
-			params->j = MAX(n_bucks - 3, 3);
+			params->j = n_bucks - 3;
 	}
 	
 	// ________________________________________BEGIN___________________________________
 	struct params_build_big_table *params = (struct params_build_big_table *) data;
 	struct asm_graph_t *g = params->g;
 	khash_t(big_table) *big_table = params->big_table;
+	int *list_long_contig = params->list_long_contig;
 
 	do {
 		pthread_mutex_lock(&lock_id);
-		next_index(params, g);
-		if (params->i == g->n_e){
+		if (params->i == params->n_long_contig){
 			pthread_mutex_unlock(&lock_id);
 			break;
 		}
+		next_index(params, g);
 		int i = params->i;
 		int j = params->j;
 		int new_i_contig = i;
@@ -269,44 +273,60 @@ void *process_build_big_table(void *data)
 		int new_count;
 		pthread_mutex_unlock(&lock_id);
 		
-		struct asm_edge_t *e = &g->edges[i];
+		struct asm_edge_t *e = &g->edges[list_long_contig[i]];
+		assert(e != NULL);
 		struct barcode_hash_t *buck = &e->bucks[j];
 		for (int l = 0; l < buck->size; l++){
 			if (buck->cnts[l] > 0){
 				new_count = buck->cnts[l];
 				uint64_t barcode  = buck->keys[l];
-				pthread_mutex_lock(&lock_table);
+				pthread_mutex_lock(&lock_put_table);
 				khint_t k = kh_get(big_table, big_table, barcode);
 				if (k == kh_end(big_table)) {
-					int tmp;
+					int tmp=1;
 					k = kh_put(big_table, big_table, barcode, &tmp);
 					VERBOSE_FLAG(3, "tmp is %d\n", tmp);
 					assert(tmp == 1);
 				}
+				pthread_mutex_unlock(&lock_put_table);
 				assert(k != kh_end(big_table));
+				pthread_mutex_lock(&lock_put_table);
 				struct list_position *pos = kh_value(big_table, k);
 				if (pos == NULL){
 					pos = calloc(1, sizeof(struct list_position));
 					kh_value(big_table,k) = pos;
+					pos->lock_entry = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER ;
 				} 
+				pthread_mutex_unlock(&lock_put_table);
+				pthread_mutex_lock(&pos->lock_entry);
 				int v = pos->n_pos;
-				pos->i_contig = realloc(pos->i_contig, (v+1) *
-						sizeof(int));
+//				if (v == 0) {
+//					pos->i_contig = realloc(pos->i_contig, 16 *
+//							sizeof(int));
+//					pos->i_bin = realloc(pos->i_bin, 16 *
+//							sizeof(int));
+//					pos->count = realloc(pos->count, 16 * sizeof(int));
+//				}
+				if ((v&(v-1)) == 0) {
+					pos->i_contig = realloc(pos->i_contig, (v*2+1) *
+							sizeof(int));
+					pos->i_bin = realloc(pos->i_bin, (v*2+1) *
+							sizeof(int));
+					pos->count = realloc(pos->count, (v*2+1) * sizeof(int));
+				}
+					
 				pos->i_contig[v] = new_i_contig;
-				pos->i_bin = realloc(pos->i_bin, (v+1) *
-						sizeof(int));
 				pos->i_bin[v] = new_i_bin;
-				pos->count = realloc(pos->count, (v+1) * sizeof(int));
 				pos->count[v] = new_count;
 				pos->n_pos++;
-				pthread_mutex_unlock(&lock_table);
+				pthread_mutex_unlock(&pos->lock_entry);
 			}
    		}
 		// todo @huu lock at only this entry pthread_mutex_lock(
 	} while (1);
 }
 
-khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *opt)
+khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *opt, int n_long_contig, int *list_long_contig)
 {
 	pthread_t *thr = (pthread_t *)calloc(opt->n_threads, sizeof(pthread_t));
 	pthread_attr_t attr = init_thread_attr();
@@ -317,8 +337,10 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	params_build_table->j = -1;
 	params_build_table->g = g;
 	params_build_table->big_table = kh_init(big_table);
+	params_build_table->n_long_contig = n_long_contig;
+	params_build_table->list_long_contig = list_long_contig;
 	// todo @huu auto resize
-	kh_resize(big_table, params_build_table->big_table, 100000000);
+	kh_resize(big_table, params_build_table->big_table, 10000000);
 
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_create(&thr[i], &attr, process_build_big_table, params_build_table);
@@ -329,39 +351,13 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	khash_t(big_table) *big_table = params_build_table->big_table ;
 
 	//test
-	struct barcode_hash_t buck = g->edges[152].bucks[0];
-	int *count = calloc(2000, 4);
-	for (int jj = 0; jj < buck.size; jj++) {
-		uint64_t barcode;
-			if (buck.cnts[jj] > 0) {
-				barcode = buck.keys[jj];
-			}else {
-				continue;
-			}
-		khint_t k = kh_get(big_table, big_table, barcode);
-		assert(k != kh_end(big_table));
-		struct list_position *pos = kh_value(big_table, k);
-		assert(pos != NULL);
-		for (int i = 0; i < pos->n_pos; i++) {
-			count[pos->i_contig[i]]+= pos->count[i];
-			VERBOSE_FLAG(3, "%d %d", pos->i_contig[i], pos->i_bin[i]);
-			VERBOSE_FLAG(3, "%d ", pos->count[i]);
-		}
-		VERBOSE_FLAG(3, "\n");
-	}
-	int sum = 0;
-	for (int i = 0; i < 1000; i++) {
-		VERBOSE_FLAG(3, "%d %d \n", i, count[i]);
-		sum += count[i];
-	};
-	VERBOSE_FLAG(1, "sum %d\n", sum);
-
 	//end test
 	return big_table;
 }
 
 void *process_build_candidate_edges(void *data)
 {
+	VERBOSE_FLAG(1, "build edgeee \n");
 	struct params_build_candidate_edges *params_candidate = 
 		(struct params_build_candidate_edges*) data;
 	int *list_long_contig = params_candidate->list_long_contig;
@@ -415,7 +411,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 	assert(list_long_contig != NULL);
 	params_candidate->g = g;
 	params_candidate->i = 0;
-	params_candidate->big_table = build_big_table(g, opt);
+	params_candidate->big_table = build_big_table(g, opt, n_long_contig, list_long_contig);
 	params_candidate->n_long_contig = n_long_contig;
 	params_candidate->list_long_contig = list_long_contig;
 	params_candidate->n_candidate_edges = 0;
