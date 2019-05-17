@@ -370,6 +370,7 @@ void *process_build_candidate_edges(void *data)
 		} else {
 			i = params_candidate->i++;
 		}
+		VERBOSE_FLAG(1, "build edge from %d\n", i);
 		pthread_mutex_unlock(&lock_id);
 		int e = list_long_contig[i];
 		int n_local_edges = 0; 
