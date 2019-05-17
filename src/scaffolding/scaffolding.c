@@ -265,12 +265,12 @@ void *process_build_big_table(void *data)
 			pthread_mutex_unlock(&lock_id);
 			break;
 		}
-		next_index(params, g);
 		int i = params->i;
 		int j = params->j;
 		int new_i_contig = i;
 		int new_i_bin = j;
 		int new_count;
+		next_index(params, g);
 		pthread_mutex_unlock(&lock_id);
 		
 		struct asm_edge_t *e = &g->edges[list_long_contig[i]];
@@ -334,7 +334,7 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	struct params_build_big_table *params_build_table = calloc(1, sizeof(struct
 				params_build_big_table));
 	params_build_table->i = 0;
-	params_build_table->j = -1;
+	params_build_table->j = 0;
 	params_build_table->g = g;
 	params_build_table->big_table = kh_init(big_table);
 	params_build_table->n_long_contig = n_long_contig;
