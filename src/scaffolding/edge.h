@@ -10,6 +10,7 @@ struct contig_edge {
 
 struct candidate_edge {
 	int src, des;
+	float score;
 };
 
 struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash);

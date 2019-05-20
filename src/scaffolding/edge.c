@@ -189,7 +189,7 @@ void build_V_from_E(struct contig_edge *listE, int n_e, int **listV, int *n_v)
 		*listV = realloc(*listV, (*n_v)*(sizeof(int)));
 		(*listV)[(*n_v)-1] = listE[i].des;
 	}
-	qsort(*listV, *n_v, sizeof(int), less_uint32);
+	qsort(*listV, *n_v, sizeof(int), ascending_unint32);
 	for (int i = 0; i < *n_v; i++) {
 		VERBOSE_FLAG(3, "list V: %d ", (*listV)[i]);
 	}

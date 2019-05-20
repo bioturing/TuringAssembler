@@ -75,6 +75,7 @@ struct params_check_edge {
 	int n_candidate_edges;
 	struct candidate_edge *list_candidate_edges;
 	float avg_bin_hash, thres_score;
+	float *score_edge_matrix;
 	FILE *out_file;
 };
 
@@ -113,13 +114,9 @@ void *process_check_edge(void *data)
 			check = 1;
 		}
 		if (check) {
-			if (score.score > thres_score) {
-				if (!check_replicate_contig_edge(g, e0, e1, n_bucks, thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
-					pthread_mutex_lock(&lock_write_file);
-					fprintf(out_file, "score: %f edge: %d %d\n", score.score, e0, e1); 
-					pthread_mutex_unlock(&lock_write_file);
-				}
-			}
+			pa_check_edge->score_edge_matrix[e0 * g->n_e + e1] = score.score;
+		} else {
+			pa_check_edge->score_edge_matrix[e0 * g->n_e + e1] = -1;
 		}
 		VERBOSE_FLAG(3, "score %f\n", score.score); 
 	} while (1); 
@@ -208,26 +205,39 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		} 
 	}
 
-	
 	VERBOSE_FLAG(3, "from edge %d\n", i_edge);
 	for (int i = 0; i < params->n_long_contig; i++){
-
 		int long_contig = params->list_long_contig[i];
-
 		float edge_cov  = __get_edge_cov(&params->g->edges[long_contig], params->g->ksize);
 		float value = count[long_contig] / edge_cov;
-		VERBOSE_FLAG(3, "count %d %f\n", long_contig, value);
-		if (value < 0)
+		VERBOSE_FLAG(0, "src %d des %d value %d\n", i_edge, long_contig, count[long_contig]);
+		if (value < 15)
 			continue;
+		VERBOSE_FLAG(3, "count %d %f\n", long_contig, value);
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
 		struct candidate_edge *new_candidate_edge = calloc(1, sizeof(struct candidate_edge));
 		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = params->list_long_contig[i];
+		new_candidate_edge->score = value;
 
 		(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 		++*n_local_edges;
 	}
+//	VERBOSE_FLAG(0, "n_local_edges %d\n ", *n_local_edges);
+//	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
+//
+//	*n_local_edges = MIN(*n_local_edges, 40);
+//	for (int i = 0; i < *n_local_edges; i++){
+//		struct candidate_edge e = (*list_local_edges)[i];
+//		VERBOSE_FLAG(0, "src %d des %d score %f \n", e.src, e.des, (*list_local_edges)[i].score );
+//		if ((*list_local_edges)[i].score == 0 )//global_filter_constant / 10)
+//		{
+//			*n_local_edges = i;
+//			break;
+//		}
+//	}
+	
 }
 
 struct params_build_big_table {
@@ -391,54 +401,117 @@ void *process_build_candidate_edges(void *data)
 	pthread_exit(NULL);
 }
 
+void init_params_build_candidate_edges(struct params_build_candidate_edges **params_candidate, 
+	struct asm_graph_t *g, int n_long_contig, int *list_long_contig, struct opt_proc_t *opt)
+{
+	(*params_candidate) = calloc(1, sizeof(struct params_build_candidate_edges));
+	(*params_candidate)->g = g;
+	(*params_candidate)->i = 0;
+	(*params_candidate)->big_table = build_big_table(g, opt, n_long_contig, list_long_contig);
+	(*params_candidate)->n_long_contig = n_long_contig;
+	(*params_candidate)->list_long_contig = list_long_contig;
+	(*params_candidate)->n_candidate_edges = 0;
+	(*params_candidate)->list_candidate_edges = NULL;
+}
+
+void run_parallel_build_candidate_edges(struct params_build_candidate_edges *params_candidate, int n_threads)
+{
+	assert(params_candidate != NULL);
+	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
+	pthread_attr_t attr = init_thread_attr();
+	for (int i = 0; i < n_threads; ++i)
+		pthread_create(&thr[i], &attr, process_build_candidate_edges, params_candidate);
+	for (int i = 0; i < n_threads; ++i)
+		pthread_join(thr[i], NULL);
+	free(thr);
+	pthread_attr_destroy(&attr);
+}
+
+void init_params_check_edge(struct params_check_edge **params, struct asm_graph_t *g, 
+	float avg_bin_hash, FILE *out_file, struct params_build_candidate_edges *params_candidate)
+{
+	*params = calloc(1, sizeof(struct params_check_edge));
+	(*params)->g = g;
+	(*params)->i = 0;
+	(*params)->n_bucks = global_n_buck;
+	(*params)->avg_bin_hash = avg_bin_hash;
+	(*params)->thres_score = global_thres_bucks_score;
+	(*params)->out_file = out_file;
+	(*params)->list_candidate_edges = params_candidate->list_candidate_edges;
+	(*params)->n_candidate_edges = params_candidate->n_candidate_edges;
+	(*params)->score_edge_matrix = calloc(g->n_e * g->n_e, sizeof(float));
+}
+
+void parallel_build_edge_score(struct params_check_edge *para, int n_threads)
+{
+	pthread_t *thr = (pthread_t *)calloc(n_threads, sizeof(pthread_t));
+	pthread_attr_t attr = init_thread_attr();
+	for (int i = 0; i < n_threads; ++i)
+		pthread_create(&thr[i], &attr, process_check_edge, para);
+	for (int i = 0; i < n_threads; ++i)
+		pthread_join(thr[i], NULL);
+	free(thr);
+	pthread_attr_destroy(&attr);
+}
+
 void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *opt) 
 {
 	init_global_params(g);
 	check_global_params(g);
+
 	int n_long_contig = 0, *list_long_contig = NULL;
 	get_long_contig(g, global_thres_length, &n_long_contig, &list_long_contig);
+	assert(list_long_contig != NULL);
 	print_list_long_contig(out_file, n_long_contig, list_long_contig);
 	float avg_bin_hash = get_avg_unique_bin_hash(g);
 
 	VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
 	VERBOSE_FLAG(1, "n_long_contig: %d\n", n_long_contig);
 
-	pthread_t *thr = (pthread_t *)calloc(opt->n_threads, sizeof(pthread_t));
-	pthread_attr_t attr = init_thread_attr();
 
-	struct contig_edge *list_candidate_edges = NULL;
-	struct params_build_candidate_edges *params_candidate = calloc(1,
-			sizeof(struct params_build_candidate_edges));
-	assert(list_long_contig != NULL);
-	params_candidate->g = g;
-	params_candidate->i = 0;
-	params_candidate->big_table = build_big_table(g, opt, n_long_contig, list_long_contig);
-	params_candidate->n_long_contig = n_long_contig;
-	params_candidate->list_long_contig = list_long_contig;
-	params_candidate->n_candidate_edges = 0;
-	params_candidate->list_candidate_edges = NULL;
+	struct params_build_candidate_edges *params_candidate ;
+	init_params_build_candidate_edges(&params_candidate, g, n_long_contig, list_long_contig, opt);
+	run_parallel_build_candidate_edges(params_candidate, opt->n_threads);
 
-	for (int i = 0; i < opt->n_threads; ++i)
-		pthread_create(&thr[i], &attr, process_build_candidate_edges, params_candidate);
-	for (int i = 0; i < opt->n_threads; ++i)
-		pthread_join(thr[i], NULL);
-
-	struct params_check_edge *para =  calloc(1, sizeof(struct params_check_edge));
-	para->g = g;
-	para->i = 0;
-	para->n_bucks = global_n_buck;
-	para->avg_bin_hash = avg_bin_hash;
-	para->thres_score = global_thres_bucks_score;
-	para->out_file = out_file;
-	para->list_candidate_edges = params_candidate->list_candidate_edges;
-	para->n_candidate_edges = params_candidate->n_candidate_edges;
+	struct params_check_edge *para;
+	init_params_check_edge(&para, g, avg_bin_hash, out_file, params_candidate);
+	parallel_build_edge_score(para, opt->n_threads);
 	VERBOSE_FLAG(1, "n candidate edges %d", para->n_candidate_edges);
-	for (int i = 0; i < opt->n_threads; ++i)
-		pthread_create(&thr[i], &attr, process_check_edge, para);
-	for (int i = 0; i < opt->n_threads; ++i)
-		pthread_join(thr[i], NULL);
-	free(thr);
-	pthread_attr_destroy(&attr);
+
+	for (int i = 0; i < g->n_e; i++) {
+		for (int j = 0; j < g->n_e; j++) {
+			float score = para->score_edge_matrix[i * g->n_e + j];
+		}
+	}
+	int n_bucks = para->n_bucks;
+	for (int i = 0; i < n_long_contig; i++) {
+		int i_edge =  list_long_contig[i];
+		struct contig_edge *list_E = NULL;
+		int n_contig_edge = 0;
+		for (int j = 0; j < g->n_e; j++) {
+			float score = para->score_edge_matrix[i_edge * g->n_e + j];
+			struct contig_edge new_edge;
+			new_edge.src = i_edge;
+			new_edge.des = j;
+			new_edge.score0 = score;
+			n_contig_edge++;
+			list_E = realloc(list_E, n_contig_edge * (sizeof(struct contig_edge)));
+			list_E[n_contig_edge-1] = new_edge;
+		}
+		qsort(list_E, n_contig_edge, sizeof(struct contig_edge), decending_edge_score);
+		for (int j = 0; j < 8 ; j++) {
+			int j_edge = list_E[j].des;
+			float score = list_E[j].score0;
+			if (score < para->thres_score) {
+				break;
+			}
+//			if (!check_replicate_contig_edge(g, i_edge, j_edge, n_bucks, para->thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
+				fprintf(out_file, "score: %f edge: %d %d\n", list_E[j].score0, list_E[j].src, list_E[j].des); 
+//			}
+		}
+		free(list_E);
+	}
+
 	free(list_long_contig);
 }
 

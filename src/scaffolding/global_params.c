@@ -9,7 +9,7 @@
 LIST_GLOBAL_PARAMS
 #undef X
 
-int log_level = 2;
+int log_level = 1;
 
 void check_global_params()
 {
@@ -75,5 +75,6 @@ void init_global_params(struct asm_graph_t *g)
 	global_thres_coefficent = 0.20;
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
+	global_filter_constant = 30;
 }
 
