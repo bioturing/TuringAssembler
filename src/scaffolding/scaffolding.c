@@ -28,6 +28,7 @@ static pthread_mutex_t lock_write_file = PTHREAD_MUTEX_INITIALIZER;
 
 
 struct params{
+	struct opt_proc_t *opt;
 	struct asm_graph_t *g;
 	int i;
 };
@@ -56,7 +57,7 @@ void *process(void *data)
 		FILE *f = fopen(file_name, "w");
 		for (int j = 0; j < MIN(20, n_bucks - 4); j+=5){
 			for (int j1 = j + 4; j1 < n_bucks -4; j1++) {
-				float tmp  = get_score_multiple_buck(pa->g, e, &e->bucks[j], &e->bucks[j1]);
+				float tmp  = get_score_multiple_buck(pa->g, e, &e->bucks[j], &e->bucks[j1], pa->opt);
 				fprintf(f, "distance %d %f\n", j1 - j, tmp);
 			}
 		}
@@ -77,6 +78,7 @@ struct params_check_edge {
 	float avg_bin_hash, thres_score;
 	float *score_edge_matrix;
 	FILE *out_file;
+	struct opt_proc_t *opt;
 };
 
 void *process_check_edge(void *data)
@@ -102,7 +104,8 @@ void *process_check_edge(void *data)
 		int e0 = list_candidate_edges[i].src;
 		int e1 = list_candidate_edges[i].des;
 		assert(e1 < g->n_e && e0 < g->n_e);
-		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, avg_bin_hash);
+		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, 
+						avg_bin_hash, pa_check_edge->opt);
 		int check = 0;
 		if (e0 == e1){
 			float cvr = global_genome_coverage;
@@ -205,15 +208,10 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		} 
 	}
 
-	VERBOSE_FLAG(3, "from edge %d\n", i_edge);
 	for (int i = 0; i < params->n_long_contig; i++){
 		int long_contig = params->list_long_contig[i];
 		float edge_cov  = __get_edge_cov(&params->g->edges[long_contig], params->g->ksize);
 		float value = count[long_contig] / edge_cov;
-		VERBOSE_FLAG(0, "src %d des %d value %d\n", i_edge, long_contig, count[long_contig]);
-		if (value < 15)
-			continue;
-		VERBOSE_FLAG(3, "count %d %f\n", long_contig, value);
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
 		struct candidate_edge *new_candidate_edge = calloc(1, sizeof(struct candidate_edge));
@@ -224,19 +222,17 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 		++*n_local_edges;
 	}
-//	VERBOSE_FLAG(0, "n_local_edges %d\n ", *n_local_edges);
-//	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
-//
-//	*n_local_edges = MIN(*n_local_edges, 40);
-//	for (int i = 0; i < *n_local_edges; i++){
-//		struct candidate_edge e = (*list_local_edges)[i];
-//		VERBOSE_FLAG(0, "src %d des %d score %f \n", e.src, e.des, (*list_local_edges)[i].score );
-//		if ((*list_local_edges)[i].score == 0 )//global_filter_constant / 10)
-//		{
-//			*n_local_edges = i;
-//			break;
-//		}
-//	}
+	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
+
+	*n_local_edges = MIN(*n_local_edges, 40);
+	for (int i = 0; i < *n_local_edges; i++){
+		struct candidate_edge e = (*list_local_edges)[i];
+		if (i > 10 && (*list_local_edges)[i].score < global_filter_constant / 2 )
+		{
+			*n_local_edges = i;
+			break;
+		}
+	}
 	
 }
 
@@ -277,7 +273,7 @@ void *process_build_big_table(void *data)
 		}
 		int i = params->i;
 		int j = params->j;
-		int new_i_contig = i;
+		int new_i_contig = params->list_long_contig[i];
 		int new_i_bin = j;
 		int new_count;
 		next_index(params, g);
@@ -310,13 +306,7 @@ void *process_build_big_table(void *data)
 				pthread_mutex_unlock(&lock_put_table);
 				pthread_mutex_lock(&pos->lock_entry);
 				int v = pos->n_pos;
-//				if (v == 0) {
-//					pos->i_contig = realloc(pos->i_contig, 16 *
-//							sizeof(int));
-//					pos->i_bin = realloc(pos->i_bin, 16 *
-//							sizeof(int));
-//					pos->count = realloc(pos->count, 16 * sizeof(int));
-//				}
+				pos->n_pos++;
 				if ((v&(v-1)) == 0) {
 					pos->i_contig = realloc(pos->i_contig, (v*2+1) *
 							sizeof(int));
@@ -328,7 +318,6 @@ void *process_build_big_table(void *data)
 				pos->i_contig[v] = new_i_contig;
 				pos->i_bin[v] = new_i_bin;
 				pos->count[v] = new_count;
-				pos->n_pos++;
 				pthread_mutex_unlock(&pos->lock_entry);
 			}
    		}
@@ -350,14 +339,14 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	params_build_table->n_long_contig = n_long_contig;
 	params_build_table->list_long_contig = list_long_contig;
 	// todo @huu auto resize
-	kh_resize(big_table, params_build_table->big_table, 10000000);
+	kh_resize(big_table, params_build_table->big_table, 100000000);
 
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_create(&thr[i], &attr, process_build_big_table, params_build_table);
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(thr[i], NULL);
 
-	VERBOSE_FLAG(1, "build done");
+	VERBOSE_FLAG(1, "build done\n");
 	khash_t(big_table) *big_table = params_build_table->big_table ;
 
 	//test
@@ -428,7 +417,8 @@ void run_parallel_build_candidate_edges(struct params_build_candidate_edges *par
 }
 
 void init_params_check_edge(struct params_check_edge **params, struct asm_graph_t *g, 
-	float avg_bin_hash, FILE *out_file, struct params_build_candidate_edges *params_candidate)
+	float avg_bin_hash, FILE *out_file, struct params_build_candidate_edges *params_candidate, 
+	struct opt_proc_t *opt)
 {
 	*params = calloc(1, sizeof(struct params_check_edge));
 	(*params)->g = g;
@@ -440,6 +430,7 @@ void init_params_check_edge(struct params_check_edge **params, struct asm_graph_
 	(*params)->list_candidate_edges = params_candidate->list_candidate_edges;
 	(*params)->n_candidate_edges = params_candidate->n_candidate_edges;
 	(*params)->score_edge_matrix = calloc(g->n_e * g->n_e, sizeof(float));
+	(*params)->opt = opt;
 }
 
 void parallel_build_edge_score(struct params_check_edge *para, int n_threads)
@@ -465,16 +456,15 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 	print_list_long_contig(out_file, n_long_contig, list_long_contig);
 	float avg_bin_hash = get_avg_unique_bin_hash(g);
 
-	VERBOSE_FLAG(1, "avg_bin_hash %f", avg_bin_hash);
+	VERBOSE_FLAG(1, "avg_bin_hash %f\n", avg_bin_hash);
 	VERBOSE_FLAG(1, "n_long_contig: %d\n", n_long_contig);
-
 
 	struct params_build_candidate_edges *params_candidate ;
 	init_params_build_candidate_edges(&params_candidate, g, n_long_contig, list_long_contig, opt);
 	run_parallel_build_candidate_edges(params_candidate, opt->n_threads);
 
 	struct params_check_edge *para;
-	init_params_check_edge(&para, g, avg_bin_hash, out_file, params_candidate);
+	init_params_check_edge(&para, g, avg_bin_hash, out_file, params_candidate, opt);
 	parallel_build_edge_score(para, opt->n_threads);
 	VERBOSE_FLAG(1, "n candidate edges %d", para->n_candidate_edges);
 
@@ -483,6 +473,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 			float score = para->score_edge_matrix[i * g->n_e + j];
 		}
 	}
+	VERBOSE_FLAG(1, "find real edge");
 	int n_bucks = para->n_bucks;
 	for (int i = 0; i < n_long_contig; i++) {
 		int i_edge =  list_long_contig[i];
@@ -499,12 +490,13 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 			list_E[n_contig_edge-1] = new_edge;
 		}
 		qsort(list_E, n_contig_edge, sizeof(struct contig_edge), decending_edge_score);
-		for (int j = 0; j < 8 ; j++) {
+		for (int j = 0; j < MIN(8, n_contig_edge) ; j++) {
 			int j_edge = list_E[j].des;
 			float score = list_E[j].score0;
-			if (score < para->thres_score) {
+			if ((j >= 2 && score < para->thres_score) || score <=0) {
 				break;
 			}
+			// todo @huu should I used this function? It seem not good now.
 //			if (!check_replicate_contig_edge(g, i_edge, j_edge, n_bucks, para->thres_score*(n_bucks * n_bucks - 1), avg_bin_hash)) {
 				fprintf(out_file, "score: %f edge: %d %d\n", list_E[j].score0, list_E[j].src, list_E[j].des); 
 //			}
@@ -515,12 +507,16 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 	free(list_long_contig);
 }
 
-void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, struct contig_edge *listE_ori, int n_e, int n_v, int *listV, float avg_bin_hash)
+void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g, 
+		struct contig_edge *listE_ori, int n_e, int n_v, int *listV, float avg_bin_hash)
 {
-	struct contig_edge *list_one_dir_E = calloc(2*n_e, sizeof(struct contig_edge));
+	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
 	for (int i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE_ori[i];
 		normalize_one_dir(g, list_one_dir_E+i);
+	}
+	for (int i = 0; i < n_e; i++) {
+		VERBOSE_FLAG(3, "unique4 %d %d\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 	}
 	VERBOSE_FLAG(1, "in graph when find hamiltonian n_e n_v: %d %d\n", n_e, n_v);
 	VERBOSE_FLAG(3, "listV:\n");
@@ -559,6 +555,7 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {
 		fscanf(fp, "vertex:%d\n", &listV[i]);
 	}
+	VERBOSE_FLAG(1, "load n_long_contig %d done", n_v);
 	float score;
 	int src, des;
 	struct contig_edge *listE = NULL;
@@ -567,10 +564,12 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 	while (fscanf(fp,"score: %f edge: %d %d\n", &score, &src, &des) !=EOF) {
 		n_e += 1;
 		listE = realloc(listE, n_e*sizeof(struct contig_edge));
-		add_contig_edge(g, listE, n_e-1, src, des, score);
+		add_contig_edge(g, listE, n_e-1, src, des, score, opt);
 	}
+	VERBOSE_FLAG(1, "done add contig edge\n");
 	qsort(listE, n_e, sizeof(struct contig_edge), less_contig_edge);
 	unique_edge(listE, &n_e);
+	VERBOSE_FLAG(1, "n_e after unique %d \n", n_e);
 
 	char *tmp = str_concate(opt->out_dir, "/list_unique_contig");
 	FILE *f_unique = fopen(tmp, "w");
@@ -581,7 +580,7 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 	fclose(f_unique);
 
 
-	print_gfa_from_E(g, n_e, listE, n_v, listV, out_graph);
+//	print_gfa_from_E(g, n_e, listE, n_v, listV, out_graph);
 
 	find_hamiltonian_contig_edge(out_file, g, listE, n_e, n_v, listV, avg_bin_hash);
 	free(listE);

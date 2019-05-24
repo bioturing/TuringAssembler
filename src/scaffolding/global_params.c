@@ -9,7 +9,7 @@
 LIST_GLOBAL_PARAMS
 #undef X
 
-int log_level = 1;
+int log_level = 2;
 
 void check_global_params()
 {

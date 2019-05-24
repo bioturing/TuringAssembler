@@ -282,6 +282,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-cf")) {
 			opt->in_contig_file = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-mul_data")){
+			opt->mul_data = 1;
+			pos += 1;
 		} else if (!strcmp(argv[pos], "-l")) {
 			opt->lib_type = get_library_index(argv[pos + 1]);
 			if (opt->lib_type == -1)

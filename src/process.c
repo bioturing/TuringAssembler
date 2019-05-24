@@ -136,6 +136,9 @@ void build_scaffolding_2_process(struct opt_proc_t *opt)
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 
 	FILE *fp;
+	if (opt->in_contig_file == NULL) {
+		opt->in_contig_file = str_concate(opt->out_dir, "/list_contig");
+	} 
 	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
 		__VERBOSE("openfile error");
 	}
@@ -168,10 +171,13 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 
 	//step 2:
 	FILE *fp;
+	if (opt->in_contig_file == NULL) {
+		__VERBOSE( "fffffff");
+		opt->in_contig_file = str_concate(opt->out_dir, "/list_contig");
+	} 
 	if ((fp = fopen(opt->in_contig_file,"r")) == NULL){
 		__VERBOSE("openfile error");
-	}
-
+	} 
 	char *out_name = str_concate(opt->out_dir, "/scaffolds.fasta");
 	FILE *out_file = fopen(out_name, "w");
 

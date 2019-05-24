@@ -9,7 +9,8 @@
 #include "scaffolding/compare.h"
 #include "scaffolding/score.h"
 
-struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks, float avg_bin_hash)
+struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks,
+ 			float avg_bin_hash, struct opt_proc_t *opt)
 {
 	struct matrix_score *score = NULL;
 	score = realloc(score, sizeof(struct matrix_score));
@@ -32,8 +33,8 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(int));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(int));
 	for (int i = 0; i < score->n_bucks; ++i) {
-		check_bucks_A[i] = check_qualify_buck(g, rev_e0, i, avg_bin_hash);
-		check_bucks_B[i] = check_qualify_buck(g, e1, i, avg_bin_hash);
+		check_bucks_A[i] = check_qualify_buck(g, rev_e0, i, avg_bin_hash, opt);
+		check_bucks_B[i] = check_qualify_buck(g, e1, i, avg_bin_hash, opt);
 	}
 	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
 	float cov_e1 = __get_edge_cov(e1, g->ksize);
@@ -102,13 +103,14 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_has
 	return score;
 }
 
-int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1, const int n_bucks, float threshold, float avg_bin_hash)
+int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1, 
+		const int n_bucks, float threshold, float avg_bin_hash, struct opt_proc_t *opt)
 {
 	int rev_i0 = g->edges[i0].rc_id, rev_i1 = g->edges[i1].rc_id;
-	struct matrix_score *s0 = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash);
-	struct matrix_score *s1 = get_score_edges_matrix(g, i0, rev_i1, n_bucks, avg_bin_hash);
-	struct matrix_score *s2 = get_score_edges_matrix(g, rev_i0, i1, n_bucks, avg_bin_hash);
-	struct matrix_score *s3 = get_score_edges_matrix(g, rev_i0, rev_i1, n_bucks, avg_bin_hash);
+	struct matrix_score *s0 = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_score *s1 = get_score_edges_matrix(g, i0, rev_i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_score *s2 = get_score_edges_matrix(g, rev_i0, i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_score *s3 = get_score_edges_matrix(g, rev_i0, rev_i1, n_bucks, avg_bin_hash, opt);
 	int res = (detect_anomal_diagonal(s0, threshold) || detect_anomal_diagonal(s1, threshold) || detect_anomal_diagonal(s2, threshold) || detect_anomal_diagonal(s3, threshold));
 	destroy_matrix_score(s0);
 	destroy_matrix_score(s1);
@@ -117,9 +119,10 @@ int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1, const int
 	return res;
 }
 
-struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, const int n_bucks, float avg_bin_hash) 
+struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, const int n_bucks, 
+		float avg_bin_hash, struct opt_proc_t *opt) 
 {
-	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash);
+	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash, opt);
 	mat_score->A[0] = -1;
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	float res = 0;
@@ -141,17 +144,18 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 	return res_score;
 }
 
-void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, int pos, int src, int des, float score0)
+void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, int pos, int src, int des, 
+		float score0, struct opt_proc_t *opt)
 {
 	assert(src >= 0 && des >= 0 && src < g->n_e && des < g->n_e);
-	struct contig_edge e;
-	e.src = src;
-	e.des = des;
-	e.score0 = score0;
-	e.rv_src = 0;
-	e.rv_des = 0;
-	normalize_min_index(g, &e);
-	listE[pos] = e;
+	struct contig_edge *e = calloc(1, sizeof(struct contig_edge));
+	e->src = src;
+	e->des = des;
+	e->score0 = score0;
+	e->rv_src = 0;
+	e->rv_des = 0;
+	normalize_min_index(g, e);
+	listE[pos] = *e;
 }
 
 void unique_edge(struct contig_edge *listE, int *n_e)
@@ -159,15 +163,15 @@ void unique_edge(struct contig_edge *listE, int *n_e)
 	int new_n_e = 0;
 	for (int i = 0; i < *n_e; ) {
 		int j = i;
-		struct contig_edge best;
-		best.score0 = 0;
+		struct contig_edge *best = calloc(1, sizeof(struct contig_edge));
+		best->score0 = -1;
 		while (j < *n_e && equal_contig_edge(&listE[j], &listE[i])){
-			if (better_contig_edge(&listE[j], &best)){
-				best = listE[j];
+			if (better_contig_edge(&listE[j], best)){
+				best = &listE[j];
 			}
 			++j;
 		}
-		listE[new_n_e++] = best;
+		listE[new_n_e++] = *best;
 		i = j;
 	}
 	*n_e = new_n_e;

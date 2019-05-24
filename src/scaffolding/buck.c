@@ -22,7 +22,8 @@ int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, int b)
 	return res;
 }
 
-int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash)
+int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash, 
+		struct opt_proc_t *opt)
 {
 	if (get_amount_hole(g, e, b)  > 0.7*g->bin_size) {
 		VERBOSE_FLAG(2, "NNNNN size is to big ");
@@ -37,7 +38,7 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float
 		}
 	}
 	assert(normal_count != 0);
-	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
+	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && !opt->mul_data)
 	{
 		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
@@ -45,7 +46,8 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float
 	return 1;
 }
 
-int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct barcode_hash_t *buck,  float avg_bin_hash)
+int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct barcode_hash_t *buck,
+  			float avg_bin_hash, struct opt_proc_t *opt)
 {
 	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
 	for (uint32_t i = 0; i < buck->size; ++i) {
@@ -54,7 +56,7 @@ int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct ba
 		}
 	}
 	assert(normal_count != 0);
-	if  (cnt > 2 * normal_count || cnt < normal_count * 0.5) 
+	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && opt->mul_data)
 	{
 		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
@@ -95,14 +97,16 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	return 1.0 * res2 / global_avg_sum_bin_hash; 
 }
 
-float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct barcode_hash_t *b_left, struct barcode_hash_t *b_right)
+float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, 
+		struct barcode_hash_t *b_left, struct barcode_hash_t *b_right,
+		struct opt_proc_t *opt)
 {
 	float avg_bin_hash = get_avg_unique_bin_hash(g);
 	float res = 0;
 	int count = 0;
 	float cov_e = __get_edge_cov(e, g->ksize);
-	for (int i = 0; i < 3; i++) if (check_count_hash_buck(g, e, &b_left[i], avg_bin_hash)) {
-		for(int j = 0; j < 3; j++) if (check_count_hash_buck(g, e, &b_right[j], avg_bin_hash)) {
+	for (int i = 0; i < 3; i++) if (check_count_hash_buck(g, e, &b_left[i], avg_bin_hash, opt)) {
+		for(int j = 0; j < 3; j++) if (check_count_hash_buck(g, e, &b_right[j], avg_bin_hash, opt)) {
 			count ++;
 			float t = get_score_bucks(&b_left[i], &b_right[j], cov_e, cov_e);
 //			VERBOSE_FLAG(log_check_contig, "score %f\n", t);
