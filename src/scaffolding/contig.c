@@ -24,13 +24,11 @@ void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
 {
 	assert(e->src < g->n_e && e->des < g->n_e && e->src >=0 && e->des >=0);
 	if (e->rv_src == 1) {
-//		e->src = g->edges[e->src].rc_id;
-		e->src ^= 1;
+		e->src = g->edges[e->src].rc_id;
 		e->rv_src = 0;
 	}
 	if (e->rv_des == 1) {
-//		e->des = g->edges[e->des].rc_id;
-		e->des ^= 1;
+		e->des = g->edges[e->des].rc_id;
 		e->rv_des = 0;
 	}
 }

@@ -462,11 +462,12 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 	struct params_build_candidate_edges *params_candidate ;
 	init_params_build_candidate_edges(&params_candidate, g, n_long_contig, list_long_contig, opt);
 	run_parallel_build_candidate_edges(params_candidate, opt->n_threads);
+	VERBOSE_FLAG(1, "n candidate edges %d", params_candidate->n_candidate_edges);
+	VERBOSE_FLAG(1, "done build candidate edge");
 
 	struct params_check_edge *para;
 	init_params_check_edge(&para, g, avg_bin_hash, out_file, params_candidate, opt);
 	parallel_build_edge_score(para, opt->n_threads);
-	VERBOSE_FLAG(1, "n candidate edges %d", para->n_candidate_edges);
 
 	for (int i = 0; i < g->n_e; i++) {
 		for (int j = 0; j < g->n_e; j++) {
@@ -536,7 +537,9 @@ void find_hamiltonian_contig_edge(FILE *out_file, struct asm_graph_t *g,
 			VERBOSE_FLAG(3, "%d %d ERRRRRR\n", list_one_dir_E[i].src, list_one_dir_E[i].des);
 		}
 		E[u * n_v + v] = list_one_dir_E[i].score0;
-		E[(v^1) * n_v + (u^1)] = list_one_dir_E[i].score0;
+		uint32_t v_rc_id = g->edges[v].rc_id;
+		uint32_t u_rc_id = g->edges[u].rc_id;
+		E[v_rc_id * n_v + u_rc_id] = list_one_dir_E[i].score0;
 	}
 	int *res = calloc(n_v, sizeof(int)), n_res=0;
 	algo_find_hamiltonian(out_file, g, E, n_v, res, &n_res, listV, avg_bin_hash);

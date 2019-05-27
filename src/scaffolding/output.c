@@ -56,6 +56,7 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 		memcpy(total_seq + total_len + len_of_contig, NNN, len_NNN);
 		total_len += len_of_contig + len_NNN;
 	}
+	total_len -= len_NNN;
 	print_seq(out_file, index, total_seq, total_len, 1);
 	for(int i = 0; i < n_contig; i++) {
 		int e = list_contig[i];

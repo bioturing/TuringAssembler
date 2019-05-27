@@ -28,7 +28,6 @@ struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i
 	score->A = NULL;
 	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
 	// check_bucks_A[i] && check_bucks_B[i] de improve performance
-	VERBOSE_FLAG(2, "cov %f binsize %d ksize %d", global_genome_coverage, g->bin_size, g->ksize);
 	int *check_bucks_A = NULL, *check_bucks_B = NULL;
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(int));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(int));
