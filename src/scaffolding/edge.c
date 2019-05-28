@@ -125,7 +125,7 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 	mat_score->A[0] = -1;
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	float res = 0;
-	int count = 0;
+	int count = 1;
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
 		for (int j = 0; j < mat_score->n_bucks; ++j) {
 			float tmp = mat_score->A[i * n_bucks + j];

@@ -75,8 +75,8 @@ struct params_check_edge {
 	int *list_contig, n_bucks, n_list_contig;
 	int n_candidate_edges;
 	struct candidate_edge *list_candidate_edges;
-	float avg_bin_hash, thres_score;
-	float *score_edge_matrix;
+	float avg_bin_hash, thres_score ;
+	float *list_candidate_scores;
 	FILE *out_file;
 	struct opt_proc_t *opt;
 };
@@ -92,20 +92,21 @@ void *process_check_edge(void *data)
 	FILE* out_file = pa_check_edge->out_file;
 	int n_candidate_edges = pa_check_edge->n_candidate_edges;
 	do {
-		int i;
+		int i_candidate;
 		pthread_mutex_lock(&lock_id);
 		if (pa_check_edge->i == n_candidate_edges) {
 			pthread_mutex_unlock(&lock_id);
 			break;
 		} else {
-			i = pa_check_edge->i++;
+			i_candidate = pa_check_edge->i++;
 		}
 		pthread_mutex_unlock(&lock_id);
-		int e0 = list_candidate_edges[i].src;
-		int e1 = list_candidate_edges[i].des;
+		int e0 = list_candidate_edges[i_candidate].src;
+		int e1 = list_candidate_edges[i_candidate].des;
 		assert(e1 < g->n_e && e0 < g->n_e);
 		struct bucks_score score = get_score_edges_res(e0, e1, g, n_bucks, 
 						avg_bin_hash, pa_check_edge->opt);
+		assert(!isnan(score.score));
 		int check = 0;
 		if (e0 == e1){
 			float cvr = global_genome_coverage;
@@ -117,9 +118,9 @@ void *process_check_edge(void *data)
 			check = 1;
 		}
 		if (check) {
-			pa_check_edge->score_edge_matrix[e0 * g->n_e + e1] = score.score;
+			pa_check_edge->list_candidate_scores[i_candidate] = score.score;
 		} else {
-			pa_check_edge->score_edge_matrix[e0 * g->n_e + e1] = -1;
+			pa_check_edge->list_candidate_scores[i_candidate] = -1;
 		}
 		VERBOSE_FLAG(3, "score %f\n", score.score); 
 	} while (1); 
@@ -224,15 +225,15 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	}
 	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
 
-	*n_local_edges = MIN(*n_local_edges, 40);
-	for (int i = 0; i < *n_local_edges; i++){
-		struct candidate_edge e = (*list_local_edges)[i];
-		if (i > 10 && (*list_local_edges)[i].score < global_filter_constant / 2 )
-		{
-			*n_local_edges = i;
-			break;
-		}
-	}
+//	*n_local_edges = MIN(*n_local_edges, 40);
+//	for (int i = 0; i < *n_local_edges; i++){
+//		struct candidate_edge e = (*list_local_edges)[i];
+//		if ((*list_local_edges)[i].score < global_filter_constant / 2 )
+//		{
+//			*n_local_edges = i;
+//			break;
+//		}
+//	}
 	
 }
 
@@ -427,9 +428,9 @@ void init_params_check_edge(struct params_check_edge **params, struct asm_graph_
 	(*params)->avg_bin_hash = avg_bin_hash;
 	(*params)->thres_score = global_thres_bucks_score;
 	(*params)->out_file = out_file;
-	(*params)->list_candidate_edges = params_candidate->list_candidate_edges;
 	(*params)->n_candidate_edges = params_candidate->n_candidate_edges;
-	(*params)->score_edge_matrix = calloc(g->n_e * g->n_e, sizeof(float));
+	(*params)->list_candidate_edges = params_candidate->list_candidate_edges;
+	(*params)->list_candidate_scores = calloc(params_candidate->n_candidate_edges, sizeof(float));
 	(*params)->opt = opt;
 }
 
@@ -469,22 +470,20 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 	init_params_check_edge(&para, g, avg_bin_hash, out_file, params_candidate, opt);
 	parallel_build_edge_score(para, opt->n_threads);
 
-	for (int i = 0; i < g->n_e; i++) {
-		for (int j = 0; j < g->n_e; j++) {
-			float score = para->score_edge_matrix[i * g->n_e + j];
-		}
-	}
 	VERBOSE_FLAG(1, "find real edge");
 	int n_bucks = para->n_bucks;
 	for (int i = 0; i < n_long_contig; i++) {
 		int i_edge =  list_long_contig[i];
 		struct contig_edge *list_E = NULL;
 		int n_contig_edge = 0;
-		for (int j = 0; j < g->n_e; j++) {
-			float score = para->score_edge_matrix[i_edge * g->n_e + j];
+		for (int j = 0; j < para->n_candidate_edges; j++) 
+						if (para->list_candidate_edges[j].src == i_edge)  {
+			int i2_edge = para->list_candidate_edges[j].des; 
+			float score = para->list_candidate_scores[j];
 			struct contig_edge new_edge;
+			assert(!isnan(score));
 			new_edge.src = i_edge;
-			new_edge.des = j;
+			new_edge.des = i2_edge;
 			new_edge.score0 = score;
 			n_contig_edge++;
 			list_E = realloc(list_E, n_contig_edge * (sizeof(struct contig_edge)));
@@ -494,7 +493,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 		for (int j = 0; j < MIN(8, n_contig_edge) ; j++) {
 			int j_edge = list_E[j].des;
 			float score = list_E[j].score0;
-			if ((j >= 2 && score < para->thres_score) || score <=0) {
+			if ((score < para->thres_score) || score <=0) {
 				break;
 			}
 			// todo @huu should I used this function? It seem not good now.
