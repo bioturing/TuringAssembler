@@ -210,26 +210,11 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
 	VERBOSE_FLAG(1, "thres len MIN %d ", thres_len_min);
 
-	int *arr_i_short = NULL, n_arr_short = 0;
-	int *mark_short = NULL;
-	VERBOSE_FLAG(1, "g->n_e %ld", g->n_e);
-	for (int e = 0; e < g->n_e; ++e) {
-		int len = get_edge_len(&g->edges[e]);
-		VERBOSE_FLAG(3, "len %d\n", len);
-		if (len < thres_len && len >= thres_len_min) {
-			++n_arr_short;
-			arr_i_short = realloc(arr_i_short, n_arr_short * sizeof(int));
-			mark_short = realloc(mark_short, n_arr_short * sizeof(int));
-			arr_i_short[n_arr_short-1] = e;
-			mark_short[n_arr_short-1] = 0;
-		}
-	}
-
 	int *remain_unvisited = calloc(n_v, sizeof(int));
 	for (int i = 0; i < n_v; i++) {
 		float cvr = global_genome_coverage;
 		VERBOSE_FLAG(3, "list v %d", listV[i]);
-		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr) ;
+		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr);
 		remain_unvisited[i] = lround(cov_times);
 		VERBOSE_FLAG(3, "%d " , remain_unvisited[i]);
 	}
@@ -258,8 +243,6 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
 		for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
 			VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
-//		insert_short_contigs(best_n_hamiltonian_path, best_hamiltonian_path, n_insert, arr_insert, n_arr_short, arr_i_short, mark_short);
-		merge_big_and_small(&best_n_hamiltonian_path, &best_hamiltonian_path, n_insert, arr_insert);
 
 		print_contig(g, out_file, count, best_n_hamiltonian_path, best_hamiltonian_path);
 		VERBOSE_FLAG(3, "contig path ");
@@ -271,22 +254,10 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		free(arr_insert);
 	}
 
-	VERBOSE_FLAG(1, "n arr short %d\n", n_arr_short);
-	for (int i = 0; i < n_arr_short; i++) {
-		VERBOSE_FLAG(3, "printf short edge \n");
-		int e = arr_i_short[i]; 
-		uint32_t seq_len = 0;
-		char *seq = NULL;
-		int len = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
-		print_seq(out_file, count, seq, seq_len, 1); 
-		count++;
-		free(seq);
-	}
-
 	for (int e = 0; e < g->n_e; e++){
 		int len  = get_edge_len(&g->edges[e]);
 		VERBOSE_FLAG(3, "len very short %d %d\n", len, thres_len_min); 
-		if (len < thres_len_min && len > 1000) {
+		if (len < global_thres_length && len > 1000) {
 			VERBOSE_FLAG(3, "printf very short edge \n");
 			uint32_t seq_len = 0;
 			char *seq = NULL;
@@ -298,7 +269,5 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	}
 
 	free(remain_unvisited);
-	free(arr_i_short);
-	free(mark_short);
 }
 
