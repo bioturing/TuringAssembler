@@ -216,7 +216,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	for (int e = 0; e < g->n_e; ++e) {
 		int len = get_edge_len(&g->edges[e]);
 		VERBOSE_FLAG(3, "len %d\n", len);
-		if (len < thres_len && len > thres_len_min) {
+		if (len < thres_len && len >= thres_len_min) {
 			++n_arr_short;
 			arr_i_short = realloc(arr_i_short, n_arr_short * sizeof(int));
 			mark_short = realloc(mark_short, n_arr_short * sizeof(int));
@@ -272,7 +272,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	}
 
 	VERBOSE_FLAG(1, "n arr short %d\n", n_arr_short);
-	for (int i = 0; i < n_arr_short; i++) if (remain_unvisited[i] == 0) {
+	for (int i = 0; i < n_arr_short; i++) {
 		VERBOSE_FLAG(3, "printf short edge \n");
 		int e = arr_i_short[i]; 
 		uint32_t seq_len = 0;
