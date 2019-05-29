@@ -652,8 +652,10 @@ void *barcode_retriever(void *data)
 
 			++n_reads;
 			barcode = barcode_calculator(&read1, &read2);
-			read_process(&read1, barcode, bundle);
-			read_process(&read2, barcode, bundle);
+			if (barcode != -1) {
+				read_process(&read1, barcode, bundle);
+				read_process(&read2, barcode, bundle);
+			}
 
 			if (rc1 == READ_END)
 				break;
