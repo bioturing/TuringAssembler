@@ -181,8 +181,6 @@ void count_pos(int *count, struct list_position *pos)
 {
 	assert(pos != NULL && count != NULL);
 	VERBOSE_FLAG(3, "n pos %d\n", pos->n_pos);
-	if (pos->n_pos > 10)
-		return;
 	for (int i = 0; i < pos->n_pos; i++){
 		count[pos->i_contig[i]] += pos->count[i];
 	}
@@ -195,7 +193,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	struct asm_edge_t *e = &params->g->edges[i_edge];
 	khash_t(big_table) *big_table = params->big_table;
 	int n_bucks = (get_edge_len(e) + 1000-1) / 1000;
-	for (int i = n_bucks/2 -1 ; i <  n_bucks/2 +1; i++) {
+	for (int i = n_bucks - 3; i <  n_bucks -1; i++) {
 		struct barcode_hash_t *buck = &e->bucks[i];
 		for (int j = 0; j < buck->n_item; j++){
 			if (buck->cnts[j] > 20) {
@@ -212,20 +210,20 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	for (int i = 0; i < params->n_long_contig; i++){
 		int long_contig = params->list_long_contig[i];
 		float edge_cov  = __get_edge_cov(&params->g->edges[long_contig], params->g->ksize);
-		float value = count[long_contig] / edge_cov;
+		float value = count[long_contig] ;
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
 		struct candidate_edge *new_candidate_edge = calloc(1, sizeof(struct candidate_edge));
 		new_candidate_edge->src = i_edge;
-		new_candidate_edge->des = params->list_long_contig[i];
+		new_candidate_edge->des = long_contig;
 		new_candidate_edge->score = value;
 
 		(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 		++*n_local_edges;
 	}
-	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
 
-//	*n_local_edges = MIN(*n_local_edges, 40);
+	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
+	*n_local_edges = MIN(*n_local_edges, 50);
 //	for (int i = 0; i < *n_local_edges; i++){
 //		struct candidate_edge e = (*list_local_edges)[i];
 //		if ((*list_local_edges)[i].score < global_filter_constant / 2 )
