@@ -4,6 +4,7 @@
 #include "assembly_graph.h"
 #include "fastq_producer.h"
 #include "io_utils.h"
+#include "kmer_build.h"
 #include "k31hash.h"
 #include "k63hash.h"
 #include "kmer_count.h"
@@ -57,150 +58,174 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 
 void k63_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
+	// set_time_now();
+	// __VERBOSE("|----Estimating kmer\n");
+	// struct k63hash_t table;
+	// k63hash_init(&table, opt->hash_size - 1, 1, 1);
+	// char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
+	// memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	// memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	// KMC_build_kmer_database(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+	// 			opt->n_files * 2, tmp_files);
+	// // KMC_convert_database(ksize, opt->out_dir, k63_add_edge_str);
+	// // KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+	// // 	opt->n_files * 2, tmp_files, &table, k63_add_edge_str);
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// char path[1024];
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	// save_k63hash(&table, path);
+
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k63(opt, ksize, &table, g0);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+}
+
+void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
+{
 	set_time_now();
 	__VERBOSE("|----Estimating kmer\n");
-	struct k63hash_t table;
-	k63hash_init(&table, opt->hash_size - 1, 1, 1);
 	char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
 	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-		opt->n_files * 2, tmp_files, &table, k63_add_edge_str);
+	KMC_build_kmer_database(ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
+						opt->n_files * 2, tmp_files);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
-	char path[1024];
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	save_k63hash(&table, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k63(opt, ksize, &table, g0);
+	__VERBOSE("----Building assembly graph\n");
+	build_asm_graph_KMC(opt, ksize, g);
 	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k31_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
-	set_time_now();
-	__VERBOSE("|----Estimating kmer\n");
-	struct k31hash_t table;
-	k31hash_init(&table, opt->hash_size - 1, 1, 1);
-	char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
-	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
-	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-		opt->n_files * 2, tmp_files, &table, k31_add_edge_str);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-	char path[1024];
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	save_k31hash(&table, path);
+	// set_time_now();
+	// __VERBOSE("|----Estimating kmer\n");
+	// struct k31hash_t table;
+	// k31hash_init(&table, opt->hash_size - 1, 1, 1);
+	// char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
+	// memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	// memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	// KMC_build_kmer_database(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+	// 			opt->n_files * 2, tmp_files);
+	// // KMC_convert_database(ksize, opt->out_dir, k31_add_edge_str);
+	// // KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
+	// // 	opt->n_files * 2, tmp_files, &table, k31_add_edge_str);
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// char path[1024];
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	// save_k31hash(&table, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k31(opt, ksize, &table, g0);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k31(opt, ksize, &table, g0);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
-	set_time_now();
-	struct k63hash_t table;
-	__VERBOSE("|----Estimating kmer\n");
-	build_k63_table_from_scratch(opt, &table, ksize);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-	char path[1024];
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	save_k63hash(&table, path);
+	// set_time_now();
+	// struct k63hash_t table;
+	// __VERBOSE("|----Estimating kmer\n");
+	// build_k63_table_from_scratch(opt, &table, ksize);
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// char path[1024];
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	// save_k63hash(&table, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k63(opt, ksize, &table, g0);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k63(opt, ksize, &table, g0);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
 {
-	set_time_now();
-	struct k31hash_t table;
-	__VERBOSE("|----Estimating kmer\n");
-	build_k31_table_from_scratch(opt, &table, ksize);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-	char path[1024];
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	save_k31hash(&table, path);
+	// set_time_now();
+	// struct k31hash_t table;
+	// __VERBOSE("|----Estimating kmer\n");
+	// build_k31_table_from_scratch(opt, &table, ksize);
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// char path[1024];
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
+	// save_k31hash(&table, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k31(opt, ksize, &table, g0);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k31(opt, ksize, &table, g0);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 				struct asm_graph_t *g, const char *preload_path)
 {
-	char path[1024];
-	if (ksize_src >= ksize_dst) {
-		k31_build_scratch(opt, ksize_dst, g);
-		return;
-	}
-	set_time_now();
-	struct k31hash_t table_src, table_dst;
-	__VERBOSE("|----Estimating kmer\n");
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	if (load_k31hash(&table_src, preload_path))
-		build_k31_table_from_k31_table(opt, &table_dst, &table_src,
-							ksize_dst, ksize_src);
-	else
-		build_k31_table_from_scratch(opt, &table_dst, ksize_dst);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
-	save_k31hash(&table_dst, path);
+	// char path[1024];
+	// if (ksize_src >= ksize_dst) {
+	// 	k31_build_scratch(opt, ksize_dst, g);
+	// 	return;
+	// }
+	// set_time_now();
+	// struct k31hash_t table_src, table_dst;
+	// __VERBOSE("|----Estimating kmer\n");
+	// // snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	// if (load_k31hash(&table_src, preload_path))
+	// 	build_k31_table_from_k31_table(opt, &table_dst, &table_src,
+	// 						ksize_dst, ksize_src);
+	// else
+	// 	build_k31_table_from_scratch(opt, &table_dst, ksize_dst);
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
+	// save_k31hash(&table_dst, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k31(opt, ksize_dst, &table_dst, g);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k31(opt, ksize_dst, &table_dst, g);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 				struct asm_graph_t *g, const char *preload_path)
 {
-	char path[1024];
-	if (ksize_src >= ksize_dst) {
-		k63_build_scratch(opt, ksize_dst, g);
-		return;
-	}
-	set_time_now();
-	struct k63hash_t table_dst;
-	__VERBOSE("|----Estimating kmer\n");
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	if (ksize_src < 32) {
-		struct k31hash_t table_src;
-		if (load_k31hash(&table_src, preload_path))
-			build_k63_table_from_k31_table(opt, &table_dst, &table_src,
-							ksize_dst, ksize_src);
-		else
-			build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
-	} else if (ksize_src > 32 && ksize_src < 64) {
-		struct k63hash_t table_src;
-		if (load_k63hash(&table_src, preload_path))
-			build_k63_table_from_k63_table(opt, &table_dst, &table_src,
-							ksize_dst, ksize_src);
-		else
-			build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
-	}
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-	snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
-	save_k63hash(&table_dst, path);
+	// char path[1024];
+	// if (ksize_src >= ksize_dst) {
+	// 	k63_build_scratch(opt, ksize_dst, g);
+	// 	return;
+	// }
+	// set_time_now();
+	// struct k63hash_t table_dst;
+	// __VERBOSE("|----Estimating kmer\n");
+	// // snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
+	// if (ksize_src < 32) {
+	// 	struct k31hash_t table_src;
+	// 	if (load_k31hash(&table_src, preload_path))
+	// 		build_k63_table_from_k31_table(opt, &table_dst, &table_src,
+	// 						ksize_dst, ksize_src);
+	// 	else
+	// 		build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
+	// } else if (ksize_src > 32 && ksize_src < 64) {
+	// 	struct k63hash_t table_src;
+	// 	if (load_k63hash(&table_src, preload_path))
+	// 		build_k63_table_from_k63_table(opt, &table_dst, &table_src,
+	// 						ksize_dst, ksize_src);
+	// 	else
+	// 		build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
+	// }
+	// __VERBOSE("\n");
+	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	// set_time_now();
+	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
+	// save_k63hash(&table_dst, path);
 
-	__VERBOSE("\n|----Building assembly graph\n");
-	build_asm_graph_from_k63(opt, ksize_dst, &table_dst, g);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+	// __VERBOSE("\n|----Building assembly graph\n");
+	// build_asm_graph_from_k63(opt, ksize_dst, &table_dst, g);
+	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
 static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,

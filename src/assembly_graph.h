@@ -67,6 +67,7 @@ void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			struct asm_graph_t *g, const char *preload_path);
 void build_asm_graph_from_k63(struct opt_proc_t *opt, int ksize,
 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
+void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
 
 /*************************** Barcoding ultilities *****************************/
 /******************************************************************************/
@@ -100,7 +101,7 @@ struct cov_range_t convert_cov_range(double fcov);
  * int __int_cov_ratio(float cov1, float cov2);
  */
 #define __int_cov_ratio(cov1, cov2) ((int)((cov1) / (cov2) + 0.49999999))
-#define __binseq_set(seq, k, c) ((seq)[(k) >> 4] |= (c) << (((k) & 15) << 1))
+#define __binseq_set(seq, k, c) ((seq)[(k) >> 4] |= (uint32_t)(c) << (((k) & 15) << 1))
 /* Function signature:
  * uint32_t __binseq_get(uint32_t *seq, uint32_t k);
  * Extract the numberic nucleotide at position k-th on seq

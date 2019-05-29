@@ -12,6 +12,9 @@
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
 
+#define KMCP			"KMCP"
+#define KMCS			"KMCS"
+
 #if !defined(GIT_SHA)
 #define GIT_SHA			"unknown"
 #endif

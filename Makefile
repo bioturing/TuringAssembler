@@ -4,7 +4,7 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -pthread -lm -lz -static -O3 -std=c++11 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+LIBS = -static -pthread -lm -lz -O3 -std=c++11 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
 
 KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 
@@ -21,6 +21,7 @@ EXEC = skipping
 # SRC = $(wildcard src/*.c)
 
 SRC = src/assembly_graph.c 				\
+      src/barcode_hash.c 				\
       src/barcode_retriever.c 				\
       src/barcode_resolve.c 				\
       src/basic_resolve.c 				\
@@ -28,11 +29,9 @@ SRC = src/assembly_graph.c 				\
       src/fastq_producer.c 				\
       src/get_buffer.c 					\
       src/io_utils.c 					\
-      src/k31_build.c 					\
-      src/k31hash.c 					\
-      src/k63_build.c 					\
-      src/k63hash.c 					\
-      src/kmer_count.c 					\
+      src/KMC_reader.c 					\
+      src/kmer_build.c 					\
+      src/kmhash.c 						\
       src/process.c 					\
       src/pthread_barrier.c 				\
       src/semaphore_wrapper.c 				\
@@ -55,6 +54,7 @@ $(EXEC): $(OBJ) $(KMC_LIBS)
 	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
+debug: CFLAGS += -fsanitize=undefined,address
 debug: LIBS += -fsanitize=undefined,address
 debug: $(EXEC)
 

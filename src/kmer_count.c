@@ -40,39 +40,6 @@ struct kmer_count_bundle_t {
 	__reverse_bit_order64(x), (x) ^= 0xffffffffffffffffull, (x) &= (mask)  \
 )
 
-uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
-{
-	char *s = r1->info;
-	if (s == NULL)
-		return (uint64_t)(-1);
-	int i, k, len = 0;
-	uint64_t ret = 0;
-	for (i = 0; s[i]; ++i) {
-		if (strncmp(s + i, "BX:Z:", 5) == 0) {
-			for (k = i + 5; s[k] && !__is_sep(s[k]); ++k) {
-				ret = ret * 5 + nt4_table[(int)s[k]];
-				++len;
-			}
-			break;
-		}
-	}
-	return ret;
-}
-
-uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
-{
-	char *s = r1->seq;
-	assert(r1->len >= 23); /* 16 bp barcode and 7 bp UMI */
-	uint64_t ret = 0;
-	int i;
-	for (i = 0; i < 16; ++i)
-		ret = ret * 5 + nt4_table[(int)s[i]];
-	r1->seq += 23;
-	return ret;
-}
-
-uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_barcode, x10_get_barcode};
-
 /*
  * Move the kmer window along reads and add kmer to hash table
  */

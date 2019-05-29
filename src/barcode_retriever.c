@@ -39,6 +39,38 @@ struct bccount_bundle_t {
 	int need_count;
 };
 
+uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
+{
+	char *s = r1->info;
+	int i, k, len = 0;
+	uint64_t ret = 0;
+	for (i = 0; s[i]; ++i) {
+		if (strncmp(s + i, "BX:Z:", 5) == 0) {
+			for (k = i + 5; s[k] && !__is_sep(s[k]); ++k) {
+				ret = ret * 5 + nt4_table[(int)s[k]];
+				++len;
+			}
+			break;
+		}
+	}
+	assert(len == 18);
+	return ret;
+}
+
+uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
+{
+	char *s = r1->seq;
+	assert(r1->len >= 23); /* 16 bp barcode and 7 bp UMI */
+	uint64_t ret = 0;
+	int i;
+	for (i = 0; i < 16; ++i)
+		ret = ret * 5 + nt4_table[(int)s[i]];
+	r1->seq += 23;
+	return ret;
+}
+
+uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_barcode, x10_get_barcode};
+
 void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small);
 void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 					khash_t(k31_dict) *dict, int is_small);
