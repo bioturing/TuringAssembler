@@ -89,8 +89,8 @@ void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 	char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
 	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	// KMC_build_kmer_database(ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
-	// 					opt->n_files * 2, tmp_files);
+	KMC_build_kmer_database(ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
+						opt->n_files * 2, tmp_files);
 	__VERBOSE("\n");
 	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
 	set_time_now();
