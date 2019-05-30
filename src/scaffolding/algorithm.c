@@ -13,8 +13,39 @@ int get_rc_id(struct asm_graph_t *g, int i_e)
 	return g->edges[i_e].rc_id;
 }
 
+int get_rc_id_V(struct asm_graph_t *g, int n_v, int *listV, int i_e)
+{
+	int rc = g->edges[listV[i_e]].rc_id;
+	if (listV[i_e ^ 1] == rc) {
+		return i_e^1;
+	} else{
+		char *a = "this case should not happen, if it happen, contact @huu";
+		assert(1 == 0 && a);
+		for (int i = 0; i < n_v; i++) {
+			if (listV[i] == rc) {
+				return i;
+			}
+		}
+	}
+
+
+}
+
+float get_component_cov(struct asm_graph_t *g, int n_component_node, int *connected_component, int *listV)
+{
+	uint64_t sum_count = 0, sum_len = 0, sum_n_holes = 0;
+	for (int i = 0 ; i < n_component_node; i++) {
+		struct asm_edge_t *e = &g->edges[listV[connected_component[i]]];
+		sum_count += e->count;
+		sum_len += e->seq_len;
+		sum_n_holes += e->n_holes;
+	}
+	return 1.0*sum_count/(sum_len - g->ksize * sum_n_holes - g->ksize * n_component_node);
+}
+
 void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float *E, int *remain_unvisited, 
-		int *cur_path, int *best_n_res, int *best_res, int *listV, struct asm_graph_t *g)
+		int *cur_path, int *best_n_res, int *best_res, struct asm_graph_t *g, 
+		int *listV)
 {
 	int cmp(const void *i, const void *j)
 	{
@@ -27,8 +58,8 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 	}
 // #########################      BEGIN FUNCTION      ########################
 	remain_unvisited[x]--;
-	remain_unvisited[get_rc_id(g, x)]--;
-	assert(remain_unvisited[x]>=0 && remain_unvisited[get_rc_id(g, x)]>=0);
+	remain_unvisited[get_rc_id_V(g, n_v, listV, x)]--;
+	assert(remain_unvisited[x]>=0 && remain_unvisited[get_rc_id_V(g, n_v, listV, x)]>=0);
 	cur_path[depth-1] = x;
 	if (depth > *best_n_res) {
 		*best_n_res = depth;
@@ -46,15 +77,16 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 		int adj = list_sort[i];
 		if (remain_unvisited[adj] && E[x * n_v + adj] > 0) {
 			dfs_hamiltonian(adj, depth+1, n_adj, list_adj, n_v, E, remain_unvisited, 
-				cur_path, best_n_res, best_res, listV, g);
+				cur_path, best_n_res, best_res, g, listV);
 		}
 	}
 	remain_unvisited[x]++;
-	remain_unvisited[get_rc_id(g, x)]++;
+	remain_unvisited[get_rc_id_V(g, n_v, listV, x)]++;
 	free(list_sort);
 }
 
-void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, int *res, int *n_res, int *listV, float avg_bin_hash)
+void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, 
+		int *res, int *n_res, int *listV, float avg_bin_hash, struct opt_proc_t *opt)
 {
 	// deprecated due to low performance
 	void insert_short_contigs(int n_big_contigs, int *big_contigs, int n_insert, int *arr_insert, 
@@ -118,7 +150,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 	{
 		VERBOSE_FLAG(1, "find longest path from node");
 		remain_unvisited[x]--;
-		remain_unvisited[get_rc_id(g, x)]--;
+		remain_unvisited[get_rc_id_V(g, n_v, listV, x)]--;
 		assert(*best_n_hamiltonian_path == 0);
 		*best_n_hamiltonian_path = 1;
 		best_hamiltonian_path[0] = x;
@@ -126,7 +158,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			int *list_adj = NULL, count_adj = 0;
 			int last_pos = best_hamiltonian_path[*best_n_hamiltonian_path-1];
 			for (int i = 0; i < n_v; i++) if (E[last_pos * n_v + i] != 0 && remain_unvisited[i]){
-				assert(remain_unvisited[i] >0);
+				assert(remain_unvisited[i] > 0);
 				list_adj = realloc(list_adj, (count_adj+1) * sizeof(int));
 				list_adj[count_adj] = i;
 				count_adj++;
@@ -141,7 +173,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 				int *cur_path = calloc(n_v, sizeof(int));
 				dfs_hamiltonian(
 					adj, 1, count_adj, list_adj, n_v, E, remain_unvisited,
-					cur_path, &best_add_len, best_hamiltonian_path + *best_n_hamiltonian_path, listV, g
+					cur_path, &best_add_len, best_hamiltonian_path + *best_n_hamiltonian_path, g,
+					listV
 				);
 				free(cur_path);
 			}
@@ -151,7 +184,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			for (int i_path = *best_n_hamiltonian_path; i_path < *best_n_hamiltonian_path + best_add_len; i_path++){
 				remain_unvisited[best_hamiltonian_path[i_path]]--;
-				remain_unvisited[get_rc_id(g, best_hamiltonian_path[i_path])]--;
+				remain_unvisited[get_rc_id_V(g, n_v, listV, best_hamiltonian_path[i_path])]--;
 			}
 			*best_n_hamiltonian_path += best_add_len;
 			free(best_local_path);
@@ -159,32 +192,25 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		}
 		for (int i = 0; i < *best_n_hamiltonian_path; i++){
 			remain_unvisited[best_hamiltonian_path[i]]++;
-			remain_unvisited[get_rc_id(g, best_hamiltonian_path[i])]++;
+			remain_unvisited[get_rc_id_V(g, n_v, listV, best_hamiltonian_path[i])]++;
 		}
 	}
 
-	void dfs_find_connected_component(int root, int *remain_unvisited, int
-			*connected_component)
+	void dfs_find_connected_component(int root, int *mark, int
+			*n_component_node, int *connected_component)
 	{
-		connected_component[root] = 1;
-		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] && connected_component[i] == 0 
+		connected_component[(*n_component_node)++] = root;
+		mark[root] = 0;
+		mark[get_rc_id_V(g, n_v, listV, root)] = 0;
+		for (int i = 0; i < n_v; i++) if (mark[i] == 1 
 				&& ((E[root * n_v + i]) || (E[i * n_v + root]))) {
-			dfs_find_connected_component(i, remain_unvisited, connected_component);
+			dfs_find_connected_component(i, mark, n_component_node, connected_component);
 		}
 	}
 
 	void iter_find_longest_path(int *remain_unvisited, int *best_n_hamiltonian_path, int *best_hamiltonian_path)
 	{
-		int *save_remain_unvisited = calloc(n_v, sizeof(int));
-		COPY_ARR(remain_unvisited, save_remain_unvisited, n_v);
-		int *connected_component = calloc(n_v, sizeof(int));
 		for (int i = 0; i < n_v; i++) if (remain_unvisited[i]) {
-			dfs_find_connected_component(i, remain_unvisited, connected_component);
-			break;
-		}
-		int count_connected_compoent = 0;
-		for (int i = 0; i < n_v; i++) if (remain_unvisited[i] && connected_component[i]) {
-			count_connected_compoent++;
 			assert(remain_unvisited[i] > 0);
 			int *hamiltonian_path = calloc(n_v, sizeof(int)), n_hamiltonian_path = 0 ;
 			
@@ -199,59 +225,71 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			}
 			free(hamiltonian_path);
 		}
-		VERBOSE_FLAG(3, "count connected component %d\n", count_connected_compoent);
 		VERBOSE_FLAG(1, "\n");
-		for (int i = 0 ; i < n_v; i++)
-			assert(save_remain_unvisited[i] ==  remain_unvisited[i]);
-		free(save_remain_unvisited);
 	}
 	
+	void find_path_in_component(int n_component_node, int *connected_component, int *count){
+		int *remain_unvisited = calloc(n_v, sizeof(int));
+		for (int i = 0 ; i < n_component_node; i++) {
+			float cvr = 0;
+			if (opt->metagenomics) 
+				cvr = get_component_cov(g, n_component_node, connected_component, listV);
+			else 
+				cvr = global_genome_coverage;
+			int i_edge = connected_component[i];
+			int i_contig = listV[i_edge];
+
+			float cov_times = (__get_edge_cov(&g->edges[i_contig], g->ksize)/cvr);
+			remain_unvisited[i_edge] = lround(cov_times);
+			remain_unvisited[get_rc_id_V(g, n_v, listV, i_edge)] = lround(cov_times);
+		}
+		// todo @huu calculate remain_unvisited
+		while (1) {
+			int *best_hamiltonian_path = calloc(n_v, sizeof(int)), best_n_hamiltonian_path = 0;
+			iter_find_longest_path(remain_unvisited, &best_n_hamiltonian_path, best_hamiltonian_path);
+			if (best_n_hamiltonian_path == 0){
+				free(best_hamiltonian_path);
+				break;
+			}
+			VERBOSE_FLAG(1, "calculate seq %d", *count);
+			for(int i = 0; i < best_n_hamiltonian_path; i++) {
+				VERBOSE_FLAG(3, "remain %d %d\n", best_hamiltonian_path[i], remain_unvisited[best_hamiltonian_path[i]]);
+				remain_unvisited[best_hamiltonian_path[i]]--;
+				remain_unvisited[get_rc_id_V(g, n_v, listV, best_hamiltonian_path[i])]--;
+			}
+
+			for (int i = 0; i < best_n_hamiltonian_path; i++) 
+				best_hamiltonian_path[i] = listV[best_hamiltonian_path[i]];
+			VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
+			for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
+			VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
+
+			print_contig(g, out_file, *count, best_n_hamiltonian_path, best_hamiltonian_path);
+			VERBOSE_FLAG(3, "contig path ");
+			for (int i = 0; i < best_n_hamiltonian_path; i++) 
+				VERBOSE_FLAG(3, "%d " , best_hamiltonian_path[i]);
+			(*count)++;
+			free(best_hamiltonian_path);
+		}
+	}
 //#############################  BEGIN OF FUNCTION  ###########################
 	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
 	VERBOSE_FLAG(1, "thres len MIN %d ", thres_len_min);
 
-	int *remain_unvisited = calloc(n_v, sizeof(int));
+	int *mark = calloc(n_v, sizeof(int));
 	for (int i = 0; i < n_v; i++) {
-		float cvr = global_genome_coverage;
-		VERBOSE_FLAG(3, "list v %d", listV[i]);
-		float cov_times = (__get_edge_cov(&g->edges[listV[i]], g->ksize)/cvr);
-		remain_unvisited[i] = lround(cov_times);
-		VERBOSE_FLAG(3, "%d " , remain_unvisited[i]);
+		mark[i] = 1;
 	}
 	int count = 0;
 	while (1){
-		int *best_hamiltonian_path = calloc(n_v, sizeof(int)), best_n_hamiltonian_path = 0 ;
-		iter_find_longest_path(remain_unvisited, &best_n_hamiltonian_path, best_hamiltonian_path);
-		VERBOSE_FLAG(3, "best_n_hamiltonian_path %d\n", best_n_hamiltonian_path);
-		for(int i = 0; i < best_n_hamiltonian_path; i++) {
-			VERBOSE_FLAG(3, "remain %d %d\n", best_hamiltonian_path[i], remain_unvisited[best_hamiltonian_path[i]]);
-			remain_unvisited[best_hamiltonian_path[i]]--;
-			remain_unvisited[get_rc_id(g, best_hamiltonian_path[i])]--;
-			assert(remain_unvisited[best_hamiltonian_path[i]]>=0);
-			assert(remain_unvisited[get_rc_id(g, best_hamiltonian_path[i])]>=0);
-		}
-		if (best_n_hamiltonian_path == 0){
-			free(best_hamiltonian_path);
+		int *connected_component = calloc(n_v, sizeof(int)), n_component_node = 0;
+		for (int i = 0; i < n_v; i++) if (mark[i]) {
+			dfs_find_connected_component(i, mark, &n_component_node, connected_component);
+			find_path_in_component(n_component_node, connected_component, &count);
 			break;
 		}
-
-		int *arr_insert = NULL, n_insert = best_n_hamiltonian_path + 1;
-		arr_insert = realloc(arr_insert, n_insert * sizeof(int));
-		for (int i = 0; i < n_insert; i++) arr_insert[i] = -1;
-		for (int i = 0; i < best_n_hamiltonian_path; i++) 
-			best_hamiltonian_path[i] = listV[best_hamiltonian_path[i]];
-		VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
-		for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
-			VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
-
-		print_contig(g, out_file, count, best_n_hamiltonian_path, best_hamiltonian_path);
-		VERBOSE_FLAG(3, "contig path ");
-		for (int i = 0; i < best_n_hamiltonian_path; i++) 
-			VERBOSE_FLAG(3, "%d " , best_hamiltonian_path[i]);
-		VERBOSE_FLAG(3, "best n %d\n", best_n_hamiltonian_path);
-		count++;
-		free(best_hamiltonian_path);
-		free(arr_insert);
+		if (n_component_node == 0)
+			break;
 	}
 
 	for (int e = 0; e < g->n_e; e++){
@@ -267,7 +305,5 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			free(seq);
 		}
 	}
-
-	free(remain_unvisited);
 }
 

@@ -38,7 +38,7 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float
 		}
 	}
 	assert(normal_count != 0);
-	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && !opt->mul_data)
+	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && !opt->metagenomics)
 	{
 		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
@@ -56,7 +56,7 @@ int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct ba
 		}
 	}
 	assert(normal_count != 0);
-	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && opt->mul_data)
+	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && opt->metagenomics)
 	{
 		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
 		return 0;
