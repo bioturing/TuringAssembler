@@ -444,10 +444,27 @@ void parallel_build_edge_score(struct params_check_edge *para, int n_threads)
 	pthread_attr_destroy(&attr);
 }
 
+void remove_lov_cov(struct asm_graph_t *g)
+{
+	float cvr = global_genome_coverage;
+	int count = 0;
+	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		if (__get_edge_cov(&g->edges[i_e], g->ksize)/cvr > 0.3) {
+			int rc_id = g->edges[i_e].rc_id;
+			g->edges[rc_id].rc_id = count;
+			g->edges[count] =  g->edges[i_e];
+			count++;
+		}
+	}
+	g->n_e = count;
+}
+
 void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *opt) 
 {
 	init_global_params(g);
 	check_global_params(g);
+	if (!opt->metagenomics)
+		remove_lov_cov(g);
 
 	int n_long_contig = 0, *list_long_contig = NULL;
 	get_long_contig(g, global_thres_length, &n_long_contig, &list_long_contig);
@@ -550,6 +567,8 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 {
 	init_global_params(g);
 	check_global_params(g);
+	if (!opt->metagenomics)
+		remove_lov_cov(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_long_contig: %d\n", &n_v);
 	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {

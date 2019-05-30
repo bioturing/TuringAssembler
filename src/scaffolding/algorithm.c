@@ -8,6 +8,11 @@
 #include "scaffolding/global_params.h"
 #include "scaffolding/edge.h"
 
+int hround(float x)
+{
+	return lround(x);
+}
+
 int get_rc_id(struct asm_graph_t *g, int i_e)
 {
 	return g->edges[i_e].rc_id;
@@ -240,8 +245,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			int i_contig = listV[i_edge];
 
 			float cov_times = (__get_edge_cov(&g->edges[i_contig], g->ksize)/cvr);
-			remain_unvisited[i_edge] = lround(cov_times);
-			remain_unvisited[get_rc_id_V(g, n_v, listV, i_edge)] = lround(cov_times);
+			remain_unvisited[i_edge] = hround(cov_times);
+			remain_unvisited[get_rc_id_V(g, n_v, listV, i_edge)] = hround(cov_times);
 		}
 		// todo @huu calculate remain_unvisited
 		while (1) {
@@ -273,7 +278,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		}
 	}
 //#############################  BEGIN OF FUNCTION  ###########################
-	int thres_len = global_thres_length, thres_len_min = global_thres_length_min;
+	int thres_len_min = global_thres_length;
 	VERBOSE_FLAG(1, "thres len MIN %d ", thres_len_min);
 
 	int *mark = calloc(n_v, sizeof(int));
@@ -292,6 +297,7 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			break;
 	}
 
+	float cvr = global_genome_coverage;
 	for (int e = 0; e < g->n_e; e++){
 		int len  = get_edge_len(&g->edges[e]);
 		VERBOSE_FLAG(3, "len very short %d %d\n", len, thres_len_min); 
