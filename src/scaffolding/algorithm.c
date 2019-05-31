@@ -245,8 +245,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			int i_contig = listV[i_edge];
 
 			float cov_times = (__get_edge_cov(&g->edges[i_contig], g->ksize)/cvr);
-			remain_unvisited[i_edge] = hround(cov_times);
-			remain_unvisited[get_rc_id_V(g, n_v, listV, i_edge)] = hround(cov_times);
+			remain_unvisited[i_edge] = MIN(hround(cov_times), 1);
+			remain_unvisited[get_rc_id_V(g, n_v, listV, i_edge)] = MIN(hround(cov_times), 1);
 		}
 		// todo @huu calculate remain_unvisited
 		while (1) {

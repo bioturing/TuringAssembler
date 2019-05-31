@@ -449,7 +449,9 @@ void remove_lov_cov(struct asm_graph_t *g)
 	float cvr = global_genome_coverage;
 	int count = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
-		if (__get_edge_cov(&g->edges[i_e], g->ksize)/cvr > 0.3) {
+		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
+		VERBOSE_FLAG(0, "edge %d len:%d cov: %d\n", i_e , get_edge_len(&g->edges[i_e]), lround(edge_cov));
+		if (edge_cov > 0.5){
 			int rc_id = g->edges[i_e].rc_id;
 			g->edges[rc_id].rc_id = count;
 			g->edges[count] =  g->edges[i_e];
@@ -492,7 +494,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 		struct contig_edge *list_E = NULL;
 		int n_contig_edge = 0;
 		for (int j = 0; j < para->n_candidate_edges; j++) 
-						if (para->list_candidate_edges[j].src == i_edge)  {
+						if (para->list_candidate_edges[j].src == i_edge) {
 			int i2_edge = para->list_candidate_edges[j].des; 
 			float score = para->list_candidate_scores[j];
 			struct contig_edge new_edge;
@@ -505,7 +507,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 			list_E[n_contig_edge-1] = new_edge;
 		}
 		qsort(list_E, n_contig_edge, sizeof(struct contig_edge), decending_edge_score);
-		for (int j = 0; j < MIN(8, n_contig_edge) ; j++) {
+		for (int j = 0; j < MIN(4, n_contig_edge) ; j++) {
 			int j_edge = list_E[j].des;
 			float score = list_E[j].score0;
 			if ((score < para->thres_score) || score <=0) {
@@ -567,8 +569,8 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 {
 	init_global_params(g);
 	check_global_params(g);
-	if (!opt->metagenomics)
-		remove_lov_cov(g);
+	// todo @huu: uncomment the following line. Comment for debug purpose only
+	//if (!opt->metagenomics) remove_lov_cov(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_long_contig: %d\n", &n_v);
 	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {
