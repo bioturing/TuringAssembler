@@ -297,11 +297,14 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 			break;
 	}
 
+	int *mark_short =  calloc(g->n_e, sizeof(int));
 	float cvr = global_genome_coverage;
 	for (int e = 0; e < g->n_e; e++){
 		int len  = get_edge_len(&g->edges[e]);
 		VERBOSE_FLAG(3, "len very short %d %d\n", len, thres_len_min); 
-		if (len < global_thres_length && len > 1000) {
+		if (len < global_thres_length && len > 1000 &&mark_short[e] == 0) {
+			mark_short[e] = 1;
+			mark_short[g->edges[e].rc_id] = 1;
 			VERBOSE_FLAG(3, "printf very short edge \n");
 			uint32_t seq_len = 0;
 			char *seq = NULL;
