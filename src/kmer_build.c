@@ -349,6 +349,7 @@ void retrieve_kmer_from_kedge(struct opt_proc_t *opt, int ksize,
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 	struct kmbuild_bundle_t bundle;
 	kmbuild_bundle_init(&bundle, kmer_table, ksize);
+	// KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge);
 	KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge);
 	kmbuild_bundle_destroy(&bundle);
 	destroy_kmc_info(&kmc_inf);

@@ -56,7 +56,7 @@ static inline kmint_t estimate_probe_3(kmint_t size)
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * i * 64;
+		s += i * i * i;
 	}
 	return i;
 }

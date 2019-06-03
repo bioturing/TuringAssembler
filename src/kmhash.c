@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "atomic.h"
 #include "asm_hash.h"
 #include "attribute.h"
 #include "io_utils.h"
@@ -156,92 +157,86 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 	return h2;
 }
 
-#define __kmhash_equal(ws, a, b) (memcmp((const char *)(a), (const char *)(b), ws) == 0)
+#define __kmhash_equal(a, b, ws) (memcmp((const char *)(a), (const char *)(b), ws) == 0)
 
 kmint_t kmhash_get(struct kmhash_t *h, const uint8_t *key)
 {
-	kmint_t n_probe, mask, step, i, last;
+	kmint_t n_probe, mask, step, i;
 	mask = h->size - 1;
 	n_probe = h->n_probe;
 	int word_size = h->word_size;
 	uint64_t k = MurmurHash3_x64_64(key, word_size);
 	i = k & mask;
-	last = i;
 	step = 0;
-	while (h->flag[i] != KMFLAG_EMPTY &&
-		!__kmhash_equal(word_size, h->keys + i * word_size, key)) {
-		i = (i + (++step)) & mask;
-		if (i == last) return h->size;
-	}
-	if (h->flag[i] != KMFLAG_EMPTY)
-		assert(__kmhash_equal(word_size, h->keys + i * word_size, key));
-	return (h->flag[i] == KMFLAG_EMPTY) ? h->size : i;
-
-	// step = 0;
-	// while (step <= n_probe && h->flag[i] != KMFLAG_EMPTY &&
-	// 	!__kmhash_equal(word_size, h->keys + i * word_size, key)) {
-	// 	++step;
-	// 	i = (i + step * (step + 1) / 2) & mask;
-	// }
-	// return (step <= n_probe && h->flag[i] != KMFLAG_EMPTY) ? i : h->size;
+	do {
+		if (h->flag[i] == KMFLAG_EMPTY)
+			return KMHASH_END(h);
+		if (__kmhash_equal(h->keys + i * word_size, key, word_size))
+			return i;
+		++step;
+		i = (i + step * (step + 1) / 2) & mask;
+	} while (step <= n_probe);
+	return KMHASH_END(h);
 }
 
-// static kmint_t internal_kmhash_put(struct kmhash_t *h, const uint8_t *key)
-// {
-// 	kmint_t mask, step, i, last;
-// 	mask = h->size - 1;
-// 	int word_size = h->word_size;
-// 	uint64_t k = MurmurHash3_x64_64(key, word_size);
-// 	last = i = k & mask;
-// 	step = 0;
-// 	do {
-// 		cur_flag = atomic_val_CAS8(&(h->flag[i]), KMFLAG_EMPTY, 
-// 	}
-// }
+static kmint_t internal_kmhash_put_multi(struct kmhash_t *h, const uint8_t *key)
+{
+	kmint_t mask, step, i, last, n_probe;
+	mask = h->size - 1;
+	int word_size = h->word_size;
+	uint64_t k = MurmurHash3_x64_64(key, word_size);
+	uint8_t cur_flag;
+	n_probe = h->n_probe;
+	i = k & mask;
+	step = 0;
+	do {
+		cur_flag = atomic_val_CAS8(&(h->flag[i]), KMFLAG_EMPTY,
+								KMFLAG_LOADING);
+		if (cur_flag == KMFLAG_EMPTY) {
+			memcpy(h->keys + i * word_size, key, word_size);
+			atomic_add_and_fetch_kmint(&(h->n_item), 1);
+			h->flag[i] = KMFLAG_NEW;
+			return i;
+		} else if (cur_flag == KMFLAG_LOADING) {
+			continue;
+		} else {
+			if (__kmhash_equal(h->keys + i * word_size, key, word_size))
+				return i;
+			++step;
+			i = (i + step * (step + 1) / 2) & mask;
+		}
+	} while (step <= n_probe);
+	return KMHASH_END(h);
+}
 
 static kmint_t internal_kmhash_put(struct kmhash_t *h, const uint8_t *key)
 {
-	kmint_t n_probe, mask, step, i, last;
+	kmint_t mask, step, i, last, n_probe;
 	mask = h->size - 1;
-	// n_probe = h->n_probe;
 	int word_size = h->word_size;
 	uint64_t k = MurmurHash3_x64_64(key, word_size);
-	// __VERBOSE("hash_key = %lu\n", k);
+	n_probe = h->n_probe;
 	i = k & mask;
-	last = i;
 	step = 0;
-	while (h->flag[i] != KMFLAG_EMPTY &&
-		!__kmhash_equal(word_size, h->keys + i * word_size, key)) {
-		i = (i + (++step)) & mask;
-		if (i == last) return h->size;
-	}
-	if (h->flag[i] == KMFLAG_EMPTY) {
-		h->flag[i] = KMFLAG_NEW;
-		memcpy(h->keys + i * word_size, key, word_size);
-		++h->n_item;
-	}
-	return i;
-
-	// step = 0;
-	// while (step <= n_probe && h->flag[i] != KMFLAG_EMPTY &&
-	// 	!__kmhash_equal(word_size, h->keys + i * word_size, key)) {
-	// 	++step;
-	// 	i = (i + step * (step + 1) / 2) & mask;
-	// }
-	// if (step <= n_probe) {
-	// 	if (h->flag[i] == KMFLAG_EMPTY) {
-	// 		h->flag[i] = KMFLAG_NEW;
-	// 		memcpy(h->keys + i * word_size, key, word_size);
-	// 		++h->n_item;
-	// 	}
-	// 	return i;
-	// }
-	// return h->size;
+	do {
+		if (h->flag[i] == KMFLAG_EMPTY) {
+			memcpy(h->keys + i * word_size, key, word_size);
+			++h->n_item;
+			h->flag[i] = KMFLAG_NEW;
+			return i;
+		} else {
+			if (__kmhash_equal(h->keys + i * word_size, key, word_size))
+				return i;
+			++step;
+			i = (i + step * (step + 1) / 2) & mask;
+		}
+	} while (step <= n_probe);
+	return KMHASH_END(h);
 }
 
 static void kmhash_resize(struct kmhash_t *h)
 {
-	// __VERBOSE("Resize ---- size = %lu; n_item = %lu\n", h->size, h->n_item);
+	__VERBOSE("Resize ---- size = %lu; n_item = %lu\n", h->size, h->n_item);
 	kmint_t old_size, size, mask, n_probe, i;
 	int word_size = h->word_size;
 	old_size = h->size;
@@ -249,8 +244,8 @@ static void kmhash_resize(struct kmhash_t *h)
 	size = h->size;
 	h->upper_bound = h->size * HASH_SIZE_UPPER;
 	mask = size - 1;
-	// h->n_probe = estimate_probe_3(h->size);
-	// n_probe = h->n_probe;
+	h->n_probe = estimate_probe_3(h->size);
+	n_probe = h->n_probe;
 	uint32_t aux_flag = h->aux_flag;
 
 	size_t new_byte_size = h->size * h->word_size;
@@ -286,15 +281,6 @@ static void kmhash_resize(struct kmhash_t *h)
 	uint8_t a = 0, at;
 	gint_t id = 0, idt;
 	struct edge_data_t p = (struct edge_data_t){NULL, 0}, pt;
-	// uint8_t hash_sum = 0;
-	// for (i = 0; i < old_size; ++i) {
-	// 	if (h->flag[i] == KMFLAG_EMPTY)
-	// 		continue;
-	// 	int k;
-	// 	for (k = 0; k < word_size; ++k)
-	// 		hash_sum ^= h->keys[i * word_size + k];
-	// 	hash_sum ^= h->adjs[i];
-	// }
 	for (i = 0; i < old_size; ++i) {
 		if (flag[i] == KMFLAG_OLD) {
 			memcpy(x, keys + i * word_size, word_size);
@@ -311,13 +297,19 @@ static void kmhash_resize(struct kmhash_t *h)
 				uint64_t k = MurmurHash3_x64_64(x, word_size);
 				kmint_t j, step, last;
 				j = k & mask;
-				last = j;
+				// last = j;
 				step = 0;
-				while (flag[j] != KMFLAG_EMPTY && flag[j] != KMFLAG_OLD) {
-					j = (j + (++step)) & mask;
-					if (j == last)
+				while (step <= n_probe) {
+					if (flag[j] == KMFLAG_EMPTY || flag[j] == KMFLAG_OLD)
 						break;
+					++step;
+					j = (j + step * (step + 1) / 2) & mask;
 				}
+				// while (flag[j] != KMFLAG_EMPTY && flag[j] != KMFLAG_OLD) {
+				// 	j = (j + (++step)) & mask;
+				// 	if (j == last)
+				// 		break;
+				// }
 				if (flag[j] == KMFLAG_EMPTY) {
 					flag[j] = KMFLAG_NEW;
 					memcpy(keys + j * word_size, x, word_size);
@@ -354,45 +346,6 @@ static void kmhash_resize(struct kmhash_t *h)
 			}
 		}
 	}
-	// uint8_t hash_sum2 = 0;
-	// for (i = 0; i < size; ++i) {
-	// 	if (h->flag[i] == KMFLAG_EMPTY)
-	// 		continue;
-	// 	int k;
-	// 	for (k = 0; k < word_size; ++k)
-	// 		hash_sum2 ^= h->keys[i * word_size + k];
-	// 	hash_sum2 ^= h->adjs[i];
-	// }
-	// assert(hash_sum == hash_sum2);
-	// fprintf(stderr, "hash_sum = %hhu\n", hash_sum);
-	// fprintf(stderr, "hash_sum2 = %hhu\n", hash_sum2);
-
-	// kmint_t recount = 0;
-	// for (i = 0; i < h->size; ++i) {
-	// 	assert(h->flag[i] == KMFLAG_EMPTY || h->flag[i] == KMFLAG_NEW);
-	// 	recount += (h->flag[i] == KMFLAG_NEW);
-	// }
-	// assert(recount == h->n_item);
-	// for (i = 0; i < h->size; ++i) {
-	// 	if (h->flag[i] == KMFLAG_EMPTY)
-	// 		continue;
-	// 	kmint_t k = kmhash_get(h, h->keys + i * word_size);
-	// 	if (k != i) {
-	// 		for (int x = 0; x < word_size; ++x)
-	// 			__VERBOSE(x + 1 == word_size ? "%hhu\n" : "%hhu ", h->keys[i * word_size + x]);
-	// 		for (int x = 0; x < word_size; ++x)
-	// 			__VERBOSE(x + 1 == word_size ? "%hhu\n" : "%hhu ", h->keys[k * word_size + x]);
-	// 		__VERBOSE("k = %lu; i = %lu; h->size = %lu\n", k, i, h->size);
-	// 		char *t1 = h->keys + i * word_size;
-	// 		char *t2 = h->keys + k * word_size;
-	// 		__VERBOSE("t1 = %lu; t2 = %lu\n", t1, t2);
-	// 		__VERBOSE("strcmp = %d\n", strncmp(t1, t2, word_size));
-	// 		__VERBOSE("strncmp = %d\n", __kmhash_equal(word_size, h->keys + i * word_size, h->keys + k * word_size));
-	// 		__VERBOSE("flag[i] = %hhu; flag[k] = %hhu\n", h->flag[i], h->flag[k]);
-	// 		assert(0);
-	// 	}
-	// 	assert(k == i);
-	// }
 }
 
 kmint_t kmhash_put(struct kmhash_t *h, const uint8_t *key)
