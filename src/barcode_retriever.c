@@ -4,30 +4,19 @@
 #include "assembly_graph.h"
 #include "fastq_producer.h"
 #include "io_utils.h"
-#include "k31hash.h"
-#include "k63hash.h"
-#include "khash.h"
+#include "kmer.h"
+#include "kmhash.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-
-struct edge_idx_t {
-	gint_t idx;
-	gint_t pos;
-};
-
-struct edge_data_t {
-	struct edge_idx_t *e;
-	gint_t n;
-};
 
 #define __not_null(x) ((x).idx != -1)
 #define MIN_HEAD_LEN 5
 #define MAX_N_BUCK		6
 
-KHASH_INIT(k63_dict, k63key_t, struct edge_data_t, 1, __hash_k63, __k63_equal)
+// KHASH_INIT(k63_dict, k63key_t, struct edge_data_t, 1, __hash_k63, __k63_equal)
 
-KHASH_INIT(k31_dict, k31key_t, struct edge_data_t, 1, __hash_k31, __k31_equal)
+// KHASH_INIT(k31_dict, k31key_t, struct edge_data_t, 1, __hash_k31, __k31_equal)
 
 struct bccount_bundle_t {
 	struct asm_graph_t *g;
@@ -53,7 +42,8 @@ uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
 			break;
 		}
 	}
-	assert(len == 18);
+	if (len != 18)
+		return (uint64_t)-1;
 	return ret;
 }
 
@@ -72,14 +62,15 @@ uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
 uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_barcode, x10_get_barcode};
 
 void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small);
-void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k31_dict) *dict, int is_small);
-void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k63_dict) *dict, int is_small);
-void k31_read_iterator(struct read_t *r, uint64_t barcode,
-					struct bccount_bundle_t *bundle);
-void k63_read_iterator(struct read_t *r, uint64_t barcode,
-					struct bccount_bundle_t *bundle);
+void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small);
+// void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+// 					khash_t(k31_dict) *dict, int is_small);
+// void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+// 					khash_t(k63_dict) *dict, int is_small);
+// void k31_read_iterator(struct read_t *r, uint64_t barcode,
+// 					struct bccount_bundle_t *bundle);
+// void k63_read_iterator(struct read_t *r, uint64_t barcode,
+// 					struct bccount_bundle_t *bundle);
 void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske);
 
 gint_t count_bc(struct barcode_hash_t *t)
@@ -335,16 +326,16 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	}
 }
 
-void debug_build_index(khash_t(k31_dict) *dict)
-{
-	gint_t s = 0;
-	khiter_t it;
-	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
-		if (kh_exist(dict, it))
-			s += kh_value(dict, it).n;
-	}
-	__VERBOSE("Number of indexed position: %ld\n", s);
-}
+// void debug_build_index(khash_t(k31_dict) *dict)
+// {
+// 	gint_t s = 0;
+// 	khiter_t it;
+// 	for (it = kh_begin(dict); it != kh_end(dict); ++it) {
+// 		if (kh_exist(dict, it))
+// 			s += kh_value(dict, it).n;
+// 	}
+// 	__VERBOSE("Number of indexed position: %ld\n", s);
+// }
 
 void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 					int is_small, int need_count)
@@ -356,35 +347,40 @@ void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 	ske.barcode_calculator = barcode_calculators[opt->lib_type];
 	// ske.barcode_calculator = ust_get_barcode;
 	ske.need_count = need_count;
-	if (g->ksize < 32) {
-		khash_t(k31_dict) *edict = kh_init(k31_dict);
-		k31_build_index(g, opt, edict, is_small);
-		ske.dict = edict;
-		ske.read_process_func = k31_read_iterator;
-	} else if (g->ksize >= 32 && g->ksize < 64) {
-		khash_t(k63_dict) *edict = kh_init(k63_dict);
-		k63_build_index(g, opt, edict, is_small);
-		ske.dict = edict;
-		ske.read_process_func = k63_read_iterator;
-	}
+	struct kmhash_t edict;
+	kmhash_init(&edict, opt->hash_size, g->ksize + 1, KM_AUX_POS);
+	kmer_build_index(&edict, g, is_small);
+	ske.dict = &edict;
 	barcode_start_count(opt, &ske);
-	if (g->ksize < 32) {
-		khash_t(k31_dict) *edict = ske.dict;
-		khiter_t it;
-		for (it = kh_begin(edict); it != kh_end(edict); ++it) {
-			if (kh_exist(edict, it))
-				free(kh_value(edict, it).e);
-		}
-		kh_destroy(k31_dict, edict);
-	} else {
-		khash_t(k63_dict) *edict = ske.dict;
-		khiter_t it;
-		for (it = kh_begin(edict); it != kh_end(edict); ++it) {
-			if (kh_exist(edict, it))
-				free(kh_value(edict, it).e);
-		}
-		kh_destroy(k63_dict, edict);
-	}
+	// if (g->ksize < 32) {
+	// 	khash_t(k31_dict) *edict = kh_init(k31_dict);
+	// 	k31_build_index(g, opt, edict, is_small);
+	// 	ske.dict = edict;
+	// 	ske.read_process_func = k31_read_iterator;
+	// } else if (g->ksize >= 32 && g->ksize < 64) {
+	// 	khash_t(k63_dict) *edict = kh_init(k63_dict);
+	// 	k63_build_index(g, opt, edict, is_small);
+	// 	ske.dict = edict;
+	// 	ske.read_process_func = k63_read_iterator;
+	// }
+	// barcode_start_count(opt, &ske);
+	// if (g->ksize < 32) {
+	// 	khash_t(k31_dict) *edict = ske.dict;
+	// 	khiter_t it;
+	// 	for (it = kh_begin(edict); it != kh_end(edict); ++it) {
+	// 		if (kh_exist(edict, it))
+	// 			free(kh_value(edict, it).e);
+	// 	}
+	// 	kh_destroy(k31_dict, edict);
+	// } else {
+	// 	khash_t(k63_dict) *edict = ske.dict;
+	// 	khiter_t it;
+	// 	for (it = kh_begin(edict); it != kh_end(edict); ++it) {
+	// 		if (kh_exist(edict, it))
+	// 			free(kh_value(edict, it).e);
+	// 	}
+	// 	kh_destroy(k63_dict, edict);
+	// }
 }
 
 void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small)
@@ -423,16 +419,20 @@ void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small)
 // 	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
 // }
 
-void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k31_dict) *dict, int is_small)
+void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 {
-	gint_t e, i, k, last;
-	k31key_t knum, krev, kmask;
-	knum = krev = 0;
-	kmask = ((k31key_t)1 << (g->ksize << 1)) - 1;
-	int lmc = (g->ksize << 1) - 2;
+	int ksize, word_size;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	uint8_t *knum, *krev;
+	knum = alloca(word_size);
+	krev = alloca(word_size);
+	gint_t e, e_rc, i, k, last;
 	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
 		uint32_t p = 0;
+		memset(knum, 0, word_size);
+		memset(krev, 0, word_size);
 		gint_t slen, seq_len;
 		slen = get_edge_len(g->edges + e);
 		if (is_small)
@@ -440,204 +440,305 @@ void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
 		seq_len = g->edges[e].seq_len;
 		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
-			knum = ((knum << 2) & kmask) | c;
-			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
+			km_shift_append(knum, ksize, word_size, c);
+			km_shift_append_rv(krev, ksize, word_size, c ^ 3);
 			++last;
-			if (last >= g->ksize) {
-				khiter_t it;
-				int ret;
-				if (knum <= krev)
-					it = kh_put(k31_dict, dict, knum, &ret);
+			if (last >= ksize) {
+				kmint_t it;
+				if (km_cmp(knum, krev, word_size) <= 0)
+					it = kmhash_put(h, knum);
 				else
-					it = kh_put(k31_dict, dict, krev, &ret);
-				struct edge_data_t *b = &kh_value(dict, it);
-				if (ret == 1) {
-					b->e = NULL;
-					b->n = 0;
+					it = kmhash_put(h, knum);
+				struct edge_data_t *b = &KMHASH_POS(h, it);
+				if ((b->n & (b->n - 1)) == 0) {
+					if (b->n == 0)
+						b->e = calloc(1, sizeof(struct edge_idx_t));
+					else
+						b->e = realloc(b->e, (b->n << 1) * sizeof(struct edge_idx_t));
 				}
-				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
 				b->e[b->n].idx = e;
 				b->e[b->n].pos = k;
 				++b->n;
 			}
-			if (p < g->edges[e].n_holes &&
-				i == g->edges[e].p_holes[p]) {
+			if (p < g->edges[e].n_holes && i == g->edges[e].p_holes[p]) {
 				last = 0;
-				k += g->edges[e].l_holes[p];
-				++p;
+				k += g->edges[e].l_holes[p++];
 			}
 		}
 	}
 }
 
-void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
-					khash_t(k63_dict) *dict, int is_small)
-{
-	gint_t e, i, k, last;
-	k63key_t knum, krev, kmask;
-	kmask.bin[0] = (uint64_t)-1;
-	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
-	int lmc = (g->ksize << 1) - 2;
-	for (e = 0; e < g->n_e; ++e) {
-		uint32_t p = 0;
-		gint_t slen, seq_len;
-		slen = get_edge_len(g->edges + e);
-		if (is_small)
-			slen = __min(slen, g->bin_size * MAX_N_BUCK);
-		seq_len = g->edges[e].seq_len;
-		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
-			uint32_t c = __binseq_get(g->edges[e].seq, i);
-			__k63_lshift2(knum); __k63_and(knum, kmask);
-			knum.bin[0] |= c;
-			__k63_rshift2(krev);
-			krev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
-			++last;
-			if (last >= g->ksize) {
-				khiter_t it;
-				int ret;
-				if (__k63_lt(knum, krev))
-					it = kh_put(k63_dict, dict, knum, &ret);
-				else
-					it = kh_put(k63_dict, dict, krev, &ret);
-				struct edge_data_t *b = &kh_value(dict, it);
-				if (ret == 1) {
-					b->e = NULL;
-					b->n = 0;
-				}
-				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
-				b->e[b->n].idx = e;
-				b->e[b->n].pos = k;
-				++b->n;
-			}
-			if (p < g->edges[e].n_holes &&
-				i == g->edges[e].p_holes[p]) {
-				last = 0;
-				k += g->edges[e].l_holes[p];
-				++p;
-			}
-		}
-	}
-}
+// void k31_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+// 					khash_t(k31_dict) *dict, int is_small)
+// {
+// 	gint_t e, i, k, last;
+// 	k31key_t knum, krev, kmask;
+// 	knum = krev = 0;
+// 	kmask = ((k31key_t)1 << (g->ksize << 1)) - 1;
+// 	int lmc = (g->ksize << 1) - 2;
+// 	for (e = 0; e < g->n_e; ++e) {
+// 		uint32_t p = 0;
+// 		gint_t slen, seq_len;
+// 		slen = get_edge_len(g->edges + e);
+// 		if (is_small)
+// 			slen = __min(slen, g->bin_size * MAX_N_BUCK);
+// 		seq_len = g->edges[e].seq_len;
+// 		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
+// 			uint32_t c = __binseq_get(g->edges[e].seq, i);
+// 			knum = ((knum << 2) & kmask) | c;
+// 			krev = (krev >> 2) | ((k31key_t)(c ^ 3) << lmc);
+// 			++last;
+// 			if (last >= g->ksize) {
+// 				khiter_t it;
+// 				int ret;
+// 				if (knum <= krev)
+// 					it = kh_put(k31_dict, dict, knum, &ret);
+// 				else
+// 					it = kh_put(k31_dict, dict, krev, &ret);
+// 				struct edge_data_t *b = &kh_value(dict, it);
+// 				if (ret == 1) {
+// 					b->e = NULL;
+// 					b->n = 0;
+// 				}
+// 				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
+// 				b->e[b->n].idx = e;
+// 				b->e[b->n].pos = k;
+// 				++b->n;
+// 			}
+// 			if (p < g->edges[e].n_holes &&
+// 				i == g->edges[e].p_holes[p]) {
+// 				last = 0;
+// 				k += g->edges[e].l_holes[p];
+// 				++p;
+// 			}
+// 		}
+// 	}
+// }
 
-void k31_read_iterator(struct read_t *r, uint64_t barcode,
-						struct bccount_bundle_t *bundle)
+// void k63_build_index(struct asm_graph_t *g, struct opt_proc_t *opt,
+// 					khash_t(k63_dict) *dict, int is_small)
+// {
+// 	gint_t e, i, k, last;
+// 	k63key_t knum, krev, kmask;
+// 	kmask.bin[0] = (uint64_t)-1;
+// 	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
+// 	knum = krev = (k63key_t){{0ull, 0ull}};
+// 	int lmc = (g->ksize << 1) - 2;
+// 	for (e = 0; e < g->n_e; ++e) {
+// 		uint32_t p = 0;
+// 		gint_t slen, seq_len;
+// 		slen = get_edge_len(g->edges + e);
+// 		if (is_small)
+// 			slen = __min(slen, g->bin_size * MAX_N_BUCK);
+// 		seq_len = g->edges[e].seq_len;
+// 		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
+// 			uint32_t c = __binseq_get(g->edges[e].seq, i);
+// 			__k63_lshift2(knum); __k63_and(knum, kmask);
+// 			knum.bin[0] |= c;
+// 			__k63_rshift2(krev);
+// 			krev.bin[1] |= (uint64_t)(c ^ 3) << (lmc - 64);
+// 			++last;
+// 			if (last >= g->ksize) {
+// 				khiter_t it;
+// 				int ret;
+// 				if (__k63_lt(knum, krev))
+// 					it = kh_put(k63_dict, dict, knum, &ret);
+// 				else
+// 					it = kh_put(k63_dict, dict, krev, &ret);
+// 				struct edge_data_t *b = &kh_value(dict, it);
+// 				if (ret == 1) {
+// 					b->e = NULL;
+// 					b->n = 0;
+// 				}
+// 				b->e = realloc(b->e, (b->n + 1) * sizeof(struct edge_idx_t));
+// 				b->e[b->n].idx = e;
+// 				b->e[b->n].pos = k;
+// 				++b->n;
+// 			}
+// 			if (p < g->edges[e].n_holes &&
+// 				i == g->edges[e].p_holes[p]) {
+// 				last = 0;
+// 				k += g->edges[e].l_holes[p];
+// 				++p;
+// 			}
+// 		}
+// 	}
+// }
+
+void bcread_iterator(struct read_t *r, uint64_t barcode, struct bccount_bundle_t *bundle)
 {
 	struct asm_graph_t *g = bundle->g;
-	khash_t(k31_dict) *dict = bundle->dict;
-	int i, last, ci, len, lmc, ksize;
-	char *seq;
-	len = r->len;
-	seq = r->seq;
-	ksize = g->ksize;
+	struct kmhash_t *dict = bundle->dict;
 
-	k31key_t knum, krev, kmask;
-	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
-	knum = krev = 0;
+	int ksize, word_size, i, k, last, len;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	uint8_t *knum, *krev;
+	uint8_t ci;
+	knum = alloca(word_size);
+	krev = alloca(word_size);
+	char *seq = r->seq;
+	len = r->len;
+
 	last = 0;
-	lmc = (ksize - 1) << 1;
 	for (i = 0; i < len; ++i) {
 		ci = nt4_table[(int)seq[i]];
-		knum = (knum << 2) & kmask;
-		krev = krev >> 2;
 		if (ci < 4) {
-			knum |= ci;
-			krev |= (k31key_t)(ci ^ 3) << lmc;
+			km_shift_append(knum, ksize, word_size, ci);
+			km_shift_append_rv(krev, ksize, word_size, ci ^ 3);
 			++last;
 		} else {
 			last = 0;
 		}
 		if (last >= ksize) {
-			khiter_t k;
-			if (knum < krev) {
-				k = kh_get(k31_dict, dict, knum);
-			} else {
-				k = kh_get(k31_dict, dict, krev);
+			kmint_t k;
+			if (km_cmp(knum, krev, word_size) <= 0)
+				k = kmhash_get(dict, knum);
+			else
+				k = kmhash_get(dict, krev);
+			if (k == KMHASH_END(dict))
+				continue;
+			struct edge_idx_t *p = KMHASH_POS(dict, k).e;
+			gint_t n, e, bin, j;
+			n = KMHASH_POS(dict, k).n;
+			for (j = 0; j < n; ++j) {
+				e = p[j].idx;
+				bin = p[j].pos / g->bin_size;
+				pthread_mutex_lock(&(g->edges[e].lock));
+				barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
+				pthread_mutex_unlock(&(g->edges[e].lock));
 			}
-			if (k != kh_end(dict)) {
-				struct edge_idx_t *p = kh_value(dict, k).e;
-				gint_t n, e, bin, j;
-				n = kh_value(dict, k).n;
+			if (bundle->need_count) {
+				gint_t prev_e = -1;
 				for (j = 0; j < n; ++j) {
 					e = p[j].idx;
-					bin = p[j].pos / g->bin_size;
-					pthread_mutex_lock(&(g->edges[e].lock));
-					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
-					pthread_mutex_unlock(&(g->edges[e].lock));
-				}
-				if (bundle->need_count) {
-					gint_t prev_e = -1;
-					for (j = 0; j < n; ++j) {
-						e = p[j].idx;
-						if (e != prev_e)
-							atomic_add_and_fetch64(&(g->edges[e].count), 1);
-						prev_e = e;
-					}
+					if (e != prev_e)
+						atomic_add_and_fetch64(&(g->edges[e].count), 1);
+					prev_e = e;
 				}
 			}
 		}
 	}
 }
 
-void k63_read_iterator(struct read_t *r, uint64_t barcode,
-						struct bccount_bundle_t *bundle)
-{
-	struct asm_graph_t *g = bundle->g;
-	khash_t(k63_dict) *dict = bundle->dict;
-	int i, last, ci, len, lmc, ksize;
-	char *seq;
-	len = r->len;
-	seq = r->seq;
-	ksize = g->ksize;
+// void k31_read_iterator(struct read_t *r, uint64_t barcode,
+// 						struct bccount_bundle_t *bundle)
+// {
+// 	struct asm_graph_t *g = bundle->g;
+// 	khash_t(k31_dict) *dict = bundle->dict;
+// 	int i, last, ci, len, lmc, ksize;
+// 	char *seq;
+// 	len = r->len;
+// 	seq = r->seq;
+// 	ksize = g->ksize;
 
-	k63key_t knum, krev, kmask;
-	kmask.bin[0] = (uint64_t)-1;
-	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
-	knum = krev = (k63key_t){{0ull, 0ull}};
-	lmc = (g->ksize - 1) << 1;
-	last = 0;
-	for (i = 0; i < len; ++i) {
-		ci = nt4_table[(int)seq[i]];
-		__k63_lshift2(knum); __k63_and(knum, kmask);
-		__k63_rshift2(krev);
-		if (ci < 4) {
-			knum.bin[0] |= ci;
-			krev.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
-			++last;
-		} else {
-			last = 0;
-		}
-		if (last >= ksize) {
-			khiter_t k;
-			if (__k63_lt(knum, krev)) {
-				k = kh_get(k63_dict, dict, knum);
-			} else {
-				k = kh_get(k63_dict, dict, krev);
-			}
-			if (k != kh_end(dict)) {
-				struct edge_idx_t *p = kh_value(dict, k).e;
-				gint_t n, e, bin, j;
-				n = kh_value(dict, k).n;
-				for (j = 0; j < n; ++j) {
-					e = p[j].idx;
-					bin = p[j].pos / g->bin_size;
-					pthread_mutex_lock(&(g->edges[e].lock));
-					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
-					pthread_mutex_unlock(&(g->edges[e].lock));
-				}
-				if (bundle->need_count) {
-					gint_t prev_e = -1;
-					for (j = 0; j < n; ++j) {
-						e = p[j].idx;
-						if (e != prev_e)
-							atomic_add_and_fetch64(&(g->edges[e].count), 1);
-						prev_e = e;
-					}
-				}
-			}
-		}
-	}
-}
+// 	k31key_t knum, krev, kmask;
+// 	kmask = ((k31key_t)1 << (ksize << 1)) - 1;
+// 	knum = krev = 0;
+// 	last = 0;
+// 	lmc = (ksize - 1) << 1;
+// 	for (i = 0; i < len; ++i) {
+// 		ci = nt4_table[(int)seq[i]];
+// 		knum = (knum << 2) & kmask;
+// 		krev = krev >> 2;
+// 		if (ci < 4) {
+// 			knum |= ci;
+// 			krev |= (k31key_t)(ci ^ 3) << lmc;
+// 			++last;
+// 		} else {
+// 			last = 0;
+// 		}
+// 		if (last >= ksize) {
+// 			khiter_t k;
+// 			if (knum < krev) {
+// 				k = kh_get(k31_dict, dict, knum);
+// 			} else {
+// 				k = kh_get(k31_dict, dict, krev);
+// 			}
+// 			if (k != kh_end(dict)) {
+// 				struct edge_idx_t *p = kh_value(dict, k).e;
+// 				gint_t n, e, bin, j;
+// 				n = kh_value(dict, k).n;
+// 				for (j = 0; j < n; ++j) {
+// 					e = p[j].idx;
+// 					bin = p[j].pos / g->bin_size;
+// 					pthread_mutex_lock(&(g->edges[e].lock));
+// 					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
+// 					pthread_mutex_unlock(&(g->edges[e].lock));
+// 				}
+// 				if (bundle->need_count) {
+// 					gint_t prev_e = -1;
+// 					for (j = 0; j < n; ++j) {
+// 						e = p[j].idx;
+// 						if (e != prev_e)
+// 							atomic_add_and_fetch64(&(g->edges[e].count), 1);
+// 						prev_e = e;
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
+// void k63_read_iterator(struct read_t *r, uint64_t barcode,
+// 						struct bccount_bundle_t *bundle)
+// {
+// 	struct asm_graph_t *g = bundle->g;
+// 	khash_t(k63_dict) *dict = bundle->dict;
+// 	int i, last, ci, len, lmc, ksize;
+// 	char *seq;
+// 	len = r->len;
+// 	seq = r->seq;
+// 	ksize = g->ksize;
+
+// 	k63key_t knum, krev, kmask;
+// 	kmask.bin[0] = (uint64_t)-1;
+// 	kmask.bin[1] = (1ull << ((g->ksize << 1) - 64)) - 1;
+// 	knum = krev = (k63key_t){{0ull, 0ull}};
+// 	lmc = (g->ksize - 1) << 1;
+// 	last = 0;
+// 	for (i = 0; i < len; ++i) {
+// 		ci = nt4_table[(int)seq[i]];
+// 		__k63_lshift2(knum); __k63_and(knum, kmask);
+// 		__k63_rshift2(krev);
+// 		if (ci < 4) {
+// 			knum.bin[0] |= ci;
+// 			krev.bin[1] |= (uint64_t)(ci ^ 3) << (lmc - 64);
+// 			++last;
+// 		} else {
+// 			last = 0;
+// 		}
+// 		if (last >= ksize) {
+// 			khiter_t k;
+// 			if (__k63_lt(knum, krev)) {
+// 				k = kh_get(k63_dict, dict, knum);
+// 			} else {
+// 				k = kh_get(k63_dict, dict, krev);
+// 			}
+// 			if (k != kh_end(dict)) {
+// 				struct edge_idx_t *p = kh_value(dict, k).e;
+// 				gint_t n, e, bin, j;
+// 				n = kh_value(dict, k).n;
+// 				for (j = 0; j < n; ++j) {
+// 					e = p[j].idx;
+// 					bin = p[j].pos / g->bin_size;
+// 					pthread_mutex_lock(&(g->edges[e].lock));
+// 					barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
+// 					pthread_mutex_unlock(&(g->edges[e].lock));
+// 				}
+// 				if (bundle->need_count) {
+// 					gint_t prev_e = -1;
+// 					for (j = 0; j < n; ++j) {
+// 						e = p[j].idx;
+// 						if (e != prev_e)
+// 							atomic_add_and_fetch64(&(g->edges[e].count), 1);
+// 						prev_e = e;
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
 void *barcode_retriever(void *data)
 {
@@ -654,7 +755,7 @@ void *barcode_retriever(void *data)
 	int64_t *gcnt_reads;
 	uint64_t barcode;
 	gcnt_reads = bundle->n_reads;
-	void (*read_process)(struct read_t *, uint64_t, struct bccount_bundle_t *) = bundle->read_process_func;
+	// void (*read_process)(struct read_t *, uint64_t, struct bccount_bundle_t *) = bundle->read_process_func;
 	uint64_t (*barcode_calculator)(struct read_t *, struct read_t *) = bundle->barcode_calculator;
 
 	while (1) {
@@ -684,9 +785,9 @@ void *barcode_retriever(void *data)
 
 			++n_reads;
 			barcode = barcode_calculator(&read1, &read2);
-			if (barcode != -1) {
-				read_process(&read1, barcode, bundle);
-				read_process(&read2, barcode, bundle);
+			if (barcode != (uint64_t)-1) {
+				bcread_iterator(&read1, barcode, bundle);
+				bcread_iterator(&read2, barcode, bundle);
 			}
 
 			if (rc1 == READ_END)
@@ -719,7 +820,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 		worker_bundles[i].n_reads = &n_reads;
 		worker_bundles[i].g = ske->g;
 		worker_bundles[i].dict = ske->dict;
-		worker_bundles[i].read_process_func = ske->read_process_func;
+		// worker_bundles[i].read_process_func = ske->read_process_func;
 		worker_bundles[i].barcode_calculator = ske->barcode_calculator;
 		worker_bundles[i].need_count = ske->need_count;
 	}

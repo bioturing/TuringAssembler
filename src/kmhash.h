@@ -7,6 +7,7 @@
 
 #define KM_AUX_ADJ			0x1
 #define KM_AUX_IDX			0x2
+#define KM_AUX_POS			0x4
 
 #define KM_IS_EMPTY(h, k) ((h)->flag[k] == KMFLAG_EMPTY)
 
@@ -17,6 +18,18 @@
 #define KMHASH_ADJ(h, k) ((h)->adjs[k])
 
 #define KMHASH_IDX(h, k) ((h)->idx[k])
+
+#define KMHASH_POS(h, k) ((h)->pos[k])
+
+struct edge_idx_t {
+	gint_t idx;
+	gint_t pos;
+};
+
+struct edge_data_t {
+	struct edge_idx_t *e;
+	gint_t n;
+};
 
 struct kmhash_t {
 	kmint_t size;
@@ -29,6 +42,7 @@ struct kmhash_t {
 
 	uint8_t *adjs;
 	gint_t  *idx;
+	struct edge_data_t *pos;
 
 	int word_size;
 	uint32_t aux_flag;

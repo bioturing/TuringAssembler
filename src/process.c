@@ -327,6 +327,12 @@ void assembly3_process(struct opt_proc_t *opt)
 	build_2_3(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_3", 1);
 	asm_graph_destroy(&g1);
+
+	build_barcode(opt, &g2);
+	build_3_4(&g2, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4", 1);
+
+	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
 }
 
