@@ -21,11 +21,12 @@ int get_rc_id(struct asm_graph_t *g, int i_e)
 int get_rc_id_V(struct asm_graph_t *g, int n_v, int *listV, int i_e)
 {
 	int rc = g->edges[listV[i_e]].rc_id;
-	if (listV[i_e ^ 1] == rc) {
+	if ((i_e^1) < n_v && listV[i_e^1] == rc) {
 		return i_e^1;
 	} else{
 		for (int i = 0; i < n_v; i++) {
 			if (listV[i] == rc) {
+				VERBOSE_FLAG(0, "rcidV %d %d\n", i_e, i);
 				return i;
 			}
 		}
@@ -284,6 +285,10 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		mark[i] = 1;
 	}
 	int count = 0;
+	for (int i = 0 ; i < n_v; i++) {
+		int x = listV[i];
+		VERBOSE_FLAG(0, "this is i %d rc_id %d huy %d\n", x, g->edges[x].rc_id, g->edges[x].source);
+	}
 	while (1){
 		int *connected_component = calloc(n_v, sizeof(int)), n_component_node = 0;
 		for (int i = 0; i < n_v; i++) if (mark[i]) {

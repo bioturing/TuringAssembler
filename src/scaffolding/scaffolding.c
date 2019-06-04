@@ -507,7 +507,7 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 			list_E[n_contig_edge-1] = new_edge;
 		}
 		qsort(list_E, n_contig_edge, sizeof(struct contig_edge), decending_edge_score);
-		for (int j = 0; j < MIN(4, n_contig_edge) ; j++) {
+		for (int j = 0; j < MIN(global_number_degree, n_contig_edge) ; j++) {
 			int j_edge = list_E[j].des;
 			float score = list_E[j].score0;
 			if ((score < para->thres_score) || score <=0) {
