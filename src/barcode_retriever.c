@@ -31,6 +31,8 @@ struct bccount_bundle_t {
 uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
 {
 	char *s = r1->info;
+	if (s == NULL)
+		return (uint64_t)-1;
 	int i, k, len = 0;
 	uint64_t ret = 0;
 	for (i = 0; s[i]; ++i) {
