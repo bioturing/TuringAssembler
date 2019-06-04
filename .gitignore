@@ -11,7 +11,10 @@
 /src/execute/**
 !/src/execute/*.c
 
-!KMC-lib.tar.gz
+!/include
+/include/**
+!/include/*.h
+
 !build.sh
 
 !Makefile

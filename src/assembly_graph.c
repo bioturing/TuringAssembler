@@ -12,7 +12,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-#include "../KMC/kmc_api/kmc_skipping.h"
+#include "../include/kmc_skipping.h"
 
 KSEQ_INIT(gzFile, gzread);
 

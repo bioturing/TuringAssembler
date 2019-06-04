@@ -4,13 +4,13 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -static -pthread -lm -lz -O3 -std=c++11 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+LIBS = -pthread -lm -O3 -std=c++11 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so
 
-KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
+# KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -static -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
 	-Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
 	-DGIT_SHA='"$(GIT_SHA)"' \
 	-Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
@@ -45,8 +45,8 @@ OBJ = $(SRC:.c=.o)
 
 DEP = $(OBJ:.o=.d)
 
-$(EXEC): $(OBJ) $(KMC_LIBS)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS) $(KMC_LIBS)
+$(EXEC): $(OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 -include $(DEP)
 
