@@ -350,10 +350,15 @@ static void kmhash_resize(struct kmhash_t *h)
 	}
 }
 
+kmint_t kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *lock)
+{
+	kmint_t k;
+}
+
 kmint_t kmhash_put(struct kmhash_t *h, const uint8_t *key)
 {
-	if (h->n_item >= h->upper_bound)
-		kmhash_resize(h);
+	// if (h->n_item >= h->upper_bound)
+	// 	kmhash_resize(h);
 	kmint_t k;
 	k = internal_kmhash_put(h, key);
 	int n_try = 0;

@@ -432,13 +432,17 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 	gint_t e, e_rc, i, k, last;
 	for (e = 0; e < g->n_e; ++e) {
 		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
 		uint32_t p = 0;
 		memset(knum, 0, word_size);
 		memset(krev, 0, word_size);
-		gint_t slen, seq_len;
-		slen = get_edge_len(g->edges + e);
+		gint_t slen, seq_len, edge_len;
+		edge_len = get_edge_len(g->edges + e);
 		if (is_small)
-			slen = __min(slen, g->bin_size * MAX_N_BUCK);
+			slen = __min(edge_len, g->bin_size * MAX_N_BUCK);
+		else
+			slen = edge_len;
 		seq_len = g->edges[e].seq_len;
 		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
@@ -452,14 +456,17 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 				else
 					it = kmhash_put(h, knum);
 				struct edge_data_t *b = &KMHASH_POS(h, it);
-				if ((b->n & (b->n - 1)) == 0) {
+				if ((b->n & (b->n + 1)) == 0) {
 					if (b->n == 0)
-						b->e = calloc(1, sizeof(struct edge_idx_t));
+						b->e = calloc(2, sizeof(struct edge_idx_t));
 					else
 						b->e = realloc(b->e, (b->n << 1) * sizeof(struct edge_idx_t));
 				}
 				b->e[b->n].idx = e;
 				b->e[b->n].pos = k;
+				++b->n;
+				b->e[b->n].idx = e_rc;
+				b->e[b->n].pos = edge_len - k - ksize;
 				++b->n;
 			}
 			if (p < g->edges[e].n_holes && i == g->edges[e].p_holes[p]) {
