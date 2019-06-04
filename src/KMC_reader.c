@@ -105,7 +105,8 @@ struct KMC_bundle_t {
 	const char *path;
 	struct kmc_info_t *data;
 	void *bundle;
-	void (*process)(uint8_t *, uint32_t, void*);
+	void (*process)(int, uint8_t *, uint32_t, void*);
+	int thread_no;
 	uint64_t lo_prefix;
 	uint64_t hi_prefix;
 	uint64_t offset_kmer;
@@ -116,8 +117,9 @@ void *KMC_worker_multi(void *raw_data)
 	struct KMC_bundle_t *bundle = (struct KMC_bundle_t *)raw_data;
 	pthread_mutex_t *lock = bundle->lock;
 	struct kmc_info_t *data = bundle->data;
-	void (*process)(uint8_t *, uint32_t, void *) = bundle->process;
+	void (*process)(int, uint8_t *, uint32_t, void *) = bundle->process;
 	void *child_bundle = bundle->bundle;
+	int thread_no = bundle->thread_no;
 	uint64_t lo_prefix = bundle->lo_prefix;
 	uint64_t hi_prefix = bundle->hi_prefix;
 	int suffix_size = (data->header.kmer_length - data->header.lut_prefix_length) / 4;
@@ -132,6 +134,7 @@ void *KMC_worker_multi(void *raw_data)
 	b.rem_size = fread(b.buf, 1, b.buf_size, fp);
 	b.cur_pos = 0;
 	uint8_t *kmer = alloca((data->header.kmer_length + 3) / 4);
+	// __VERBOSE("lo_prefix = %lu; hi_prefix = %lu\n", lo_prefix, hi_prefix);
 	for (i = lo_prefix; i < hi_prefix; ++i) {
 		prefix = i & prefix_mask;
 		n_kmers = data->prefix_offset[i + 1] - data->prefix_offset[i];
@@ -151,9 +154,9 @@ void *KMC_worker_multi(void *raw_data)
 			KMC_add_prefix_kmer(kmer, suffix_size,
 					data->header.lut_prefix_length, prefix);
 			uint32_t counter = *((uint32_t *)(b.buf + b.cur_pos + suffix_size));
-			pthread_mutex_lock(lock);
-			process(kmer, counter, child_bundle);
-			pthread_mutex_unlock(lock);
+			// pthread_mutex_lock(lock);
+			process(thread_no, kmer, counter, child_bundle);
+			// pthread_mutex_unlock(lock);
 			b.cur_pos += record_size;
 			b.rem_size -= record_size;
 		}
@@ -164,8 +167,8 @@ void *KMC_worker_multi(void *raw_data)
 }
 
 void KMC_retrieve_kmer_multi(const char *path, int n_threads,
-				struct kmc_info_t *data, void *bundle,
-				void (*process)(uint8_t *, uint32_t, void*))
+			struct kmc_info_t *data, void *bundle,
+			void (*process)(int, uint8_t *, uint32_t, void*))
 {
 	FILE *fp = fopen(path, "rb");
 	char sig[4];
@@ -200,23 +203,27 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 	cnt_kmers = 0;
 	int k = 0;
 	i = 0;
+	worker_bundle[0].lo_prefix = 0;
+	worker_bundle[0].offset_kmer = 0;
 	while (data->prefix_offset[i + 1] != data->header.total_kmers + 1) {
 		cnt_kmers += data->prefix_offset[i + 1] - data->prefix_offset[i];
 		if (cnt_kmers >= cap * (k + 1)) {
-			worker_bundle[k].lo_prefix = cur_prefix;
+			// worker_bundle[k].lo_prefix = cur_prefix;
 			worker_bundle[k].hi_prefix = i + 1;
-			worker_bundle[k].offset_kmer = cur_cnt;
-			cur_prefix = i + 1;
-			cur_cnt = cnt_kmers;
+			worker_bundle[k + 1].lo_prefix = i + 1;
+			worker_bundle[k + 1].offset_kmer = cnt_kmers;
+			// cur_prefix = i + 1;
+			// cur_cnt = cnt_kmers;
 			++k;
 		}
 		++i;
 	}
 	worker_bundle[n_threads - 1].hi_prefix = i;
-	pthread_mutex_t lock;
-	pthread_mutex_init(&lock, NULL);
+	// pthread_mutex_t lock;
+	// pthread_mutex_init(&lock, NULL);
 	for (k = 0; k < n_threads; ++k) {
-		worker_bundle[k].lock = &lock;
+		// worker_bundle[k].lock = &lock;
+		worker_bundle[k].thread_no = k;
 		worker_bundle[k].path = path;
 		worker_bundle[k].data = data;
 		worker_bundle[k].bundle = bundle;
@@ -232,7 +239,7 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 		pthread_create(threads + k, &attr, KMC_worker_multi, worker_bundle + k);
 	for (k = 0; k < n_threads; ++k)
 		pthread_join(threads[k], NULL);
-	pthread_mutex_destroy(&lock);
+	// pthread_mutex_destroy(&lock);
 	free(threads);
 	free(worker_bundle);
 }

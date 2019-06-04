@@ -29,6 +29,7 @@ void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
 void assign_edge_kmer_count(struct opt_proc_t *opt, struct kmhash_t *h,
 							struct asm_graph_t *g);
 void build_edge_kmer_index(struct kmhash_t *h, struct asm_graph_t *g);
+void build_edge_kmer_index_multi(struct opt_proc_t *opt, struct kmhash_t *h, struct asm_graph_t *g);
 
 /* ------------------------------>
  *  T A C C A C T G G G A T T C A
@@ -212,6 +213,59 @@ void test_kmhash(struct kmhash_t *h, int ksize)
 	}
 }
 
+void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)
+{
+	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	int ksize = bundle->ksize;
+	int word_size = (ksize + 3) >> 2;
+	// char *s = alloca(ksize + 2);
+	// dump_kmer(kedge, ksize + 1, s);
+	// __VERBOSE("kedge = %s\n", s);
+	// if (s[0] != 'A')
+	// 	__VERBOSE("ok kmer = %s\n", s);
+	uint8_t *k1, *k2, *k1_rc, *k2_rc;
+	kmint_t ik1, ik2;
+	int c1, c2;
+	// k1 = bundle->k1;
+	// k2 = bundle->k2;
+	// k1_rc = bundle->k1_rc;
+	// k2_rc = bundle->k2_rc;
+	k1 = alloca(word_size);
+	k2 = alloca(word_size);
+	k1_rc = alloca(word_size);
+	k2_rc = alloca(word_size);
+	kedge_get_left(k1, kedge, ksize, word_size);
+	kedge_get_right(k2, kedge, ksize, word_size);
+	km_get_rc(k1_rc, k1, ksize, word_size);
+	km_get_rc(k2_rc, k2, ksize, word_size);
+
+	c1 = kedge[0] & 0x3;
+	c2 = (kedge[ksize >> 2] >> ((ksize & 0x3) << 1)) ^ 0x3;
+	// assert(c2 == (nt4_table[(int)s[0]] ^ 3));
+	// if (c2 != 3)
+	// 	__VERBOSE("c1 = %d; c2 = %d\n", c1, c2);
+	if (km_cmp(k1, k1_rc, word_size) <= 0) {
+		kmhash_set_adj_multi(h, k1, c1, h->locks + thread_no);
+		// ik1 = kmhash_put(h, k1);
+		// kmhash_set_adj(h, ik1, c1);
+	} else {
+		kmhash_set_adj_multi(h, k1_rc, c1 + 4, h->locks + thread_no);
+		// ik1 = kmhash_put(h, k1_rc);
+		// kmhash_set_adj(h, ik1, c1 + 4);
+	}
+
+	if (km_cmp(k2, k2_rc, word_size) <= 0) {
+		kmhash_set_adj_multi(h, k2, c2 + 4, h->locks + thread_no);
+		// ik2 = kmhash_put(h, k2);
+		// kmhash_set_adj(h, ik2, c2 + 4);
+	} else {
+		kmhash_set_adj_multi(h, k2_rc, c2, h->locks + thread_no);
+		// ik2 = kmhash_put(h, k2_rc);
+		// kmhash_set_adj(h, ik2, c2);
+	}
+}
+
 void split_kmer_from_kedge(uint8_t *kedge, uint32_t count, void *data)
 {
 	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
@@ -254,65 +308,6 @@ void split_kmer_from_kedge(uint8_t *kedge, uint32_t count, void *data)
 		ik2 = kmhash_put(h, k2_rc);
 		kmhash_set_adj(h, ik2, c2);
 	}
-
-	// if (km_cmp(k1, k1_rc, word_size) <= 0) {
-	// 	ik1 = kmhash_put(h, k1);
-	// } else {
-	// 	ik1 = kmhash_put(h, k1_rc);
-	// }
-
-	// if (km_cmp(k2, k2_rc, word_size) <= 0) {
-	// 	ik2 = kmhash_put(h, k2);
-	// } else {
-	// 	ik2 = kmhash_put(h, k2_rc);
-	// }
-
-	// int ret_check;
-	// if (km_cmp(k1, k1_rc, word_size) <= 0)
-	// 	ret_check = check_edge(h, k1, ksize, word_size);
-	// else
-	// 	ret_check = check_edge(h, k1_rc, ksize, word_size);
-	// if (!ret_check) {
-	// 	__VERBOSE("Error type 1\n");
-	// 	__VERBOSE("c1 = %d; c2 = %d\n", c1, c2);
-	// 	char *s = alloca(ksize + 2);
-	// 	dump_kmer(kedge, ksize + 1, s);
-	// 	__VERBOSE("edge = %s\n", s);
-	// 	dump_kmer(k1, ksize, s);
-	// 	__VERBOSE("k1   = %s   %hhu\n", s, KMHASH_ADJ(h, ik1));
-	// 	dump_kmer(k2, ksize, s);
-	// 	__VERBOSE("k2   =  %s  %hhu\n", s, KMHASH_ADJ(h, ik2));
-	// 	dump_kmer(k1_rc, ksize, s);
-	// 	__VERBOSE("k1rc =  %s  %hhu\n", s, KMHASH_ADJ(h, ik1));
-	// 	dump_kmer(k2_rc, ksize, s);
-	// 	__VERBOSE("k2rc = %s   %hhu\n", s, KMHASH_ADJ(h, ik2));
-
-	// 	assert(0);
-	// }
-
-	// if (km_cmp(k2, k2_rc, word_size) <= 0)
-	// 	ret_check = check_edge(h, k2, ksize, word_size);
-	// else
-	// 	ret_check = check_edge(h, k2_rc, ksize, word_size);
-
-	// if (!ret_check) {
-	// 	__VERBOSE("Error type 2\n");
-	// 	__VERBOSE("c1 = %d; c2 = %d\n", c1, c2);
-	// 	char *s = alloca(ksize + 2);
-	// 	dump_kmer(kedge, ksize + 1, s);
-	// 	__VERBOSE("edge = %s\n", s);
-	// 	dump_kmer(k1, ksize, s);
-	// 	__VERBOSE("k1   = %s   %hhu\n", s, KMHASH_ADJ(h, ik1));
-	// 	dump_kmer(k2, ksize, s);
-	// 	__VERBOSE("k2   =  %s  %hhu\n", s, KMHASH_ADJ(h, ik2));
-	// 	dump_kmer(k1_rc, ksize, s);
-	// 	__VERBOSE("k1rc =  %s  %hhu\n", s, KMHASH_ADJ(h, ik1));
-	// 	dump_kmer(k2_rc, ksize, s);
-	// 	__VERBOSE("k2rc = %s   %hhu\n", s, KMHASH_ADJ(h, ik2));
-
-	// 	assert(0);
-	// }
-
 }
 
 void kmbuild_bundle_init(struct kmbuild_bundle_t *b, struct kmhash_t *h,
@@ -349,8 +344,8 @@ void retrieve_kmer_from_kedge(struct opt_proc_t *opt, int ksize,
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 	struct kmbuild_bundle_t bundle;
 	kmbuild_bundle_init(&bundle, kmer_table, ksize);
-	// KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge);
-	KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge);
+	KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge_multi);
+	// KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), split_kmer_from_kedge);
 	kmbuild_bundle_destroy(&bundle);
 	destroy_kmc_info(&kmc_inf);
 }
@@ -374,9 +369,9 @@ void find_bugs(struct kmhash_t *h, int ksize)
 void build_asm_graph_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
 	struct kmhash_t kmer_table;
-	__VERBOSE("|-------- Retrive kmer nodes\n");
-	kmhash_init(&kmer_table, opt->hash_size, ksize, KM_AUX_ADJ);
+	__VERBOSE("|-------- Retrieve kmer nodes\n");
 	/* FIXME: parallel */
+	kmhash_init(&kmer_table, opt->hash_size, (ksize + 3) >> 2, KM_AUX_ADJ, opt->n_threads);
 	retrieve_kmer_from_kedge(opt, ksize, &kmer_table);
 	// find_bugs(&kmer_table, ksize);
 	__VERBOSE("Number of kmer = %lu\n", kmer_table.n_item);
@@ -384,13 +379,13 @@ void build_asm_graph_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *
 	__VERBOSE("|-------- Build kmer graph from kmer table\n");
 	build_asm_graph_from_kmhash(opt, ksize, &kmer_table, g);
 	__VERBOSE("Number of nodes: %ld; Number of edges: %ld\n", g->n_v, g->n_e);
-	test_asm_graph(g);
 
 	kmhash_destroy(&kmer_table);
 	__VERBOSE("|-------- Build edge index\n");
-	kmhash_init(&kmer_table, opt->hash_size, ksize + 1, KM_AUX_IDX);
+	kmhash_init(&kmer_table, opt->hash_size, (ksize + 4) >> 2, KM_AUX_IDX, opt->n_threads);
 	/* FIXME: parallel */
-	build_edge_kmer_index(&kmer_table, g);
+	build_edge_kmer_index_multi(opt, &kmer_table, g);
+	// build_edge_kmer_index(&kmer_table, g);
 	__VERBOSE("|-------- Assign edge kmer count\n");
 	/* FIXME: parallel */
 	assign_edge_kmer_count(opt, &kmer_table, g);
@@ -411,43 +406,27 @@ void assign_count_kedge(uint8_t *kmer, uint32_t count, void *data)
 	int word_size = (ksize + 3) >> 2;
 	kmint_t k = kmhash_get(h, kmer);
 	if (k == KMHASH_END(h)) {
-		// uint8_t *k1, *k2, *k1_rc, *k2_rc;
-		// k1 = alloca(word_size);
-		// k2 = alloca(word_size);
-		// k1_rc = alloca(word_size);
-		// k2_rc = alloca(word_size);
-		// kedge_get_left(k1, kmer, g->ksize, (g->ksize + 3) >> 2);
-		// kedge_get_right(k2, kmer, g->ksize, (g->ksize + 3) >> 2);
-		// km_get_rc(k1_rc, k1, g->ksize, (g->ksize + 3) >> 2);
-		// km_get_rc(k2_rc, k2, g->ksize, (g->ksize + 3) >> 2);
-		// char *s = alloca(ksize + 2);
-		// dump_kmer(kmer, ksize, s);
-		// __VERBOSE("edge = %s\n", s);
-		// dump_kmer(k1, g->ksize, s);
-		// __VERBOSE("k1   = %s\n", s);
-		// dump_kmer(k2, g->ksize, s);
-		// __VERBOSE("k2   =  %s\n", s);
-		// dump_kmer(k1_rc, g->ksize, s);
-		// __VERBOSE("k1rc =  %s\n", s);
-		// dump_kmer(k2_rc, g->ksize, s);
-		// __VERBOSE("k2rc = %s\n", s);
-		// int i;
-		// for (i = 0; i < (g->ksize + 3) >> 2; ++i)
-		// 	__VERBOSE("%hhu, ", k1[i]);
-		// __VERBOSE("\n");
-		// for (i = 0; i < (g->ksize + 3) >> 2; ++i)
-		// 	__VERBOSE("%hhu, ", k1_rc[i]);
-		// __VERBOSE("\n");
-		// for (i = 0; i < (g->ksize + 3) >> 2; ++i)
-		// 	__VERBOSE("%hhu, ", k2[i]);
-		// __VERBOSE("\n");
-		// for (i = 0; i < (g->ksize + 3) >> 2; ++i)
-		// 	__VERBOSE("%hhu, ", k2_rc[i]);
-		// __VERBOSE("\n");
-		// assert(0);
 		return;
 	}
 	gint_t e = KMHASH_IDX(h, k);
+	g->edges[e].count += count;
+	g->edges[g->edges[e].rc_id].count += count;
+}
+
+void assign_count_kedge_multi(int thread_no, uint8_t *kmer, uint32_t count, void *data)
+{
+	struct kmedge_bundle_t *bundle = (struct kmedge_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	struct asm_graph_t *g = bundle->g;
+	int ksize = g->ksize + 1;
+	int word_size = (ksize + 3) >> 2;
+	kmint_t k = kmhash_get(h, kmer);
+	if (k == KMHASH_END(h)) {
+		return;
+	}
+	gint_t e = KMHASH_IDX(h, k);
+	atomic_add_and_fetch64(&g->edges[e].count, count);
+	atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count, count);
 	g->edges[e].count += count;
 	g->edges[g->edges[e].rc_id].count += count;
 }
@@ -466,7 +445,8 @@ void assign_edge_kmer_count(struct opt_proc_t *opt, struct kmhash_t *h,
 	struct kmedge_bundle_t bundle;
 	bundle.h = h;
 	bundle.g = g;
-	KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), assign_count_kedge);
+	KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf, (void *)(&bundle), assign_count_kedge_multi);
+	// KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), assign_count_kedge);
 	destroy_kmc_info(&kmc_inf);
 }
 
@@ -481,6 +461,108 @@ static inline void deb_dump_bin_seq(const char *label, uint32_t *bin, uint32_t l
 	seq[len] = '\0';
 	fprintf(stderr, "%s%s\n", label, seq);
 	free(seq);
+}
+
+struct iedge_bundle_t {
+	struct asm_graph_t *g;
+	struct kmhash_t *h;
+	gint_t lo_e;
+	gint_t hi_e;
+	pthread_mutex_t *lock;
+};
+
+void *build_edge_index_worker(void *data)
+{
+	struct iedge_bundle_t *bundle = (struct iedge_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	struct asm_graph_t *g = bundle->g;
+	gint_t lo_e, hi_e;
+	lo_e = bundle->lo_e;
+	hi_e = bundle->hi_e;
+	// __VERBOSE("hi_e = %ld; lo_e = %ld\n", hi_e, lo_e);
+	pthread_mutex_t *lock = bundle->lock;
+	int ksize, word_size;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	uint8_t *knum, *krev;
+	knum = alloca(word_size);
+	krev = alloca(word_size);
+	gint_t e, e_rc;
+	for (e = lo_e; e < hi_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		uint32_t i;
+		memset(knum, 0, word_size);
+		memset(krev, 0, word_size);
+		for (i = 0; i < g->edges[e].seq_len; ++i) {
+			uint32_t c = __binseq_get(g->edges[e].seq, i);
+			km_shift_append(knum, ksize, word_size, c);
+			km_shift_append_rv(krev, ksize, word_size, c ^ 3);
+			if (i + 1 < (uint32_t)ksize)
+				continue;
+			kmint_t k;
+			if (km_cmp(knum, krev, word_size) <= 0) {
+				kmhash_set_idx_multi(h, knum, e, lock);
+				// k = kmhash_put(h, knum);
+				// KMHASH_IDX(h, k) = e;
+			} else {
+				kmhash_set_idx_multi(h, krev, e, lock);
+				// k = kmhash_put(h, krev);
+				// KMHASH_IDX(h, k) = e;
+			}
+		}
+	}
+	return NULL;
+}
+
+void build_edge_kmer_index_multi(struct opt_proc_t *opt, struct kmhash_t *h, struct asm_graph_t *g)
+{
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct iedge_bundle_t *bundle;
+	bundle = calloc(opt->n_threads, sizeof(struct iedge_bundle_t));
+
+	gint_t e, e_rc, cur_e, cap, sum = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum += g->edges[e].seq_len - g->ksize;
+	}
+	cap = sum / opt->n_threads + 1;
+	int k = 0;
+	sum = 0;
+	bundle[0].lo_e = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum += g->edges[e].seq_len - g->ksize;
+		if (sum >= cap * (k + 1)) {
+			bundle[k].hi_e = e + 1;
+			bundle[k + 1].lo_e = e + 1;
+			++k;
+		}
+	}
+	bundle[opt->n_threads - 1].hi_e = g->n_e;
+
+	for (k = 0; k < opt->n_threads; ++k) {
+		bundle[k].h = h;
+		bundle[k].g = g;
+		bundle[k].lock = h->locks + k;
+	}
+
+	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
+	for (k = 0; k < opt->n_threads; ++k)
+		pthread_create(threads + k, &attr, build_edge_index_worker, bundle + k);
+	for (k = 0; k < opt->n_threads; ++k)
+		pthread_join(threads[k], NULL);
+	free(threads);
+	free(bundle);
 }
 
 void build_edge_kmer_index(struct kmhash_t *h, struct asm_graph_t *g)
@@ -504,51 +586,14 @@ void build_edge_kmer_index(struct kmhash_t *h, struct asm_graph_t *g)
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			km_shift_append(knum, ksize, word_size, c);
 			km_shift_append_rv(krev, ksize, word_size, c ^ 3);
-			if (i + 1 < ksize)
+			if (i + 1 < (uint32_t)ksize)
 				continue;
-			if (!is_seq_rc_kmer(knum, krev, ksize)) {
-				__VERBOSE("ksize = %d; word_size = %d\n", ksize, word_size);
-				char *s = alloca(ksize + 1);
-				dump_kmer(knum, ksize, s);
-				__VERBOSE("knum = %s\n", s);
-				dump_kmer(krev, ksize, s);
-				__VERBOSE("krev = %s\n", s);
-				assert(0);
-			}
 			++n_pos;
 			kmint_t k;
 			if (km_cmp(knum, krev, word_size) <= 0) {
-				// k = kmhash_get(h, knum);
-				// if (k != KMHASH_END(h)) {
-				// 	__VERBOSE("e = %ld; ep = %ld; i = %u\n",
-				// 			e, KMHASH_IDX(h, k), i);
-				// 	deb_dump_bin_seq("seq: ", g->edges[e].seq, g->edges[e].seq_len);
-				// 	char *s = alloca(ksize + 1);
-				// 	dump_kmer(knum, ksize, s);
-				// 	__VERBOSE("knum = %s\n", s);
-				// 	dump_kmer(krev, ksize, s);
-				// 	__VERBOSE("krev = %s\n", s);
-				// 	dump_kmer(KMHASH_KEY(h, k), ksize, s);
-				// 	__VERBOSE("key  = %s\n", s);
-				// 	assert(0);
-				// }
 				k = kmhash_put(h, knum);
 				KMHASH_IDX(h, k) = e;
 			} else {
-				// k = kmhash_get(h, krev);
-				// if (k != KMHASH_END(h)) {
-				// 	__VERBOSE("e = %ld; ep = %ld; i = %u\n",
-				// 			e, KMHASH_IDX(h, k), i);
-				// 	deb_dump_bin_seq("seq: ", g->edges[e].seq, g->edges[e].seq_len);
-				// 	char *s = alloca(ksize + 1);
-				// 	dump_kmer(knum, ksize, s);
-				// 	__VERBOSE("knum = %s\n", s);
-				// 	dump_kmer(krev, ksize, s);
-				// 	__VERBOSE("krev = %s\n", s);
-				// 	dump_kmer(KMHASH_KEY(h, k), ksize, s);
-				// 	__VERBOSE("key  = %s\n", s);
-				// 	assert(0);
-				// }
 				k = kmhash_put(h, krev);
 				KMHASH_IDX(h, k) = e;
 			}
@@ -605,6 +650,7 @@ static void *build_graph_worker(void *data)
 	krev = alloca(word_size);
 	cur_knum = alloca(word_size);
 	cur_krev = alloca(word_size);
+	// __VERBOSE("it_l = %ld; it_r = %ld\n", it_l, it_r);
 
 	kmint_t i, k;
 	for (i = it_l; i < it_r; ++i) {

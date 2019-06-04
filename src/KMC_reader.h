@@ -31,8 +31,8 @@ void KMC_retrive_kmer(const char *path, struct kmc_info_t *data, void *bundle,
 				void (*process)(uint8_t *, uint32_t, void *));
 
 void KMC_retrieve_kmer_multi(const char *path, int n_threads,
-				struct kmc_info_t *data, void *bundle,
-				void (*process)(uint8_t *, uint32_t, void*));
+			struct kmc_info_t *data, void *bundle,
+			void (*process)(int, uint8_t *, uint32_t, void*));
 
 void KMC_read_prefix(const char *path, struct kmc_info_t *data);
 

@@ -350,7 +350,7 @@ void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 	// ske.barcode_calculator = ust_get_barcode;
 	ske.need_count = need_count;
 	struct kmhash_t edict;
-	kmhash_init(&edict, opt->hash_size, g->ksize + 1, KM_AUX_POS);
+	kmhash_init(&edict, opt->hash_size, (g->ksize + 4) >> 2, KM_AUX_POS, 0);
 	kmer_build_index(&edict, g, is_small);
 	ske.dict = &edict;
 	barcode_start_count(opt, &ske);

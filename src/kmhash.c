@@ -167,8 +167,13 @@ kmint_t kmhash_get(struct kmhash_t *h, const uint8_t *key)
 	int word_size = h->word_size;
 	uint64_t k = MurmurHash3_x64_64(key, word_size);
 	i = k & mask;
+	// __VERBOSE("[get] hash = %lu\n", k);
 	step = 0;
 	do {
+		// __VERBOSE("[get] pos = %lu; flag = %hhu\n", i, h->flag[i]);
+		// for (int j = 0; j < word_size; ++j)
+		// 	__VERBOSE("%hhu ", h->keys[i * word_size + j]);
+		// __VERBOSE("\n");
 		if (h->flag[i] == KMFLAG_EMPTY)
 			return KMHASH_END(h);
 		if (__kmhash_equal(h->keys + i * word_size, key, word_size))
@@ -177,6 +182,13 @@ kmint_t kmhash_get(struct kmhash_t *h, const uint8_t *key)
 		i = (i + step * (step + 1) / 2) & mask;
 	} while (step <= n_probe);
 	return KMHASH_END(h);
+}
+
+static inline void volatile_memcpy(volatile uint8_t *dst, const uint8_t *src, int sz)
+{
+	int i;
+	for (i = 0; i < sz; ++i)
+		dst[i] = src[i];
 }
 
 static kmint_t internal_kmhash_put_multi(struct kmhash_t *h, const uint8_t *key)
@@ -194,8 +206,9 @@ static kmint_t internal_kmhash_put_multi(struct kmhash_t *h, const uint8_t *key)
 								KMFLAG_LOADING);
 		if (cur_flag == KMFLAG_EMPTY) {
 			memcpy(h->keys + i * word_size, key, word_size);
+			// volatile_memcpy(h->keys + i * word_size, key, word_size);
 			atomic_add_and_fetch_kmint(&(h->n_item), 1);
-			h->flag[i] = KMFLAG_NEW;
+			*((volatile uint8_t *)(&(h->flag[i]))) = KMFLAG_NEW;
 			return i;
 		} else if (cur_flag == KMFLAG_LOADING) {
 			continue;
@@ -352,6 +365,17 @@ static void kmhash_resize(struct kmhash_t *h)
 
 static void kmhash_resize_multi(struct kmhash_t *h)
 {
+	int i;
+	for (i = 0; i < h->n_worker; ++i)
+		pthread_mutex_lock(h->locks + i);
+
+	if (h->size == KMHASH_MAX_SIZE)
+		__ERROR("Hash table size limit");
+
+	kmhash_resize(h);
+
+	for (i = 0; i < h->n_worker; ++i)
+		pthread_mutex_unlock(h->locks + i);
 }
 
 void kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *lock)
@@ -370,6 +394,54 @@ void kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *l
 
 		pthread_mutex_lock(lock);
 		k = internal_kmhash_put_multi(h, key);
+		pthread_mutex_unlock(lock);
+	}
+}
+
+void kmhash_set_adj_multi(struct kmhash_t *h, const uint8_t *key, int c, pthread_mutex_t *lock)
+{
+	kmint_t k;
+
+	pthread_mutex_lock(lock);
+	k = internal_kmhash_put_multi(h, key);
+	if (k != KMHASH_END(h))
+		atomic_set_bit8(h->adjs + k, c);
+	pthread_mutex_unlock(lock);
+
+	while (k == KMHASH_END(h)) {
+		if (atomic_bool_CAS8(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+			kmhash_resize_multi(h);
+			atomic_val_CAS8(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+		}
+
+		pthread_mutex_lock(lock);
+		k = internal_kmhash_put_multi(h, key);
+		if (k != KMHASH_END(h))
+			atomic_set_bit8(h->adjs + k, c);
+		pthread_mutex_unlock(lock);
+	}
+}
+
+void kmhash_set_idx_multi(struct kmhash_t *h, const uint8_t *key, gint_t id, pthread_mutex_t *lock)
+{
+	kmint_t k;
+
+	pthread_mutex_lock(lock);
+	k = internal_kmhash_put_multi(h, key);
+	if (k != KMHASH_END(h))
+		h->idx[k] = id;
+	pthread_mutex_unlock(lock);
+
+	while (k == KMHASH_END(h)) {
+		if (atomic_bool_CAS8(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+			kmhash_resize_multi(h);
+			atomic_val_CAS8(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+		}
+
+		pthread_mutex_lock(lock);
+		k = internal_kmhash_put_multi(h, key);
+		if (k != KMHASH_END(h))
+			h->idx[k] = id;
 		pthread_mutex_unlock(lock);
 	}
 }
@@ -413,7 +485,7 @@ void kmhash_alloc_aux(struct kmhash_t *h, uint32_t aux_flag)
 	}
 }
 
-void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int ksize, uint32_t aux_flag)
+void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int word_size, uint32_t aux_flag, int n_threads)
 {
 	h->size = pre_alloc;
 	__round_up_kmint(h->size);
@@ -421,7 +493,7 @@ void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int ksize, uint32_t aux_
 	h->n_item = 0;
 	h->upper_bound = h->size * HASH_SIZE_UPPER;
 	h->aux_flag = aux_flag;
-	h->word_size = (ksize + 3) >> 2;
+	h->word_size = word_size;
 	size_t l = h->size * h->word_size;
 	h->keys = malloc(l);
 	h->flag = calloc(h->size, sizeof(uint8_t));
@@ -437,6 +509,12 @@ void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int ksize, uint32_t aux_
 		h->pos = calloc(h->size, sizeof(struct edge_data_t));
 	else
 		h->pos = NULL;
+	h->status = KMHASH_IDLE;
+	h->n_worker = n_threads;
+	h->locks = calloc(n_threads, sizeof(pthread_mutex_t));
+	int i;
+	for (i = 0; i < n_threads; ++i)
+		pthread_mutex_init(h->locks + i, NULL);
 }
 
 void kmhash_destroy(struct kmhash_t *h)
@@ -445,8 +523,15 @@ void kmhash_destroy(struct kmhash_t *h)
 	free(h->flag);
 	free(h->adjs);
 	free(h->idx);
+	free(h->pos);
 	h->keys = NULL;
 	h->flag = NULL;
 	h->adjs = NULL;
 	h->idx = NULL;
+	h->pos = NULL;
+	int i;
+	for (i = 0; i < h->n_worker; ++i)
+		pthread_mutex_destroy(h->locks + i);
+	free(h->locks);
+	h->locks = NULL;
 }
