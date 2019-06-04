@@ -350,12 +350,16 @@ static void kmhash_resize(struct kmhash_t *h)
 	}
 }
 
+static void kmhash_resize_multi(struct kmhash_t *h)
+{
+}
+
 void kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *lock)
 {
 	kmint_t k;
 
 	pthread_mutex_lock(lock);
-	k = internal_kmhash_put_multi(h, k);
+	k = internal_kmhash_put_multi(h, key);
 	pthread_mutex_unlock(lock);
 
 	while (k == KMHASH_END(h)) {

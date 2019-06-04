@@ -46,6 +46,8 @@ struct kmhash_t {
 
 	int word_size;
 	uint32_t aux_flag;
+
+	uint8_t status;
 };
 
 void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int ksize,
