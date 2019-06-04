@@ -24,8 +24,6 @@ int get_rc_id_V(struct asm_graph_t *g, int n_v, int *listV, int i_e)
 	if (listV[i_e ^ 1] == rc) {
 		return i_e^1;
 	} else{
-		char *a = "this case should not happen, if it happen, contact @huu";
-		assert(1 == 0 && a);
 		for (int i = 0; i < n_v; i++) {
 			if (listV[i] == rc) {
 				return i;
