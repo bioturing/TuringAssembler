@@ -456,7 +456,7 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 				else
 					it = kmhash_put(h, knum);
 				struct edge_data_t *b = &KMHASH_POS(h, it);
-				if ((b->n & (b->n + 1)) == 0) {
+				if ((b->n & (b->n - 1)) == 0) {
 					if (b->n == 0)
 						b->e = calloc(2, sizeof(struct edge_idx_t));
 					else
