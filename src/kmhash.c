@@ -290,8 +290,10 @@ static void kmhash_resize(struct kmhash_t *h)
 			}
 			if (aux_flag & KM_AUX_IDX)
 				id = idx[i];
-			if (aux_flag & KM_AUX_POS)
+			if (aux_flag & KM_AUX_POS) {
 				p = pos[i];
+				pos[i] = (struct edge_data_t){(void *)NULL, (gint_t)0};
+			}
 			flag[i] = KMFLAG_EMPTY;
 			while (1) {
 				uint64_t k = MurmurHash3_x64_64(x, word_size);
