@@ -621,8 +621,7 @@ void bcread_iterator(struct read_t *r, uint64_t barcode, struct bccount_bundle_t
 				gint_t prev_e = -1;
 				for (j = 0; j < n; ++j) {
 					e = p[j].idx;
-					if (e != prev_e)
-						atomic_add_and_fetch64(&(g->edges[e].count), 1);
+					atomic_add_and_fetch64(&(g->edges[e].count), 1);
 					prev_e = e;
 				}
 			}

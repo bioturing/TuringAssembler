@@ -350,9 +350,24 @@ static void kmhash_resize(struct kmhash_t *h)
 	}
 }
 
-kmint_t kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *lock)
+void kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *lock)
 {
 	kmint_t k;
+
+	pthread_mutex_lock(lock);
+	k = internal_kmhash_put_multi(h, k);
+	pthread_mutex_unlock(lock);
+
+	while (k == KMHASH_END(h)) {
+		if (atomic_bool_CAS8(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+			kmhash_resize_multi(h);
+			atomic_val_CAS8(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+		}
+
+		pthread_mutex_lock(lock);
+		k = internal_kmhash_put_multi(h, key);
+		pthread_mutex_unlock(lock);
+	}
 }
 
 kmint_t kmhash_put(struct kmhash_t *h, const uint8_t *key)
