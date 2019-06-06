@@ -427,8 +427,8 @@ void assign_count_kedge_multi(int thread_no, uint8_t *kmer, uint32_t count, void
 	gint_t e = KMHASH_IDX(h, k);
 	atomic_add_and_fetch64(&g->edges[e].count, count);
 	atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count, count);
-	g->edges[e].count += count;
-	g->edges[g->edges[e].rc_id].count += count;
+	// g->edges[e].count += count;
+	// g->edges[g->edges[e].rc_id].count += count;
 }
 
 void assign_edge_kmer_count(struct opt_proc_t *opt, struct kmhash_t *h,
@@ -561,6 +561,7 @@ void build_edge_kmer_index_multi(struct opt_proc_t *opt, struct kmhash_t *h, str
 		pthread_create(threads + k, &attr, build_edge_index_worker, bundle + k);
 	for (k = 0; k < opt->n_threads; ++k)
 		pthread_join(threads[k], NULL);
+	__VERBOSE("Number of (k+1)-mer: %lu\n", h->n_item);
 	free(threads);
 	free(bundle);
 }

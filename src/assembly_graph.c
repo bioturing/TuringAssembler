@@ -917,10 +917,10 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
-		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
-			g->edges[e].seq_len < MIN_NOTICE_LEN)
-			continue;
+		// gint_t cc_id = id_edge[e];
+		// if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
+		// 	g->edges[e].seq_len < MIN_NOTICE_LEN)
+		// 	continue;
 		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
@@ -1050,6 +1050,16 @@ void test_asm_graph(struct asm_graph_t *g)
 	gint_t le_idx = get_longest_edge(g);
 	__VERBOSE("Longest edge %ld_%ld, length %u\n",
 		le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
+	uint64_t sum_count = 0;
+	for (gint_t e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		gint_t e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum_count += g->edges[e].count;
+	}
+	__VERBOSE("sum_count = %lu\n", sum_count);
 
 	gint_t u, e, j, k;
 	for (u = 0; u < g->n_v; ++u) {

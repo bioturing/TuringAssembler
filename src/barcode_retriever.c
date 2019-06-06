@@ -4,11 +4,13 @@
 #include "assembly_graph.h"
 #include "fastq_producer.h"
 #include "io_utils.h"
+#include "KMC_reader.h"
 #include "kmer.h"
 #include "kmhash.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "../include/kmc_skipping.h"
 
 #define __not_null(x) ((x).idx != -1)
 #define MIN_HEAD_LEN 5
@@ -339,6 +341,61 @@ void print_test_barcode_edge2(struct asm_graph_t *g, gint_t e1, gint_t e2,
 // 	__VERBOSE("Number of indexed position: %ld\n", s);
 // }
 
+struct kmedge_bundle_t {
+	struct kmhash_t *h;
+	struct asm_graph_t *g;
+};
+
+void assign_count_kedge_multi_2(int thread_no, uint8_t *kmer, uint32_t count, void *data)
+{
+	struct kmedge_bundle_t *bundle = (struct kmedge_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	struct asm_graph_t *g = bundle->g;
+	int ksize = g->ksize + 1;
+	int word_size = (ksize + 3) >> 2;
+	kmint_t k = kmhash_get(h, kmer);
+	if (k == KMHASH_END(h)) {
+		return;
+	}
+	struct edge_idx_t *p = KMHASH_POS(h, k).e;
+	gint_t n, e, bin, j;
+	n = KMHASH_POS(h, k).n;
+	for (j = 0; j < n; ++j) {
+		e = p[j].idx;
+		atomic_add_and_fetch64(&g->edges[e].count, count);
+		// bin = p[j].pos / g->bin_size;
+		// pthread_mutex_lock(&(g->edges[e].lock));
+		// barcode_hash_inc_count(g->edges[e].bucks + bin, barcode);
+		// pthread_mutex_unlock(&(g->edges[e].lock));
+	}
+
+	// gint_t e = KMHASH_IDX(h, k);
+	// atomic_add_and_fetch64(&g->edges[e].count, count);
+	// atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count, count);
+	// g->edges[e].count += count;
+	// g->edges[g->edges[e].rc_id].count += count;
+}
+
+void assign_edge_kmer_count_2(struct opt_proc_t *opt, struct kmhash_t *h,
+							struct asm_graph_t *g)
+{
+	char *database_path = alloca(strlen(opt->out_dir) + 20);
+	sprintf(database_path, "%s/KMC_%d_count", opt->out_dir, g->ksize + 1);
+	char *kmc_pre = alloca(strlen(database_path) + 10);
+	char *kmc_suf = alloca(strlen(database_path) + 10);
+	strcpy(kmc_pre, database_path); strcat(kmc_pre, ".kmc_pre");
+	strcpy(kmc_suf, database_path); strcat(kmc_suf, ".kmc_suf");
+	struct kmc_info_t kmc_inf;
+	KMC_read_prefix(kmc_pre, &kmc_inf);
+	struct kmedge_bundle_t bundle;
+	bundle.h = h;
+	bundle.g = g;
+	KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf,
+				(void *)(&bundle), assign_count_kedge_multi_2);
+	// KMC_retrive_kmer(kmc_suf, &kmc_inf, (void *)(&bundle), assign_count_kedge);
+	destroy_kmc_info(&kmc_inf);
+}
+
 void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 					int is_small, int need_count)
 {
@@ -352,8 +409,19 @@ void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct kmhash_t edict;
 	kmhash_init(&edict, opt->hash_size, (g->ksize + 4) >> 2, KM_AUX_POS, 0);
 	kmer_build_index(&edict, g, is_small);
+	// build_edge_kmer_index_2(&edict, g);
 	ske.dict = &edict;
 	barcode_start_count(opt, &ske);
+	// __VERBOSE("|----Estimating kmer\n");
+	// char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
+	// memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	// memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	// __VERBOSE("ksize = %d\n", g->ksize + 1);
+	// KMC_build_kmer_database(g->ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
+	// 					opt->n_files * 2, tmp_files);
+	// __VERBOSE("\n");
+	// assign_edge_kmer_count_2(opt, &edict, g);
+
 	// if (g->ksize < 32) {
 	// 	khash_t(k31_dict) *edict = kh_init(k31_dict);
 	// 	k31_build_index(g, opt, edict, is_small);
@@ -420,6 +488,7 @@ void init_barcode_map(struct asm_graph_t *g, int buck_len, int is_small)
 // 	fprintf(stderr, "Number of position: %u\n", sum);
 // 	fprintf(stderr, "Mean positon/kmer: %f\n", sum * 1.0 / kh_size(dict));
 // }
+//
 
 void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 {
@@ -430,6 +499,8 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 	knum = alloca(word_size);
 	krev = alloca(word_size);
 	gint_t e, e_rc, i, k, last;
+	gint_t sum_len, sum_kmer;
+	sum_len = sum_kmer = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
@@ -444,6 +515,7 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 		else
 			slen = edge_len;
 		seq_len = g->edges[e].seq_len;
+		sum_len += (g->edges[e].seq_len - ksize + 1);
 		for (i = k = last = 0; i < seq_len && k < slen; ++i, ++k) {
 			uint32_t c = __binseq_get(g->edges[e].seq, i);
 			km_shift_append(knum, ksize, word_size, c);
@@ -454,7 +526,7 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 				if (km_cmp(knum, krev, word_size) <= 0)
 					it = kmhash_put(h, knum);
 				else
-					it = kmhash_put(h, knum);
+					it = kmhash_put(h, krev);
 				struct edge_data_t *b = &KMHASH_POS(h, it);
 				if ((b->n & (b->n - 1)) == 0) {
 					if (b->n == 0)
@@ -468,6 +540,7 @@ void kmer_build_index(struct kmhash_t *h, struct asm_graph_t *g, int is_small)
 				b->e[b->n].idx = e_rc;
 				b->e[b->n].pos = edge_len - k - ksize;
 				++b->n;
+				sum_kmer += 2;
 			}
 			if (p < g->edges[e].n_holes && i == g->edges[e].p_holes[p]) {
 				last = 0;
