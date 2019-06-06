@@ -917,10 +917,10 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
-		// gint_t cc_id = id_edge[e];
-		// if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
-		// 	g->edges[e].seq_len < MIN_NOTICE_LEN)
-		// 	continue;
+		gint_t cc_id = id_edge[e];
+		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
+			g->edges[e].seq_len < MIN_NOTICE_LEN)
+			continue;
 		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
