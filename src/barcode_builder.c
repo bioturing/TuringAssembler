@@ -133,6 +133,7 @@ void init_barcode_map(struct asm_graph_t *g, const char *path, uint32_t max_len)
 			k += l;
 		}
 		barcode_hash_init(&g->edges[e].barcodes, 4);
+		barcode_hash_init(&g->edges[e].mate_contigs, 4);
 	}
 	fclose(fp);
 	bwa_idx_build(path, path, BWTALGO_AUTO, 25000000);
@@ -161,6 +162,19 @@ static inline void add_barcode_to_edge(struct asm_graph_t *g, gint_t e, uint64_t
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 
+static inline void add_read_pair_edge(struct asm_graph_t *g, gint_t e, gint_t next_e)
+{
+	pthread_mutex_lock(&g->edges[e].lock);
+	barcode_hash_inc_count(&g->edges[e].mate_contigs, next_e);
+	pthread_mutex_unlock(&g->edges[e].lock);
+}
+
+struct ref_contig_t {
+	gint_t e;
+	int pos;
+	int strand;
+};
+
 void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 						struct bccount_bundle_t *bundle)
 {
@@ -170,6 +184,9 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	mem_alnreg_v ar1, ar2;
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
+	struct ref_contig_t *p1, p2;
+	p1 = alloca(ar1.n * sizeof(struct ref_contig_t));
+	p2 = alloca(ar2.n * sizeof(struct ref_contig_t));
 	int i;
 	gint_t prev_e = -1;
 	for (i = 0; i < ar1.n; ++i) {
@@ -178,6 +195,7 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
+		p1[i] = (struct ref_contig_t){e, a.pos, (int)a.is_rev};
 		if (e != prev_e)
 			add_barcode_to_edge(g, e, bc);
 		prev_e = e;
@@ -190,10 +208,20 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
+		p2[i] = (struct ref_contig_t){e, a.pos, (int)a.is_rev};
 		if (e != prev_e)
 			add_barcode_to_edge(g, e, bc);
 		prev_e = e;
 		free(a.cigar);
+	}
+	for (i = 0; i < ar1.n; ++i) {
+		for (k = 0; k < ar2.n; ++k) {
+			if (p1[i].e != p2[k].e && p1[i].is_rev != p2[k].is_rev &&
+				p1[i].pos + p2[k].pos <= 500) {
+				add_read_pair_edge(g, p1[i].e, p2[k].e);
+				add_read_pair_edge(g, p2[k].e, p1[i].e);
+			}
+		}
 	}
 	free(ar1.a);
 	free(ar2.a);

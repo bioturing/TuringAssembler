@@ -29,6 +29,7 @@ struct asm_edge_t {
 	gint_t rc_id;
 	struct barcode_hash_t *bucks;
 	struct barcode_hash_t barcodes;
+	struct barcode_hash_t mate_contigs;
 	pthread_mutex_t lock;
 };
 
