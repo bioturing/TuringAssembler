@@ -70,8 +70,30 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 }
 
+uint32_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
+{
+	uint32_t i, k, ret = 0;
+	for (i = 0; i < t1->size; ++i) {
+		if (t1->keys[i] == (uint64_t)-1)
+			continue;
+		k = barcode_hash_get(t2, t1->keys[i]);
+		ret += (k != BARCODE_HASH_END(t2));
+	}
+	return ret;
+}
+
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
+	printf("---------------- TEST %ld <-> %ld-------------------\n", e1, e2);
+	struct barcode_hash_t *h1, *h2;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
+	printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
+
+	uint32_t cnt = count_shared_bc(h1, h2);
+	printf("Number of shared barcode: %u\n", cnt);
+	printf("Ratio = %.3f\n", cnt * 1.0 / (h1->n_item + h2->n_item));
 }
 
 static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
