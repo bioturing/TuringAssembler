@@ -4,8 +4,7 @@
 #include <stdint.h>
 
 #include "attribute.h"
-#include "k31hash.h"
-#include "k63hash.h"
+#include "barcode_hash.h"
 
 struct asm_node_t {
 	gint_t rc_id;
@@ -29,6 +28,7 @@ struct asm_edge_t {
 	gint_t target;
 	gint_t rc_id;
 	struct barcode_hash_t *bucks;
+	struct barcode_hash_t barcodes;
 	pthread_mutex_t lock;
 };
 
@@ -58,15 +58,15 @@ void k31_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			struct asm_graph_t *g, const char *preload_path);
-void build_asm_graph_from_k31(struct opt_proc_t *opt, int ksize,
-			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
+// void build_asm_graph_from_k31(struct opt_proc_t *opt, int ksize,
+// 			struct k31hash_t *kmer_hash, struct asm_graph_t *ret_g);
 /* Build graph using kmer with length from 33 to 63 */
 void k63_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0);
 void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
 			struct asm_graph_t *g, const char *preload_path);
-void build_asm_graph_from_k63(struct opt_proc_t *opt, int ksize,
-			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
+// void build_asm_graph_from_k63(struct opt_proc_t *opt, int ksize,
+// 			struct k63hash_t *kmer_hash, struct asm_graph_t *ret_g);
 void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
 
 /*************************** Barcoding ultilities *****************************/
@@ -78,8 +78,9 @@ int test_edge_barcode(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_small(struct asm_graph_t *g, gint_t e1, gint_t e2);
-void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
-					int is_small, int need_count);
+// void construct_barcode_map_ust(struct opt_proc_t *opt, struct asm_graph_t *g,
+// 					int is_small, int need_count);
+void construct_barcode_map(struct opt_proc_t *opt, struct asm_graph_t *g, int is_small);
 
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
@@ -114,7 +115,7 @@ struct cov_range_t convert_cov_range(double fcov);
 #define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
 				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 /* Write plain nucleotide sequence to buffer seq */
-gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
+// gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 /* Estimate coverage of 1 walk on genome */
 double get_genome_coverage(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */

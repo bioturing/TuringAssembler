@@ -3,9 +3,6 @@
 
 #include "assembly_graph.h"
 #include "io_utils.h"
-#include "k31hash.h"
-#include "k63hash.h"
-#include "kmer_count.h"
 #include "process.h"
 #include "resolve.h"
 #include "utils.h"
@@ -170,7 +167,8 @@ void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_barcode_map_ust(opt, g, 0, 0);
+	// construct_barcode_map_ust(opt, g, 0, 0);
+	construct_barcode_map(opt, g, 0);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
@@ -180,7 +178,8 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_barcode_map_ust(opt, g, 0, 1);
+	// construct_barcode_map_ust(opt, g, 0, 1);
+	construct_barcode_map(opt, g, 1);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 

@@ -11,7 +11,6 @@
 #include "get_buffer.h"
 #include "io_utils.h"
 #include "khash.h"
-#include "kmer_count.h"
 #include "process.h"
 #include "time_utils.h"
 #include "utils.h"
