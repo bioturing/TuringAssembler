@@ -195,7 +195,7 @@ void graph_query_process(struct opt_proc_t *opt)
 	__VERBOSE("Querying pair-edge barcode information\n");
 	gint_t u, v;
 	FILE *fp;
-	fp = xfopen(opt->in_file, "r");
+	fp = xfopen(opt->in_fasta, "r");
 	while (1) {
 		int ret = fscanf(fp, "%ld%ld", &u, &v);
 		if (ret == EOF || ret == 0)
