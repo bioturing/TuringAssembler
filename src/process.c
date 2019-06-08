@@ -197,12 +197,19 @@ void graph_query_process(struct opt_proc_t *opt)
 	FILE *fp;
 	fp = xfopen(opt->in_fasta, "r");
 	while (1) {
-		int ret = fscanf(fp, "%ld%ld", &u, &v);
+		char c;
+		int ret = fscanf(fp, "%c %ld", &c, &u);
 		if (ret == EOF || ret == 0)
 			break;
+		if (c == 'L') {
+			fscanf(fp, "%ld\n", &v);
+			print_test_barcode_edge(g0, u, v);
+		} else if (c == 'P') {
+			fscanf(fp, "\n");
+			print_test_pair_end(g0, u);
+		}
 		// int qret = test_edge_barcode(g0, u, v);
 		// fprintf(stdout, "ret = %d\n", qret);
-		print_test_barcode_edge(g0, u, v);
 	}
 	fclose(fp);
 }

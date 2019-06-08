@@ -96,6 +96,33 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	printf("Ratio = %.3f\n", cnt * 1.0 / (h1->n_item + h2->n_item));
 }
 
+void print_test_pair_end(struct asm_graph_t *g, gint_t e)
+{
+	struct barcode_hash_t *h;
+	h = &g->edges[e].mate_contigs;
+	gint_t best, second_best;
+	best = second_best = -1;
+	uint32_t cnt_best, cnt_2nd_best;
+	cnt_best = cnt_2nd_best = 0;
+	uint32_t i;
+	for (i = 0; i < h->size; ++i) {
+		if (h->keys[i] == (uint64_t)-1)
+			continue;
+		if (h->cnts[i] > cnt_best) {
+			cnt_2nd_best = cnt_best;
+			second_best = best;
+			cnt_best = h->cnts[i];
+			best = h->keys[i];
+		} else if (h->cnts[i] > cnt_2nd_best) {
+			cnt_2nd_best = h->cnts[i];
+			second_best = h->keys[i];
+		}
+	}
+	printf("---------------- TEST %ld-------------------\n", e);
+	printf("Best pair-end edge: %ld (cnt = %u)\n", best, cnt_best);
+	printf("2nd pair-end edge : %ld (cnt = %u)\n", second_best, cnt_2nd_best);
+}
+
 static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
 					struct asm_edge_t *e, uint32_t max_len)
 {
@@ -184,10 +211,10 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	mem_alnreg_v ar1, ar2;
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
-	struct ref_contig_t *p1, p2;
+	struct ref_contig_t *p1, *p2;
 	p1 = alloca(ar1.n * sizeof(struct ref_contig_t));
 	p2 = alloca(ar2.n * sizeof(struct ref_contig_t));
-	int i;
+	int i, k;
 	gint_t prev_e = -1;
 	for (i = 0; i < ar1.n; ++i) {
 		mem_aln_t a;
@@ -216,7 +243,7 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	}
 	for (i = 0; i < ar1.n; ++i) {
 		for (k = 0; k < ar2.n; ++k) {
-			if (p1[i].e != p2[k].e && p1[i].is_rev != p2[k].is_rev &&
+			if (p1[i].e != p2[k].e && p1[i].strand != p2[k].strand &&
 				p1[i].pos + p2[k].pos <= 500) {
 				add_read_pair_edge(g, p1[i].e, p2[k].e);
 				add_read_pair_edge(g, p2[k].e, p1[i].e);

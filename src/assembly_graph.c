@@ -1256,6 +1256,11 @@ void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
 		xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 		xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 		xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+		h = &g->edges[e].mate_contigs;
+		xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+		xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+		xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+		xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 	}
 	// xfwrite(&g->bin_size, sizeof(int), 1, fp);
 	// gint_t e;
@@ -1319,6 +1324,14 @@ void load_barcode(struct asm_graph_t *g, FILE *fp)
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
 		struct barcode_hash_t *h = &g->edges[e].barcodes;
+		xfread(&h->size, sizeof(uint32_t), 1, fp);
+		xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+		h->keys = malloc(h->size * sizeof(uint64_t));
+		h->cnts = malloc(h->size * sizeof(uint32_t));
+		xfread(h->keys, sizeof(uint64_t), h->size, fp);
+		xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+
+		h = &g->edges[e].mate_contigs;
 		xfread(&h->size, sizeof(uint32_t), 1, fp);
 		xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 		h->keys = malloc(h->size * sizeof(uint64_t));
