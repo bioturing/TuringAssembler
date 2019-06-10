@@ -150,14 +150,16 @@ void init_barcode_map(struct asm_graph_t *g, const char *path, uint32_t max_len)
 		pthread_mutex_init(&(g->edges[e].lock), NULL);
 		uint32_t len, k, l;
 		len = dump_edge_seq(&seq, &seq_len, g->edges + e, max_len);
-		fprintf(fp, ">%ld\n", e);
-		k = 0;
-		while (k < len) {
-			l = __min(80, len - k);
-			memcpy(buf, seq + k, l);
-			buf[l] = '\0';
-			fprintf(fp, "%s\n", buf);
-			k += l;
+		if (len >= 1000) {
+			fprintf(fp, ">%ld\n", e);
+			k = 0;
+			while (k < len) {
+				l = __min(80, len - k);
+				memcpy(buf, seq + k, l);
+				buf[l] = '\0';
+				fprintf(fp, "%s\n", buf);
+				k += l;
+			}
 		}
 		barcode_hash_init(&g->edges[e].barcodes, 4);
 		barcode_hash_init(&g->edges[e].mate_contigs, 4);
@@ -214,15 +216,16 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	struct ref_contig_t *p1, *p2;
 	p1 = alloca(ar1.n * sizeof(struct ref_contig_t));
 	p2 = alloca(ar2.n * sizeof(struct ref_contig_t));
-	int i, k;
+	int i, k, n1, n2;
 	gint_t prev_e = -1;
+	n1 = n2 = 0;
 	for (i = 0; i < ar1.n; ++i) {
 		mem_aln_t a;
 		if (ar1.a[i].secondary >= 0)
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		p1[i] = (struct ref_contig_t){e, a.pos, (int)a.is_rev};
+		p1[n1++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		if (e != prev_e)
 			add_barcode_to_edge(g, e, bc);
 		prev_e = e;
@@ -235,19 +238,17 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		p2[i] = (struct ref_contig_t){e, a.pos, (int)a.is_rev};
+		p2[n2++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		if (e != prev_e)
 			add_barcode_to_edge(g, e, bc);
 		prev_e = e;
 		free(a.cigar);
 	}
-	for (i = 0; i < ar1.n; ++i) {
-		for (k = 0; k < ar2.n; ++k) {
-			if (p1[i].e != p2[k].e && p1[i].strand != p2[k].strand &&
-				p1[i].pos + p2[k].pos <= 500) {
-				add_read_pair_edge(g, p1[i].e, p2[k].e);
-				add_read_pair_edge(g, p2[k].e, p1[i].e);
-			}
+	if (n1 && n2) {
+		if (p1[0].e != p2[0].e && p1[0].strand == p2[0].strand &&
+			p1[0].pos + p2[0].pos < 500) {
+			add_read_pair_edge(g, p1[0].e, p2[0].e);
+			add_read_pair_edge(g, p2[0].e, p1[0].e);
 		}
 	}
 	free(ar1.a);
