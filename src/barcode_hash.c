@@ -133,6 +133,95 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 	free(flag);
 }
 
+void barcode_hash_filter(struct barcode_hash_t *h, uint32_t thres)
+{
+	uint32_t n_item, i, j, new_size, cur_size, mask, step;
+	cur_size = h->size;
+	uint8_t *flag = calloc(cur_size, sizeof(uint8_t));
+	n_item = 0;
+	for (i = 0; i < cur_size; ++i) {
+		if (h->keys[i] != K31_NULL && h->cnts[i] > thres) {
+			++n_item;
+			flag[i] = KMFLAG_OLD;
+		} else {
+			h->keys[i] = K31_NULL;
+			h->cnts[i] = 0;
+			flag[i] = KMFLAG_EMPTY;
+		}
+	}
+	new_size = n_item;
+	__round_up_32(new_size);
+	if (new_size > cur_size)
+		new_size = cur_size;
+	mask = new_size - 1;
+
+	uint64_t x = K31_NULL, xt;
+	uint32_t y = 0, yt;
+	int retry = 0;
+loop_refill:
+	if (retry) {
+		fprintf(stderr, "retry shrink #%d\n", retry);
+		for (i = 0; i < cur_size; ++i) {
+			if (flag[i] == KMFLAG_NEW)
+				flag[i] = KMFLAG_OLD;
+		}
+		for (i = 0; i < cur_size; ++i) {
+			if (flag[i] == KMFLAG_EMPTY) {
+				h->keys[i] = x;
+				h->cnts[i] = y;
+				flag[i] = KMFLAG_OLD;
+				break;
+			}
+		}
+		new_size <<= 1;
+		mask = new_size - 1;
+	}
+	for (i = 0; i < cur_size; ++i) {
+		if (flag[i] == KMFLAG_OLD) {
+			x = h->keys[i];
+			y = h->cnts[i];
+			h->keys[i] = K31_NULL;
+			h->cnts[i] = 0;
+			flag[i] = KMFLAG_EMPTY;
+			while (1) {
+				uint64_t k = __hash_k31(x);
+				uint32_t j = k & mask, step = 0, last;
+				last = j;
+				while (flag[j] != KMFLAG_EMPTY && flag[j] != KMFLAG_OLD) {
+					j = (j + (++step)) & mask;
+					if (j == last)
+						break;
+				}
+				if (flag[j] == KMFLAG_EMPTY) {
+					flag[j] = KMFLAG_NEW;
+					h->keys[j] = x;
+					h->cnts[j] = y;
+					break;
+				} else if (flag[j] == KMFLAG_OLD) {
+					flag[j] = KMFLAG_NEW;
+					xt = h->keys[j];
+					yt = h->cnts[j];
+					h->keys[j] = x;
+					h->cnts[j] = y;
+					x = xt; y = yt;
+				} else {
+					if (cur_size == new_size)
+						__ERROR("Resize barcode hash failed");
+					++retry;
+					goto loop_refill;
+				}
+			}
+		}
+	}
+	h->size = new_size;
+	h->n_item = n_item;
+	if (new_size < cur_size) {
+		h->keys = realloc(h->keys, new_size * sizeof(uint64_t));
+		h->cnts = realloc(h->cnts, new_size * sizeof(uint32_t));
+	}
+	free(flag);
+}
+
 uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t k;
@@ -179,4 +268,13 @@ void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 	dst->cnts = malloc(dst->size * sizeof(uint32_t));
 	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
 	memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
+}
+
+void barcode_hash_destroy(struct barcode_hash_t *h)
+{
+	free(h->keys);
+	free(h->cnts);
+	h->keys = NULL;
+	h->cnts = NULL;
+	h->size = h->n_item = 0;
 }

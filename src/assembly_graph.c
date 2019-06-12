@@ -54,32 +54,6 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 	g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
 }
 
-void k63_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
-{
-	// set_time_now();
-	// __VERBOSE("|----Estimating kmer\n");
-	// struct k63hash_t table;
-	// k63hash_init(&table, opt->hash_size - 1, 1, 1);
-	// char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
-	// memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
-	// memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	// KMC_build_kmer_database(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-	// 			opt->n_files * 2, tmp_files);
-	// // KMC_convert_database(ksize, opt->out_dir, k63_add_edge_str);
-	// // KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-	// // 	opt->n_files * 2, tmp_files, &table, k63_add_edge_str);
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// char path[1024];
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	// save_k63hash(&table, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k63(opt, ksize, &table, g0);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
 void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
 	set_time_now();
@@ -98,134 +72,6 @@ void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
 }
 
-void k31_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
-{
-	// set_time_now();
-	// __VERBOSE("|----Estimating kmer\n");
-	// struct k31hash_t table;
-	// k31hash_init(&table, opt->hash_size - 1, 1, 1);
-	// char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
-	// memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
-	// memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	// KMC_build_kmer_database(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-	// 			opt->n_files * 2, tmp_files);
-	// // KMC_convert_database(ksize, opt->out_dir, k31_add_edge_str);
-	// // KMC_slave_kmer_count(ksize, opt->out_dir, opt->n_threads, opt->mmem,
-	// // 	opt->n_files * 2, tmp_files, &table, k31_add_edge_str);
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// char path[1024];
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	// save_k31hash(&table, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k31(opt, ksize, &table, g0);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
-void k63_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
-{
-	// set_time_now();
-	// struct k63hash_t table;
-	// __VERBOSE("|----Estimating kmer\n");
-	// build_k63_table_from_scratch(opt, &table, ksize);
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// char path[1024];
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	// save_k63hash(&table, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k63(opt, ksize, &table, g0);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
-void k31_build_scratch(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g0)
-{
-	// set_time_now();
-	// struct k31hash_t table;
-	// __VERBOSE("|----Estimating kmer\n");
-	// build_k31_table_from_scratch(opt, &table, ksize);
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// char path[1024];
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize);
-	// save_k31hash(&table, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k31(opt, ksize, &table, g0);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
-void k31_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-				struct asm_graph_t *g, const char *preload_path)
-{
-	// char path[1024];
-	// if (ksize_src >= ksize_dst) {
-	// 	k31_build_scratch(opt, ksize_dst, g);
-	// 	return;
-	// }
-	// set_time_now();
-	// struct k31hash_t table_src, table_dst;
-	// __VERBOSE("|----Estimating kmer\n");
-	// // snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	// if (load_k31hash(&table_src, preload_path))
-	// 	build_k31_table_from_k31_table(opt, &table_dst, &table_src,
-	// 						ksize_dst, ksize_src);
-	// else
-	// 	build_k31_table_from_scratch(opt, &table_dst, ksize_dst);
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
-	// save_k31hash(&table_dst, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k31(opt, ksize_dst, &table_dst, g);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
-void k63_build_precount(struct opt_proc_t *opt, int ksize_dst, int ksize_src,
-				struct asm_graph_t *g, const char *preload_path)
-{
-	// char path[1024];
-	// if (ksize_src >= ksize_dst) {
-	// 	k63_build_scratch(opt, ksize_dst, g);
-	// 	return;
-	// }
-	// set_time_now();
-	// struct k63hash_t table_dst;
-	// __VERBOSE("|----Estimating kmer\n");
-	// // snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_src);
-	// if (ksize_src < 32) {
-	// 	struct k31hash_t table_src;
-	// 	if (load_k31hash(&table_src, preload_path))
-	// 		build_k63_table_from_k31_table(opt, &table_dst, &table_src,
-	// 						ksize_dst, ksize_src);
-	// 	else
-	// 		build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
-	// } else if (ksize_src > 32 && ksize_src < 64) {
-	// 	struct k63hash_t table_src;
-	// 	if (load_k63hash(&table_src, preload_path))
-	// 		build_k63_table_from_k63_table(opt, &table_dst, &table_src,
-	// 						ksize_dst, ksize_src);
-	// 	else
-	// 		build_k63_table_from_scratch(opt, &table_dst, ksize_dst);
-	// }
-	// __VERBOSE("\n");
-	// __VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	// set_time_now();
-	// snprintf(path, 1024, "%s/kmer_k_%d.hash", opt->out_dir, ksize_dst);
-	// save_k63hash(&table_dst, path);
-
-	// __VERBOSE("\n|----Building assembly graph\n");
-	// build_asm_graph_from_k63(opt, ksize_dst, &table_dst, g);
-	// __VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
 static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 						uint32_t *seq2, uint32_t l2)
 {
@@ -240,24 +86,6 @@ static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 			return 0;
 	}
 	return 1;
-}
-
-void asm_graph_destroy(struct asm_graph_t *g)
-{
-	gint_t u, e;
-	for (e = 0; e < g->n_e; ++e)
-		asm_clean_edge_seq2(g, e);
-	free(g->edges);
-	g->edges = NULL;
-	for (u = 0; u < g->n_v; ++u) {
-		free(g->nodes[u].adj);
-		g->nodes[u].adj = NULL;
-	}
-	free(g->nodes);
-	g->nodes = NULL;
-	g->n_e = g->n_v = 0;
-	g->ksize = 0;
-	g->bin_size = 0;
 }
 
 gint_t get_longest_edge(struct asm_graph_t *g)
@@ -290,17 +118,14 @@ double get_genome_coverage(struct asm_graph_t *g)
 	gint_t e;
 	double ret_cov = 0.0;
 	uint32_t max_len = 0;
-	// uint32_t hash = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
 		if (g->edges[e].seq_len > max_len) {
 			max_len = g->edges[e].seq_len;
 			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
-			// hash = get_hash_edge32(g->edges + e);
 		}
 	}
-	// __VERBOSE("maxlen = %u; hash = %u\n", max_len, hash);
 	return ret_cov;
 }
 
@@ -328,50 +153,62 @@ static gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 	return (gint_t)k;
 }
 
-void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
+// void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
+// {
+// 	if (cov == 1)
+// 		return;
+// 	double fcov;
+// 	fcov = __get_edge_cov(g->edges + e, g->ksize);
+// 	// __VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
+// 	// 			get_edge_len(g->edges + e), fcov, cov);
+
+// 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+// 	asm_clone_edge2(g, g->n_e, e);
+// 	int n;
+// 	for (n = 0; n + 1 < cov; ++n)
+// 		asm_append_seq2(g, e, g->n_e);
+// 	asm_clean_edge_seq(g->edges + g->n_e);
+
+// 	fcov = __get_edge_cov(g->edges + e, g->ksize);
+// 	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// 		get_edge_len(g->edges + e), fcov);
+// }
+
+void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	if (cov == 1)
-		return;
-	double fcov;
-	fcov = __get_edge_cov(g->edges + e, g->ksize);
-	// __VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
-	// 			get_edge_len(g->edges + e), fcov, cov);
-
 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
-	asm_clone_edge2(g, g->n_e, e);
-	int n;
-	for (n = 0; n + 1 < cov; ++n)
-		asm_append_edge_seq2(g, e, g->n_e);
-	asm_clean_edge_seq(g->edges + g->n_e);
-
-	fcov = __get_edge_cov(g->edges + e, g->ksize);
-	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
-	// 		get_edge_len(g->edges + e), fcov);
+	++g->n_e;
+	asm_clone_edge(g, g->n_e - 1, e1);
+	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+	asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
+	g->edges[e1].count = g->edges[e2].count;
+	asm_clean_edge(g, g->n_e - 1);
+	--g->n_e;
 }
 
-void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
-{
-	double fcov1, fcov2;
-	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	// __VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
-	// 	e1, get_edge_len(g->edges + e1), fcov1,
-	// 	e2, get_edge_len(g->edges + e2), fcov2, cov);
+// void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
+// {
+// 	double fcov1, fcov2;
+// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
+// 	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
+// 	// __VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
+// 	// 	e1, get_edge_len(g->edges + e1), fcov1,
+// 	// 	e2, get_edge_len(g->edges + e2), fcov2, cov);
 
-	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
-	asm_clone_edge2(g, g->n_e, e1);
-	int n;
-	for (n = 0; n < cov; ++n) {
-		asm_append_edge_seq2(g, e1, e2);
-		asm_append_edge_seq2(g, e1, g->n_e);
-	}
-	g->edges[e1].count += g->edges[e2].count;
-	asm_clean_edge_seq(g->edges + g->n_e);
+// 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+// 	asm_clone_edge2(g, g->n_e, e1);
+// 	int n;
+// 	for (n = 0; n < cov; ++n) {
+// 		asm_append_seq2(g, e1, e2);
+// 		asm_append_seq2(g, e1, g->n_e);
+// 	}
+// 	g->edges[e1].count += g->edges[e2].count;
+// 	asm_clean_edge_seq(g->edges + g->n_e);
 
-	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
-	// 		get_edge_len(g->edges + e1), fcov1);
-}
+// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
+// 	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// 		get_edge_len(g->edges + e1), fcov1);
+// }
 
 gint_t asm_create_node(struct asm_graph_t *g)
 {
@@ -384,40 +221,7 @@ gint_t asm_create_node(struct asm_graph_t *g)
 	return g->n_v - 2;
 }
 
-
-gint_t asm_clone_edge3(struct asm_graph_t *g, gint_t src)
-{
-	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
-	// __VERBOSE("Cloning edges %ld -> %ld\n", src, g->n_e);
-	g->n_e += 2;
-	asm_clone_edge2(g, g->n_e - 2, src);
-	asm_clone_edge2(g, g->n_e - 1, g->edges[src].rc_id);
-	g->edges[g->n_e - 2].rc_id = g->n_e - 1;
-	g->edges[g->n_e - 1].rc_id = g->n_e - 2;
-	asm_add_node_adj(g, g->edges[g->n_e - 2].source, g->n_e - 2);
-	asm_add_node_adj(g, g->edges[g->n_e - 1].source, g->n_e - 1);
-	return g->n_e - 2;
-}
-
-void asm_clone_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
-{
-	asm_clone_edge(g->edges + dst, g->edges + src);
-	g->edges[dst].source = g->edges[src].source;
-	g->edges[dst].target = g->edges[src].target;
-	/* clone the bucks */
-	gint_t slen, nbin;
-	slen = get_edge_len(g->edges + dst);
-	if (g->bin_size == 0 || g->edges[src].bucks == NULL)
-		return;
-	nbin = (slen + g->bin_size - 1) / g->bin_size;
-	g->edges[dst].bucks = malloc(nbin * sizeof(struct barcode_hash_t));
-	gint_t i;
-	for (i = 0; i < nbin; ++i)
-		barcode_hash_clone(g->edges[dst].bucks + i,
-						g->edges[src].bucks + i);
-}
-
-void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
+void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src)
 {
 	dst->count = src->count;
 	dst->seq_len = src->seq_len;
@@ -431,7 +235,7 @@ void asm_clone_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
 	memcpy(dst->l_holes, src->l_holes, dst->n_holes * sizeof(uint32_t));
 }
 
-void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
+void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 {
 	dst->count = src->count;
 	dst->seq_len = src->seq_len;
@@ -452,55 +256,64 @@ void asm_clone_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	}
 }
 
-void asm_append_seq_with_gap2(struct asm_graph_t *g, gint_t e1, gint_t e2,
-							uint32_t gap_size)
+void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
-	gint_t slen, slen1, slen2, nbin, nbin1, nbin2;
-	/* append the bucket */
-	slen1 = get_edge_len(g->edges + e1);
-	slen2 = get_edge_len(g->edges + e2);
-	asm_append_seq_with_gap(g->edges + e1, g->edges + e2, gap_size);
-	if (g->edges[e1].bucks == NULL)
-		return;
-	slen = get_edge_len(g->edges + e1);
-	nbin = (slen + g->bin_size - 1) / g->bin_size;
-	nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
-	nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
-	g->edges[e1].bucks = realloc(g->edges[e1].bucks,
-					nbin * sizeof(struct barcode_hash_t));
-	gint_t i;
-	if (nbin == nbin1 + nbin2) {
-		/* just concat 2 bucks */
-		for (i = 0; i < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i,
-				g->edges[e2].bucks + i);
-	} else if (nbin + 1 == nbin1 + nbin2) {
-		/* merge the first bucket of e2 to last bucket of e1 */
-		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
-							g->edges[e2].bucks);
-		for (i = 1; i < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
-				g->edges[e2].bucks + i);
-	} else if (nbin + 2 == nbin1 + nbin2) {
-		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
-							g->edges[e2].bucks);
-		for (i = 1; i + 1 < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
-				g->edges[e2].bucks + i);
-	} else if (nbin > nbin1 + nbin2) {
-		/* append some empty bin in the middle */
-		for (i = 0; i < nbin - nbin1 - nbin2; ++i)
-			barcode_hash_init(g->edges[e1].bucks + nbin1 + i, 4);
-		for (i = 0; i < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + (nbin - nbin2 + i),
-				g->edges[e2].bucks + i);
-	} else {
-		assert(0 && "wrong barcode list merge");
-	}
+	/* clone the topology */
+	asm_clone_seq(g->edges + dst, g->edges + src);
+	g->edges[dst].source = g->edges[src].source;
+	g->edges[dst].target = g->edges[src].target;
+	/* clone the barcode and read pair information */
+	if (g->aux_flag & ASM_HAVE_BARCODE)
+		barcode_hash_clone(&g->edges[dst].barcodes, &g->edges[src].barcodes);
+	if (g->aux_flag & ASM_HAVE_READPAIR)
+		barcode_hash_clone(&g->edges[dst].mate_contigs, &g->edges[src].mate_contigs);
+	g->edges[dst].best_mate_contigs = g->edges[src].best_mate_contigs;
 }
 
-void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap)
+gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src)
+{
+	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	g->n_e += 2;
+	asm_clone_edge(g, g->n_e - 2, src);
+	asm_clone_edge(g, g->n_e - 1, g->edges[src].rc_id);
+	g->edges[g->n_e - 2].rc_id = g->n_e - 1;
+	g->edges[g->n_e - 1].rc_id = g->n_e - 2;
+	asm_add_node_adj(g, g->edges[g->n_e - 2].source, g->n_e - 2);
+	asm_add_node_adj(g, g->edges[g->n_e - 1].source, g->n_e - 1);
+	return g->n_e - 2;
+}
+
+void asm_append_seq_with_gap(struct asm_edge_t *dst,
+				struct asm_edge_t *src, uint32_t gap_size)
+{
+	/* append the bin seq */
+	uint32_t seq_len, new_m, m, i, k;
+	seq_len = dst->seq_len + src->seq_len;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len + 15) >> 4;
+	if (new_m > m) {
+		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	}
+	for (i = 0; i < src->seq_len; ++i) {
+		k = i + dst->seq_len;
+		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1) & 3)
+							<< ((k & 15) << 1));
+	}
+	uint32_t n_holes = dst->n_holes + src->n_holes + 1;
+	dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
+	dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
+	/* new gap */
+	dst->p_holes[dst->n_holes] = dst->seq_len - 1;
+	dst->l_holes[dst->n_holes] = gap_size;
+	for (i = 0; i < src->n_holes; ++i)
+		dst->p_holes[dst->n_holes + i + 1] = src->p_holes[i] + dst->seq_len;
+	memcpy(dst->l_holes + dst->n_holes + 1, src->l_holes, src->n_holes * sizeof(uint32_t));
+	dst->n_holes = n_holes;
+	dst->seq_len = seq_len;
+}
+
+void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap)
 {
 	/* append the bin seq */
 	uint32_t seq_len, new_m, m;
@@ -534,67 +347,18 @@ void asm_append_edge_seq(struct asm_edge_t *dst, struct asm_edge_t *src,
 	dst->seq_len = seq_len;
 }
 
-void asm_append_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2)
-{
-	gint_t slen, slen1, slen2, nbin, nbin1, nbin2;
-	/* append the bucket */
-	slen1 = get_edge_len(g->edges + e1);
-	slen2 = get_edge_len(g->edges + e2);
-	if (g->bin_size) {
-		nbin1 = (slen1 + g->bin_size - 1) / g->bin_size;
-		nbin2 = (slen2 + g->bin_size - 1) / g->bin_size;
-	}
-	asm_append_edge_seq(g->edges + e1, g->edges + e2, g->ksize);
-	if (g->edges[e1].bucks == NULL || g->bin_size == 0)
-		return;
-	slen = get_edge_len(g->edges + e1);
-	nbin = (slen + g->bin_size - 1) / g->bin_size;
-	g->edges[e1].bucks = realloc(g->edges[e1].bucks,
-					nbin * sizeof(struct barcode_hash_t));
-	gint_t i;
-	if (nbin == nbin1 + nbin2) {
-		/* just concat 2 bucks */
-		for (i = 0; i < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i,
-				g->edges[e2].bucks + i);
-		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks,
-		// 			nbin2 * sizeof(struct barcode_hash_t));
-	} else if (nbin + 1 == nbin1 + nbin2) {
-		/* merge the first bucket of e2 to last bucket of e1 */
-		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
-							g->edges[e2].bucks);
-		for (i = 1; i < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
-				g->edges[e2].bucks + i);
-		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks + 1,
-		// 		(nbin2 - 1) * sizeof(struct barcode_hash_t));
-	} else if (nbin + 2 == nbin1 + nbin2) {
-		barcode_hash_merge(g->edges[e1].bucks + (nbin1 - 1),
-							g->edges[e2].bucks);
-		for (i = 1; i + 1 < nbin2; ++i)
-			barcode_hash_clone(g->edges[e1].bucks + nbin1 + i - 1,
-				g->edges[e2].bucks + i);
-		// memcpy(g->edges[e1].bucks + nbin1, g->edges[e2].bucks + 1,
-		// 		(nbin2 - 2) * sizeof(struct barcode_hash_t));
-	} else {
-		assert(0 && "wrong barcode list merge");
-	}
-}
-
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 				gint_t e2, gint_t e_rc2, uint32_t gap_size)
 {
-	double cov, cov1, cov2;
-	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	// __VERBOSE("Join with gap [%u] %ld(~%.3lf) -> %ld(~%.3lf). ",
-	// 	gap_size, e1, cov1, e2, cov2);
-	uint32_t j;
-	asm_append_seq_with_gap2(g, e1, e2, gap_size);
+	/*    contig 1  |  gap  |   contig2
+	 * AAAAAAAAAAAAANNNNNNNNNAAAAAAAAAAAA
+	 * Since the barcode + read pair is now preserve only on the 1st contig
+	 * we do not need to append the barcode + read pair information */
+	asm_append_seq_with_gap(g->edges + e1, g->edges + e2, gap_size);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
 
-	asm_append_seq_with_gap2(g, e_rc2, e_rc1, gap_size);
+	asm_append_seq_with_gap(g->edges + e_rc2, g->edges + e_rc1, gap_size);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
 
@@ -603,22 +367,22 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
-	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 					gint_t e2, gint_t e_rc2)
 {
-	double cov, cov1, cov2;
-	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	// __VERBOSE("Join %ld(~%.3lf) -> %ld(~%.3lf). ",
-	// 	e1, cov1, e2, cov2);
-	asm_append_edge_seq2(g, e1, e2);
+	/*    contig 1  | overlap |
+	 * ATCTTCGGTTTTTCTTTAAAAAAG
+	 *              CTTTAAAAAAGAATTAAAAACTT
+	 *                           contig 2
+	 * Since the barcode + read pair is now preserve only on the 1st contig
+	 * we do not need to append the barcode + read pair information */
+	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
-	asm_append_edge_seq2(g, e_rc2, e_rc1);
+
+	asm_append_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
 
@@ -627,172 +391,85 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
-	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count)
+	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
 {
-	double cov, cov1, cov2;
-	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	cov2 = __get_edge_cov(g->edges + e3, g->ksize);
-	// __VERBOSE("Join %ld(~%.3lf) -> %ld -> %ld(~%.3lf). ",
-	// 	e1, cov1, e2, e3, cov2);
-
-	asm_append_edge_seq2(g, e1, e2);
-	asm_append_edge_seq2(g, e1, e3);
+	/*    contig 1  | overlap |      | overlap |  contig 3
+	 * ATCTTCGGTTTTTCTTTAAAAAAG      AAACTTTTTTTGGGGGATACCC
+	 *              CTTTAAAAAAGAATTAAAAACTTTTTTT
+	 *                        contig 2
+	 * Since e2 is usually a repetitive edges, we need to pre-estimate the
+	 * count that e2 contributes to final edge
+	 */
+	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+	asm_append_seq(g->edges + e1, g->edges + e3, g->ksize);
 	g->edges[e1].target = g->edges[e3].target;
-	g->edges[e1].count += g->edges[e3].count + added_count;
+	g->edges[e1].count += g->edges[e3].count + e2_count;
 
-	asm_append_edge_seq2(g, e_rc3, e_rc2);
-	asm_append_edge_seq2(g, e_rc3, e_rc1);
+	asm_append_seq(g->edges + e_rc3, g->edges + e_rc2, g->ksize);
+	asm_append_seq(g->edges + e_rc3, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc3].target = g->edges[e_rc1].target;
-	g->edges[e_rc3].count += g->edges[e_rc1].count + added_count;
+	g->edges[e_rc3].count += g->edges[e_rc1].count + e2_count;
 	
 	g->edges[e1].rc_id = e_rc3;
 	g->edges[e_rc3].rc_id = e1;
 
 	asm_remove_edge(g, e3);
 	asm_remove_edge(g, e_rc1);
-	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("New cov: %.3f\n", cov);
 }
 
-void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
-				gint_t e_rc2, gint_t e_rc1)
-{
-	double cov, cov1, cov2;
-	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	// __VERBOSE("Join loop reverse %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf) -> %ld[len=%u](~%.3lf)",
-	// 	e1, get_edge_len(g->edges + e1), cov1,
-	// 	e2, get_edge_len(g->edges + e2), cov2,
-	// 	e1, get_edge_len(g->edges + e1), cov1);
+// void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
+// 				gint_t e_rc2, gint_t e_rc1)
+// {
+// 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+// 	g->n_e += 2;
+// 	asm_clone_edge2(g, g->n_e - 2, e2);
+// 	asm_clone_edge2(g, g->n_e - 1, e_rc2);
+// 	asm_append_seq2(g, g->n_e - 2, e_rc1);
+// 	asm_append_seq2(g, g->n_e - 1, e_rc1);
 
-	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
-	g->n_e += 2;
-	asm_clone_edge2(g, g->n_e - 2, e2);
-	asm_clone_edge2(g, g->n_e - 1, e_rc2);
-	asm_append_edge_seq2(g, g->n_e - 2, e_rc1);
-	asm_append_edge_seq2(g, g->n_e - 1, e_rc1);
+// 	asm_remove_edge(g, e_rc1);
+// 	asm_clone_edge2(g, e_rc1, e1);
 
-	asm_remove_edge(g, e_rc1);
-	asm_clone_edge2(g, e_rc1, e1);
+// 	asm_append_seq2(g, e1, g->n_e - 1);
+// 	asm_append_seq2(g, e_rc1, g->n_e - 2);
 
-	asm_append_edge_seq2(g, e1, g->n_e - 1);
-	asm_append_edge_seq2(g, e_rc1, g->n_e - 2);
+// 	g->edges[e1].count += g->edges[e2].count;
+// 	g->edges[e_rc1].count = g->edges[e1].count;
+// 	g->edges[e1].target = g->nodes[g->edges[e1].source].rc_id;
+// 	asm_add_node_adj(g, g->edges[e_rc1].source, e_rc1);
+// 	g->edges[e_rc1].target = g->nodes[g->edges[e_rc1].source].rc_id;
 
-	g->edges[e1].count += g->edges[e2].count;
-	g->edges[e_rc1].count = g->edges[e1].count;
-	g->edges[e1].target = g->nodes[g->edges[e1].source].rc_id;
-	asm_add_node_adj(g, g->edges[e_rc1].source, e_rc1);
-	g->edges[e_rc1].target = g->nodes[g->edges[e_rc1].source].rc_id;
+// 	asm_clean_edge_seq(g->edges + g->n_e - 2);
+// 	asm_clean_edge_seq(g->edges + g->n_e - 1);
+// 	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
+// 	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
+// 	g->n_e -= 2;
+// }
 
-	asm_clean_edge_seq(g->edges + g->n_e - 2);
-	asm_clean_edge_seq(g->edges + g->n_e - 1);
-	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
-	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
-	g->n_e -= 2;
+// void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+// 			gint_t e2, gint_t e_rc2, uint64_t added_count)
+// {
+// 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+// 	g->n_e += 2;
+// 	asm_clone_edge2(g, g->n_e - 2, e2);
+// 	asm_clone_edge2(g, g->n_e - 1, e_rc2);
+// 	asm_append_seq2(g, g->n_e - 2, e1);
+// 	asm_append_seq2(g, e1, g->n_e - 2);
+// 	asm_append_seq2(g, g->n_e - 1, e_rc1);
+// 	asm_append_seq2(g, e_rc1, g->n_e - 1);
+// 	g->edges[e1].count += added_count;
+// 	g->edges[e_rc1].count += added_count;
+// 	asm_clean_edge_seq(g->edges + g->n_e - 2);
+// 	asm_clean_edge_seq(g->edges + g->n_e - 1);
+// 	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
+// 	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
+// 	g->n_e -= 2;
+// }
 
-	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("New cov: %.3f\n", cov);
-}
-
-void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-			gint_t e2, gint_t e_rc2, uint64_t added_count)
-{
-	double cov, cov1, cov2;
-	cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-	cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	// __VERBOSE("Join loop %ld(~%.3lf) -> %ld(~%.3lf) -> %ld(~%.3lf). Added count: %lu. ",
-	// 	e1, cov1, e2, cov2, e1, cov1, added_count);
-
-	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
-	g->n_e += 2;
-	asm_clone_edge2(g, g->n_e - 2, e2);
-	asm_clone_edge2(g, g->n_e - 1, e_rc2);
-	asm_append_edge_seq2(g, g->n_e - 2, e1);
-	asm_append_edge_seq2(g, e1, g->n_e - 2);
-	asm_append_edge_seq2(g, g->n_e - 1, e_rc1);
-	asm_append_edge_seq2(g, e_rc1, g->n_e - 1);
-	g->edges[e1].count += added_count;
-	g->edges[e_rc1].count += added_count;
-	asm_clean_edge_seq(g->edges + g->n_e - 2);
-	asm_clean_edge_seq(g->edges + g->n_e - 1);
-	g->edges[g->n_e - 2].source = g->edges[g->n_e - 2].target = -1;
-	g->edges[g->n_e - 1].source = g->edges[g->n_e - 1].target = -1;
-	g->n_e -= 2;
-
-	cov = __get_edge_cov(g->edges + e1, g->ksize);
-	// __VERBOSE("New cov: %.3f\n", cov);
-}
-
-void asm_append_seq_with_gap(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t gap_size)
-{
-	/* append the bin seq */
-	uint32_t seq_len, new_m, m, i, k;
-	seq_len = dst->seq_len + src->seq_len;
-	new_m = (seq_len + 15) >> 4;
-	m = (dst->seq_len + 15) >> 4;
-	if (new_m > m) {
-		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
-		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	}
-	for (i = 0; i < src->seq_len; ++i) {
-		k = i + dst->seq_len;
-		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1) & 3)
-							<< ((k & 15) << 1));
-	}
-	uint32_t n_holes = dst->n_holes + src->n_holes + 1;
-	dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
-	dst->l_holes = realloc(dst->l_holes, n_holes * sizeof(uint32_t));
-	/* new gap */
-	dst->p_holes[dst->n_holes] = dst->seq_len - 1;
-	dst->l_holes[dst->n_holes] = gap_size;
-	for (i = 0; i < src->n_holes; ++i)
-		dst->p_holes[dst->n_holes + i + 1] = src->p_holes[i] + dst->seq_len;
-	memcpy(dst->l_holes + dst->n_holes + 1, src->l_holes, src->n_holes * sizeof(uint32_t));
-	dst->n_holes = n_holes;
-	dst->seq_len = seq_len;
-}
-
-void asm_append_edge(struct asm_edge_t *dst, struct asm_edge_t *src,
-							uint32_t overlap)
-{
-	if (dst->target != src->source)
-		__VERBOSE_INFO("WARNING", "Append edge not consecutive\n");
-	asm_append_edge_seq(dst, src, overlap);
-	dst->count += src->count;
-	dst->target = src->target;
-}
-
-void asm_append_edge2(struct asm_graph_t *g, gint_t dst, gint_t src)
-{
-	if (g->edges[dst].target != g->edges[src].source)
-		__VERBOSE_INFO("WARNING", "Append edge not consecutive\n");
-	asm_append_edge_seq2(g, dst, src);
-	g->edges[dst].count += g->edges[src].count;
-	g->edges[dst].target = g->edges[src].target;
-}
-
-void asm_clean_edge_seq2(struct asm_graph_t *g, gint_t e)
-{
-	uint32_t len, n_bin, i;
-	if (g->edges[e].bucks != NULL && g->bin_size != 0) {
-		len = get_edge_len(g->edges + e);
-		n_bin = (len + g->bin_size - 1) / g->bin_size;
-		for (i = 0; i < n_bin; ++i) {
-			barcode_hash_clean(g->edges[e].bucks + i);
-		}
-		free(g->edges[e].bucks);
-		g->edges[e].bucks = NULL;
-	}
-	asm_clean_edge_seq(g->edges + e);
-}
-
-void asm_clean_edge_seq(struct asm_edge_t *e)
+static inline void asm_clean_edge_seq(struct asm_edge_t *e)
 {
 	free(e->seq);
 	free(e->l_holes);
@@ -803,11 +480,21 @@ void asm_clean_edge_seq(struct asm_edge_t *e)
 	e->n_holes = 0;
 }
 
+void asm_clean_edge(struct asm_graph_t *g, gint_t e)
+{
+	asm_clean_edge_seq(g->edges + e);
+	if (g->aux_flag & ASM_HAVE_BARCODE)
+		barcode_hash_clean(&g->edges[e].barcodes);
+	if (g->aux_flag & ASM_HAVE_READPAIR)
+		barcode_hash_clean(&g->edges[e].mate_contigs);
+}
+
 void asm_remove_edge(struct asm_graph_t *g, gint_t e)
 {
-	assert(e < g->n_e);
-	asm_clean_edge_seq(g->edges + e);
 	gint_t u = g->edges[e].source;
+	if (u == -1) /* already clean */
+		return;
+	asm_clean_edge(g, e);
 	gint_t j = find_adj_idx(g->nodes[u].adj, g->nodes[u].deg, e);
 	if (j >= 0)
 		g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
@@ -1207,12 +894,18 @@ void test_asm_graph(struct asm_graph_t *g)
 	// }
 }
 
-void save_graph(struct asm_graph_t *g, FILE *fp)
+void save_asm_graph(struct asm_graph_t *g, const char *path)
 {
+	FILE *fp = xfopen(path, "wb");
+	char *sig = "asmg";
+	xfwrite(sig, 4, 1, fp);
+	xfwrite(&g->aux_flag, 4, 1, fp);
+
+	/* save the graph topology and sequence information */
+	gint_t u, e;
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
-	gint_t u, e;
 	for (u = 0; u < g->n_v; ++u) {
 		xfwrite(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfwrite(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
@@ -1232,61 +925,48 @@ void save_graph(struct asm_graph_t *g, FILE *fp)
 			xfwrite(g->edges[e].l_holes, sizeof(uint32_t), g->edges[e].n_holes, fp);
 		}
 	}
-}
 
-void save_asm_graph_simple(struct asm_graph_t *g, const char *path)
-{
-	FILE *fp = xfopen(path, "wb");
-	char *sig = "asmg";
-	xfwrite(sig, 4, 1, fp);
-	save_graph(g, fp);
-	fclose(fp);
-}
-
-void save_asm_graph_barcode(struct asm_graph_t *g, const char *path)
-{
-	FILE *fp = xfopen(path, "wb");
-	char *sig = "asmb";
-	xfwrite(sig, 4, 1, fp);
-	save_graph(g, fp);
-	gint_t e;
-	for (e = 0; e < g->n_e; ++e) {
-		struct barcode_hash_t *h = &g->edges[e].barcodes;
-		xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-		xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-		xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-		xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
-		h = &g->edges[e].mate_contigs;
-		xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-		xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-		xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-		xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+	/* save the barcode information */
+	if (g->aux_flag & ASM_HAVE_BARCODE) {
+		for (e = 0; e < g->n_e; ++e) {
+			struct barcode_hash_t *h = &g->edges[e].barcodes;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+		}
 	}
-	// xfwrite(&g->bin_size, sizeof(int), 1, fp);
-	// gint_t e;
-	// for (e = 0; e < g->n_e; ++e) {
-	// 	gint_t n, k, len;
-	// 	len = get_edge_len(g->edges + e);
-	// 	n = (len + g->bin_size - 1) / g->bin_size;
-	// 	for (k = 0; k < n; ++k) {
-	// 		struct barcode_hash_t *h = g->edges[e].bucks + k;
-	// 		xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-	// 		xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-	// 		xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-	// 		xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
-	// 	}
-	// }
+
+	/* save the read pair information */
+	if (g->aux_flag & ASM_HAVE_READPAIR) {
+		for (e = 0; e < g->n_e; ++e) {
+			xfwrite(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
+			struct barcode_hash_t *h = &g->edges[e].mate_contigs;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+		}
+	}
 	fclose(fp);
 }
 
-void load_graph(struct asm_graph_t *g, FILE *fp)
+void load_asm_graph(struct asm_graph_t *g, const char *path)
 {
+	FILE *fp = xfopen(path, "rb");
+	char sig[4];
+	xfread(sig, 4, 1, fp);
+	if (strncmp(sig, "asmg", 4))
+		__ERROR("Not assembly graph format file");
+	xfread(&g->aux_flag, 4, 1, fp);
+	__VERBOSE("aux_flag = %u\n", g->aux_flag);
+
+	/* load the graph topology and sequence information */
+	gint_t u, e;
 	xfread(&g->ksize, sizeof(int), 1, fp);
 	xfread(&g->n_v, sizeof(gint_t), 1, fp);
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
 	g->nodes = malloc(g->n_v * sizeof(struct asm_node_t));
 	g->edges = malloc(g->n_e * sizeof(struct asm_edge_t));
-	gint_t u, e;
 	for (u = 0; u < g->n_v; ++u) {
 		xfread(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfread(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
@@ -1315,44 +995,36 @@ void load_graph(struct asm_graph_t *g, FILE *fp)
 			g->edges[e].p_holes = NULL;
 			g->edges[e].l_holes = NULL;
 		}
+		g->edges[e].best_mate_contigs = -1; /* just for the case that we does not have read pair information */
 	}
-}
 
-void load_barcode(struct asm_graph_t *g, FILE *fp)
-{
-	// xfread(&g->bin_size, sizeof(int), 1, fp);
-	gint_t e;
-	for (e = 0; e < g->n_e; ++e) {
-		struct barcode_hash_t *h = &g->edges[e].barcodes;
-		xfread(&h->size, sizeof(uint32_t), 1, fp);
-		xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-		h->keys = malloc(h->size * sizeof(uint64_t));
-		h->cnts = malloc(h->size * sizeof(uint32_t));
-		xfread(h->keys, sizeof(uint64_t), h->size, fp);
-		xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-
-		h = &g->edges[e].mate_contigs;
-		xfread(&h->size, sizeof(uint32_t), 1, fp);
-		xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-		h->keys = malloc(h->size * sizeof(uint64_t));
-		h->cnts = malloc(h->size * sizeof(uint32_t));
-		xfread(h->keys, sizeof(uint64_t), h->size, fp);
-		xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-
-		// gint_t n, k;
-		// gint_t len = get_edge_len(g->edges + e);
-		// n = (len + g->bin_size - 1) / g->bin_size;
-		// g->edges[e].bucks = calloc(n, sizeof(struct barcode_hash_t));
-		// for (k = 0; k < n; ++k) {
-		// 	struct barcode_hash_t *h = g->edges[e].bucks + k;
-		// 	xfread(&h->size, sizeof(uint32_t), 1, fp);
-		// 	xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-		// 	h->keys = malloc(h->size * sizeof(uint64_t));
-		// 	h->cnts = malloc(h->size * sizeof(uint32_t));
-		// 	xfread(h->keys, sizeof(uint64_t), h->size, fp);
-		// 	xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-		// }
+	/* load the barcode information */
+	if (g->aux_flag & ASM_HAVE_BARCODE) {
+		__VERBOSE("Load barcode\n");
+		for (e = 0; e < g->n_e; ++e) {
+			struct barcode_hash_t *h = &g->edges[e].barcodes;
+			xfread(&h->size, sizeof(uint32_t), 1, fp);
+			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			h->keys = malloc(h->size * sizeof(uint64_t));
+			xfread(h->keys, sizeof(uint64_t), h->size, fp);
+		}
 	}
+
+	/* load the read pair information */
+	if (g->aux_flag & ASM_HAVE_READPAIR) {
+		__VERBOSE("Load read pair\n");
+		for (e = 0; e < g->n_e; ++e) {
+			xfread(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
+			struct barcode_hash_t *h = &g->edges[e].mate_contigs;
+			xfread(&h->size, sizeof(uint32_t), 1, fp);
+			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			h->keys = malloc(h->size * sizeof(uint64_t));
+			xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			h->cnts = malloc(h->size * sizeof(uint32_t));
+			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+		}
+	}
+	fclose(fp);
 }
 
 int asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
@@ -1407,6 +1079,7 @@ int asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 {
 	g->ksize = ksize;
+	g->aux_flag = 0;
 	g->edges = NULL;
 	g->nodes = NULL;
 	g->n_v = g->n_e = 0;
@@ -1416,14 +1089,15 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	kseq_t *seq = kseq_init(fp);
 	while (kseq_read(seq) >= 0) {
 		/* add new edge */
-		if (seq->seq.l < ksize)
+		if ((int)seq->seq.l < ksize)
 			continue;
 		g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
 		g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
 
 		if (!asm_fasta_edge_convert(g, g->n_e, seq))
 			continue;
-		asm_clone_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
+		asm_clone_seq_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
+		// asm_clone_reverse(g->edges + (g->n_e + 1), g->edges + g->n_e);
 		g->edges[g->n_e].rc_id = g->n_e + 1;
 		g->edges[g->n_e + 1].rc_id = g->n_e;
 
@@ -1452,65 +1126,23 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	}
 	kseq_destroy(seq);
 	gzclose(fp);
-	test_asm_graph(g);
 }
 
-void load_asm_graph(struct asm_graph_t *g, const char *path)
+void asm_graph_destroy(struct asm_graph_t *g)
 {
-	FILE *fp = xfopen(path, "rb");
-	char sig[4];
-	xfread(sig, 4, 1, fp);
-	if (strncmp(sig, "asmg", 4) && strncmp(sig, "asmb", 4))
-		__ERROR("Not assembly graph format file");
-	load_graph(g, fp);
-	if (strncmp(sig, "asmb", 4) == 0)
-		load_barcode(g, fp);
-	fclose(fp);
-}
-
-void load_asm_graph_simple(struct asm_graph_t *g, const char *path)
-{
-	FILE *fp = xfopen(path, "rb");
-	char sig[4];
-	xfread(sig, 4, 1, fp);
-	if (strncmp(sig, "asmg", 4) && strncmp(sig, "asmb", 4))
-		__ERROR("Not assembly graph format file");
-	load_graph(g, fp);
-	fclose(fp);
-}
-
-void load_asm_graph_complex(struct asm_graph_t *g, const char *path)
-{
-	FILE *fp = xfopen(path, "rb");
-	char sig[4];
-	xfread(sig, 4, 1, fp);
-	if (strncmp(sig, "asmb", 4))
-		__ERROR("Not assembly graph with barcode format file");
-	load_graph(g, fp);
-	load_barcode(g, fp);
-	fclose(fp);
-}
-
-struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
-{
-	double fcov = __get_edge_cov(g->edges + e, g->ksize);
-	int icov = (int)fcov;
-	if (fcov + EPS < icov + 0.25)
-		return (struct cov_range_t){icov, icov};
-	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
-		return (struct cov_range_t){icov, icov + 1};
-	else
-		return (struct cov_range_t){icov + 1, icov + 1};
-}
-
-struct cov_range_t convert_cov_range(double fcov)
-{
-	int icov = (int)fcov;
-	if (fcov + EPS < icov + 0.25)
-		return (struct cov_range_t){icov, icov};
-	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
-		return (struct cov_range_t){icov, icov + 1};
-	else
-		return (struct cov_range_t){icov + 1, icov + 1};
+	gint_t u, e;
+	for (e = 0; e < g->n_e; ++e)
+		asm_clean_edge(g, e);
+	free(g->edges);
+	g->edges = NULL;
+	for (u = 0; u < g->n_v; ++u) {
+		free(g->nodes[u].adj);
+		g->nodes[u].adj = NULL;
+	}
+	free(g->nodes);
+	g->nodes = NULL;
+	g->n_e = g->n_v = 0;
+	g->ksize = 0;
+	g->bin_size = 0;
 }
 

@@ -333,22 +333,6 @@ void print_info(int argc, char *argv[])
 	free(cmd);
 }
 
-void assembly_opt_process(int argc, char *argv[])
-{
-	struct opt_proc_t *opt;
-	opt = parse_proc_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char log_dir[1024];
-	snprintf(log_dir, 1024, "%s/assembly.log", opt->out_dir);
-	init_log(log_dir);
-	init_clock();
-	print_info(argc, argv);
-	assembly_process(opt);
-}
-
 void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_proc_t *))
 {
 	struct opt_proc_t *opt;
@@ -420,13 +404,9 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	if (!strcmp(argv[1], "assembly"))
-		assembly_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "assembly2"))
-		build_opt_process(argc, argv, &assembly2_process);
+		build_opt_process(argc, argv, &assembly3_process);
 	else if (!strcmp(argv[1], "assembly3"))
 		build_opt_process(argc, argv, &assembly3_process);
-	else if (!strcmp(argv[1], "assembly_precount"))
-		build_opt_process(argc, argv, &assembly_precount_process);
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))

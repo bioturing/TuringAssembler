@@ -21,6 +21,8 @@
 
 #define VERSION_STRING		"0.9-"
 
+#define EPS			1e-6
+
 typedef int64_t gint_t;
 
 struct read_t {

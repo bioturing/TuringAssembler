@@ -29,4 +29,8 @@ void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src);
 
 void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src);
 
+void barcode_hash_filter(struct barcode_hash_t *h, uint32_t thres);
+
+void barcode_hash_destroy(struct barcode_hash_t *h);
+
 #endif /* __BARCODE_HASH_H__ */

@@ -26,7 +26,7 @@ EXEC = skipping
 SRC = src/assembly_graph.c 				\
       src/barcode_hash.c 				\
       src/barcode_builder.c 				\
-      src/barcode_resolve.c 				\
+      src/barcode_resolve2.c 				\
       src/basic_resolve.c 				\
       src/dqueue.c 					\
       src/fastq_producer.c 				\
