@@ -217,4 +217,5 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		cnt_local += collapse_1_1_small_jungle(g0);
 		cnt += cnt_local;
 	} while (cnt_local);
+	asm_condense(g0, g1);
 }
