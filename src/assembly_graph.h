@@ -53,7 +53,7 @@ struct asm_graph_t {
 
 #define MIN_FRAG_LEN			200
 #define MIN_UNIQUE_BARCODE		100
-#define MIN_NOTICE_LEN			500
+#define MIN_NOTICE_LEN			200
 #define MIN_CONNECT_SIZE		500
 #define MAX_TIPS_LEN			250
 #define TIPS_THRESHOLD			5.0
@@ -112,7 +112,7 @@ struct cov_range_t {
 				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 static inline struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
-	double fcov = __get_edge_cov(g->edges + e, g->ksize);
+	double fcov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
 	int icov = (int)fcov;
 	if (fcov + EPS < icov + 0.25)
 		return (struct cov_range_t){icov, icov};

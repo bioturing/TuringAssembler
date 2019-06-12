@@ -242,7 +242,7 @@ void read_destroy(struct read_t *read, int is_buf)
 
 int get_read_from_fq(struct read_t *read, char *buf, int *pos)
 {
-	int i = *pos, prev, k;
+	int i = *pos, prev, k = -1;
 
 	/* name part */
 	prev = i;
@@ -308,7 +308,7 @@ int get_read_from_fq(struct read_t *read, char *buf, int *pos)
 
 int get_read_from_fa(struct read_t *read, char *buf, int *pos)
 {
-	int i = *pos, prev, k;
+	int i = *pos, prev, k = -1;
 	read->qual = read->note = NULL;
 
 	/* name part */
