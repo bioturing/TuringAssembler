@@ -296,8 +296,16 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
-	if (g->edges[legs[0]].best_mate_contigs == legs[2]) {
-		if (g->edges[legs[1]].best_mate_contigs != legs[3]) {
+	if (e == 186) {
+		print_test_barcode_edge(g, legs[0], legs[2]);
+		print_test_barcode_edge(g, legs[0], legs[3]);
+		print_test_barcode_edge(g, legs[1], legs[2]);
+		print_test_barcode_edge(g, legs[1], legs[3]);
+	}
+	if (g->edges[legs[0]].best_mate_contigs == legs[2] &&
+		g->edges[legs[2]].best_mate_contigs == legs[0]) {
+		if (g->edges[legs[1]].best_mate_contigs != legs[3] ||
+			g->edges[legs[3]].best_mate_contigs != legs[1]) {
 			// print_test_pair_end(g, legs[0]);
 			// print_test_pair_end(g, legs[1]);
 			// print_test_pair_end(g, legs[2]);
@@ -324,8 +332,10 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		asm_remove_edge(g, e_rc);
 		return 2;
 
-	} else if (g->edges[legs[0]].best_mate_contigs == legs[3]) {
-		if (g->edges[legs[1]].best_mate_contigs != legs[2]) {
+	} else if (g->edges[legs[0]].best_mate_contigs == legs[3] &&
+		g->edges[legs[3]].best_mate_contigs == legs[0]) {
+		if (g->edges[legs[1]].best_mate_contigs != legs[2] ||
+			g->edges[legs[2]].best_mate_contigs != legs[1]) {
 			// print_test_pair_end(g, legs[0]);
 			// print_test_pair_end(g, legs[1]);
 			// print_test_pair_end(g, legs[2]);
@@ -403,11 +413,11 @@ gint_t check_2_2_covbase_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
-	if (ecov.hi < __max(rcov[0].lo + rcov[1].lo, rcov[2].lo + rcov[3].lo)) {
-		__VERBOSE("[Covbase Bridge] Coverage of bridge is too low %ld(%ld)\n",
-			e, e_rc);
-		return 0;
-	}
+	// if (ecov.hi < __max(rcov[0].lo + rcov[1].lo, rcov[2].lo + rcov[3].lo)) {
+	// 	__VERBOSE("[Covbase Bridge] Coverage of bridge is too low %ld(%ld)\n",
+	// 		e, e_rc);
+	// 	return 0;
+	// }
 	if (check_pair_contigs(g, legs[0], legs[2]) || check_pair_contigs(g, legs[1], legs[3])) {
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);

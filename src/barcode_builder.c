@@ -197,8 +197,8 @@ void graph_aux_refine(struct asm_graph_t *g)
 {
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
-		if (g->aux_flag & ASM_HAVE_BARCODE)
-			barcode_hash_filter(&g->edges[e].barcodes, 1);
+		// if (g->aux_flag & ASM_HAVE_BARCODE)
+		// 	barcode_hash_filter(&g->edges[e].barcodes, 1);
 		if (g->aux_flag & ASM_HAVE_READPAIR) {
 			g->edges[e].best_mate_contigs = find_best_mate(&g->edges[e].mate_contigs);
 			// barcode_hash_filter(&g->edges[e].mate_contigs, 0);
@@ -383,36 +383,36 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	// printf("\n");
 	// pthread_mutex_unlock(bundle->lock);
 	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
-		// if (n1 == 1 && p1[0].pos <= MIN_CONTIG_BARCODE)
-		// 	add_barcode_to_edge(g, p1[0].e, bc);
-		// if (n2 == 1 && p2[0].pos <= MIN_CONTIG_BARCODE)
-		// 	add_barcode_to_edge(g, p2[0].e, bc);
-		for (i = 0; i < n1; ++i) {
-			if (p1[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_to_edge(g, p1[i].e, bc);
-		}
-		for (i = 0; i < n2; ++i) {
-			if (p2[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_to_edge(g, p2[i].e, bc);
-		}
+		if (n1 == 1 && p1[0].pos <= MIN_CONTIG_BARCODE)
+			add_barcode_to_edge(g, p1[0].e, bc);
+		if (n2 == 1 && p2[0].pos <= MIN_CONTIG_BARCODE)
+			add_barcode_to_edge(g, p2[0].e, bc);
+		// for (i = 0; i < n1; ++i) {
+		// 	if (p1[i].pos <= MIN_CONTIG_BARCODE)
+		// 		add_barcode_to_edge(g, p1[i].e, bc);
+		// }
+		// for (i = 0; i < n2; ++i) {
+		// 	if (p2[i].pos <= MIN_CONTIG_BARCODE)
+		// 		add_barcode_to_edge(g, p2[i].e, bc);
+		// }
 	}
 	if (n1 && n2 && (bundle->aux_build & ASM_BUILD_READPAIR)) {
-		for (i = 0; i < n1; ++i) {
-			for (k = 0; k < n2; ++k) {
-				if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
-					&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
-					add_read_pair_edge(g, p1[i].e, p2[k].e);
-					add_read_pair_edge(g, p2[k].e, p1[i].e);
-				}
-			}
-		}
-		// if (n1 == 1 && n2 == 1) {
-		// 	if (p1[0].e != p2[0].e && p1[0].strand == p2[0].strand
-		// 		&& p1[0].pos + p2[0].pos < MAX_PAIR_LEN) {
-		// 		add_read_pair_edge(g, p1[0].e, p2[0].e);
-		// 		add_read_pair_edge(g, p2[0].e, p1[0].e);
+		// for (i = 0; i < n1; ++i) {
+		// 	for (k = 0; k < n2; ++k) {
+		// 		if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
+		// 			&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
+		// 			add_read_pair_edge(g, p1[i].e, p2[k].e);
+		// 			add_read_pair_edge(g, p2[k].e, p1[i].e);
+		// 		}
 		// 	}
 		// }
+		if (n1 == 1 && n2 == 1) {
+			if (p1[0].e != p2[0].e && p1[0].strand == p2[0].strand
+				&& p1[0].pos + p2[0].pos < MAX_PAIR_LEN) {
+				add_read_pair_edge(g, p1[0].e, p2[0].e);
+				add_read_pair_edge(g, p2[0].e, p1[0].e);
+			}
+		}
 	}
 	// pthread_mutex_lock(bundle->lock);
 	// *(bundle->hash_sum) += hash_sum;
