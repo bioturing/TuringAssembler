@@ -89,10 +89,10 @@ struct cov_range_t {
 	int hi;
 };
 
-#define __strictly_greater(cov1, cov2) ((cov1) > 1.5 * (cov2))
+#define __ratio_greater(fcov1, fcov2) ((fcov1) > 2.0 * (fcov2))
 #define __coverage_range_intersect(rcov1, rcov2) ((rcov1).lo <= (rcov2).hi && (rcov2).lo <= (rcov1).hi)
 #define __check_coverage(fcov1, fcov2, rcov1, rcov2)			\
-	(__coverage_range_intersect(rcov1, rcov2) && __abs((fcov1) - (fcov2)) < 0.5)
+	(__coverage_range_intersect(rcov1, rcov2) && __abs((fcov1) - (fcov2)) < 0.3)
 
 /* Function signature:
  * int __int_cov_ratio(float cov1, float cov2);
