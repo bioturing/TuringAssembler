@@ -298,8 +298,8 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	// printf("%s\t", r1->name);
 	for (i = 0; i < (int)ar1.n; ++i) {
 		mem_aln_t a;
-		if (ar1.a[i].secondary >= 0)
-			continue;
+		// if (ar1.a[i].secondary >= 0)
+		// 	continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		// printf("%s\t", idx->bns->anns[a.rid].name);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
@@ -336,8 +336,8 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	}
 	for (i = 0; i < (int)ar2.n; ++i) {
 		mem_aln_t a;
-		if (ar2.a[i].secondary >= 0)
-			continue;
+		// if (ar2.a[i].secondary >= 0)
+		// 	continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		// printf("%s\t", idx->bns->anns[a.rid].name);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
@@ -472,7 +472,7 @@ void *barcode_buffer_iterator(void *data)
 				break;
 		}
 		n_reads = atomic_add_and_fetch64(gcnt_reads, n_reads);
-		__VERBOSE("\rNumber of process read:    %lld", (long long)n_reads);
+		// __VERBOSE("\rNumber of process read:    %lld", (long long)n_reads);
 	}
 
 	free_pair_buffer(own_buf);

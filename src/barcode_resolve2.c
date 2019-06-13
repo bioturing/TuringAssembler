@@ -298,6 +298,11 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	}
 	if (g->edges[legs[0]].best_mate_contigs == legs[2]) {
 		if (g->edges[legs[1]].best_mate_contigs != legs[3]) {
+			// print_test_pair_end(g, legs[0]);
+			// print_test_pair_end(g, legs[1]);
+			// print_test_pair_end(g, legs[2]);
+			// print_test_pair_end(g, legs[3]);
+			// print_test_barcode_edge(g, legs[1], legs[3]);
 			__VERBOSE("[Med Bridge] Not so confident (0-2, 1-3) %ld(%ld)\n",
 				e, e_rc);
 			return 0;
@@ -321,6 +326,11 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 
 	} else if (g->edges[legs[0]].best_mate_contigs == legs[3]) {
 		if (g->edges[legs[1]].best_mate_contigs != legs[2]) {
+			// print_test_pair_end(g, legs[0]);
+			// print_test_pair_end(g, legs[1]);
+			// print_test_pair_end(g, legs[2]);
+			// print_test_pair_end(g, legs[3]);
+			// print_test_barcode_edge(g, legs[1], legs[2]);
 			__VERBOSE("[Med Bridge] Not so confident (0-3, 1-2) %ld(%ld)\n",
 				e, e_rc);
 			return 0;
