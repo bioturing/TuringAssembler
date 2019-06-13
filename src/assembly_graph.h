@@ -60,7 +60,7 @@ struct asm_graph_t {
 #define TIPS_RATIO_THRESHOLD		0.1
 
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE		2000
+#define MIN_CONTIG_BARCODE		3000
 /* Only add and use barcode for contig with length minimum */
 #define MIN_LONG_CONTIG			1000
 #define MIN_CONTIG_READPAIR		500

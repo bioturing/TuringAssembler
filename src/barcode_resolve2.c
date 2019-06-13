@@ -207,9 +207,6 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	ratio[1] = get_barcode_ratio(g, legs[0], legs[3]);
 	ratio[2] = get_barcode_ratio(g, legs[1], legs[2]);
 	ratio[3] = get_barcode_ratio(g, legs[1], legs[3]);
-	if (e == 634 || e == 635) {
-		__VERBOSE("%.3f\t%.3f\t%.3f\t%.3f\n", ratio[0], ratio[1], ratio[2], ratio[3]);
-	}
 	if (__ratio_greater(ratio[0], ratio[1]) && __ratio_greater(ratio[3], ratio[2])) {
 		if ((!__positive_ratio(ratio[0]) || !__positive_ratio(ratio[3]))
 			&& (__ratio_greater(ratio[0], ratio[3]) || __ratio_greater(ratio[3], ratio[0]))) {

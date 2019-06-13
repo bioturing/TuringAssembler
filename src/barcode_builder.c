@@ -160,7 +160,8 @@ static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
 	return len;
 }
 
-void init_contig_map_info(struct asm_graph_t *g, const char *path, uint32_t max_len)
+void init_contig_map_info(struct asm_graph_t *g, const char *path,
+				uint32_t min_len, uint32_t max_len)
 {
 	FILE *fp = xfopen(path, "wb");
 	gint_t e;
@@ -171,7 +172,7 @@ void init_contig_map_info(struct asm_graph_t *g, const char *path, uint32_t max_
 		pthread_mutex_init(&(g->edges[e].lock), NULL);
 		uint32_t len, k, l;
 		len = dump_edge_seq(&seq, &seq_len, g->edges + e, max_len);
-		if (g->edges[e].seq_len >= max_len) {
+		if (g->edges[e].seq_len >= min_len) {
 			fprintf(fp, ">%ld\n", e);
 			k = 0;
 			while (k < len) {
@@ -217,15 +218,16 @@ void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, ui
 	if (aux_build & ASM_BUILD_READPAIR)
 		g->aux_flag |= ASM_HAVE_READPAIR;
 	if (!(g->aux_flag & ASM_BUILD_COVERAGE))
-		init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR);
+		init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR, MIN_CONTIG_BARCODE);
 	else
-		init_contig_map_info(g, fasta_prefix, 0);
+		init_contig_map_info(g, fasta_prefix, 0, 0);
 	struct bccount_bundle_t ske;
 	ske.g = g;
 	ske.aux_build = aux_build;
 	ske.barcode_calculator = barcode_calculators[opt->lib_type];
 	ske.bwa_idx = bwa_idx_load(fasta_prefix, BWA_IDX_ALL);
 	ske.bwa_opt = mem_opt_init();
+	ske.bwa_opt->max_XA_hits = 100;
 	barcode_start_count(opt, &ske);
 	bwa_idx_destroy(ske.bwa_idx);
 	free(ske.bwa_opt);
@@ -300,9 +302,9 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		// printf("%s\t", idx->bns->anns[a.rid].name);
-		// if (check_clip_both_end(a.n_cigar, a.cigar) ||
-		// 	count_M_cigar(a.n_cigar, a.cigar) * 2 < r1->len)
-		// 	continue;
+		if (check_clip_both_end(a.n_cigar, a.cigar) ||
+			count_M_cigar(a.n_cigar, a.cigar) * 2 < r1->len)
+			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
@@ -338,9 +340,9 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			continue;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		// printf("%s\t", idx->bns->anns[a.rid].name);
-		// if (check_clip_both_end(a.n_cigar, a.cigar) ||
-		// 	count_M_cigar(a.n_cigar, a.cigar) * 2 < r2->len)
-		// 	continue;
+		if (check_clip_both_end(a.n_cigar, a.cigar) ||
+			count_M_cigar(a.n_cigar, a.cigar) * 2 < r2->len)
+			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
