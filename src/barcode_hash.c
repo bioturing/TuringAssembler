@@ -16,6 +16,7 @@ void barcode_hash_init(struct barcode_hash_t *h, uint32_t size)
 	h->size = size - 1;
 	__round_up_32(h->size);
 	h->n_item = 0;
+	h->n_unique = 0;
 	h->keys = malloc(h->size * sizeof(uint64_t));
 	h->cnts = calloc(h->size, sizeof(uint32_t));
 	uint32_t i;
@@ -29,7 +30,7 @@ void barcode_hash_clean(struct barcode_hash_t *h)
 	free(h->cnts);
 	h->keys = NULL;
 	h->cnts = NULL;
-	h->n_item = h->size = 0;
+	h->n_item = h->size = h->n_unique = 0;
 }
 
 uint32_t barcode_hash_get(struct barcode_hash_t *h, uint64_t key)
@@ -222,16 +223,29 @@ loop_refill:
 	free(flag);
 }
 
-uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key)
+uint32_t barcode_hash_add(struct barcode_hash_t *h, uint64_t key)
 {
 	uint32_t k;
-	// pthread_mutex_lock(h->lock);
 	k = internal_barcode_hash_put(h, key);
 	while (k == BARCODE_HASH_END(h)) {
 		barcode_hash_resize(h);
 		k = internal_barcode_hash_put(h, key);
 	}
-	// pthread_mutex_unlock(h->lock);
+	return k;
+}
+
+uint32_t barcode_hash_add_unique(struct barcode_hash_t *h, uint64_t key)
+{
+	uint32_t k;
+	k = internal_barcode_hash_put(h, key);
+	while (k == BARCODE_HASH_END(h)) {
+		barcode_hash_resize(h);
+		k = internal_barcode_hash_put(h, key);
+	}
+	if (h->cnts[k] == 0) {
+		++h->n_unique;
+		h->cnts[k] = 1;
+	}
 	return k;
 }
 
@@ -249,21 +263,11 @@ uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key)
 	return k;
 }
 
-void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src)
-{
-	uint32_t k, j;
-	for (k = 0; k < src->size; ++k) {
-		if (src->keys[k] == K31_NULL)
-			continue;
-		j = barcode_hash_put(dst, src->keys[k]);
-		dst->cnts[j] += src->cnts[k];
-	}
-}
-
 void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 {
 	dst->size = src->size;
 	dst->n_item = src->n_item;
+	dst->n_unique = src->n_unique;
 	dst->keys = malloc(dst->size * sizeof(uint64_t));
 	dst->cnts = malloc(dst->size * sizeof(uint32_t));
 	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
@@ -276,5 +280,5 @@ void barcode_hash_destroy(struct barcode_hash_t *h)
 	free(h->cnts);
 	h->keys = NULL;
 	h->cnts = NULL;
-	h->size = h->n_item = 0;
+	h->size = h->n_item = h->n_unique = 0;
 }

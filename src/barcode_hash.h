@@ -10,6 +10,7 @@ typedef uint64_t k31key_t;
 struct barcode_hash_t {
 	uint32_t size;
 	uint32_t n_item;
+	uint32_t n_unique;
 
 	uint64_t *keys;
 	uint32_t *cnts;
@@ -22,6 +23,10 @@ void barcode_hash_clean(struct barcode_hash_t *h);
 uint32_t barcode_hash_get(struct barcode_hash_t *h, uint64_t key);
 
 uint32_t barcode_hash_put(struct barcode_hash_t *h, uint64_t key);
+
+uint32_t barcode_hash_add(struct barcode_hash_t *h, uint64_t key);
+
+uint32_t barcode_hash_add_unique(struct barcode_hash_t *h, uint64_t key);
 
 uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key);
 
