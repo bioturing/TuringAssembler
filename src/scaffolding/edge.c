@@ -131,6 +131,11 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 			float tmp = mat_score->A[i * n_bucks + j];
 			VERBOSE_FLAG(3, "%f ", tmp);
 			if (tmp >= -0.000001) {
+			// todo @huu think more about it (weighted score)
+//				if (i ==0 && j == 0){
+//					count += 9;
+//					res += tmp*9;
+//				}
 				count++;
 				res += tmp;
 			}

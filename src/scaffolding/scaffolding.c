@@ -109,6 +109,7 @@ void *process_check_edge(void *data)
 		assert(!isnan(score.score));
 		int check = 0;
 		if (e0 == e1){
+			// todo @huu what about metagenomics
 			float cvr = global_genome_coverage;
 			if (__get_edge_cov(&g->edges[e0], g->ksize)/cvr > 1.8) {
 				check = 1;
@@ -450,7 +451,7 @@ void remove_lov_cov(struct asm_graph_t *g)
 	int count = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
-		VERBOSE_FLAG(0, "edge %d len:%d cov: %d\n", i_e , get_edge_len(&g->edges[i_e]), lround(edge_cov));
+		VERBOSE_FLAG(0, "edge %d len:%d cov: %f\n", i_e , get_edge_len(&g->edges[i_e]), edge_cov);
 		if (edge_cov > 0.5){
 			int rc_id = g->edges[i_e].rc_id;
 			g->edges[rc_id].rc_id = count;
@@ -465,9 +466,18 @@ void build_list_edges(struct asm_graph_t *g, FILE *out_file, struct opt_proc_t *
 {
 	init_global_params(g);
 	check_global_params(g);
-	if (!opt->metagenomics)
-		remove_lov_cov(g);
+	// todo @huu: uncomment the following line. Comment for debug purpose only
+//	if (!opt->metagenomics)
+//		remove_lov_cov(g);
+	for (int i = 0 ; i < g->n_e; i++) {
+		printf("this is i %d rc_id %d huy %d\n", i, g->edges[i].rc_id, g->edges[i].source);
+	}
 
+	float cvr = global_genome_coverage;
+	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
+		VERBOSE_FLAG(0, "edge %d len:%d cov: %f\n", i_e , get_edge_len(&g->edges[i_e]), edge_cov);
+	}
 	int n_long_contig = 0, *list_long_contig = NULL;
 	get_long_contig(g, global_thres_length, &n_long_contig, &list_long_contig);
 	assert(list_long_contig != NULL);
@@ -569,8 +579,6 @@ void connect_contig(FILE *fp, FILE *out_file, FILE *out_graph, struct asm_graph_
 {
 	init_global_params(g);
 	check_global_params(g);
-	// todo @huu: uncomment the following line. Comment for debug purpose only
-	//if (!opt->metagenomics) remove_lov_cov(g);
 	int n_v, *listV = NULL;
 	fscanf(fp, "n_long_contig: %d\n", &n_v);
 	listV = realloc(listV , n_v * sizeof(int)); for (int i = 0; i < n_v; i++) {

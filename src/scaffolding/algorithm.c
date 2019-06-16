@@ -7,6 +7,14 @@
 #include "scaffolding/output.h"
 #include "scaffolding/global_params.h"
 #include "scaffolding/edge.h"
+#include "scaffolding/contig_graph.h"
+
+int get_relative_cov(struct asm_graph_t *g, int i_e)
+{
+	float cvr = global_genome_coverage;
+	return lround(__get_edge_cov(&g->edges[i_e], g->ksize)/cvr);
+}
+
 
 int hround(float x)
 {
@@ -92,34 +100,34 @@ void dfs_hamiltonian(int x, int depth, int n_adj, int *list_adj, int n_v, float 
 void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int n_v, 
 		int *res, int *n_res, int *listV, float avg_bin_hash, struct opt_proc_t *opt)
 {
-	// deprecated due to low performance
-	void insert_short_contigs(int n_big_contigs, int *big_contigs, int n_insert, int *arr_insert, 
-			int n_short, int *arr_i_short, int *mark_short)
+	void insert_short_contigs(struct asm_graph_t *g,int *n_big_contigs, int **big_contigs, 
+			struct contig_graph *contig_g , int *mark_short)
 	{
-		//todo @huu insert to the beginning
-		VERBOSE_FLAG(1, "big contig length %d:", n_big_contigs);
-		for (int i = 0; i < n_big_contigs; i++){
-			VERBOSE_FLAG(3, "%d ", big_contigs[i]);
-		}
-		for (int i = 1; i < n_insert - 1; i++) {
-			VERBOSE_FLAG(3, "i insert: %d\n", i);
-			int max_score = -1, pos = -1;
-			for (int j = 0; j < n_short; j++) if (mark_short[j] == 0) {
-				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g, avg_bin_hash);
-				int score1 = get_score_big_small(g->edges[big_contigs[i]].rc_id, g->edges[arr_i_short[j]].rc_id, g, avg_bin_hash);
-				int score = score0 + score1;
-				if (score > max_score){
-					max_score = score;
-					pos = j;
-				}
+		int *new_array = calloc(1, sizeof(int)), n_new_array = 1;
+		new_array[0] = (*big_contigs)[0];
+		for (int i = 1 ; i < *n_big_contigs; i++) {
+			int *short_path  = NULL, n_short_path = 0;
+			VERBOSE_FLAG(0, "find path short edge %d %d\n", (*big_contigs)[i-1], (*big_contigs)[i]);
+			int src_edge = (*big_contigs)[i-1], des_edge = (*big_contigs)[i];
+			struct barcode_hash_t *hl = &(g->edges[g->edges[src_edge].rc_id].bucks[0]);
+			struct barcode_hash_t *hr = &(g->edges[des_edge].bucks[0]);
+			find_path_short(g->edges[src_edge].target, g->edges[des_edge].source, g, contig_g, 
+					&n_short_path, &short_path, mark_short, hl, hr);
+			new_array = realloc(new_array, (n_new_array + n_short_path+1)* sizeof(int));
+			for (int j = 0; j < n_short_path; j++){
+				new_array[n_new_array + j] = short_path[j];
 			}
-			VERBOSE_FLAG(3, "max score: %d \n",max_score);
-			//todo @huu check if normal score large enough
-			if (max_score > 15) {
-				arr_insert[i] = arr_i_short[pos];
-				mark_short[pos] = 1;
-			}
+			n_new_array += n_short_path;
+			new_array[n_new_array++] = (*big_contigs)[i];
 		}
+		VERBOSE_FLAG(1, "big contig length %d:", *n_big_contigs);
+		for (int i = 0; i < *n_big_contigs; i++){
+			VERBOSE_FLAG(3, "%d ", (*big_contigs)[i]);
+		}
+		*n_big_contigs = n_new_array;
+		*big_contigs = new_array;
+//				int score0 = get_score_big_small(big_contigs[i-1], arr_i_short[j], g, avg_bin_hash);
+//				int score1 = get_score_big_small(g->edges[big_contigs[i]].rc_id, g->edges[arr_i_short[j]].rc_id, g, avg_bin_hash);
 		//todo @huu insert to the end
 	}
 
@@ -232,7 +240,8 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		VERBOSE_FLAG(1, "\n");
 	}
 	
-	void find_path_in_component(int n_component_node, int *connected_component, int *count){
+	void find_path_in_component(int n_component_node, int *connected_component, 
+			int *count, struct contig_graph *contig_g, int *mark_short){
 		int *remain_unvisited = calloc(n_v, sizeof(int));
 		for (int i = 0 ; i < n_component_node; i++) {
 			float cvr = 0;
@@ -266,7 +275,13 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 				best_hamiltonian_path[i] = listV[best_hamiltonian_path[i]];
 			VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
 			for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
-			VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
+				VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
+			VERBOSE_FLAG(1, "\n");
+			insert_short_contigs(g, &best_n_hamiltonian_path, &best_hamiltonian_path, contig_g, mark_short);
+			VERBOSE_FLAG(1, "best n hamiltonian %d \n", best_n_hamiltonian_path);
+			for(int i = 0 ; i < best_n_hamiltonian_path; i++) 
+				VERBOSE_FLAG(1, "best ham path %d ", best_hamiltonian_path[i]);
+			VERBOSE_FLAG(1, "\n");
 
 			print_contig(g, out_file, *count, best_n_hamiltonian_path, best_hamiltonian_path);
 			VERBOSE_FLAG(3, "contig path ");
@@ -285,29 +300,31 @@ void algo_find_hamiltonian(FILE *out_file, struct asm_graph_t *g, float *E, int 
 		mark[i] = 1;
 	}
 	int count = 0;
-	for (int i = 0 ; i < n_v; i++) {
-		int x = listV[i];
-		VERBOSE_FLAG(0, "this is i %d rc_id %d huy %d\n", x, g->edges[x].rc_id, g->edges[x].source);
+	int *mark_short =  calloc(g->n_e, sizeof(int));
+	for (int e = 0; e < g->n_e; e++){
+		int len  = get_edge_len(&g->edges[e]);
+		if (len < global_thres_length ) {
+			float cvr = global_genome_coverage;
+			mark_short[e] = get_relative_cov(g, e);
+		}
 	}
+	struct contig_graph *contig_g = build_graph_contig(g, mark_short);
 	while (1){
 		int *connected_component = calloc(n_v, sizeof(int)), n_component_node = 0;
 		for (int i = 0; i < n_v; i++) if (mark[i]) {
 			dfs_find_connected_component(i, mark, &n_component_node, connected_component);
-			find_path_in_component(n_component_node, connected_component, &count);
+			find_path_in_component(n_component_node, connected_component, &count
+					, contig_g, mark_short);
 			break;
 		}
 		if (n_component_node == 0)
 			break;
 	}
 
-	int *mark_short =  calloc(g->n_e, sizeof(int));
-	float cvr = global_genome_coverage;
 	for (int e = 0; e < g->n_e; e++){
-		int len  = get_edge_len(&g->edges[e]);
-		VERBOSE_FLAG(3, "len very short %d %d\n", len, thres_len_min); 
-		if (len < global_thres_length && len > 1000 &&mark_short[e] == 0) {
-			mark_short[e] = 1;
-			mark_short[g->edges[e].rc_id] = 1;
+		if (mark_short[e] == 1) {
+			mark_short[e] = 0;
+			mark_short[g->edges[e].rc_id] = 0;
 			VERBOSE_FLAG(3, "printf very short edge \n");
 			uint32_t seq_len = 0;
 			char *seq = NULL;

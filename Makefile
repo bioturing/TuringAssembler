@@ -47,6 +47,7 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/output.c 						\
       src/scaffolding/score.c 						\
       src/scaffolding/scaffolding.c 						\
+      src/scaffolding/contig_graph.c 						\
       src/main.c
 
 OBJ = $(SRC:.c=.o)
