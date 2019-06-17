@@ -274,6 +274,29 @@ void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 	memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
 }
 
+void barcode_hash_merge_barcode(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+{
+	uint32_t i, k;
+	for (i = 0; i < src->size; ++i) {
+		if (src->keys[i] == K31_NULL)
+			continue;
+		k = internal_barcode_hash_put(dst, src->keys[i]);
+		if (src->cnts[i] == 1)
+			dst->cnts[k] = 1;
+	}
+}
+
+void barcode_hash_merge_readpair(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+{
+	uint32_t i, k;
+	for (i = 0; i < src->size; ++i) {
+		if (src->keys[i] == K31_NULL)
+			continue;
+		k = internal_barcode_hash_put(dst, src->keys[i]);
+		dst->cnts[k] += src->cnts[i];
+	}
+}
+
 void barcode_hash_destroy(struct barcode_hash_t *h)
 {
 	free(h->keys);

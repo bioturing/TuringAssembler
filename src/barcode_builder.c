@@ -81,7 +81,8 @@ uint32_t count_shared_bc_unique(struct barcode_hash_t *t1, struct barcode_hash_t
 		if (t1->keys[i] == (uint64_t)-1 || t1->cnts[i] == 0)
 			continue;
 		k = barcode_hash_get(t2, t1->keys[i]);
-		ret += (int)(k != BARCODE_HASH_END(t2) && t2->cnts[k] == 1);
+		if (k != BARCODE_HASH_END(t2))
+			ret += (int)(t2->cnts[k] == 1);
 	}
 	return ret;
 }
@@ -92,6 +93,8 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	h1 = &g->edges[e1].barcodes;
 	h2 = &g->edges[e2].barcodes;
 	uint32_t cnt = count_shared_bc(h1, h2);
+	if (h1->n_item + h2->n_item - cnt == 0)
+		return -1;
 	return cnt * 1.0 / (h1->n_item + h2->n_item - cnt);
 }
 
@@ -101,6 +104,8 @@ double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	h1 = &g->edges[e1].barcodes;
 	h2 = &g->edges[e2].barcodes;
 	uint32_t cnt = count_shared_bc_unique(h1, h2);
+	if (h1->n_unique + h2->n_unique - cnt == 0)
+		return -1;
 	return cnt * 1.0 / (h1->n_unique + h2->n_unique - cnt);
 }
 
@@ -115,13 +120,13 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 
 	uint32_t cnt = count_shared_bc(h1, h2);
 	printf("Number of shared barcode: %u\n", cnt);
-	printf("Ratio = %.3f\n", cnt * 1.0 / (h1->n_item + h2->n_item - cnt));
+	printf("Ratio = %.3f\n", get_barcode_ratio(g, e1, e2));
 
 	printf("Number of unique mapped barcode of %ld: %u\n", e1, h1->n_unique);
 	printf("Number of unique mapped barcode of %ld: %u\n", e2, h2->n_unique);
 	cnt = count_shared_bc_unique(h1, h2);
 	printf("Number of unique mapped shared barcode: %u\n", cnt);
-	printf("Ratio = %.3f\n", cnt * 1.0 / (h1->n_unique + h2->n_unique - cnt));
+	printf("Ratio = %.3f\n", get_barcode_ratio_unique(g, e1, e2));
 }
 
 static inline gint_t find_best_mate(struct barcode_hash_t *h)

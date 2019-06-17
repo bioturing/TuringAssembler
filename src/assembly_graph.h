@@ -78,6 +78,7 @@ void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
 
 /* get the barcode share ratio between two contigs */
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
+double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, uint32_t aux_build);
 
@@ -103,8 +104,7 @@ struct cov_range_t {
  * uint32_t __binseq_get(uint32_t *seq, uint32_t k);
  * Extract the numberic nucleotide at position k-th on seq
  */
-#define __binseq_get(seq, k) (((seq)[(uint32_t)(k) >> 4] >>		\
-		(((uint32_t)(k) & 15) << 1)) & (uint32_t)3)
+#define __binseq_get(seq, k) (((seq)[(k) >> 4] >> (((k) & 15) << 1)) & (uint32_t)3)
 /* Function signature:
  * float __get_edge_cov(struct asm_edge_t *e, int ksize);
  * */

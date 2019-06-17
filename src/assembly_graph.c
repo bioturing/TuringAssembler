@@ -313,8 +313,18 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 	dst->seq_len = seq_len;
 }
 
+void asm_append_barcode(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t aux_flag)
+{
+	if (aux_flag & ASM_HAVE_BARCODE)
+		barcode_hash_merge_barcode(&(dst->barcodes), &(src->barcodes));
+	if (aux_flag & ASM_HAVE_READPAIR)
+		barcode_hash_merge_readpair(&(dst->mate_contigs), &(src->mate_contigs));
+	dst->best_mate_contigs = -1;
+}
+
 void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap)
 {
+	uint32_t i, k;
 	/* append the bin seq */
 	uint32_t seq_len, new_m, m;
 	seq_len = dst->seq_len + src->seq_len - overlap;
@@ -327,7 +337,6 @@ void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t ove
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
 	}
 
-	uint32_t i, k;
 	for (i = overlap; i < src->seq_len; ++i) {
 		k = i - overlap + dst->seq_len;
 		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
@@ -378,10 +387,14 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	 *                           contig 2
 	 * Since the barcode + read pair is now preserve only on the 1st contig
 	 * we do not need to append the barcode + read pair information */
+	// if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
+	// 	asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
 
+	// if (g->edges[e_rc2].seq_len < MIN_CONTIG_READPAIR)
+	// 	asm_append_barcode(g->edges + e_rc2, g->edges + e_rc1, g->aux_flag);
 	asm_append_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
@@ -403,12 +416,20 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	 * Since e2 is usually a repetitive edges, we need to pre-estimate the
 	 * count that e2 contributes to final edge
 	 */
+	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e1, g->edges + e3, g->aux_flag);
 	asm_append_seq(g->edges + e1, g->edges + e3, g->ksize);
 	g->edges[e1].target = g->edges[e3].target;
 	g->edges[e1].count += g->edges[e3].count + e2_count;
 
+	if (g->edges[e_rc3].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e_rc3, g->edges + e_rc2, g->aux_flag);
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc2, g->ksize);
+	if (g->edges[e_rc3].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e_rc3, g->edges + e_rc1, g->aux_flag);
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc3].target = g->edges[e_rc1].target;
 	g->edges[e_rc3].count += g->edges[e_rc1].count + e2_count;
@@ -730,6 +751,14 @@ static void debug_dump_adj(struct asm_graph_t *g, gint_t u)
 	free(seq);
 }
 
+void deb_dump_seq(struct asm_graph_t *g, gint_t e)
+{
+	uint32_t len = 0;
+	char *seq = NULL;
+	dump_edge_seq(&seq, &len, g->edges + e);
+	printf("%s\n", seq);
+}
+
 void test_asm_graph(struct asm_graph_t *g)
 {
 	gint_t le_idx = get_longest_edge(g);
@@ -784,6 +813,27 @@ void test_asm_graph(struct asm_graph_t *g)
 		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
 			__VERBOSE("node = %ld; rc_id = %ld\n", u, g->nodes[u].rc_id);
 			assert(0 && "Node has undefined reverse complement");
+		}
+		/* Test 5: Continous edges share kmer */
+		gint_t u_rc, e1, e2;
+		u_rc = g->nodes[u].rc_id;
+		if (g->nodes[u].deg > 0 && g->nodes[u_rc].deg > 0) {
+			e1 = g->nodes[u].adj[0];
+			e2 = g->edges[g->nodes[u_rc].adj[0]].rc_id;
+			for (k = 0; k < g->ksize; ++k) {
+				j = g->edges[e2].seq_len - g->ksize + k;
+				if (__binseq_get(g->edges[e2].seq, j) !=
+					__binseq_get(g->edges[e1].seq, k)) {
+					printf("(%ld, %ld) -> (%ld, %ld)\n",
+						g->edges[e2].source,
+						g->edges[e2].target,
+						g->edges[e1].source,
+						g->edges[e1].target);
+					deb_dump_seq(g, e2);
+					deb_dump_seq(g, e1);
+					assert(0 && "Continuous edges not share kmer");
+				}
+			}
 		}
 	}
 	for (e = 0; e < g->n_e; ++e) {
@@ -851,12 +901,14 @@ void test_asm_graph(struct asm_graph_t *g)
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
 			dump_edge_seq(&seq, &lseq, g->edges + e);
-			__VERBOSE("%s\n", seq);
+			// __VERBOSE("%s\n", seq);
+			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
 			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
 			dump_edge_seq(&seq, &lseq, g->edges + e_rc);
-			__VERBOSE("%s\n", seq);
+			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
+			// __VERBOSE("%s\n", seq);
 			assert(0 && "Edge and rc sequence is not reverse complemented");
 		}
 		if (!is_hole_rc(g->edges + e, g->edges + e_rc)) {
@@ -932,7 +984,9 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			struct barcode_hash_t *h = &g->edges[e].barcodes;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_unique, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 
@@ -1005,8 +1059,11 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			struct barcode_hash_t *h = &g->edges[e].barcodes;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfread(&h->n_unique, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			h->cnts = malloc(h->size * sizeof(uint32_t));
+			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 

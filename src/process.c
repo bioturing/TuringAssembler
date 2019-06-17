@@ -119,6 +119,8 @@ void graph_query_process(struct opt_proc_t *opt)
 		if (c == 'L') {
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
+			print_test_pair_end(g0, u);
+			print_test_pair_end(g0, v);
 		} else if (c == 'P') {
 			fscanf(fp, "\n");
 			print_test_pair_end(g0, u);
@@ -215,6 +217,7 @@ void build_3_4_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
+	test_asm_graph(&g1);
 	build_barcode(opt, &g1);
 	build_3_4(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_4");

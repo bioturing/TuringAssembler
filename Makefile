@@ -4,10 +4,10 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -pthread -lm -O3 -std=c++11 \
+LIBS = -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
        -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
-       libs/libbwa.a
+       libs/libbwa.a -lm
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 

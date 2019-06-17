@@ -32,6 +32,10 @@ uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key);
 
 void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src);
 
+void barcode_hash_merge_barcode(struct barcode_hash_t *dst, struct barcode_hash_t *src);
+
+void barcode_hash_merge_readpair(struct barcode_hash_t *dst, struct barcode_hash_t *src);
+
 void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src);
 
 void barcode_hash_filter(struct barcode_hash_t *h, uint32_t thres);

@@ -200,6 +200,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 	free(node_id);
 	edges = realloc(edges, n_e * sizeof(struct asm_edge_t));
 	g->ksize = g0->ksize;
+	g->aux_flag = g0->aux_flag;
 	g->n_v = n_v;
 	g->n_e = n_e;
 	g->nodes = nodes;
