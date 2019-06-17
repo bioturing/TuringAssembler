@@ -143,12 +143,14 @@ clean_up:
 	free(q);
 }
 
-void detect_leg(struct asm_graph_t *g, uint32_t min_contig_len, khash_t(gint) *set_v,
-	khash_t(gint) *set_e, khash_t(gint) *set_leg, khash_t(gint) *set_self)
+void detect_leg(struct asm_graph_t *g, uint32_t min_contig_len,
+	uint32_t max_molecule_len, khash_t(gint) *set_v, khash_t(gint) *set_e,
+				khash_t(gint) *set_leg, khash_t(gint) *set_self)
 {
 	khiter_t k;
 	gint_t e;
 	int ret;
+	uint32_t len;
 	for (k = kh_begin(set_e); k != kh_end(set_e); ++k) {
 		if (!kh_exist(set_e, k))
 			continue;
@@ -161,9 +163,15 @@ void detect_leg(struct asm_graph_t *g, uint32_t min_contig_len, khash_t(gint) *s
 			continue;
 		e = kh_key(set_e, k);
 		if (kh_get(gint, set_leg, e) == kh_end(set_leg) &&
-			kh_get(gint, set_leg, g->edges[e].rc_id) == kh_end(set_leg) &&
-			get_edge_len(g->edges + e) >= min_contig_len)
-			kh_put(gint, set_self, e, &ret);
+			kh_get(gint, set_leg, g->edges[e].rc_id) == kh_end(set_leg)) {
+			len = get_edge_len(g->edges + e);
+			if (len >= max_molecule_len) {
+				kh_put(gint, set_leg, e, &ret);
+				kh_put(gint, set_leg, g->edges[e].rc_id, &ret);
+			} else if (len >= min_contig_len) {
+				kh_put(gint, set_self, e, &ret);
+			}
+		}
 	}
 }
 
@@ -979,6 +987,8 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 			gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
 				&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
 				g->edges[e2].source);
+			__VERBOSE("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
+				g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 			if (gap_size < 1000)
 				join_edge_path(g, g->edges[e1].rc_id, e2,
 					path_seq, lpath_seq, uni_cov_local);
@@ -998,6 +1008,18 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 		khash_t(gint) *set_leg, khash_t(gint) *set_self, double uni_cov)
 {
+	khiter_t k;
+	for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
+		if (!kh_exist(set_leg, k))
+			continue;
+		__VERBOSE("[Complex Jungle] legs = %ld\n", kh_key(set_leg, k));
+	}
+	for (k = kh_begin(set_self); k != kh_end(set_self); ++k) {
+		if (!kh_exist(set_self, k))
+			continue;
+		__VERBOSE("[Complex Jungle] self = %ld\n", kh_key(set_self, k));
+	}
+
 	return 0;
 }
 
@@ -1128,12 +1150,13 @@ void resolve_complex(struct asm_graph_t *g, struct asm_graph_t *gd)
 		find_region(g, e, MIN_CONTIG_BARCODE, MAX_EDGE_COUNT, uni_cov, set_v, set_e);
 		if (kh_size(set_e) < MAX_EDGE_COUNT) {
 			kh_merge_set(visited, set_v);
-			detect_leg(g, MIN_LONG_CONTIG, set_v, set_e, set_leg, set_self);
+			detect_leg(g, MIN_LONG_CONTIG, MAX_MOLECULE_LEN,
+					set_v, set_e, set_leg, set_self);
 			n_leg = kh_size(set_leg);
 			n_self = kh_size(set_self);
-			if (n_self == 0) {
+			if (n_self == 0 && n_leg >= 2) {
 				ret += join_n_m_small_jungle(g, set_e, set_leg, uni_cov);
-			} else {
+			} else if (n_self + n_leg >= 2) {
 				ret += join_n_m_complex_jungle(g, set_e, set_leg, set_self, uni_cov);
 			}
 		}
