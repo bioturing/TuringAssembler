@@ -70,12 +70,23 @@ void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 void build_3_4(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolving graph using read pair + barcode\n");
+	__VERBOSE("Resolving graph using read pair + barcode (simple repetitive)\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	resolve_n_m_simple(g0, g);
 	test_asm_graph(g);
-	__VERBOSE_LOG("TIMER", "Build graph level 3 time: %.3f\n", sec_from_prev_time());
+	__VERBOSE_LOG("TIMER", "Build graph level 4 time: %.3f\n", sec_from_prev_time());
+}
+
+void build_4_5(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Resolving graph using read pair + barcode (complex jungle)\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	set_time_now();
+	resolve_complex(g0, g);
+	test_asm_graph(g);
+	__VERBOSE_LOG("TIMER", "Build graph level 5 time: %.3f\n", sec_from_prev_time());
 }
 
 void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
@@ -170,6 +181,11 @@ void assembly3_process(struct opt_proc_t *opt)
 	build_barcode(opt, &g2);
 	build_3_4(&g2, &g1);
 	save_graph_info(opt->out_dir, &g1, "level_4");
+	asm_graph_destroy(&g2);
+
+	build_barcode(opt, &g1);
+	build_4_5(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_5");
 
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
@@ -217,7 +233,6 @@ void build_3_4_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
-	test_asm_graph(&g1);
 	build_barcode(opt, &g1);
 	build_3_4(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_4");
@@ -231,6 +246,17 @@ void build_3_4_no_bc_rebuild_process(struct opt_proc_t *opt)
 	load_asm_graph(&g1, opt->in_file);
 	build_3_4(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_4");
+	asm_graph_destroy(&g1);
+	asm_graph_destroy(&g2);
+}
+
+void build_4_5_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+	load_asm_graph(&g1, opt->in_file);
+	build_barcode(opt, &g1);
+	build_4_5(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_5");
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
 }

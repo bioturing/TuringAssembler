@@ -787,6 +787,7 @@ void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
 	g->nodes = nodes;
 	g->edges = edges;
 	g->ksize = ksize;
+	g->aux_flag = 0;
 	g->n_e = n_e;
 	g->n_v = n_v * 2;
 	g->bin_size = 0;

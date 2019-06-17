@@ -421,6 +421,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_2_3_process);
 	else if (!strcmp(argv[1], "build_3_4"))
 		build_opt_process(argc, argv, &build_3_4_process);
+	else if (!strcmp(argv[1], "build_4_5"))
+		build_opt_process(argc, argv, &build_4_5_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))

@@ -387,14 +387,14 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	 *                           contig 2
 	 * Since the barcode + read pair is now preserve only on the 1st contig
 	 * we do not need to append the barcode + read pair information */
-	// if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
-	// 	asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
+	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
 
-	// if (g->edges[e_rc2].seq_len < MIN_CONTIG_READPAIR)
-	// 	asm_append_barcode(g->edges + e_rc2, g->edges + e_rc1, g->aux_flag);
+	if (g->edges[e_rc2].seq_len < MIN_CONTIG_READPAIR)
+		asm_append_barcode(g->edges + e_rc2, g->edges + e_rc1, g->aux_flag);
 	asm_append_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
