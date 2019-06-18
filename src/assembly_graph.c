@@ -229,10 +229,15 @@ void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src)
 	memcpy(dst->seq, src->seq,
 		((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
 	dst->n_holes = src->n_holes;
-	dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	memcpy(dst->p_holes, src->p_holes, dst->n_holes * sizeof(uint32_t));
-	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
-	memcpy(dst->l_holes, src->l_holes, dst->n_holes * sizeof(uint32_t));
+	if (dst->n_holes) {
+		dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
+		memcpy(dst->p_holes, src->p_holes, dst->n_holes * sizeof(uint32_t));
+		dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
+		memcpy(dst->l_holes, src->l_holes, dst->n_holes * sizeof(uint32_t));
+	} else {
+		dst->p_holes = NULL;
+		dst->l_holes = NULL;
+	}
 }
 
 void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
@@ -308,7 +313,8 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 	dst->l_holes[dst->n_holes] = gap_size;
 	for (i = 0; i < src->n_holes; ++i)
 		dst->p_holes[dst->n_holes + i + 1] = src->p_holes[i] + dst->seq_len;
-	memcpy(dst->l_holes + dst->n_holes + 1, src->l_holes, src->n_holes * sizeof(uint32_t));
+	if (src->n_holes)
+		memcpy(dst->l_holes + dst->n_holes + 1, src->l_holes, src->n_holes * sizeof(uint32_t));
 	dst->n_holes = n_holes;
 	dst->seq_len = seq_len;
 }

@@ -267,7 +267,7 @@ gint_t dfs_get_dist(struct asm_graph_t *g, khash_t(gint) *set_e,
 		v = g->edges[e].target;
 		dfs_push_edge(seq, mseq, lseq, e);
 		if (v == t)
-			return 0;
+			return g->edges[e].seq_len - g->ksize;
 		if (kh_get(gint, vis, v) == kh_end(vis)) {
 			kh_put(gint, vis, v, &hash_ret);
 			ret = dfs_get_dist(g, set_e, vis, seq, mseq, lseq, v, t);
@@ -290,7 +290,7 @@ gint_t dfs_get_dist_simple(struct asm_graph_t *g, khash_t(gint) *set_e,
 			continue;
 		v = g->edges[e].target;
 		if (v == t)
-			return 0;
+			return g->edges[e].seq_len - g->ksize;
 		if (kh_get(gint, vis, v) == kh_end(vis)) {
 			kh_put(gint, vis, v, &hash_ret);
 			ret = dfs_get_dist_simple(g, set_e, vis, v, t);
@@ -355,6 +355,8 @@ static gint_t bc_find_pair(struct asm_graph_t *g, gint_t se, gint_t *adj, gint_t
 	ret_e = -1; sec_e = -1;
 	for (j = 0; j < n; ++j) {
 		e = adj[j];
+		if (e == se || e == g->edges[se].rc_id)
+			continue;
 		if (ret_e == -1 || check_medium_pair_greater(g, se, e, ret_e)) {
 			sec_e = ret_e;
 			ret_e = e;
@@ -380,6 +382,8 @@ static gint_t bc_find_pair_check_path(struct asm_graph_t *g, khash_t(gint) *set_
 		if (!kh_exist(set_leg, k))
 			continue;
 		e = kh_key(set_leg, k);
+		if (e == se || e == g->edges[se].rc_id)
+			continue;
 		if (get_dist_simple(g, set_e,
 				g->nodes[g->edges[se].source].rc_id,
 				g->edges[e].source) != -1) {
@@ -410,6 +414,8 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 		if (!kh_exist(set_candidate, k))
 			continue;
 		e = kh_key(set_candidate, k);
+		if (e == se || e == g->edges[se].rc_id)
+			continue;
 		if (get_dist_simple(g, set_e,
 					g->nodes[g->edges[se].source].rc_id,
 					g->edges[e].source) != -1) {
@@ -421,6 +427,8 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 			}
 		}
 	}
+	if (de >= 0 && ret_e == de)
+		return -3;
 	if (ret_e < 0 || !check_medium_pair_positive(g, se, ret_e)) {
 		return -1;
 	}
@@ -838,9 +846,6 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				asm_remove_edge(g, e_rc);
 			}
 		}
-	} else {
-		asm_remove_edge(g, e);
-		asm_remove_edge(g, e_rc);
 	}
 	return ret;
 }
@@ -961,8 +966,8 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 	khiter_t k;
 	do {
 		resolve = 0;
-		gint_t e1, e2, et1;
-		double fcov1, fcov2, gap_size;
+		gint_t e1, e2, et1, gap_size;
+		double fcov1, fcov2;
 		struct cov_range_t rcov1, rcov2;
 		for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
 			if (!kh_exist(set_leg, k))
@@ -983,17 +988,19 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 					e1, et1, e2);
 				continue;
 			}
-			gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
-				&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
-				g->edges[e2].source);
 			__VERBOSE("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
-			if (gap_size < 1000)
-				join_edge_path(g, g->edges[e1].rc_id, e2,
-					path_seq, lpath_seq, uni_cov_local);
-			else
-				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-					e2, g->edges[e2].rc_id, gap_size);
+			asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+				e2, g->edges[e2].rc_id, 500);
+			// gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
+			// 	&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
+			// 	g->edges[e2].source);
+			// if (gap_size < 1000)
+			// 	join_edge_path(g, g->edges[e1].rc_id, e2,
+			// 		path_seq, lpath_seq, uni_cov_local);
+			// else
+			// 	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+			// 		e2, g->edges[e2].rc_id, gap_size);
 			/* remove legs */
 			kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
 			kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
@@ -1023,6 +1030,7 @@ gint_t get_contig_array(gint_t *legs, khash_t(gint) *set_leg,
 		if (kh_exist(set_self, k)) {
 			e = kh_key(set_self, k);
 			legs[ret++] = e;
+			kh_del(gint, set_e, kh_get(gint, set_e, e));
 		}
 	}
 	return ret;
@@ -1051,8 +1059,8 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 	gint_t *path_seq = malloc(mpath_seq * sizeof(gint_t));
 	do {
 		resolve = 0;
-		gint_t e1, e2, et1, ec;
-		double fcov1, fcov2, gap_size;
+		gint_t e1, e2, et1, ec, gap_size;
+		double fcov1, fcov2;
 		struct cov_range_t rcov1, rcov2;
 		int flag, hash_ret;
 		for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
@@ -1082,17 +1090,21 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 					__VERBOSE("[Complex Jungle] Not best pair (%ld, %ld) <-> %ld\n",
 						e1, et1, e2);
 				}
-				gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
-					&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
-					g->edges[ec].source);
+				// gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
+				// 	&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
+				// 	g->edges[ec].source);
+				// assert(gap_size != -1);
 				__VERBOSE("Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 						g->edges[e1].rc_id, e1, ec, g->edges[ec].rc_id);
-				if (gap_size < 1000)
-					join_edge_path(g, g->edges[e1].rc_id, e2,
-						path_seq, lpath_seq, uni_cov_local);
-				else
-					asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-						ec, g->edges[ec].rc_id, gap_size);
+				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+					ec, g->edges[ec].rc_id, 100);
+				// __VERBOSE("Join to self loop, distance = %ld\n", gap_size);
+				// if (gap_size < 1000)
+				// 	join_edge_path(g, g->edges[e1].rc_id, ec,
+				// 		path_seq, lpath_seq, uni_cov_local);
+				// else
+				// 	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+				// 		ec, g->edges[ec].rc_id, gap_size);
 				kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
 				kh_del(gint, set_self, kh_get(gint, set_self, ec));
 				kh_del(gint, set_self, kh_get(gint, set_self, g->edges[ec].rc_id));
@@ -1103,17 +1115,21 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				rcov2 = convert_cov_range(fcov2);
 				if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 					continue;
-				gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
-					&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
-					g->edges[e2].source);
-				__VERBOSE("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
+				// gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
+				// 	&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
+				// 	g->edges[e2].source);
+				// assert(gap_size != -1);
+				__VERBOSE("[Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 					g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
-				if (gap_size < 1000)
-					join_edge_path(g, g->edges[e1].rc_id, e2,
-						path_seq, lpath_seq, uni_cov_local);
-				else
-					asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-						e2, g->edges[e2].rc_id, gap_size);
+				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+					e2, g->edges[e2].rc_id, 500);
+				// __VERBOSE("Join two legs, distance = %ld\n", gap_size);
+				// if (gap_size < 1000)
+				// 	join_edge_path(g, g->edges[e1].rc_id, e2,
+				// 		path_seq, lpath_seq, uni_cov_local);
+				// else
+				// 	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
+				// 		e2, g->edges[e2].rc_id, gap_size);
 				/* remove legs */
 				kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
 				kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
@@ -1122,9 +1138,10 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				++resolve;
 			}
 		}
+		ret += resolve;
 	} while (resolve);
 	free(path_seq);
-	return 0;
+	return ret;
 }
 
 /*************************** Iterate regions **********************************/
