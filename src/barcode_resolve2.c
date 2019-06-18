@@ -1050,7 +1050,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 	// 		continue;
 	// 	__VERBOSE("[Complex Jungle] self = %ld\n", kh_key(set_self, k));
 	// }
-	gint_t *contigs = alloca(kh_size(set_leg) * sizeof(gint_t));
+	gint_t *contigs = alloca((kh_size(set_leg) + kh_size(set_self)) * sizeof(gint_t));
 	gint_t n_contig = get_contig_array(contigs, set_leg, set_self, set_e);
 	gint_t ret, resolve;
 	ret = 0;
