@@ -138,6 +138,9 @@ void graph_query_process(struct opt_proc_t *opt)
 		} else if (c == 'S') {
 			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
+			print_test_pair_end(g0, u);
+			print_test_pair_end(g0, v);
+			print_test_pair_end(g0, v2);
 		}
 		// int qret = test_edge_barcode(g0, u, v);
 		// fprintf(stdout, "ret = %d\n", qret);

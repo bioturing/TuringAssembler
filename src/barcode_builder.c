@@ -136,7 +136,7 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 	}
 
 	printf("**** Number of share barcode of %ld and %ld: %u\n", e1, e2, share_1_2);
-	printf("**** Number of share barcode of %ld and %ld: %u\n", e2, e2a, share_1_2a);
+	printf("**** Number of share barcode of %ld and %ld: %u\n", e1, e2a, share_1_2a);
 	printf("**** Number of share barcode of the three: %u\n", share_1_2_2a);
 	printf("-----------------------------------------------------------\n");
 }
