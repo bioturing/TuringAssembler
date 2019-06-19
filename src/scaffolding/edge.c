@@ -9,11 +9,11 @@
 #include "scaffolding/compare.h"
 #include "scaffolding/score.h"
 
-struct matrix_score *get_score_edges_matrix(struct asm_graph_t *g, int i0, int i1, int n_bucks,
+struct matrix_buck_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1, int n_bucks,
  			float avg_bin_hash, struct opt_proc_t *opt)
 {
-	struct matrix_score *score = NULL;
-	score = realloc(score, sizeof(struct matrix_score));
+	struct matrix_buck_score *score = NULL;
+	score = realloc(score, sizeof(struct matrix_buck_score));
 	int rev_i0 = g->edges[i0].rc_id;
 	assert(rev_i0 < g->n_e);
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
@@ -102,14 +102,14 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_has
 	return score;
 }
 
-int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1, 
+int check_replicate_scaffold_edge(struct asm_graph_t *g, int i0, int i1, 
 		const int n_bucks, float threshold, float avg_bin_hash, struct opt_proc_t *opt)
 {
 	int rev_i0 = g->edges[i0].rc_id, rev_i1 = g->edges[i1].rc_id;
-	struct matrix_score *s0 = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_score *s1 = get_score_edges_matrix(g, i0, rev_i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_score *s2 = get_score_edges_matrix(g, rev_i0, i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_score *s3 = get_score_edges_matrix(g, rev_i0, rev_i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_buck_score *s0 = get_score_l_l_mat(g, i0, i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_buck_score *s1 = get_score_l_l_mat(g, i0, rev_i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_buck_score *s2 = get_score_l_l_mat(g, rev_i0, i1, n_bucks, avg_bin_hash, opt);
+	struct matrix_buck_score *s3 = get_score_l_l_mat(g, rev_i0, rev_i1, n_bucks, avg_bin_hash, opt);
 	int res = (detect_anomal_diagonal(s0, threshold) || detect_anomal_diagonal(s1, threshold) || detect_anomal_diagonal(s2, threshold) || detect_anomal_diagonal(s3, threshold));
 	destroy_matrix_score(s0);
 	destroy_matrix_score(s1);
@@ -121,9 +121,15 @@ int check_replicate_contig_edge(struct asm_graph_t *g, int i0, int i1,
 struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, const int n_bucks, 
 		float avg_bin_hash, struct opt_proc_t *opt) 
 {
-	struct matrix_score *mat_score = get_score_edges_matrix(g, i0, i1, n_bucks, avg_bin_hash, opt);
-	mat_score->A[0] = -1;
+	struct bucks_score res_score;
+	res_score.score = -1;
+
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
+	if (is_very_short_contig(e0) || is_very_short_contig(e1))
+		return res_score;
+
+	struct matrix_buck_score *mat_score = get_score_l_l_mat(g, i0, i1, n_bucks, avg_bin_hash, opt);
+	mat_score->A[0] = -1;
 	float res = 0;
 	int count = 1;
 	for (int i = 0; i < mat_score->n_bucks; ++i) {
@@ -142,17 +148,17 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 		}
 		VERBOSE_FLAG(3, "#\n");
 	}
-	struct bucks_score res_score;
+
 	res_score.score = res/count;
 	destroy_matrix_score(mat_score);
 	return res_score;
 }
 
-void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, int pos, int src, int des, 
+void add_scaffold_edge(struct asm_graph_t *g,struct scaffold_edge *listE, int pos, int src, int des, 
 		float score0, struct opt_proc_t *opt)
 {
 	assert(src >= 0 && des >= 0 && src < g->n_e && des < g->n_e);
-	struct contig_edge *e = calloc(1, sizeof(struct contig_edge));
+	struct scaffold_edge *e = calloc(1, sizeof(struct scaffold_edge));
 	e->src = src;
 	e->des = des;
 	e->score0 = score0;
@@ -162,15 +168,15 @@ void add_contig_edge(struct asm_graph_t *g,struct contig_edge *listE, int pos, i
 	listE[pos] = *e;
 }
 
-void unique_edge(struct contig_edge *listE, int *n_e)
+void unique_edge(struct scaffold_edge *listE, int *n_e)
 {
 	int new_n_e = 0;
 	for (int i = 0; i < *n_e; ) {
 		int j = i;
-		struct contig_edge *best = calloc(1, sizeof(struct contig_edge));
+		struct scaffold_edge *best = calloc(1, sizeof(struct scaffold_edge));
 		best->score0 = -1;
-		while (j < *n_e && equal_contig_edge(&listE[j], &listE[i])){
-			if (better_contig_edge(&listE[j], best)){
+		while (j < *n_e && equal_scaffold_edge(&listE[j], &listE[i])){
+			if (better_scaffold_edge(&listE[j], best)){
 				best = &listE[j];
 			}
 			++j;
@@ -181,7 +187,7 @@ void unique_edge(struct contig_edge *listE, int *n_e)
 	*n_e = new_n_e;
 }
 
-void build_V_from_E(struct contig_edge *listE, int n_e, int **listV, int *n_v)
+void build_V_from_E(struct scaffold_edge *listE, int n_e, int **listV, int *n_v)
 {
 	*listV = NULL; 
 	*n_v = 0;
@@ -204,20 +210,28 @@ void build_V_from_E(struct contig_edge *listE, int n_e, int **listV, int *n_v)
 	unique(*listV, n_v);
 }
 
-uint32_t equal_contig_edge(struct contig_edge *e0,struct contig_edge *e1)
+uint32_t equal_scaffold_edge(struct scaffold_edge *e0,struct scaffold_edge *e1)
 {
 	return (e0->src == e1->src && e0->des == e1->des);
 }
 
-uint32_t better_contig_edge(struct contig_edge *e0, struct contig_edge *e1)
+uint32_t better_scaffold_edge(struct scaffold_edge *e0, struct scaffold_edge *e1)
 {
 	return (e0->score0 > e1->score0);
 }
 
-int less_contig_edge(const void *e0,const void *e1)
+int less_scaffold_edge(const void *e0,const void *e1)
 {
-	struct contig_edge * v0 = (struct contig_edge *) e0;
-	struct contig_edge * v1 = (struct contig_edge *) e1;
+	struct scaffold_edge * v0 = (struct scaffold_edge *) e0;
+	struct scaffold_edge * v1 = (struct scaffold_edge *) e1;
 	return (v0->src > v1->src || (v0->src == v1->src && v0->des > v1->des));
 }
 
+struct scaffold_edge *new_scaffold_edge(int src, int des, float score)
+{
+	struct scaffold_edge* new_edge = calloc(1, sizeof(struct scaffold_edge));
+	new_edge->src = src;
+	new_edge->des = des;
+	new_edge->score0 = score;
+	return new_edge;
+}

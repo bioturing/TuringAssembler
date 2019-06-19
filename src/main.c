@@ -448,10 +448,6 @@ int main(int argc, char *argv[])
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "build_scaffolding_1")) 
-		build_opt_process(argc, argv, &build_scaffolding_1_process); 
-	else if (!strcmp(argv[1], "build_scaffolding_2"))
-		build_opt_process(argc, argv, &build_scaffolding_2_process); 
 	else if (!strcmp(argv[1], "build_scaffolding_1_2"))
 		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
 	else if (!strcmp(argv[1], "build_scaffolding_test"))

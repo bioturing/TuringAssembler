@@ -17,13 +17,22 @@ int decending_uint32(const void *e0,const void *e1)
 
 int decending_edge_score(const void *d0, const void *d1)
 {
-	float a =  ((struct contig_edge *) d0)->score0;
-	float b =  ((struct contig_edge *) d1)->score0;
-	struct contig_edge *e1 =  (struct contig_edge *) d1;
+	float a =  ((struct scaffold_edge *) d0)->score0;
+	float b =  ((struct scaffold_edge *) d1)->score0;
+	struct scaffold_edge *e1 =  (struct scaffold_edge *) d1;
 	return (a < b) - (a > b);
 }
 
-
+int ascending_edge(const void *e0, const void *e1)
+{
+	struct scaffold_edge *a = (struct scaffold_edge *) e0;
+	struct scaffold_edge *b = (struct scaffold_edge *) e1;
+	int t0 = (a->src > b->src) - (a->src < b->src);
+	int t1 = (a->des > b->des) - (a->des < b->des);
+	if (t0 != 0)
+		return t0;
+	return t1;
+}
 
 int decending_candidate_edge(const void *d0, const void *d1)
 {
@@ -32,3 +41,13 @@ int decending_candidate_edge(const void *d0, const void *d1)
 	return (a < b) - (a > b);
 }
 
+int ascending_index_edge(const void *e0, const void *e1)
+{
+	struct candidate_edge *a = (struct candidate_edge *) e0;
+	struct candidate_edge *b = (struct candidate_edge *) e1;
+	int t0 = (a->src > b->src) - (a->src < b->src);
+	int t1 = (a->des > b->des) - (a->des < b->des);
+	if (t0 != 0)
+		return t0;
+	return t1;
+}

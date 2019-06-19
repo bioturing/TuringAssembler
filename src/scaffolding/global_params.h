@@ -7,6 +7,7 @@
 	X(float, global_thres_bucks_score, -1)\
 	X(int, global_thres_count_kmer , -1)\
 	X(int, global_thres_length , -1)\
+	X(int, global_thres_short_len, -1)\
 	X(int, global_thres_n_buck_big_small , -1)\
 	X(int, global_n_buck , -1)\
 	X(float, global_genome_coverage, -1)\

@@ -5,7 +5,7 @@
 #include "verbose.h"
 #include "global_params.h"
 
-void normalize_min_index(struct asm_graph_t *g, struct contig_edge *e)
+void normalize_min_index(struct asm_graph_t *g, struct scaffold_edge *e)
 {
 	assert(e->src < g->n_e && e->des < g->n_e && e->src>=0 && e->des>=0);
 	int rc_id_src = g->edges[e->src].rc_id;
@@ -20,7 +20,7 @@ void normalize_min_index(struct asm_graph_t *g, struct contig_edge *e)
 	}
 }
 
-void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
+void normalize_one_dir(struct asm_graph_t *g, struct scaffold_edge *e)
 {
 	assert(e->src < g->n_e && e->des < g->n_e && e->src >=0 && e->des >=0);
 	if (e->rv_src == 1) {
@@ -31,5 +31,32 @@ void normalize_one_dir(struct asm_graph_t *g, struct contig_edge *e)
 		e->des = g->edges[e->des].rc_id;
 		e->rv_des = 0;
 	}
+}
+
+int is_long_contig(struct asm_edge_t *e)
+{
+	int len = get_edge_len(e);
+	if (len >= global_thres_length){
+		return 1;
+	}
+	return 0;
+}
+
+int is_short_contig(struct asm_edge_t *e)
+{
+	int len = get_edge_len(e);
+	if (global_thres_length > len && len >= global_thres_short_len ){
+		return 1;
+	}
+	return 0;
+}
+
+int is_very_short_contig(struct asm_edge_t *e)
+{
+	int len = get_edge_len(e);
+	if (global_thres_short_len > len){
+		return 1;
+	}
+	return 0;
 }
 

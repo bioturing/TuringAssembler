@@ -39,8 +39,13 @@ int get_rc_id_V(struct asm_graph_t *g, int n_v, int *listV, int i_e)
 			}
 		}
 	}
+}
 
-
+int get_new_size(int size)
+{
+	if (size == 0)
+		return 1;
+	return size << 1;
 }
 
 float get_component_cov(struct asm_graph_t *g, int n_component_node, int *connected_component, int *listV)

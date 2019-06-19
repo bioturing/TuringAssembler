@@ -66,8 +66,9 @@ int get_global_count_kmer(struct asm_graph_t *g)
 void init_global_params(struct asm_graph_t *g)
 {
 	global_thres_length = 10000;
+	global_thres_short_len= 5000;
 	global_thres_n_buck_big_small = 5;
-	global_n_buck = 6;
+	global_n_buck = 5;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  1;//get_global_count_kmer(g);
 	global_avg_sum_bin_hash = get_avg_sum_bin_hash(g);

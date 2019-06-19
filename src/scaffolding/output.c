@@ -66,9 +66,9 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 	free(NNN);
 }
 
-void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct contig_edge *listE, int n_v, int *listV, FILE *out_graph)
+void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct scaffold_edge *listE, int n_v, int *listV, FILE *out_graph)
 {
-	struct contig_edge *list_one_dir_E = calloc(n_e, sizeof(struct contig_edge));
+	struct scaffold_edge *list_one_dir_E = calloc(n_e, sizeof(struct scaffold_edge));
 	for (int i = 0; i < n_e; i++) {
 		list_one_dir_E[i] = listE[i];
 		normalize_min_index(g, list_one_dir_E+i);
