@@ -143,15 +143,16 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	// printf("---------------- TEST %ld <-> %ld-------------------\n", e1, e2);
-	// struct barcode_hash_t *h1, *h2;
-	// h1 = &g->edges[e1].barcodes;
-	// h2 = &g->edges[e2].barcodes;
-	// printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
-	// printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
+	printf("---------------- TEST %ld <-> %ld-------------------\n", e1, e2);
+	struct barcode_hash_t *h1, *h2;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
+	printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
 
-	// uint32_t cnt = count_shared_bc(h1, h2);
-	// printf("Number of shared barcode: %u\n", cnt);
+	uint32_t cnt = count_shared_bc(h1, h2);
+	printf("Number of shared barcode: %u\n", cnt);
+	printf("-----------------------------------------------------------\n");
 	// printf("Ratio = %.3f\n", get_barcode_ratio(g, e1, e2));
 
 	// printf("Number of unique mapped barcode of %ld: %u\n", e1, h1->n_unique);
