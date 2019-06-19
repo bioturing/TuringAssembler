@@ -270,9 +270,17 @@ void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 	/* clone the barcode and read pair information */
 	if (g->aux_flag & ASM_HAVE_BARCODE)
 		barcode_hash_clone(&g->edges[dst].barcodes, &g->edges[src].barcodes);
-	if (g->aux_flag & ASM_HAVE_READPAIR)
-		barcode_hash_clone(&g->edges[dst].mate_contigs, &g->edges[src].mate_contigs);
-	g->edges[dst].best_mate_contigs = g->edges[src].best_mate_contigs;
+	if ((g->aux_flag & ASM_HAVE_READPAIR) && g->edges[src].n_mate_contigs) {
+		g->edges[dst].n_mate_contigs = g->edges[src].n_mate_contigs;
+		g->edges[dst].mate_contigs = malloc(g->edges[dst].n_mate_contigs * sizeof(gint_t));
+		memcpy(g->edges[dst].mate_contigs, g->edges[src].mate_contigs,
+				g->edges[dst].n_mate_contigs * sizeof(gint_t));
+		g->edges[dst].mate_barcodes = malloc(g->edges[dst].n_mate_contigs * sizeof(struct barcode_hash_t));
+		gint_t i;
+		for (i = 0; i < g->edges[dst].n_mate_contigs; ++i)
+			barcode_hash_clone(g->edges[dst].mate_barcodes + i,
+						g->edges[src].mate_barcodes + i);
+	}
 }
 
 gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src)
@@ -322,10 +330,28 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 void asm_append_barcode(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t aux_flag)
 {
 	if (aux_flag & ASM_HAVE_BARCODE)
-		barcode_hash_merge_barcode(&(dst->barcodes), &(src->barcodes));
-	if (aux_flag & ASM_HAVE_READPAIR)
-		barcode_hash_merge_readpair(&(dst->mate_contigs), &(src->mate_contigs));
-	dst->best_mate_contigs = -1;
+		barcode_hash_merge(&(dst->barcodes), &(src->barcodes));
+	if (aux_flag & ASM_HAVE_READPAIR) {
+		gint_t i, k;
+		for (i = 0; i < src->n_mate_contigs; ++i) {
+			for (k = 0; k < dst->n_mate_contigs; ++k)
+				if (dst->mate_contigs[k] == src->mate_contigs[i])
+					break;
+			if (k == dst->n_mate_contigs) {
+				++dst->n_mate_contigs;
+				dst->mate_contigs = realloc(dst->mate_contigs,
+					dst->n_mate_contigs * sizeof(gint_t));
+				dst->mate_contigs[k] = src->mate_contigs[i];
+				dst->mate_barcodes = realloc(dst->mate_barcodes,
+					dst->n_mate_contigs * sizeof(struct barcode_hash_t));
+				barcode_hash_clone(dst->mate_barcodes + k,
+							src->mate_barcodes + i);
+			} else {
+				barcode_hash_merge(dst->mate_barcodes + k,
+							src->mate_barcodes + i);
+			}
+		}
+	}
 }
 
 void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap)
@@ -512,8 +538,16 @@ void asm_clean_edge(struct asm_graph_t *g, gint_t e)
 	asm_clean_edge_seq(g->edges + e);
 	if (g->aux_flag & ASM_HAVE_BARCODE)
 		barcode_hash_clean(&g->edges[e].barcodes);
-	if (g->aux_flag & ASM_HAVE_READPAIR)
-		barcode_hash_clean(&g->edges[e].mate_contigs);
+	if (g->aux_flag & ASM_HAVE_READPAIR) {
+		free(g->edges[e].mate_contigs);
+		g->edges[e].mate_contigs = NULL;
+		gint_t i;
+		for (i = 0; i < g->edges[e].n_mate_contigs; ++i)
+			barcode_hash_clean(g->edges[e].mate_barcodes + i);
+		free(g->edges[e].mate_barcodes);
+		g->edges[e].mate_barcodes = NULL;
+		g->edges[e].n_mate_contigs = 0;
+	}
 }
 
 void asm_remove_edge(struct asm_graph_t *g, gint_t e)
@@ -990,21 +1024,32 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			struct barcode_hash_t *h = &g->edges[e].barcodes;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-			xfwrite(&h->n_unique, sizeof(uint32_t), 1, fp);
+			// xfwrite(&h->n_unique, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			// xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 
 	/* save the read pair information */
 	if (g->aux_flag & ASM_HAVE_READPAIR) {
 		for (e = 0; e < g->n_e; ++e) {
-			xfwrite(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
-			struct barcode_hash_t *h = &g->edges[e].mate_contigs;
-			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			xfwrite(&g->edges[e].n_mate_contigs, sizeof(gint_t), 1, fp);
+			xfwrite(&g->edges[e].mate_contigs, sizeof(gint_t),
+						g->edges[e].n_mate_contigs, fp);
+			gint_t i;
+			struct barcode_hash_t *h;
+			for (i = 0; i < g->edges[e].n_mate_contigs; ++i) {
+				h = g->edges[e].mate_barcodes + i;
+				xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+				xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+				xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			}
+			// xfwrite(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
+			// struct barcode_hash_t *h = &g->edges[e].mate_contigs;
+			// xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			// xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			// xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			// xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 	fclose(fp);
@@ -1055,36 +1100,49 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			g->edges[e].p_holes = NULL;
 			g->edges[e].l_holes = NULL;
 		}
-		g->edges[e].best_mate_contigs = -1; /* just for the case that we does not have read pair information */
 	}
 
 	/* load the barcode information */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
-		__VERBOSE("Load barcode\n");
 		for (e = 0; e < g->n_e; ++e) {
 			struct barcode_hash_t *h = &g->edges[e].barcodes;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-			xfread(&h->n_unique, sizeof(uint32_t), 1, fp);
+			// xfread(&h->n_unique, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			// h->cnts = malloc(h->size * sizeof(uint32_t));
+			// xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 
 	/* load the read pair information */
 	if (g->aux_flag & ASM_HAVE_READPAIR) {
-		__VERBOSE("Load read pair\n");
 		for (e = 0; e < g->n_e; ++e) {
-			xfread(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
-			struct barcode_hash_t *h = &g->edges[e].mate_contigs;
-			xfread(&h->size, sizeof(uint32_t), 1, fp);
-			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-			h->keys = malloc(h->size * sizeof(uint64_t));
-			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			xfread(&g->edges[e].n_mate_contigs, sizeof(gint_t), 1, fp);
+			g->edges[e].mate_contigs = malloc(g->edges[e].n_mate_contigs *
+									sizeof(gint_t));
+			xfread(g->edges[e].mate_contigs, sizeof(gint_t),
+						g->edges[e].n_mate_contigs, fp);
+			g->edges[e].mate_barcodes = malloc(g->edges[e].n_mate_contigs *
+								sizeof(struct barcode_hash_t));
+			gint_t i;
+			struct barcode_hash_t *h;
+			for (i = 0; i < g->edges[e].n_mate_contigs; ++i) {
+				h = g->edges[e].mate_barcodes + i;
+				xfread(&h->size, sizeof(uint32_t), 1, fp);
+				xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+				h->keys = malloc(h->size * sizeof(uint64_t));
+				xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			}
+			// xfread(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
+			// struct barcode_hash_t *h = &g->edges[e].mate_contigs;
+			// xfread(&h->size, sizeof(uint32_t), 1, fp);
+			// xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			// h->keys = malloc(h->size * sizeof(uint64_t));
+			// xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			// h->cnts = malloc(h->size * sizeof(uint32_t));
+			// xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 	fclose(fp);

@@ -163,73 +163,75 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 
 static inline int check_large_pair_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	double r1, r2, r1u, r2u;
-	r1 = get_barcode_ratio(g, e1, e2);
-	r2 = get_barcode_ratio(g, e1, e2a);
-	if (__ratio_greater(r1, r2) && __positive_ratio(r1))
-		return 1;
-	r1u = get_barcode_ratio_unique(g, e1, e2);
-	r2u = get_barcode_ratio_unique(g, e1, e2a);
-	if (__ratio_greater(r1u, r2u) && __positive_ratio_unique(r1u))
-		return 1;
-	return g->edges[e1].best_mate_contigs == e2 &&
-		g->edges[e2].best_mate_contigs == e1;
+	// double r1, r2, r1u, r2u;
+	// r1 = get_barcode_ratio(g, e1, e2);
+	// r2 = get_barcode_ratio(g, e1, e2a);
+	// if (__ratio_greater(r1, r2) && __positive_ratio(r1))
+	// 	return 1;
+	// r1u = get_barcode_ratio_unique(g, e1, e2);
+	// r2u = get_barcode_ratio_unique(g, e1, e2a);
+	// if (__ratio_greater(r1u, r2u) && __positive_ratio_unique(r1u))
+	// 	return 1;
+	// return g->edges[e1].best_mate_contigs == e2 &&
+	// 	g->edges[e2].best_mate_contigs == e1;
 }
 
 static inline int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
-		return check_large_pair_superior(g, e1, e2, e2a);
-	if (g->edges[e1].best_mate_contigs == e2 &&
-		g->edges[e2].best_mate_contigs == e1)
-		return 1;
-	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
-		/* Do some naughty stuff */
-	}
-	return 0;
+	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
+	// 	return check_large_pair_superior(g, e1, e2, e2a);
+	// if (g->edges[e1].best_mate_contigs == e2 &&
+	// 	g->edges[e2].best_mate_contigs == e1)
+	// 	return 1;
+	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
+	// 	/* Do some naughty stuff */
+	// }
+	// return 0;
 }
 
 static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
-		double r = get_barcode_ratio(g, e1, e2);
-		if (__positive_ratio(r))
-			return 1;
-	}
-	return g->edges[e1].best_mate_contigs == e2 &&
-		g->edges[e2].best_mate_contigs == e1;
+	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
+	// 	double r = get_barcode_ratio(g, e1, e2);
+	// 	if (__positive_ratio(r))
+	// 		return 1;
+	// }
+	// return g->edges[e1].best_mate_contigs == e2 &&
+	// 	g->edges[e2].best_mate_contigs == e1;
 }
 
 static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	double r1, r2, r1u, r2u;
-	r1 = get_barcode_ratio(g, e1, e2);
-	r2 = get_barcode_ratio(g, e1, e2a);
-	if (r1 > r2 && __positive_ratio(r1))
-		return 1;
-	r1u = get_barcode_ratio_unique(g, e1, e2);
-	r2u = get_barcode_ratio_unique(g, e1, e2a);
-	if (r1u > r2u && __positive_ratio_unique(r1u))
-		return 1;
-	return g->edges[e1].best_mate_contigs == e2 &&
-		g->edges[e2].best_mate_contigs == e1;
+	// double r1, r2, r1u, r2u;
+	// r1 = get_barcode_ratio(g, e1, e2);
+	// r2 = get_barcode_ratio(g, e1, e2a);
+	// if (r1 > r2 && __positive_ratio(r1))
+	// 	return 1;
+	// r1u = get_barcode_ratio_unique(g, e1, e2);
+	// r2u = get_barcode_ratio_unique(g, e1, e2a);
+	// if (r1u > r2u && __positive_ratio_unique(r1u))
+	// 	return 1;
+	// return g->edges[e1].best_mate_contigs == e2 &&
+	// 	g->edges[e2].best_mate_contigs == e1;
 }
 
 static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
-		return check_large_pair_greater(g, e1, e2, e2a);
-	if (g->edges[e1].best_mate_contigs == e2 &&
-		g->edges[e2].best_mate_contigs == e1)
-		return 1;
-	return 0;
+	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
+	// 	g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
+	// 	return check_large_pair_greater(g, e1, e2, e2a);
+	// if (g->edges[e1].best_mate_contigs == e2 &&
+	// 	g->edges[e2].best_mate_contigs == e1)
+	// 	return 1;
+	// return 0;
 }
+
+/* end check function */
 
 static inline int remove_array_element(gint_t *a, gint_t n, gint_t x)
 {

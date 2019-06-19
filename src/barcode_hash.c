@@ -16,7 +16,7 @@ void barcode_hash_init(struct barcode_hash_t *h, uint32_t size)
 	h->size = size - 1;
 	__round_up_32(h->size);
 	h->n_item = 0;
-	h->n_unique = 0;
+	// h->n_unique = 0;
 	h->keys = malloc(h->size * sizeof(uint64_t));
 	h->cnts = calloc(h->size, sizeof(uint32_t));
 	uint32_t i;
@@ -231,23 +231,24 @@ uint32_t barcode_hash_add(struct barcode_hash_t *h, uint64_t key)
 		barcode_hash_resize(h);
 		k = internal_barcode_hash_put(h, key);
 	}
+	++h->cnts[k];
 	return k;
 }
 
-uint32_t barcode_hash_add_unique(struct barcode_hash_t *h, uint64_t key)
-{
-	uint32_t k;
-	k = internal_barcode_hash_put(h, key);
-	while (k == BARCODE_HASH_END(h)) {
-		barcode_hash_resize(h);
-		k = internal_barcode_hash_put(h, key);
-	}
-	if (h->cnts[k] == 0) {
-		++h->n_unique;
-		h->cnts[k] = 1;
-	}
-	return k;
-}
+// uint32_t barcode_hash_add_unique(struct barcode_hash_t *h, uint64_t key)
+// {
+// 	uint32_t k;
+// 	k = internal_barcode_hash_put(h, key);
+// 	while (k == BARCODE_HASH_END(h)) {
+// 		barcode_hash_resize(h);
+// 		k = internal_barcode_hash_put(h, key);
+// 	}
+// 	if (h->cnts[k] == 0) {
+// 		++h->n_unique;
+// 		h->cnts[k] = 1;
+// 	}
+// 	return k;
+// }
 
 uint32_t barcode_hash_inc_count(struct barcode_hash_t *h, uint64_t key)
 {
@@ -267,35 +268,48 @@ void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 {
 	dst->size = src->size;
 	dst->n_item = src->n_item;
-	dst->n_unique = src->n_unique;
+	// dst->n_unique = src->n_unique;
 	dst->keys = malloc(dst->size * sizeof(uint64_t));
-	dst->cnts = malloc(dst->size * sizeof(uint32_t));
+	// dst->cnts = malloc(dst->size * sizeof(uint32_t));
 	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
-	memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
+	// memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
 }
 
-void barcode_hash_merge_barcode(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+// void barcode_hash_merge_barcode(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+// {
+// 	uint32_t i, k;
+// 	for (i = 0; i < src->size; ++i) {
+// 		if (src->keys[i] == K31_NULL)
+// 			continue;
+// 		k = internal_barcode_hash_put(dst, src->keys[i]);
+// 		// if (src->cnts[i] == 1)
+// 		// 	dst->cnts[k] = 1;
+// 	}
+// }
+
+// void barcode_hash_merge_readpair(struct barcode_hash_t *dst, struct barcode_hash_t *src)
+// {
+// 	uint32_t i, k;
+// 	for (i = 0; i < src->size; ++i) {
+// 		if (src->keys[i] == K31_NULL)
+// 			continue;
+// 		k = internal_barcode_hash_put(dst, src->keys[i]);
+// 		// dst->cnts[k] += src->cnts[i];
+// 	}
+// }
+
+void barcode_hash_merge(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 {
 	uint32_t i, k;
 	for (i = 0; i < src->size; ++i) {
 		if (src->keys[i] == K31_NULL)
 			continue;
 		k = internal_barcode_hash_put(dst, src->keys[i]);
-		if (src->cnts[i] == 1)
-			dst->cnts[k] = 1;
+		// if (src->cnts[i] == 1)
+		// 	dst->cnts[k] = 1;
 	}
 }
 
-void barcode_hash_merge_readpair(struct barcode_hash_t *dst, struct barcode_hash_t *src)
-{
-	uint32_t i, k;
-	for (i = 0; i < src->size; ++i) {
-		if (src->keys[i] == K31_NULL)
-			continue;
-		k = internal_barcode_hash_put(dst, src->keys[i]);
-		dst->cnts[k] += src->cnts[i];
-	}
-}
 
 void barcode_hash_destroy(struct barcode_hash_t *h)
 {

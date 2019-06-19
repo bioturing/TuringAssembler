@@ -35,10 +35,12 @@ struct asm_edge_t {
 	gint_t target;		/* end node */
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
-	struct barcode_hash_t *bucks;
 	struct barcode_hash_t barcodes;		/* mapped barcode */
-	struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
-	gint_t best_mate_contigs;		/* best mate contigs picker */
+	struct barcode_hash_t *mate_barcodes;
+	gint_t *mate_contigs;
+	int n_mate_contigs;
+	// struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
+	// gint_t best_mate_contigs;		/* best mate contigs picker */
 };
 
 struct asm_graph_t {
@@ -186,5 +188,7 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize);
 void test_asm_graph(struct asm_graph_t *g);
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_pair_end(struct asm_graph_t *g, gint_t e);
+void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
+						gint_t e2, gint_t e2a);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
