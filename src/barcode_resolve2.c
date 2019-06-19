@@ -159,76 +159,241 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 	return ret;
 }
 
-/*************************** Helper check fucntions ***************************/
+/*************************** Helper check functions ***************************/
 
-static inline int check_large_pair_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
+static uint32_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 {
-	// double r1, r2, r1u, r2u;
-	// r1 = get_barcode_ratio(g, e1, e2);
-	// r2 = get_barcode_ratio(g, e1, e2a);
-	// if (__ratio_greater(r1, r2) && __positive_ratio(r1))
-	// 	return 1;
-	// r1u = get_barcode_ratio_unique(g, e1, e2);
-	// r2u = get_barcode_ratio_unique(g, e1, e2a);
-	// if (__ratio_greater(r1u, r2u) && __positive_ratio_unique(r1u))
-	// 	return 1;
-	// return g->edges[e1].best_mate_contigs == e2 &&
-	// 	g->edges[e2].best_mate_contigs == e1;
+	uint32_t i, k, ret = 0;
+	for (i = 0; i < t1->size; ++i) {
+		if (t1->keys[i] == (uint64_t)-1)
+			continue;
+		k = barcode_hash_get(t2, t1->keys[i]);
+		ret += (int)(k != BARCODE_HASH_END(t2));
+	}
+	return ret;
 }
 
-static inline int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
+static inline int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
+							gint_t e2, gint_t e2a)
 {
-	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
-	// 	return check_large_pair_superior(g, e1, e2, e2a);
-	// if (g->edges[e1].best_mate_contigs == e2 &&
-	// 	g->edges[e2].best_mate_contigs == e1)
-	// 	return 1;
-	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
-	// 	/* Do some naughty stuff */
-	// }
-	// return 0;
+	struct barcode_hash_t *h1, *h2, *h2a;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	h2a = &g->edges[e2a].barcodes;
+
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	share_1_2 = share_1_2a = share_1_2_2a = 0;
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1)
+			continue;
+		k2 = barcode_hash_get(h2, h1->keys[i]);
+		k2a = barcode_hash_get(h2a, h1->keys[i]);
+		share_1_2 += (k2 != BARCODE_HASH_END(h2));
+		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
+		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
+					k2a != BARCODE_HASH_END(h2a));
+	}
+	uint32_t sub_share_1_2, sub_share_1_2a;
+	if (share_1_2 < MIN_BARCODE_COUNT)
+		return 0;
+	if (share_1_2 > share_1_2a * 2) {
+		return 1;
+	} else {
+		sub_share_1_2 = share_1_2 - share_1_2_2a;
+		sub_share_1_2a = share_1_2a - share_1_2_2a;
+		if (sub_share_1_2 > sub_share_1_2a * 2 &&
+			sub_share_1_2 > sub_share_1_2a + 50)
+			return 1;
+	}
+	return 0;
+}
+
+static inline int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
+							gint_t e2, gint_t e2a)
+{
+	struct barcode_hash_t *h1, *h2, *h2a;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	h2a = &g->edges[e2a].barcodes;
+
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	share_1_2 = share_1_2a = share_1_2_2a = 0;
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1)
+			continue;
+		k2 = barcode_hash_get(h2, h1->keys[i]);
+		k2a = barcode_hash_get(h2a, h1->keys[i]);
+		share_1_2 += (k2 != BARCODE_HASH_END(h2));
+		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
+		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
+					k2a != BARCODE_HASH_END(h2a));
+	}
+
+	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a;
+	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
+	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
+
+	if (share_1_2 >= MIN_BARCODE_COUNT) {
+		if (share_1_2 > share_1_2a * 2) {
+			if (len2a + 1000 > len2)
+				return 1;
+		} else if (share_1_2 > share_1_2a) {
+			sub_share_1_2 = share_1_2 - share_1_2_2a;
+			sub_share_1_2a = share_1_2a - share_1_2_2a;
+			if (share_1_2_2a * 2 >= share_1_2a &&
+				sub_share_1_2 > sub_share_1_2a * 2 &&
+				sub_share_1_2 > sub_share_1_2a + 50) {
+				if (len2a + 1000 > len2)
+					return 1;
+			}
+		} else {
+			return 0;
+		}
+	} else {
+		h2 = NULL;
+		h2a = NULL;
+		gint_t k;
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+			if (g->edges[e1].mate_contigs[k] == e2)
+				h2 = g->edges[e1].mate_barcodes + k;
+			if (g->edges[e1].mate_contigs[k] == e2a)
+				h2a = g->edges[e1].mate_barcodes + k;
+		}
+		if (h2 == NULL)
+			return 0;
+		if (h2->n_item < MIN_READPAIR_COUNT)
+			return 0;
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+			if (g->edges[e1].mate_barcodes[k].n_item > h2->n_item)
+				return 0;
+		}
+		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
+			if (g->edges[e2].mate_barcodes[k].n_item > h2->n_item)
+				return 0;
+		}
+		if (h2a == NULL)
+			return 1;
+		if (h2->n_item > h2a->n_item * 2)
+			return 1;
+		uint32_t shared = count_shared_bc(h2, h2a);
+		if ((h2->n_item - shared) > (h2a->n_item - shared) * 2 &&
+			h2->n_item - shared > h2a->n_item - shared + 10)
+			return 1;
+	}
+	return 0;
 }
 
 static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE) {
-	// 	double r = get_barcode_ratio(g, e1, e2);
-	// 	if (__positive_ratio(r))
-	// 		return 1;
-	// }
-	// return g->edges[e1].best_mate_contigs == e2 &&
-	// 	g->edges[e2].best_mate_contigs == e1;
+	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
+							&g->edges[e2].barcodes);
+	if (shared >= MIN_BARCODE_COUNT)
+		return 1;
+	gint_t k;
+	struct barcode_hash_t *h = NULL;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (g->edges[e1].mate_contigs[k] == e2)
+			h = g->edges[e1].mate_barcodes + k;
+	}
+	if (h == NULL)
+		return 0;
+	return (h->n_item >= MIN_READPAIR_COUNT);
 }
 
 static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	// double r1, r2, r1u, r2u;
-	// r1 = get_barcode_ratio(g, e1, e2);
-	// r2 = get_barcode_ratio(g, e1, e2a);
-	// if (r1 > r2 && __positive_ratio(r1))
-	// 	return 1;
-	// r1u = get_barcode_ratio_unique(g, e1, e2);
-	// r2u = get_barcode_ratio_unique(g, e1, e2a);
-	// if (r1u > r2u && __positive_ratio_unique(r1u))
-	// 	return 1;
-	// return g->edges[e1].best_mate_contigs == e2 &&
-	// 	g->edges[e2].best_mate_contigs == e1;
+	struct barcode_hash_t *h1, *h2, *h2a;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	h2a = &g->edges[e2a].barcodes;
+
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	share_1_2 = share_1_2a = share_1_2_2a = 0;
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1)
+			continue;
+		k2 = barcode_hash_get(h2, h1->keys[i]);
+		k2a = barcode_hash_get(h2a, h1->keys[i]);
+		share_1_2 += (k2 != BARCODE_HASH_END(h2));
+		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
+		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
+					k2a != BARCODE_HASH_END(h2a));
+	}
+	uint32_t sub_share_1_2, sub_share_1_2a;
+	if (share_1_2 < MIN_BARCODE_COUNT)
+		return 0;
+	if (share_1_2 > share_1_2a)
+		return 1;
+	return 0;
 }
 
 static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
-	// if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
-	// 	g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
-	// 	return check_large_pair_greater(g, e1, e2, e2a);
-	// if (g->edges[e1].best_mate_contigs == e2 &&
-	// 	g->edges[e2].best_mate_contigs == e1)
-	// 	return 1;
-	// return 0;
+	struct barcode_hash_t *h1, *h2, *h2a;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	h2a = &g->edges[e2a].barcodes;
+
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	share_1_2 = share_1_2a = share_1_2_2a = 0;
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1)
+			continue;
+		k2 = barcode_hash_get(h2, h1->keys[i]);
+		k2a = barcode_hash_get(h2a, h1->keys[i]);
+		share_1_2 += (k2 != BARCODE_HASH_END(h2));
+		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
+		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
+					k2a != BARCODE_HASH_END(h2a));
+	}
+
+	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a;
+	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
+	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
+
+	if (share_1_2 >= MIN_BARCODE_COUNT) {
+		if (share_1_2 > share_1_2a) {
+			if (len2a + 1000 > len2)
+				return 1;
+		} else if (share_1_2 > share_1_2a) {
+			sub_share_1_2 = share_1_2 - share_1_2_2a;
+			sub_share_1_2a = share_1_2a - share_1_2_2a;
+			if (share_1_2_2a * 2 >= share_1_2a &&
+				sub_share_1_2 > sub_share_1_2a) {
+				if (len2a + 1000 > len2)
+					return 1;
+			}
+		} else {
+			return 0;
+		}
+	} else {
+		h2 = NULL;
+		h2a = NULL;
+		gint_t k;
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+			if (g->edges[e1].mate_contigs[k] == e2)
+				h2 = g->edges[e1].mate_barcodes + k;
+			if (g->edges[e1].mate_contigs[k] == e2a)
+				h2a = g->edges[e1].mate_barcodes + k;
+		}
+		if (h2 == NULL)
+			return 0;
+		if (h2->n_item < MIN_READPAIR_COUNT)
+			return 0;
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+			if (g->edges[e1].mate_barcodes[k].n_item > h2->n_item)
+				return 0;
+		}
+		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
+			if (g->edges[e2].mate_barcodes[k].n_item > h2->n_item)
+				return 0;
+		}
+		if (h2a == NULL)
+			return 1;
+		if (h2->n_item > h2a->n_item)
+			return 1;
+	}
+	return 0;
 }
 
 /* end check function */
@@ -366,7 +531,7 @@ static gint_t bc_find_pair(struct asm_graph_t *g, gint_t se, gint_t *adj, gint_t
 			sec_e = e;
 		}
 	}
-	if (ret_e == -1 || !check_medium_pair_positive(g, se, ret_e))
+	if (ret_e == -1)
 		return -1;
 	if (sec_e != -1 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {
 		return -2;
@@ -397,7 +562,7 @@ static gint_t bc_find_pair_check_path(struct asm_graph_t *g, khash_t(gint) *set_
 			}
 		}
 	}
-	if (ret_e == -1 || !check_medium_pair_positive(g, se, ret_e)) {
+	if (ret_e == -1) {
 		return -1;
 	}
 	if (sec_e != -1 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {
@@ -431,7 +596,7 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 	}
 	if (de >= 0 && ret_e == de)
 		return -3;
-	if (ret_e < 0 || !check_medium_pair_positive(g, se, ret_e)) {
+	if (ret_e < 0) {
 		return -1;
 	}
 	if (sec_e >= 0 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {

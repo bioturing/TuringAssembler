@@ -62,7 +62,7 @@ uint64_t x10_get_barcode(struct read_t *r1, struct read_t *r2)
 
 uint64_t (*barcode_calculators[])(struct read_t *, struct read_t *) = {ust_get_barcode, x10_get_barcode};
 
-uint32_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
+static uint32_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t *t2)
 {
 	uint32_t i, k, ret = 0;
 	for (i = 0; i < t1->size; ++i) {

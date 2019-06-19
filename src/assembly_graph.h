@@ -68,8 +68,10 @@ struct asm_graph_t {
 #define MIN_CONTIG_READPAIR		500
 
 #define MAX_PAIR_LEN			700
-
 #define MAX_MOLECULE_LEN		30000
+
+#define MIN_BARCODE_COUNT		150
+#define MIN_READPAIR_COUNT		20
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
