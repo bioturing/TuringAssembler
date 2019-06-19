@@ -1033,7 +1033,7 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	/* save the read pair information */
 	if (g->aux_flag & ASM_HAVE_READPAIR) {
 		for (e = 0; e < g->n_e; ++e) {
-			xfwrite(&g->edges[e].n_mate_contigs, sizeof(gint_t), 1, fp);
+			xfwrite(&g->edges[e].n_mate_contigs, sizeof(int), 1, fp);
 			xfwrite(&g->edges[e].mate_contigs, sizeof(gint_t),
 						g->edges[e].n_mate_contigs, fp);
 			gint_t i;
@@ -1119,7 +1119,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	/* load the read pair information */
 	if (g->aux_flag & ASM_HAVE_READPAIR) {
 		for (e = 0; e < g->n_e; ++e) {
-			xfread(&g->edges[e].n_mate_contigs, sizeof(gint_t), 1, fp);
+			xfread(&g->edges[e].n_mate_contigs, sizeof(int), 1, fp);
 			g->edges[e].mate_contigs = malloc(g->edges[e].n_mate_contigs *
 									sizeof(gint_t));
 			xfread(g->edges[e].mate_contigs, sizeof(gint_t),
