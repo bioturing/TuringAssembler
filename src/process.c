@@ -135,6 +135,9 @@ void graph_query_process(struct opt_proc_t *opt)
 		} else if (c == 'P') {
 			fscanf(fp, "\n");
 			print_test_pair_end(g0, u);
+		} else if (c == 'S') {
+			fscanf(fp, "%ld %ld\n", &c, &v2);
+			print_test_barcode_superior(g0, u, v, v2);
 		}
 		// int qret = test_edge_barcode(g0, u, v);
 		// fprintf(stdout, "ret = %d\n", qret);
@@ -176,16 +179,16 @@ void assembly3_process(struct opt_proc_t *opt)
 
 	build_2_3(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_3");
-	asm_graph_destroy(&g1);
+	// asm_graph_destroy(&g1);
 
-	build_barcode(opt, &g2);
-	build_3_4(&g2, &g1);
-	save_graph_info(opt->out_dir, &g1, "level_4");
-	asm_graph_destroy(&g2);
+	// build_barcode(opt, &g2);
+	// build_3_4(&g2, &g1);
+	// save_graph_info(opt->out_dir, &g1, "level_4");
+	// asm_graph_destroy(&g2);
 
-	build_barcode(opt, &g1);
-	build_4_5(&g1, &g2);
-	save_graph_info(opt->out_dir, &g2, "level_5");
+	// build_barcode(opt, &g1);
+	// build_4_5(&g1, &g2);
+	// save_graph_info(opt->out_dir, &g2, "level_5");
 
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
