@@ -119,7 +119,7 @@ void graph_query_process(struct opt_proc_t *opt)
 	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Querying pair-edge barcode information\n");
-	gint_t u, v;
+	gint_t u, v, v2;
 	FILE *fp;
 	fp = xfopen(opt->in_fasta, "r");
 	while (1) {
@@ -136,7 +136,7 @@ void graph_query_process(struct opt_proc_t *opt)
 			fscanf(fp, "\n");
 			print_test_pair_end(g0, u);
 		} else if (c == 'S') {
-			fscanf(fp, "%ld %ld\n", &c, &v2);
+			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
 		}
 		// int qret = test_edge_barcode(g0, u, v);
