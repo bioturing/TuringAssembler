@@ -77,7 +77,6 @@ struct params_check_edge {
 	int n_candidate_edges;
 	struct candidate_edge *list_candidate_edges;
 	float avg_bin_hash, thres_score ;
-	float *list_candidate_scores;
 	FILE *out_file;
 	struct opt_proc_t *opt;
 };
@@ -85,7 +84,6 @@ struct params_check_edge {
 void destroy_params_check_edge(struct params_check_edge *para)
 {
 	free(para->list_contig);
-	free(para->list_candidate_scores);
 }
 
 void *process_build_edge_score(void *data)
@@ -126,9 +124,9 @@ void *process_build_edge_score(void *data)
 			check = 1;
 		}
 		if (check) {
-			pa_check_edge->list_candidate_scores[i_candidate] = score.score;
+			pa_check_edge->list_candidate_edges[i_candidate].score = score.score;
 		} else {
-			pa_check_edge->list_candidate_scores[i_candidate] = -1;
+			pa_check_edge->list_candidate_edges[i_candidate].score = -1;
 		}
 		VERBOSE_FLAG(3, "score %f\n", score.score); 
 	} while (1); 
@@ -413,7 +411,6 @@ struct params_check_edge *new_params_check_edge(struct asm_graph_t *g, struct op
 	params->thres_score = global_thres_bucks_score;
 	params->n_candidate_edges = params_candidate->n_candidate_edges;
 	params->list_candidate_edges = params_candidate->list_candidate_edges;
-	params->list_candidate_scores = calloc(params_candidate->n_candidate_edges, sizeof(float));
 	params->opt = opt;
 	return params;
 }
@@ -463,16 +460,19 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 	VERBOSE_FLAG(1, "find real edge");
 	int n_bucks = para->n_bucks;
 	int i_candidate_edge = 0;
-	int size_list_edge = 0; 
+	qsort(para->list_candidate_edges, para->n_candidate_edges, sizeof(struct candidate_edge),
+			ascending_index_edge);
 	for (int i_contig = 0; i_contig < g->n_e; i_contig++){
 		VERBOSE_FLAG(0, "i contig %d\n", i_contig);
 		struct scaffold_edge *list_edges = NULL;
+		int size_list_edge = 0; 
 		int n_edges = 0;
 		while (i_candidate_edge < para->n_candidate_edges && 
 			para->list_candidate_edges[i_candidate_edge].src == i_contig) {
-			VERBOSE_FLAG(0, "i candidate %d\n", i_candidate_edge);
 			int i1_contig = para->list_candidate_edges[i_candidate_edge].des; 
-			float score = para->list_candidate_scores[i_candidate_edge];
+			float score = para->list_candidate_edges[i_candidate_edge].score;
+			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f\n", i_candidate_edge,
+					para->list_candidate_edges[i_candidate_edge].src, i1_contig, score);
 			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, i1_contig, score);
 			n_edges++;
 			if (n_edges > size_list_edge) {
@@ -494,7 +494,7 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 //				fprintf(out_file, "score: %f edge: %d %d\n", list_edges[j].score0, list_edges[j].src, list_edges[j].des); 
 //			}
 		}
-//		edges_score->scores[i_contig] = list_edges;
+		free(list_edges);
 	}
 	destroy_params_build_candidate(params_candidate);
 	print_edge_score(edges_score);
