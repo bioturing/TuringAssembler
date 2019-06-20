@@ -1430,7 +1430,6 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		cnt_local += collapse_n_m_bridge(g0);
 		cnt += cnt_local;
 	} while (cnt_local);
-	test_asm_graph(g0);
 	asm_condense(g0, g);
 }
 
