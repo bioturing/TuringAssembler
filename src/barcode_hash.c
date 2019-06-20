@@ -27,7 +27,7 @@ void barcode_hash_init(struct barcode_hash_t *h, uint32_t size)
 void barcode_hash_clean(struct barcode_hash_t *h)
 {
 	free(h->keys);
-	// free(h->cnts);
+	free(h->cnts);
 	h->keys = NULL;
 	h->cnts = NULL;
 	h->n_item = h->size = h->n_unique = 0;
@@ -270,6 +270,7 @@ void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 	dst->n_item = src->n_item;
 	// dst->n_unique = src->n_unique;
 	dst->keys = malloc(dst->size * sizeof(uint64_t));
+	dst->cnts = NULL;
 	// dst->cnts = malloc(dst->size * sizeof(uint32_t));
 	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
 	// memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));

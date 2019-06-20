@@ -291,6 +291,9 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 							&g->edges[e2].barcodes);
 	if (shared >= MIN_BARCODE_COUNT)
 		return 1;
+	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE)
+		return 0;
 	gint_t k;
 	struct barcode_hash_t *h = NULL;
 	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
@@ -526,11 +529,13 @@ static gint_t bc_find_pair(struct asm_graph_t *g, gint_t se, gint_t *adj, gint_t
 		e = adj[j];
 		if (e == se || e == g->edges[se].rc_id)
 			continue;
-		if (ret_e == -1 || check_medium_pair_greater(g, se, e, ret_e)) {
-			sec_e = ret_e;
-			ret_e = e;
-		} else if (sec_e == -1 || check_medium_pair_greater(g, se, e, sec_e)) {
-			sec_e = e;
+		if (check_medium_pair_positive(g, se, e)) {
+			if (ret_e == -1 || check_medium_pair_greater(g, se, e, ret_e)) {
+				sec_e = ret_e;
+				ret_e = e;
+			} else if (sec_e == -1 || check_medium_pair_greater(g, se, e, sec_e)) {
+				sec_e = e;
+			}
 		}
 	}
 	if (ret_e == -1)
@@ -553,14 +558,16 @@ static gint_t bc_find_pair_check_path(struct asm_graph_t *g, khash_t(gint) *set_
 		e = kh_key(set_leg, k);
 		if (e == se || e == g->edges[se].rc_id)
 			continue;
-		if (get_dist_simple(g, set_e,
-				g->nodes[g->edges[se].source].rc_id,
-				g->edges[e].source) != -1) {
-			if (ret_e == -1 || check_medium_pair_greater(g, se, e, ret_e)) {
-				sec_e = ret_e;
-				ret_e = e;
-			} else if (sec_e == -1 || check_medium_pair_greater(g, se, e, sec_e)) {
-				sec_e = e;
+		if (check_medium_pair_positive(g, se, e)) {
+			if (get_dist_simple(g, set_e,
+					g->nodes[g->edges[se].source].rc_id,
+					g->edges[e].source) != -1) {
+				if (ret_e == -1 || check_medium_pair_greater(g, se, e, ret_e)) {
+					sec_e = ret_e;
+					ret_e = e;
+				} else if (sec_e == -1 || check_medium_pair_greater(g, se, e, sec_e)) {
+					sec_e = e;
+				}
 			}
 		}
 	}
@@ -585,14 +592,16 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 		e = kh_key(set_candidate, k);
 		if (e == se || e == g->edges[se].rc_id)
 			continue;
-		if (get_dist_simple(g, set_e,
-					g->nodes[g->edges[se].source].rc_id,
-					g->edges[e].source) != -1) {
-			if (ret_e < 0 || check_medium_pair_greater(g, se, e, ret_e)) {
-				sec_e = ret_e;
-				ret_e = e;
-			} else if (sec_e < 0 || check_medium_pair_greater(g, se, e, sec_e)) {
-				sec_e = e;
+		if (check_medium_pair_positive(g, se, e)) {
+			if (get_dist_simple(g, set_e,
+						g->nodes[g->edges[se].source].rc_id,
+						g->edges[e].source) != -1) {
+				if (ret_e < 0 || check_medium_pair_greater(g, se, e, ret_e)) {
+					sec_e = ret_e;
+					ret_e = e;
+				} else if (sec_e < 0 || check_medium_pair_greater(g, se, e, sec_e)) {
+					sec_e = e;
+				}
 			}
 		}
 	}
@@ -917,8 +926,8 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	gint_t *legs, *legs1, *legs2;
 	gint_t n_leg1, n_leg2, n_leg, i, resolve, ret, e1, e2, et1;
 	legs = alloca((g->nodes[v].deg + g->nodes[u_rc].deg) * sizeof(gint_t));
-	legs1 = alloca(g->nodes[v].deg * sizeof(gint_t));
-	legs2 = alloca(g->nodes[u_rc].deg * sizeof(gint_t));
+	legs1 = alloca(g->nodes[u_rc].deg * sizeof(gint_t));
+	legs2 = alloca(g->nodes[v].deg * sizeof(gint_t));
 	n_leg = n_leg1 = n_leg2 = 0;
 	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
 		ei = g->nodes[u_rc].adj[i];
@@ -974,8 +983,13 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		}
 		ret += resolve;
 	} while (resolve);
-	g->edges[e].count -= sub_count;
-	g->edges[e_rc].count -= sub_count;
+	if (sub_count < g->edges[e].count) {
+		g->edges[e].count -= sub_count;
+		g->edges[e_rc].count -= sub_count;
+	} else {
+		g->edges[e].count = g->edges[e_rc].count = uni_cov_local *
+			(g->edges[e].seq_len - g->ksize);
+	}
 	if (g->nodes[u_rc].deg == 1 && g->nodes[v].deg == 1) {
 		e1 = g->nodes[u_rc].adj[0];
 		e2 = g->nodes[v].adj[0];
@@ -1030,18 +1044,18 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 	gint_t *legs, *legs1, *legs2;
 	gint_t n_leg1, n_leg2, n_leg, i, e, resolve, ret, e1, e2, et1;
 	legs = alloca((g->nodes[u].deg + g->nodes[u_rc].deg) * sizeof(gint_t));
-	legs1 = alloca(g->nodes[u].deg * sizeof(gint_t));
-	legs2 = alloca(g->nodes[u_rc].deg * sizeof(gint_t));
+	legs1 = alloca(g->nodes[u_rc].deg * sizeof(gint_t));
+	legs2 = alloca(g->nodes[u].deg * sizeof(gint_t));
 	n_leg = n_leg1 = n_leg2 = 0;
-	for (i = 0; i < g->nodes[u].deg; ++i) {
-		e = g->nodes[u].adj[i];
+	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
+		e = g->nodes[u_rc].adj[i];
 		if (g->edges[e].seq_len < MIN_CONTIG_READPAIR)
 			continue;
 		legs[n_leg++] = e;
 		legs1[n_leg1++] = e;
 	}
-	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
-		e = g->nodes[u_rc].adj[i];
+	for (i = 0; i < g->nodes[u].deg; ++i) {
+		e = g->nodes[u].adj[i];
 		if (g->edges[e].seq_len < MIN_CONTIG_READPAIR)
 			continue;
 		legs[n_leg++] = e;
@@ -1416,6 +1430,7 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		cnt_local += collapse_n_m_bridge(g0);
 		cnt += cnt_local;
 	} while (cnt_local);
+	test_asm_graph(g0);
 	asm_condense(g0, g);
 }
 
@@ -1446,7 +1461,7 @@ void resolve_complex(struct asm_graph_t *g, struct asm_graph_t *gd)
 			if (n_self == 0 && n_leg >= 2) {
 				ret += join_n_m_small_jungle(g, set_e, set_leg, uni_cov);
 			} else if (n_self + n_leg >= 2) {
-				ret += join_n_m_complex_jungle(g, set_e, set_leg, set_self, uni_cov);
+				// ret += join_n_m_complex_jungle(g, set_e, set_leg, set_self, uni_cov);
 			}
 		}
 		kh_clear(gint, set_leg);

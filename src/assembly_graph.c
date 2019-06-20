@@ -182,7 +182,7 @@ void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	asm_clone_edge(g, g->n_e - 1, e1);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 	asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
-	g->edges[e1].count = g->edges[e2].count;
+	g->edges[e1].count += g->edges[e2].count;
 	asm_clean_edge(g, g->n_e - 1);
 	--g->n_e;
 }
@@ -287,6 +287,7 @@ void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src)
 {
 	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
 	g->n_e += 2;
 	asm_clone_edge(g, g->n_e - 2, src);
 	asm_clone_edge(g, g->n_e - 1, g->edges[src].rc_id);
@@ -1071,8 +1072,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	xfread(&g->ksize, sizeof(int), 1, fp);
 	xfread(&g->n_v, sizeof(gint_t), 1, fp);
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
-	g->nodes = malloc(g->n_v * sizeof(struct asm_node_t));
-	g->edges = malloc(g->n_e * sizeof(struct asm_edge_t));
+	g->nodes = calloc(g->n_v, sizeof(struct asm_node_t));
+	g->edges = calloc(g->n_e, sizeof(struct asm_edge_t));
 	for (u = 0; u < g->n_v; ++u) {
 		xfread(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfread(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
