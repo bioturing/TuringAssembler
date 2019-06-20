@@ -195,16 +195,30 @@ int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
 	}
 	// printf("share_1_2 = %u\n", share_1_2);
 	// printf("share_1_2a = %u\n", share_1_2a);
-	uint32_t sub_share_1_2, sub_share_1_2a;
-	if (share_1_2 < MIN_BARCODE_COUNT)
+
+	uint32_t sub_share_1_2, sub_share_1_2a, total;
+	/* hard count */
+	// if (share_1_2 < MIN_BARCODE_COUNT)
+	// 	return 0;
+	/* ratio count */
+	double ratio_1_2;
+	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
+	ratio_1_2 = share_1_2 * 1.0 / total;
+	if (ratio_1_2 + EPS < MIN_BARCODE_RATIO)
 		return 0;
 	if (share_1_2 > share_1_2a * 2) {
 		return 1;
 	} else {
 		sub_share_1_2 = share_1_2 - share_1_2_2a;
 		sub_share_1_2a = share_1_2a - share_1_2_2a;
+		/* hard count */
+		// if (sub_share_1_2 > sub_share_1_2a * 2 &&
+		// 	sub_share_1_2 > sub_share_1_2a + 50)
+		// 	return 1;
+		/* ratio count */
+		ratio_1_2 = sub_share_1_2 * 1.0 / total;
 		if (sub_share_1_2 > sub_share_1_2a * 2 &&
-			sub_share_1_2 > sub_share_1_2a + 50)
+			ratio_1_2 + EPS > MIN_SUB_BARCODE_RATIO)
 			return 1;
 	}
 	return 0;
@@ -231,20 +245,32 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 					k2a != BARCODE_HASH_END(h2a));
 	}
 
-	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a;
+	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a, total;
 	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
 	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
 
-	if (share_1_2 >= MIN_BARCODE_COUNT) {
+	/* hard count */
+	// if (share_1_2 >= MIN_BARCODE_COUNT) {
+	/* ratio count */
+	double ratio_1_2;
+	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
+	ratio_1_2 = share_1_2 * 1.0 / total;
+	if (ratio_1_2 + EPS > MIN_BARCODE_RATIO) {
 		if (share_1_2 > share_1_2a * 2) {
 			if (len2a + 1000 > len2)
 				return 1;
 		} else if (share_1_2 > share_1_2a) {
 			sub_share_1_2 = share_1_2 - share_1_2_2a;
 			sub_share_1_2a = share_1_2a - share_1_2_2a;
+			/* hard count */
+			// if (share_1_2_2a * 2 >= share_1_2a &&
+			// 	sub_share_1_2 > sub_share_1_2a * 2 &&
+			// 	sub_share_1_2 > sub_share_1_2a + 50) {
+			/* ratio count */
+			ratio_1_2 = sub_share_1_2 * 1.0 / total;
 			if (share_1_2_2a * 2 >= share_1_2a &&
 				sub_share_1_2 > sub_share_1_2a * 2 &&
-				sub_share_1_2 > sub_share_1_2a + 50) {
+				ratio_1_2 > MIN_SUB_BARCODE_RATIO) {
 				if (len2a + 1000 > len2)
 					return 1;
 			}
@@ -289,7 +315,12 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 {
 	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
 							&g->edges[e2].barcodes);
-	if (shared >= MIN_BARCODE_COUNT)
+	/* hard count */
+	// if (shared >= MIN_BARCODE_COUNT)
+	// 	return 1;
+	/* ratio count */
+	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item + g->edges[e2].barcodes.n_item);
+	if (ratio + EPS > MIN_BARCODE_RATIO)
 		return 1;
 	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
 		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE)
@@ -332,8 +363,15 @@ static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gin
 		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
 					k2a != BARCODE_HASH_END(h2a));
 	}
-	uint32_t sub_share_1_2, sub_share_1_2a;
-	if (share_1_2 < MIN_BARCODE_COUNT)
+	uint32_t sub_share_1_2, sub_share_1_2a, total;
+	/* hard count */
+	// if (share_1_2 < MIN_BARCODE_COUNT)
+	// 	return 0;
+	/* ratio count */
+	double ratio_1_2;
+	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
+	ratio_1_2 = share_1_2 * 1.0 / total;
+	if (ratio_1_2 + EPS < MIN_BARCODE_RATIO)
 		return 0;
 	if (share_1_2 > share_1_2a)
 		return 1;
@@ -360,15 +398,18 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 					k2a != BARCODE_HASH_END(h2a));
 	}
 
-	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a;
+	uint32_t len2, len2a, sub_share_1_2, sub_share_1_2a, total;
 	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
 	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
 
-	if (share_1_2 >= MIN_BARCODE_COUNT) {
+	/* hard count */
+	// if (share_1_2 >= MIN_BARCODE_COUNT) {
+	/* ratio count */
+	double ratio_1_2;
+	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
+	ratio_1_2 = share_1_2 * 1.0 / total;
+	if (ratio_1_2 + EPS > MIN_BARCODE_RATIO) {
 		if (share_1_2 > share_1_2a) {
-			if (len2a + 1000 > len2)
-				return 1;
-		} else if (share_1_2 > share_1_2a) {
 			sub_share_1_2 = share_1_2 - share_1_2_2a;
 			sub_share_1_2a = share_1_2a - share_1_2_2a;
 			if (share_1_2_2a * 2 >= share_1_2a &&

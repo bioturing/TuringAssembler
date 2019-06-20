@@ -73,6 +73,9 @@ struct asm_graph_t {
 #define MIN_BARCODE_COUNT		150
 #define MIN_READPAIR_COUNT		20
 
+#define MIN_BARCODE_RATIO		0.1
+#define MIN_SUB_BARCODE_RATIO		0.04
+
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
 
