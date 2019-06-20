@@ -302,6 +302,14 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 	}
 	if (h == NULL)
 		return 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (h->n_item <= g->edges[e1].mate_barcodes[k].n_item)
+			return 0;
+	}
+	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
+		if (h->n_item <= g->edges[e2].mate_barcodes[k].n_item)
+			return 0;
+	}
 	return (h->n_item >= MIN_READPAIR_COUNT);
 }
 
@@ -1263,6 +1271,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				}
 			}
 			ec = bc_find_alter_check_path(g, set_e, e1, e2, set_self);
+			// __VERBOSE("e2 = %ld; ec = %ld\n", e2, ec);
 			if (ec >= 0) {
 				fcov2 = __get_edge_cov(g->edges + ec, g->ksize) / uni_cov_local;
 				rcov2 = convert_cov_range(fcov2);
@@ -1271,16 +1280,17 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				et1 = bc_find_pair_check_path(g, set_e, ec, set_leg);
 				if (et1 != -1 && e1 != et1) {
 					__VERBOSE("[Complex Jungle] Not best pair (%ld, %ld) <-> %ld\n",
-						e1, et1, e2);
+						e1, et1, ec);
+					continue;
 				}
 				// gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
 				// 	&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
 				// 	g->edges[ec].source);
 				// assert(gap_size != -1);
-				__VERBOSE("Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
+				__VERBOSE("[Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 						g->edges[e1].rc_id, e1, ec, g->edges[ec].rc_id);
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-					ec, g->edges[ec].rc_id, 100);
+					ec, g->edges[ec].rc_id, 500);
 				// __VERBOSE("Join to self loop, distance = %ld\n", gap_size);
 				// if (gap_size < 1000)
 				// 	join_edge_path(g, g->edges[e1].rc_id, ec,
@@ -1293,7 +1303,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				kh_del(gint, set_self, kh_get(gint, set_self, g->edges[ec].rc_id));
 				kh_put(gint, set_leg, g->edges[ec].rc_id, &hash_ret);
 				++resolve;
-			} else if (e2 >= 0 && flag) {
+			} else if (e2 >= 0 && flag && ec != -2) {
 				fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 				rcov2 = convert_cov_range(fcov2);
 				if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
@@ -1305,7 +1315,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				__VERBOSE("[Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 					g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-					e2, g->edges[e2].rc_id, 500);
+					e2, g->edges[e2].rc_id, 1000);
 				// __VERBOSE("Join two legs, distance = %ld\n", gap_size);
 				// if (gap_size < 1000)
 				// 	join_edge_path(g, g->edges[e1].rc_id, e2,
@@ -1460,7 +1470,7 @@ void resolve_complex(struct asm_graph_t *g, struct asm_graph_t *gd)
 			if (n_self == 0 && n_leg >= 2) {
 				ret += join_n_m_small_jungle(g, set_e, set_leg, uni_cov);
 			} else if (n_self + n_leg >= 2) {
-				// ret += join_n_m_complex_jungle(g, set_e, set_leg, set_self, uni_cov);
+				ret += join_n_m_complex_jungle(g, set_e, set_leg, set_self, uni_cov);
 			}
 		}
 		kh_clear(gint, set_leg);
