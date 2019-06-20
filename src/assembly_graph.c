@@ -177,6 +177,7 @@ static gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+	memset(g->edges + g->n_e, 0, sizeof(struct asm_edge_t));
 	++g->n_e;
 	asm_clone_edge(g, g->n_e - 1, e1);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
@@ -1113,6 +1114,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
 			// h->cnts = malloc(h->size * sizeof(uint32_t));
 			// xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			h->cnts = NULL;
 		}
 	}
 
@@ -1134,6 +1136,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 				xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 				h->keys = malloc(h->size * sizeof(uint64_t));
 				xfread(h->keys, sizeof(uint64_t), h->size, fp);
+				h->cnts = NULL;
 			}
 			// xfread(&g->edges[e].best_mate_contigs, sizeof(gint_t), 1, fp);
 			// struct barcode_hash_t *h = &g->edges[e].mate_contigs;

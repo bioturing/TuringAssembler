@@ -193,8 +193,8 @@ int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
 		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
 					k2a != BARCODE_HASH_END(h2a));
 	}
-	printf("share_1_2 = %u\n", share_1_2);
-	printf("share_1_2a = %u\n", share_1_2a);
+	// printf("share_1_2 = %u\n", share_1_2);
+	// printf("share_1_2a = %u\n", share_1_2a);
 	uint32_t sub_share_1_2, sub_share_1_2a;
 	if (share_1_2 < MIN_BARCODE_COUNT)
 		return 0;
