@@ -193,7 +193,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	if (get_edge_len(e) < global_thres_short_len)
 		return;
 
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 4; i++) {
 		struct barcode_hash_t *buck = &rev_e->bucks[i];
 		for (int j = 0; j < buck->size; j++){
 			if (buck->cnts[j] > 20) {
@@ -224,15 +224,14 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	}
 
 	qsort(*list_local_edges, *n_local_edges, sizeof(struct candidate_edge), decending_candidate_edge);
-	*n_local_edges = MIN(*n_local_edges, 50);
-//	for (int i = 0; i < *n_local_edges; i++){
-//		struct candidate_edge e = (*list_local_edges)[i];
-//		if ((*list_local_edges)[i].score < global_filter_constant / 2 )
-//		{
-//			*n_local_edges = i;
-//			break;
-//		}
-//	}
+	for (int i = 0; i < *n_local_edges; i++){
+		struct candidate_edge e = (*list_local_edges)[i];
+		if ((*list_local_edges)[i].score == 0)
+		{
+			*n_local_edges = i;
+			break;
+		}
+	}
 	
 }
 
@@ -566,9 +565,7 @@ void find_best_edge(struct asm_graph_t *g, struct edges_score_type *edges_score,
 		int des = list_edge_adj[i].des;
 		if (mark[des]) continue;
 		float score = get_score(g, path, *start_contig, &list_edge_adj[i], edges_score);
-		if (*start_contig == 137) 
-			VERBOSE_FLAG(0, "here137 %d %d\n", des, mark[des]);
-		if (score > max_score && score < 0.1) {
+		if (score > max_score) {
 			max_score = score;
 			best_edge = i;
 		}
