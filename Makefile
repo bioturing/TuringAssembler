@@ -21,6 +21,8 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
 
 EXEC = skipping
 
+EXEC_RELEASE = skipping_static
+
 # SRC = $(wildcard src/*.c)
 
 SRC = src/assembly_graph.c 				\
@@ -51,6 +53,9 @@ DEP = $(OBJ:.o=.d)
 $(EXEC): $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
+$(EXEC_RELEASE): $(OBJ)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+
 -include $(DEP)
 
 %.d: %.c
@@ -60,6 +65,14 @@ $(EXEC): $(OBJ)
 debug: CFLAGS += -fsanitize=undefined,address
 debug: LIBS += -fsanitize=undefined,address
 debug: $(EXEC)
+
+.PHONY: release
+release: LIBS = -pthread -static -O3 -std=c++11 \
+       -Wl,--whole-archive              \
+       -lpthread libs/libkmc_skipping.a \
+       libs/libz.a libs/libbz2.a libs/libbwa.a \
+       -Wl,--no-whole-archive -lm
+release: $(EXEC_RELEASE)
 
 .PHONY: clean
 clean:
