@@ -74,7 +74,7 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	for (uint32_t i = 0; i < buck1->size; ++i) {
 		if (buck1->cnts[i] != (uint32_t)(-1)) {
 			if (buck1->cnts[i] >= (uint32_t)thres_cnt) {
-				cnt1+= buck1->cnts[i];
+				cnt1++;
 			}
 		}
 	}
@@ -82,10 +82,10 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	for (uint32_t i = 0; i < buck0->size; ++i) {
 		if ((buck0->keys[i]) != (uint64_t)(-1)){
 			if (buck0->cnts[i] >= (uint32_t)thres_cnt) {
-				cnt0 += buck0->cnts[i];
+				cnt0 ++;
 				uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
 				if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= (uint32_t)thres_cnt) {
-					res2+= MIN(ratio0 * buck0->cnts[i] , ratio1 * buck1->cnts[tmp]);
+					res2++;
 //					VERBOSE_FLAG(3, "MIN %d\n", MIN(buck0->cnts[i], buck1->cnts[tmp]));
 				}
 			}

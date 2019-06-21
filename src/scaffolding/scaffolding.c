@@ -491,7 +491,7 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			float score = list_edges[i_edge].score0;
 			append_edge_score(edges_score, &(list_edges[i_edge]));
 			//todo huu  not hardcode
-			if ((score < para->thres_score) ) {
+			if ((score == 0) ) {
 				break;
 			}
 			// todo @huu should I used this function? It seem not good now.
