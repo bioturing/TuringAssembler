@@ -1032,13 +1032,13 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		}
 		ret += resolve;
 	} while (resolve);
-	if (sub_count < g->edges[e].count) {
-		g->edges[e].count -= sub_count;
-		g->edges[e_rc].count -= sub_count;
-	} else {
-		g->edges[e].count = g->edges[e_rc].count = uni_cov_local *
-			(g->edges[e].seq_len - g->ksize);
-	}
+	// if (sub_count < g->edges[e].count) {
+	// 	g->edges[e].count -= sub_count;
+	// 	g->edges[e_rc].count -= sub_count;
+	// } else {
+	// 	g->edges[e].count = g->edges[e_rc].count = uni_cov_local *
+	// 		(g->edges[e].seq_len - g->ksize);
+	// }
 	if (g->nodes[u_rc].deg == 1 && g->nodes[v].deg == 1) {
 		e1 = g->nodes[u_rc].adj[0];
 		e2 = g->nodes[v].adj[0];
@@ -1046,38 +1046,28 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
-		e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
-		e_rcov = convert_cov_range(e_cov);
+		//e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
+		//e_rcov = convert_cov_range(e_cov);
 		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 			g->edges[e2].seq_len >= MIN_CONTIG_READPAIR) {
+			// if (check_medium_pair_positive(g, e1, e2) &&
+			// 	__check_coverage(fcov1, fcov2, rcov1, rcov2) &&
+			// 	__check_coverage(fcov1, e_cov, rcov1, e_rcov) &&
+			// 	__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
 			if (check_medium_pair_positive(g, e1, e2) &&
-				__check_coverage(fcov1, fcov2, rcov1, rcov2) &&
-				__check_coverage(fcov1, e_cov, rcov1, e_rcov) &&
-				__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
+				__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
 				__VERBOSE("n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 					g->edges[e1].rc_id, e1, e, e_rc, e2, g->edges[e2].rc_id);
 				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 					e2, g->edges[e2].rc_id, g->edges[e].count);
 				++ret;
-			} else {
-				asm_remove_edge(g, e);
-				asm_remove_edge(g, e_rc);
-			}
-		} else {
-			if (check_medium_pair_positive(g, e1, e2) &&
-				__check_coverage(fcov1, fcov2, rcov1, rcov2) &&
-				__check_coverage(fcov1, e_cov, rcov1, e_rcov) &&
-				__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
-				__VERBOSE("n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
-					g->edges[e1].rc_id, e1, e, e_rc, e2, g->edges[e2].rc_id);
-				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
-					e2, g->edges[e2].rc_id, g->edges[e].count);
-				++ret;
-			} else {
-				asm_remove_edge(g, e);
-				asm_remove_edge(g, e_rc);
 			}
 		}
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
+	} else if (g->nodes[u_rc].deg + g->nodes[v].deg == 1) {
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
 	}
 	return ret;
 }
@@ -1223,7 +1213,7 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 			__VERBOSE("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 			asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-				e2, g->edges[e2].rc_id, 500);
+				e2, g->edges[e2].rc_id, 50);
 			// gap_size = get_dist(g, set_e, &path_seq, &mpath_seq,
 			// 	&lpath_seq, g->nodes[g->edges[e1].source].rc_id,
 			// 	g->edges[e2].source);
@@ -1331,7 +1321,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				__VERBOSE("[Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 						g->edges[e1].rc_id, e1, ec, g->edges[ec].rc_id);
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-					ec, g->edges[ec].rc_id, 500);
+					ec, g->edges[ec].rc_id, 50);
 				// __VERBOSE("Join to self loop, distance = %ld\n", gap_size);
 				// if (gap_size < 1000)
 				// 	join_edge_path(g, g->edges[e1].rc_id, ec,
@@ -1356,7 +1346,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				__VERBOSE("[Complex Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
 					g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
-					e2, g->edges[e2].rc_id, 1000);
+					e2, g->edges[e2].rc_id, 500);
 				// __VERBOSE("Join two legs, distance = %ld\n", gap_size);
 				// if (gap_size < 1000)
 				// 	join_edge_path(g, g->edges[e1].rc_id, e2,
