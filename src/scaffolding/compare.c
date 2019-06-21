@@ -51,3 +51,15 @@ int ascending_index_edge(const void *e0, const void *e1)
 		return t0;
 	return t1;
 }
+
+int ascending_scaffold_edge_index(const void *e0, const void *e1)
+{
+	struct scaffold_edge *a = (struct scaffold_edge *) e0;
+	struct scaffold_edge *b = (struct scaffold_edge *) e1;
+	int t0 = (a->src > b->src) - (a->src < b->src);
+	int t1 = (a->des > b->des) - (a->des < b->des);
+	if (t0 != 0)
+		return t0;
+	return t1;
+}
+

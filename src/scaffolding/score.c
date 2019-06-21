@@ -55,11 +55,11 @@ struct scaffold_edge *find_lower_bound_from(struct edges_score_type *edges_score
 {
 	int l = 0, r = edges_score->n_edge - 1;
 	while (l != r) {
-		int mid = (l + r+1)/2;
-		if (edges_score->list_edge[mid].src > i_contig) 
-			r = mid-1;
+		int mid = (l + r)/2;
+		if (edges_score->list_edge[mid].src < i_contig) 
+			l = mid+1;
 		else
-			l = mid;
+			r = mid;
 	}
 	return &edges_score->list_edge[l];
 }
@@ -84,6 +84,7 @@ void find_edge_from(struct edges_score_type *edges_score, int i_contig, int *n_e
 	struct scaffold_edge *start_pos = find_lower_bound_from(edges_score, i_contig);
 	struct scaffold_edge *end_pos = find_upper_bound_from(edges_score, i_contig);
 	*n_edge_adj = end_pos - start_pos;
+	VERBOSE_FLAG(0, "uppermlower %d\n", *n_edge_adj);
 	*list_edge = start_pos;
 }
 

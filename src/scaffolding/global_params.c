@@ -66,9 +66,9 @@ int get_global_count_kmer(struct asm_graph_t *g)
 void init_global_params(struct asm_graph_t *g)
 {
 	global_thres_length = 10000;
-	global_thres_short_len= 5000;
+	global_thres_short_len= 10000;
 	global_thres_n_buck_big_small = 5;
-	global_n_buck = 5;
+	global_n_buck = 6;
 	global_molecule_length = 20000;
 	global_thres_count_kmer =  1;//get_global_count_kmer(g);
 	global_avg_sum_bin_hash = get_avg_sum_bin_hash(g);
@@ -76,6 +76,6 @@ void init_global_params(struct asm_graph_t *g)
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 	global_filter_constant = 30;
-	global_number_degree = 4;
+	global_number_degree = 15;
 }
 

@@ -32,8 +32,8 @@ struct matrix_buck_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i
 	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(int));
 	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(int));
 	for (int i = 0; i < score->n_bucks; ++i) {
-		check_bucks_A[i] = check_qualify_buck(g, rev_e0, i, avg_bin_hash, opt);
-		check_bucks_B[i] = check_qualify_buck(g, e1, i, avg_bin_hash, opt);
+		check_bucks_A[i] = 1; //check_qualify_buck(g, rev_e0, i, avg_bin_hash, opt);
+		check_bucks_B[i] = 1; //check_qualify_buck(g, e1, i, avg_bin_hash, opt);
 	}
 	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
 	float cov_e1 = __get_edge_cov(e1, g->ksize);
@@ -121,6 +121,7 @@ int check_replicate_scaffold_edge(struct asm_graph_t *g, int i0, int i1,
 struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, const int n_bucks, 
 		float avg_bin_hash, struct opt_proc_t *opt) 
 {
+
 	struct bucks_score res_score;
 	res_score.score = -1;
 
@@ -147,6 +148,9 @@ struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, co
 			}
 		}
 		VERBOSE_FLAG(3, "#\n");
+	}
+	if (i0 == 28) {
+		VERBOSE_FLAG(0, "res count  %f %d", res, count);
 	}
 
 	res_score.score = res/count;
