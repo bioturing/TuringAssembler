@@ -2,10 +2,11 @@
 #include "verbose.h"
 #include "scaffolding/global_params.h"
 #include "scaffolding/bin_hash.h"
+#include "utils.h"
 
-int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, int b)
+int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e)
 {
-	int res = 0, l = b * g->bin_size, r = (b+1) * g->bin_size, sum_holes = 0;
+	int res = 0, l = 0, r = g->bin_size, sum_holes = 0;
 //	for (int i = 0; i < e->n_holes; ++i){
 //		VERBOSE_FLAG(log_hole, "holeee %d %d %d\n" , e->seq_len, e->l_holes[i], e->p_holes[i]);
 //	}
@@ -22,16 +23,16 @@ int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e, int b)
 	return res;
 }
 
-int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash, 
+int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bin_hash, 
 		struct opt_proc_t *opt)
 {
-	if (get_amount_hole(g, e, b)  > 0.7*g->bin_size) {
+	if (get_amount_hole(g, e)  > 0.7*g->bin_size) {
 		VERBOSE_FLAG(2, "NNNNN size is to big ");
 		return 0;
 	}
 	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
 
-	struct barcode_hash_t *buck = &e->bucks[b];
+	struct barcode_hash_t *buck = &e->barcodes;
 	for (uint32_t i = 0; i < buck->size; ++i) {
 		if (buck->cnts[i] != (uint32_t)(-1)) {
 			cnt += buck->cnts[i];

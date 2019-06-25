@@ -11,7 +11,6 @@
 #include "get_buffer.h"
 #include "io_utils.h"
 #include "khash.h"
-#include "kmer_count.h"
 #include "process.h"
 #include "time_utils.h"
 #include "utils.h"
@@ -40,6 +39,7 @@ void print_usage_assembly(const char *prog)
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
 	__VERBOSE("         -l                     <lib type [ust, 10x]>\n");
+	__VERBOSE("         -sm                    <maximal ammount memory for kmer counting [in GiB]>\n");
 }
 
 void print_usage_build0(const char *prog)
@@ -53,6 +53,7 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
 	__VERBOSE("         -l                     <lib type [ust, 10x]>\n");
+	__VERBOSE("         -sm                    <maximal ammount memory for kmer counting [in GiB]>\n");
 }
 
 void print_usage_build(const char *prog)
@@ -94,6 +95,7 @@ struct opt_proc_t *init_opt_proc()
 	opt->in_fasta = NULL;
 	opt->out_dir = ".";
 	opt->lib_type = 0;
+	opt->mmem = 32;
 	return opt;
 }
 
@@ -290,6 +292,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			if (opt->lib_type == -1)
 				__ERROR("Unknown library %s", argv[pos + 1]);
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-sm")) {
+			opt->mmem = atoi(argv[pos + 1]);
+			pos += 2;
 		} else if (!strcmp(argv[pos], "-1")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)
@@ -336,22 +341,6 @@ void print_info(int argc, char *argv[])
 	__VERBOSE_LOG("INFO", "Version: %s%s\n", VERSION_STRING, GIT_SHA);
 	__VERBOSE_LOG("INFO", "command: \"%s\"\n", cmd);
 	free(cmd);
-}
-
-void assembly_opt_process(int argc, char *argv[])
-{
-	struct opt_proc_t *opt;
-	opt = parse_proc_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage_assembly(argv[0]);
-		__ERROR("Error parsing arguments");
-	}
-	char log_dir[1024];
-	snprintf(log_dir, 1024, "%s/assembly.log", opt->out_dir);
-	init_log(log_dir);
-	init_clock();
-	print_info(argc, argv);
-	assembly_process(opt);
 }
 
 void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_proc_t *))
@@ -425,11 +414,9 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	if (!strcmp(argv[1], "assembly"))
-		assembly_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "assembly2"))
-		build_opt_process(argc, argv, &assembly2_process);
-	else if (!strcmp(argv[1], "assembly_precount"))
-		build_opt_process(argc, argv, &assembly_precount_process);
+		build_opt_process(argc, argv, &assembly3_process);
+	else if (!strcmp(argv[1], "assembly3"))
+		build_opt_process(argc, argv, &assembly3_process);
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
@@ -444,6 +431,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_2_3_process);
 	else if (!strcmp(argv[1], "build_3_4"))
 		build_opt_process(argc, argv, &build_3_4_process);
+	else if (!strcmp(argv[1], "build_4_5"))
+		build_opt_process(argc, argv, &build_4_5_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))

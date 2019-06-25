@@ -5,6 +5,7 @@
 #include "assembly_graph.h"
 #include "verbose.h"
 #include "global_params.h"
+#include <assert.h>
 
 void normalize_min_index(struct asm_graph_t *g, struct edges_score_type *edges_score)
 {

@@ -1,4 +1,4 @@
-#include "scaffolding/contig_graph.h"
+#include "contig_graph.h"
 #include <stdlib.h>
 #include"verbose.h"
 #include"global_params.h"
@@ -57,7 +57,7 @@ int pop_queue(int *queue, int *bot) {
 
 int check_share_bc(struct asm_graph_t *g, struct barcode_hash_t *hl, struct barcode_hash_t *hr, int ie)
 {
-	struct barcode_hash_t *b = &(g->edges[ie].bucks[0]);
+	struct barcode_hash_t *b = &(g->edges[ie].barcodes);
 	float cov = __get_edge_cov(&g->edges[ie], g->ksize); 
 	// todo @huu get cov of hl and hr
 	float score1 = get_score_bucks(hl, b, cov, cov);

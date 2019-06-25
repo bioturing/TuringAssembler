@@ -20,6 +20,7 @@
 #define KMHASH_MAX_SIZE			UINT64_C(0x400000000)
 #define KMHASH_SINGLE_RESIZE		UINT64_C(0x100000)
 
+#define HASH_SIZE_UPPER		0.88
 #define BARCODE_HASH_UPPER	0.77
 
 typedef uint64_t kmint_t;
@@ -38,10 +39,6 @@ typedef uint64_t kmint_t;
 
 #define IDHASH_ADJ(h, k) ((h)->adjs[k])
 
-#define KMHASH_END(h) (KMHASH_MAX_SIZE)
-
-#define KMHASH_KEY(h, k) ((h)->keys[k])
-
 #define BARCODE_HASH_END(h) ((h)->size)
 
 static inline uint64_t __hash_int(uint64_t k)
@@ -59,7 +56,7 @@ static inline kmint_t estimate_probe_3(kmint_t size)
 	i = s = 0;
 	while (s < size) {
 		++i;
-		s += i * i * i * 64;
+		s += i * i * i;
 	}
 	return i;
 }

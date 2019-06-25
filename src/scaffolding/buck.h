@@ -2,7 +2,6 @@
 #define SCAFFOLDS_CHECK_BUCK_H
 
 #include "assembly_graph.h"
-#include "k31hash.h"
 
 float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, 
 		struct barcode_hash_t *b_left, struct barcode_hash_t *b_right,

@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include "assembly_graph.h"
-#include "k31hash.h"
 #include "pthread.h"
 #include "verbose.h"
 #include <string.h>
@@ -33,42 +32,6 @@ struct params{
 	struct asm_graph_t *g;
 	int i;
 };
-
-void *process(void *data)
-{
-	struct params *pa = (struct params *) data;
-	do{
-		int iiii;
-		pthread_mutex_lock(&lock_id);
-		if (pa->i == (pa->g)->n_e){
-			pthread_mutex_unlock(&lock_id);
-			break;
-		}
-		else {
-			iiii = pa->i++;
-		}
-		pthread_mutex_unlock(&lock_id);
-		struct asm_graph_t *g = pa->g;
-		struct asm_edge_t *e = &g->edges[iiii];
-		int n_bucks = (get_edge_len(&g->edges[iiii]) + g->bin_size-1) / g->bin_size;
-		if (n_bucks < 40 )
-			continue;
-		char *file_name = calloc(20, 1);
-		sprintf(file_name, "logfile_%d", iiii);
-		FILE *f = fopen(file_name, "w");
-		for (int j = 0; j < MIN(20, n_bucks - 4); j+=5){
-			for (int j1 = j + 4; j1 < n_bucks -4; j1++) {
-				float tmp  = get_score_multiple_buck(pa->g, e, &e->bucks[j], &e->bucks[j1], pa->opt);
-				fprintf(f, "distance %d %f\n", j1 - j, tmp);
-			}
-		}
-		fclose(f);
-		pthread_mutex_lock(&lock_id);
-		pthread_mutex_unlock(&lock_id);
-	} while (1);
-	pthread_exit(NULL);
-	return NULL;
-}
 
 struct params_check_edge {
 	struct asm_graph_t *g;
@@ -193,19 +156,17 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	if (get_edge_len(e) < global_thres_short_len)
 		return;
 
-	for (int i = 0; i < 4; i++) {
-		struct barcode_hash_t *buck = &rev_e->bucks[i];
-		for (int j = 0; j < buck->size; j++){
-			if (buck->cnts[j] > 20) {
-				uint64_t barcode = buck->keys[j];
-				khint_t k = kh_get(big_table, big_table, barcode);
-				if (k == kh_end(big_table))
-					continue;
-				struct list_position *pos = kh_value(big_table, k);
-				count_pos(count, pos);
-			}
-		} 
-	}
+	struct barcode_hash_t *buck = &rev_e->barcodes;
+	for (int j = 0; j < buck->size; j++){
+		if (buck->cnts[j] > 20) {
+			uint64_t barcode = buck->keys[j];
+			khint_t k = kh_get(big_table, big_table, barcode);
+			if (k == kh_end(big_table))
+				continue;
+			struct list_position *pos = kh_value(big_table, k);
+			count_pos(count, pos);
+		}
+	} 
 
 	for (int i_contig = 0; i_contig < g->n_e; i_contig++) {
 		if (is_very_short_contig(&g->edges[i_contig]))
@@ -236,7 +197,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 }
 
 struct params_build_big_table {
-	int i,j;
+	int i;
 	struct asm_graph_t *g;
 	khash_t(big_table) *big_table;
 };
@@ -247,15 +208,10 @@ void *process_build_big_table(void *data)
 	{
 		int len = 0;
 		struct asm_edge_t *e = &g->edges[params->i];
-		int n_bucks = (get_edge_len(e) + 1000-1) / 1000;
-		(params->j)++;
-		if (params->j == MIN(n_bucks, 5)) {
-			params->i++;
-			if (params->i == g->n_e) 
-				return;
-			int new_n_bucks = (get_edge_len(&g->edges[params->i]) + 1000-1) / 1000;
-			params->j = 0;
-		}
+		params->i++;
+		if (params->i == g->n_e) 
+			return;
+		int new_n_bucks = (get_edge_len(&g->edges[params->i]) + 1000-1) / 1000;
 	}
 	
 	// ________________________________________BEGIN___________________________________
@@ -270,14 +226,13 @@ void *process_build_big_table(void *data)
 			break;
 		}
 		int i_contig = params->i;
-		int i_bin = params->j;
-		int new_i_contig = i_contig, new_i_bin = i_bin;
+		int new_i_contig = i_contig;
 		int new_count;
 		next_index(params, g);
 		pthread_mutex_unlock(&lock_id);
 		
 		struct asm_edge_t *e = &g->edges[i_contig];
-		struct barcode_hash_t *buck = &e->bucks[i_bin];
+		struct barcode_hash_t *buck = &e->barcodes;
 		for (int l = 0; l < buck->size; l++){
 			if (buck->cnts[l] > 0){
 				new_count = buck->cnts[l];
@@ -310,7 +265,6 @@ void *process_build_big_table(void *data)
 					pos->count = realloc(pos->count, (v*2+1) * sizeof(int));
 				}
 				pos->i_contig[v] = new_i_contig;
-				pos->i_bin[v] = new_i_bin;
 				pos->count[v] = new_count;
 				pthread_mutex_unlock(&pos->lock_entry);
 			}
@@ -326,7 +280,6 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	struct params_build_big_table *params_build_table = calloc(1, sizeof(struct
 				params_build_big_table));
 	params_build_table->i = 0;
-	params_build_table->j = 0;
 	params_build_table->g = g;
 	params_build_table->big_table = kh_init(big_table);
 	// todo @huu auto resize

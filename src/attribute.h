@@ -14,11 +14,16 @@
 #define BARCODE_LEN_10X 16
 #define UMI_LEN_10X 7
 
+#define KMCP			"KMCP"
+#define KMCS			"KMCS"
+
 #if !defined(GIT_SHA)
 #define GIT_SHA			"unknown"
 #endif
 
 #define VERSION_STRING		"0.9-"
+
+#define EPS			1e-6
 
 typedef int64_t gint_t;
 
@@ -46,6 +51,7 @@ struct opt_proc_t {
 	char *in_file;
 	char *in_fasta;
 	char *in_contig_file;
+	int mmem;
 };
 
 struct opt_count_t {

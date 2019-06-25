@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "verbose.h"
 #include "scaffolding/bin_hash.h"
+#include "utils.h"
 
 #define X(type, name, default_value) type name=default_value;
 LIST_GLOBAL_PARAMS
@@ -30,15 +31,12 @@ int get_global_count_kmer(struct asm_graph_t *g)
 	int *arr_count = NULL, n_arr = 0, *count_count = NULL; 
 	 int res = -1;
 	for (int i = 0; i < g->n_e; i++) {
-		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-		for (int j = 0; j < n_bucks-1; j++){
-			struct barcode_hash_t buck = g->edges[i].bucks[j];
+			struct barcode_hash_t buck = g->edges[i].barcodes;
 			for (uint32_t l = 0; l < buck.n_item; l++){
 				arr_count = realloc(arr_count, (n_arr + 1) * sizeof(int));
 				arr_count[n_arr] = buck.cnts[l];
 				n_arr++;
 			}
-		}
 	}
 	int size_count = 1000;
 	count_count = realloc(count_count, size_count*sizeof(int)); 

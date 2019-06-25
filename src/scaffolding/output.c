@@ -14,7 +14,7 @@ gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 		if (e->l_holes[i] > 1000)
 			e->l_holes[i] = 1000;
 	}
-	return dump_edge_seq(seq, m_seq, e);
+	return dump_edge_seq_h(seq, m_seq, e);
 }
 
 void print_seq(FILE *fp, int index, char *seq, int len, int cov)
