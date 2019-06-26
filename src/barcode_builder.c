@@ -435,12 +435,23 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		free(a.cigar);
 	}
 	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
-		for (i = 0; i < n1; ++i)
-			if (p1[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_edge(g, p1[i].e, bc);
-		for (i = 0; i < n2; ++i)
-			if (p2[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_edge(g, p2[i].e, bc);
+	// 	for (i = 0; i < n1; ++i)
+	// 		if (p1[i].pos <= MIN_CONTIG_BARCODE)
+	// 			add_barcode_edge(g, p1[i].e, bc);
+	// 	for (i = 0; i < n2; ++i)
+	// 		if (p2[i].pos <= MIN_CONTIG_BARCODE)
+	// 			add_barcode_edge(g, p2[i].e, bc);
+		for (i = 0; i < n1; ++i) {
+			if (p1[i].pos > MIN_CONTIG_BARCODE)
+				continue;
+			for (k = 0; k < n2; ++k) {
+				if (p2[k].pos <= MIN_CONTIG_BARCODE &&
+					p1[i].e == p2[k].e) {
+					add_barcode_edge(g, p1[i].e, bc);
+					break;
+				}
+			}
+		}
 	}
 	if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
 		for (i = 0; i < n1; ++i) {

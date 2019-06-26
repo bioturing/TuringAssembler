@@ -305,6 +305,9 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if (e_return == -1)
 			return 0;
 		e_return_rc = g->edges[e_return].rc_id;
+		if (g->edges[e].seq_len >= MIN_NOTICE_LEN ||
+			g->edges[e_return].seq_len > MIN_NOTICE_LEN)
+			return 0;
 		fcov1 = fcov2 = -1;
 		for (j = 0; j < g->nodes[v].deg; ++j) {
 			if (g->nodes[v].adj[j] != e_return)

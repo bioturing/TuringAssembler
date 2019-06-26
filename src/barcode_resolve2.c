@@ -634,7 +634,8 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 {
 	gint_t e, sec_e, ret_e;
 	khiter_t k;
-	ret_e = sec_e = de;
+	ret_e = de;
+	sec_e = -1;
 	for (k = kh_begin(set_candidate); k != kh_end(set_candidate); ++k) {
 		if (!kh_exist(set_candidate, k))
 			continue;
@@ -654,13 +655,14 @@ static gint_t bc_find_alter_check_path(struct asm_graph_t *g, khash_t(gint) *set
 			}
 		}
 	}
-	if (de >= 0 && ret_e == de)
-		return -3;
-	if (ret_e < 0) {
-		return -1;
-	}
 	if (sec_e >= 0 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {
 		return -2;
+	}
+	if (de >= 0 && ret_e == de) {
+		return -3;
+	}
+	if (ret_e < 0) {
+		return -1;
 	}
 	return ret_e;
 }
@@ -1032,13 +1034,12 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		}
 		ret += resolve;
 	} while (resolve);
-	// if (sub_count < g->edges[e].count) {
-	// 	g->edges[e].count -= sub_count;
-	// 	g->edges[e_rc].count -= sub_count;
-	// } else {
-	// 	g->edges[e].count = g->edges[e_rc].count = uni_cov_local *
-	// 		(g->edges[e].seq_len - g->ksize);
-	// }
+	if (sub_count <= g->edges[e].count) {
+		g->edges[e].count -= sub_count;
+		g->edges[e_rc].count -= sub_count;
+	} else {
+		g->edges[e].count = g->edges[e_rc].count = 0;
+	}
 	if (g->nodes[u_rc].deg == 1 && g->nodes[v].deg == 1) {
 		e1 = g->nodes[u_rc].adj[0];
 		e2 = g->nodes[v].adj[0];
@@ -1046,16 +1047,16 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
-		//e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
-		//e_rcov = convert_cov_range(e_cov);
+		e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
+		e_rcov = convert_cov_range(e_cov);
 		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 			g->edges[e2].seq_len >= MIN_CONTIG_READPAIR) {
-			// if (check_medium_pair_positive(g, e1, e2) &&
-			// 	__check_coverage(fcov1, fcov2, rcov1, rcov2) &&
-			// 	__check_coverage(fcov1, e_cov, rcov1, e_rcov) &&
-			// 	__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
 			if (check_medium_pair_positive(g, e1, e2) &&
-				__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
+				__check_coverage(fcov1, fcov2, rcov1, rcov2) &&
+				__check_coverage(fcov1, e_cov, rcov1, e_rcov) &&
+				__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
+			// if (check_medium_pair_positive(g, e1, e2) &&
+			// 	__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
 				__VERBOSE("n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 					g->edges[e1].rc_id, e1, e, e_rc, e2, g->edges[e2].rc_id);
 				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
@@ -1262,16 +1263,16 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 		khash_t(gint) *set_leg, khash_t(gint) *set_self, double uni_cov)
 {
 	khiter_t k;
-	// for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
-	// 	if (!kh_exist(set_leg, k))
-	// 		continue;
-	// 	__VERBOSE("[Complex Jungle] legs = %ld\n", kh_key(set_leg, k));
-	// }
-	// for (k = kh_begin(set_self); k != kh_end(set_self); ++k) {
-	// 	if (!kh_exist(set_self, k))
-	// 		continue;
-	// 	__VERBOSE("[Complex Jungle] self = %ld\n", kh_key(set_self, k));
-	// }
+	for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
+		if (!kh_exist(set_leg, k))
+			continue;
+		__VERBOSE("[Complex Jungle] legs = %ld\n", kh_key(set_leg, k));
+	}
+	for (k = kh_begin(set_self); k != kh_end(set_self); ++k) {
+		if (!kh_exist(set_self, k))
+			continue;
+		__VERBOSE("[Complex Jungle] self = %ld\n", kh_key(set_self, k));
+	}
 	gint_t *contigs = alloca((kh_size(set_leg) + kh_size(set_self)) * sizeof(gint_t));
 	gint_t n_contig = get_contig_array(contigs, set_leg, set_self, set_e);
 	gint_t ret, resolve;
@@ -1302,7 +1303,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				}
 			}
 			ec = bc_find_alter_check_path(g, set_e, e1, e2, set_self);
-			// __VERBOSE("e2 = %ld; ec = %ld\n", e2, ec);
+			__VERBOSE("e2 = %ld; ec = %ld\n", e2, ec);
 			if (ec >= 0) {
 				fcov2 = __get_edge_cov(g->edges + ec, g->ksize) / uni_cov_local;
 				rcov2 = convert_cov_range(fcov2);
