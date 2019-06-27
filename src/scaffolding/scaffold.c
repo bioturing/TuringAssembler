@@ -4,29 +4,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "verbose.h"
+#include "utils.h"
 #include "scaffolding/global_params.h"
 
 void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type *scaffold)
 {
-	for (int i = 0; i < scaffold->n_path; i++) 
-		print_contig(g, out_file, i, scaffold->path[i].n_contig, scaffold->path[i].list_i_contig);
+	for (int i = 0; i < scaffold->n_path; i++)  {
+		struct scaffold_path *path = &scaffold->path[i];
+		int sum_n = path->n_left_half + path->n_right_half;
+		int *list_contig = calloc(sum_n, sizeof(int));
+		for(int i = 0; i < path->n_left_half; i++)
+			list_contig[path->n_left_half - 1 - i] = path->left_half[i];
+		COPY_ARR(path->right_half, list_contig + path->n_left_half, path->n_right_half);
+		print_contig(g, out_file, i, sum_n, list_contig);
+	}
 }
 
-void add_edge(struct scaffold_type *scaffold, struct scaffold_edge *edge)
+void append_i_contig(struct scaffold_path *path, int i_contig)
 {
-	int v = scaffold->n_path-1;
-	scaffold->path[v].n_contig += 1;
-	scaffold->path[v].list_i_contig = realloc(scaffold->path[v].list_i_contig, 
-			scaffold->path[v].n_contig * sizeof(int));
-	scaffold->path[v].list_i_contig[scaffold->path[v].n_contig - 1] = edge->des;
+	path->n_right_half += 1;
+	path->right_half = realloc(path->right_half, path->n_right_half *sizeof(int));
+	path->right_half[path->n_right_half - 1] = i_contig;
 }
 
-void add_i_contig(struct scaffold_path *path, int i_contig)
+void prepend_i_contig(struct scaffold_path *path, int i_contig)
 {
-	path->n_contig += 1;
-	path->list_i_contig = realloc(path->list_i_contig, 
-			path->n_contig* sizeof(int));
-	path->list_i_contig[path->n_contig - 1] = i_contig;
+	path->n_left_half += 1;
+	path->left_half = realloc(path->left_half, path->n_left_half *sizeof(int));
+	path->left_half[path->n_left_half - 1] = i_contig;
 }
 
 struct scaffold_type *new_scaffold_type()
@@ -45,27 +50,42 @@ void add_path(struct scaffold_type *scaffold, struct scaffold_path *path)
 
 void destroy_path(struct scaffold_path *path)
 {
-	free(path->list_i_contig);
+	free(path->left_half);
+	free(path->right_half);
 	free(path);
-}
-
-void deepcopy_path(struct scaffold_path *src, struct scaffold_path *des)
-{
-	if (des != NULL) 
-		destroy_path(des);
-	des = calloc(1, sizeof(struct scaffold_path));
-	des->n_contig = src->n_contig;
-	des->list_i_contig = calloc(des->n_contig, sizeof(int));
-	for (int i = 0; i < des->n_contig; i++) 
-		des->list_i_contig[i] = src->list_i_contig[i];
 }
 
 void print_scaffold_contig(struct scaffold_type *scaffold) 
 {
 	for (int i = 0 ; i < scaffold->n_path; i++) {
+
 		VERBOSE_FLAG(1, "path\n");
-		for (int j = 0; j < scaffold->path[i].n_contig; j++) {
-			VERBOSE_FLAG(1, "contig %d ", scaffold->path[i].list_i_contig[j]);
+		struct scaffold_path *path = &scaffold->path[i];
+		for (int j = path->n_left_half-1; j >= 0; j--) {
+			VERBOSE_FLAG(1, "contig %d ", path->left_half[j]);
 		}
+		for(int j = 0; j < path->n_right_half; j++){
+			VERBOSE_FLAG(1, "contig %d ", path->right_half[j]);
+		}
+		VERBOSE_FLAG(1, "\n");
+	}
+}
+
+int get_last_n(struct scaffold_path *path, int is_left, int pos)
+{
+	if (is_left) {
+		if (pos + 1 <= path->n_left_half)
+			return path->left_half[path->n_left_half-1-pos];
+		pos -= path->n_left_half;
+		if (pos >= path->n_right_half)
+			return -1;
+		return path->right_half[pos];
+	} else {
+		if (pos + 1 <= path->n_right_half)
+			return path->right_half[path->n_right_half-1-pos];
+		pos -= path->n_right_half;
+		if (pos >= path->n_left_half)
+			return -1;
+		return path->left_half[pos];
 	}
 }

@@ -474,28 +474,33 @@ struct pair_contigs_score *get_score_edge(struct edges_score_type *edges_score, 
 }
 
 struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path *path, int start_contig, 
-	struct scaffold_edge *edge, struct edges_score_type *edges_score)
+	struct scaffold_edge *edge, struct edges_score_type *edges_score, int is_left)
 {
 	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
 	int des = edge->des;
 	int distance = 0;
 	//todo using distance instead of /2 
-	struct pair_contigs_score *i_score = get_score_edge(edges_score, path->list_i_contig[path->n_contig-1], des);
-	score->m_score = i_score->m_score;
-	score->m2_score = i_score->m2_score;
-	score->bc_score = i_score->bc_score;
-	i_score = get_score_edge(edges_score, path->list_i_contig[path->n_contig-1], g->edges[des].rc_id);
+	struct pair_contigs_score *i_score; 
+	int last = get_last_n(path, is_left, 0);
+	if (is_left) last = get_rc_id(g, last);
+	i_score = get_score_edge(edges_score,last , des);
+	*score = *i_score;
+	//todo return score;
+	i_score = get_score_edge(edges_score, last, g->edges[des].rc_id);
 	score->bc_score += i_score->bc_score/2;
-	//todo not return here
-	for (int i = path->n_contig-2; i>=0; i--){
-		int src = path->list_i_contig[i];
+	int i = 1;
+	while (1) {
+		int src = get_last_n(path, is_left, i);
+		if (src == -1)
+			break;
+		if (is_left) src = get_rc_id(g, src);
 		i_score = get_score_edge(edges_score, src, des);
 		score->bc_score += i_score->bc_score;
 		distance += get_edge_len(&g->edges[src]);
 		if (distance > 100000)
 			break;
 	}
-	VERBOSE_FLAG(0, "scascore %d %d %f %d %d\n", path->list_i_contig[path->n_contig-1], des, score->bc_score, score->m_score, score->m2_score);
+	VERBOSE_FLAG(0, "scascore %d %d %f %d %d\n", last, des, score->bc_score, score->m_score, score->m2_score);
 	return score;
 }
 
@@ -509,62 +514,54 @@ int better_edge(struct pair_contigs_score *sc0, struct pair_contigs_score *sc1)
 	return (sc0->bc_score + sc0->m_score > sc1->bc_score + sc1->m_score);
 }
 
-void find_best_edge(struct asm_graph_t *g, struct edges_score_type *edges_score, int *start_contig,
-		struct scaffold_path *path, int *found, int *mark)
+int find_best_edge(struct asm_graph_t *g, struct edges_score_type *edges_score, int start_contig,
+		struct scaffold_path *path, int *mark, int is_left)
 {
 	int n_edge_adj = 0;
 	struct scaffold_edge *list_edge_adj = NULL;
-	find_edge_from(edges_score, *start_contig, &n_edge_adj, &list_edge_adj);
-	if (n_edge_adj == 0){
-		*found = 0;
-		return;
-	}
+	find_edge_from(edges_score, start_contig, &n_edge_adj, &list_edge_adj);
 	struct pair_contigs_score *max_score = calloc(1, sizeof(struct pair_contigs_score));
 	max_score->bc_score = 0.3;
 	int best_edge = -1;
 	for (int i = 0; i < n_edge_adj; i++) {
 		int des = list_edge_adj[i].des;
-		if (des == *start_contig)
+		if (des == start_contig)
 			continue;
 		if (!mark[des]) continue;
-		struct pair_contigs_score *score = get_score(g, path, *start_contig, &list_edge_adj[i], edges_score);
+		struct pair_contigs_score *score = get_score(g, path, start_contig, &list_edge_adj[i], edges_score, is_left);
 		if (better_edge(score, max_score)) {
 			max_score = score;
-			best_edge = i;
+			best_edge = des;
 		}
 	}
-	if (best_edge != -1) {
-		int i_contig = list_edge_adj[best_edge].des;
-		add_i_contig(path, i_contig);
-		(*found)++;
-		*start_contig = i_contig;
-		mark[i_contig]--;
-		int rc = get_rc_id(g, i_contig); 
-		mark[rc]--;
-		return;
-	}
-	*found = 0;
+	return best_edge;
 	//todo @huu: mark by cov
 }
 
-void unmark(struct asm_graph_t *g, struct scaffold_path *path, int *mark)
-{
-	for (int i = 0; i < path->n_contig; i++) {
-		int c = path->list_i_contig[i], rc = get_rc_id(g, c);
-		mark[c]++;
-		mark[rc]++;
-		VERBOSE_FLAG(0, "mark %d %d\n", mark[c], mark[rc]);
-	}
-}
+//void unmark(struct asm_graph_t *g, struct scaffold_path *path, int *mark)
+//{
+//	for (int i = 0; i < path->n_contig; i++) {
+//		int c = path->list_i_contig[i], rc = get_rc_id(g, c);
+//		mark[c]++;
+//		mark[rc]++;
+//		VERBOSE_FLAG(0, "mark %d %d\n", mark[c], mark[rc]);
+//	}
+//}
+//
+//void domark(struct asm_graph_t *g, struct scaffold_path *path, int *mark)
+//{
+//	for (int i = 0; i < path->n_contig; i++) {
+//		int c = path->list_i_contig[i], rc = get_rc_id(g, c);
+//		mark[c]--;
+//		mark[rc]--;
+//		VERBOSE_FLAG(0, "mark %d %d\n", mark[c], mark[rc]);
+//	}
+//}
 
-void domark(struct asm_graph_t *g, struct scaffold_path *path, int *mark)
+void mark_contig(struct asm_graph_t *g, int *mark, int i_contig)
 {
-	for (int i = 0; i < path->n_contig; i++) {
-		int c = path->list_i_contig[i], rc = get_rc_id(g, c);
-		mark[c]--;
-		mark[rc]--;
-		VERBOSE_FLAG(0, "mark %d %d\n", mark[c], mark[rc]);
-	}
+	mark[i_contig]--;
+	mark[get_rc_id(g, i_contig)]--;
 }
 
 void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_score_type *edges_score,
@@ -577,38 +574,39 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 		mark[i] = lround(edge_cov);
 	}
 	int found = 0;
-	int start = 0;
-	struct scaffold_path *best_path;
-	do{
-		start = 0;
-		best_path = calloc(1, sizeof(struct scaffold_path));
+	for (int i = 0; i < g->n_e; i++) if (mark[i] && !is_very_short_contig(&g->edges[i])){
+		int start_contig = i;
+		VERBOSE_FLAG(1, "start find scaffolds from %d\n", start_contig);
+		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
+		mark_contig(g, mark, start_contig);
+//		add_i_contig(path, start_contig);
+		append_i_contig(path, start_contig);
+		int next_contig = start_contig;
 		while (1) {
-			int start_contig = get_highest_cov_contig(g, mark, start);
-			start = start_contig + 1;
-			if (start_contig == -1)
+			next_contig = find_best_edge(g, edges_score, next_contig, path, mark, 0);
+			if (next_contig == -1)
 				break;
-			struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
-			mark[start_contig]--;
-			mark[get_rc_id(g, start_contig)]--;
-			add_i_contig(path, start_contig);
-			VERBOSE_FLAG(1, "start find scaffolds from %d\n", start_contig);
-			int len_component = 0;
-			do {
-				find_best_edge(g, edges_score, &start_contig, path, &found, mark);
-				VERBOSE_FLAG(1, "find path %d ", start_contig);
-			} while (found);
-			unmark(g, path, mark);
-			if (path->n_contig > best_path->n_contig) {
-				struct scaffold_path *tmp = best_path;
-				best_path = path;
-				destroy_path(tmp);
-			}
+			mark_contig(g, mark, next_contig);
+			append_i_contig(path, next_contig);
+			VERBOSE_FLAG(0, "nextcontig %d ", next_contig);
 		}
-		add_path(scaffold, best_path);
-		domark(g, best_path, mark);
-	} while (best_path->n_contig > 0);
+		add_path(scaffold, path);
+		int rc_start = get_rc_id(g, start_contig);
+		next_contig = rc_start;
+		VERBOSE_FLAG(0, "reverse\n");
+		while (1) {
+			next_contig = find_best_edge(g, edges_score, next_contig, path, mark, 1);
+			if (next_contig == -1)
+				break;
+			mark_contig(g, mark, next_contig);
+			prepend_i_contig(path, get_rc_id(g, next_contig));
+			VERBOSE_FLAG(0, "nextcontig %d ", next_contig);
+		}
+//		print_path_contig(path);
+	}
 	for (int i = 0; i < g->n_e; i++) if (!is_very_short_contig(&g->edges[i]) && mark[i]) {
 		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
+		append_i_contig(path, i);
 		add_path(scaffold, path);
 	}
 	print_scaffold_contig(scaffold);
