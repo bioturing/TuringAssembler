@@ -41,6 +41,8 @@ void print_seq(FILE *fp, int index, char *seq, int len, int cov)
 
 void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig, int *list_contig)
 {
+	if (n_contig == 0)
+		return;
 	char *seq = NULL, *total_seq = NULL, *NNN = NULL;
 	const int len_NNN = 300;
 	NNN = calloc(len_NNN, sizeof(char));
@@ -68,24 +70,24 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 
 void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct scaffold_edge *listE, int n_v, int *listV, FILE *out_graph)
 {
-	struct scaffold_edge *list_one_dir_E = calloc(n_e, sizeof(struct scaffold_edge));
-	for (int i = 0; i < n_e; i++) {
-		list_one_dir_E[i] = listE[i];
-		normalize_min_index(g, list_one_dir_E+i);
-	}
-	for (int i = 0; i < n_v; i++) {
-		struct asm_edge_t *e = &g->edges[listV[i]];
-		char *seq = NULL;
-		uint32_t seq_len = 0;
-		dump_edge_seq_reduce_N(&seq, &seq_len, e);
-		fprintf(out_graph,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
-	}
+//	struct scaffold_edge *list_one_dir_E = calloc(n_e, sizeof(struct scaffold_edge));
+//	for (int i = 0; i < n_e; i++) {
+//		list_one_dir_E[i] = listE[i];
+//		normalize_min_index(g, list_one_dir_E+i);
+//	}
+//	for (int i = 0; i < n_v; i++) {
+//		struct asm_edge_t *e = &g->edges[listV[i]];
+//		char *seq = NULL;
+//		uint32_t seq_len = 0;
+//		dump_edge_seq_reduce_N(&seq, &seq_len, e);
+//		fprintf(out_graph,"S\t%d\t%s\tKC:i:%lu\n", listV[i], seq, e->count);
+//	}
 
-	for (int i = 0; i < n_e; i++) {
-		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
-			list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'+':'-', list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'+':'-');
-		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
-			list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'-':'+', list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'-':'+');
-	}
+//	for (int i = 0; i < n_e; i++) {
+//		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
+//			list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'+':'-', list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'+':'-');
+//		fprintf(out_graph, "L\t%d\t%c\t%d\t%c\t45M\n", 
+//			list_one_dir_E[i].des, list_one_dir_E[i].rv_des == 0?'-':'+', list_one_dir_E[i].src, list_one_dir_E[i].rv_src == 0?'-':'+');
+//	}
 }
 

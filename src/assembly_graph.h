@@ -39,6 +39,9 @@ struct asm_edge_t {
 	struct barcode_hash_t *mate_barcodes;
 	gint_t *mate_contigs;
 	int n_mate_contigs;
+	struct barcode_hash_t *mate_barcodes_2;
+	gint_t *mate_contigs_2;
+	int n_mate_contigs_2;
 	// struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
 	// gint_t best_mate_contigs;		/* best mate contigs picker */
 };

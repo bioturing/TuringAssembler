@@ -11,47 +11,26 @@
 #include "scaffolding/score.h"
 #include "utils.h"
 
-struct matrix_buck_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1, int n_bucks,
+struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1,
  			float avg_bin_hash, struct opt_proc_t *opt)
 {
-	struct matrix_buck_score *score = NULL;
-	score = realloc(score, sizeof(struct matrix_buck_score));
 	int rev_i0 = g->edges[i0].rc_id;
 	assert(rev_i0 < g->n_e);
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
-	int n0_bucks = (get_edge_len(rev_e0) + g->bin_size-1) / g->bin_size;
-	int n1_bucks = (get_edge_len(e1) + g->bin_size-1) / g->bin_size;
 	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
 	VERBOSE_FLAG(3, "len e0, e1: %d %d \n" , e0_len, e1_len);
-	assert(n0_bucks > n_bucks);
-	assert(n1_bucks > n_bucks);
 
-	score->n_bucks = n_bucks;
-	score->A = NULL;
-	score->A = realloc(score->A, n_bucks * n_bucks * sizeof(float));
-	// check_bucks_A[i] && check_bucks_B[i] de improve performance
-	int *check_bucks_A = NULL, *check_bucks_B = NULL;
-	check_bucks_A = realloc(check_bucks_A, n_bucks * sizeof(int));
-	check_bucks_B = realloc(check_bucks_B, n_bucks * sizeof(int));
-	for (int i = 0; i < score->n_bucks; ++i) {
-		check_bucks_A[i] = 1; //check_qualify_buck(g, rev_e0, i, avg_bin_hash, opt);
-		check_bucks_B[i] = 1; //check_qualify_buck(g, e1, i, avg_bin_hash, opt);
-	}
 	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
 	float cov_e1 = __get_edge_cov(e1, g->ksize);
-	for (int i = 0; i < n_bucks; ++i) {
-		for (int j = 0; j < n_bucks; ++j) {
-			if (check_bucks_A[i] && check_bucks_B[j]) {
-				score->A[i*n_bucks+j] = get_score_bucks(&rev_e0->barcodes,
-						&e1->barcodes, cov_rev_e0, cov_e1);
-			}
-			else 
-				score->A[i*n_bucks+j] = -1;
-		}
-	}
 
-	free(check_bucks_A);
-	free(check_bucks_B);
+	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
+	score->bc_score = get_share_barcode(&rev_e0->barcodes, &e1->barcodes, cov_rev_e0, cov_e1);
+	//todo @huu not hardcode
+	if (score->bc_score < 0.3){
+		return score;
+	}
+	score->m_score = get_share_mate(g, i0, i1);
+	score->m2_score = get_share_mate_2(g, i0, i1);
 	return score;
 }
 
@@ -64,57 +43,28 @@ int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_has
 int check_replicate_scaffold_edge(struct asm_graph_t *g, int i0, int i1, 
 		const int n_bucks, float threshold, float avg_bin_hash, struct opt_proc_t *opt)
 {
-	int rev_i0 = g->edges[i0].rc_id, rev_i1 = g->edges[i1].rc_id;
-	struct matrix_buck_score *s0 = get_score_l_l_mat(g, i0, i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_buck_score *s1 = get_score_l_l_mat(g, i0, rev_i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_buck_score *s2 = get_score_l_l_mat(g, rev_i0, i1, n_bucks, avg_bin_hash, opt);
-	struct matrix_buck_score *s3 = get_score_l_l_mat(g, rev_i0, rev_i1, n_bucks, avg_bin_hash, opt);
-	int res = (detect_anomal_diagonal(s0, threshold) || detect_anomal_diagonal(s1, threshold) || detect_anomal_diagonal(s2, threshold) || detect_anomal_diagonal(s3, threshold));
-	destroy_matrix_score(s0);
-	destroy_matrix_score(s1);
-	destroy_matrix_score(s2);
-	destroy_matrix_score(s3);
-	return res;
+	return 0;
+//	int rev_i0 = g->edges[i0].rc_id, rev_i1 = g->edges[i1].rc_id;
+//	float s0 = get_score_l_l_mat(g, i0, i1, n_bucks, avg_bin_hash, opt);
+//	float s1 = get_score_l_l_mat(g, i0, rev_i1, n_bucks, avg_bin_hash, opt);
+//	float s2 = get_score_l_l_mat(g, rev_i0, i1, n_bucks, avg_bin_hash, opt);
+//	float s3 = get_score_l_l_mat(g, rev_i0, rev_i1, n_bucks, avg_bin_hash, opt);
+//	return res;
 }
 
-struct bucks_score get_score_edges_res(int i0, int i1, struct asm_graph_t *g, const int n_bucks, 
+struct pair_contigs_score *get_score_edges_res(int i0, int i1, struct asm_graph_t *g, 
 		float avg_bin_hash, struct opt_proc_t *opt) 
 {
-
-	struct bucks_score res_score;
-	res_score.score = -1;
+	struct pair_contigs_score *pair_score = calloc(1, sizeof(struct pair_contigs_score));
+	pair_score->bc_score = -1;
 
 	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
 	if (is_very_short_contig(e0) || is_very_short_contig(e1))
-		return res_score;
+		return pair_score;
+	//todo @huu get_score_l_s
+	//todo @huu get_score_s_l
 
-	struct matrix_buck_score *mat_score = get_score_l_l_mat(g, i0, i1, n_bucks, avg_bin_hash, opt);
-	mat_score->A[0] = -1;
-	float res = 0;
-	int count = 1;
-	for (int i = 0; i < mat_score->n_bucks; ++i) {
-		for (int j = 0; j < mat_score->n_bucks; ++j) {
-			float tmp = mat_score->A[i * n_bucks + j];
-			VERBOSE_FLAG(3, "%f ", tmp);
-			if (tmp >= -0.000001) {
-			// todo @huu think more about it (weighted score)
-//				if (i ==0 && j == 0){
-//					count += 9;
-//					res += tmp*9;
-//				}
-				count++;
-				res += tmp;
-			}
-		}
-		VERBOSE_FLAG(3, "#\n");
-	}
-	if (i0 == 28) {
-		VERBOSE_FLAG(0, "res count  %f %d", res, count);
-	}
-
-	res_score.score = res/count;
-	destroy_matrix_score(mat_score);
-	return res_score;
+	return get_score_l_l_mat(g, i0, i1, avg_bin_hash, opt);
 }
 
 void unique_edge(struct scaffold_edge *listE, int *n_e)
@@ -123,7 +73,7 @@ void unique_edge(struct scaffold_edge *listE, int *n_e)
 	for (int i = 0; i < *n_e; ) {
 		int j = i;
 		struct scaffold_edge *best = calloc(1, sizeof(struct scaffold_edge));
-		best->score0 = -1;
+		best->score.bc_score = -1;
 		while (j < *n_e && equal_scaffold_edge(&listE[j], &listE[i])){
 			if (better_scaffold_edge(&listE[j], best)){
 				best = &listE[j];
@@ -166,7 +116,7 @@ uint32_t equal_scaffold_edge(struct scaffold_edge *e0,struct scaffold_edge *e1)
 
 uint32_t better_scaffold_edge(struct scaffold_edge *e0, struct scaffold_edge *e1)
 {
-	return (e0->score0 > e1->score0);
+	return (e0->score.bc_score > e1->score.bc_score);
 }
 
 int less_scaffold_edge(const void *e0,const void *e1)
@@ -176,11 +126,70 @@ int less_scaffold_edge(const void *e0,const void *e1)
 	return (v0->src > v1->src || (v0->src == v1->src && v0->des > v1->des));
 }
 
-struct scaffold_edge *new_scaffold_edge(int src, int des, float score)
+struct scaffold_edge *new_scaffold_edge(int src, int des, struct pair_contigs_score *score)
 {
 	struct scaffold_edge* new_edge = calloc(1, sizeof(struct scaffold_edge));
 	new_edge->src = src;
 	new_edge->des = des;
-	new_edge->score0 = score;
+	new_edge->score = *score;
 	return new_edge;
 }
+
+void append_edge_score(struct edges_score_type *edges_score, struct scaffold_edge *edge)
+{
+	edges_score->n_edge++;
+	edges_score->list_edge = realloc(edges_score->list_edge, edges_score->n_edge * 
+			sizeof(struct scaffold_edge));
+	edges_score->list_edge[edges_score->n_edge-1] = *edge;
+}
+
+struct scaffold_edge *find_lower_bound_from(struct edges_score_type *edges_score,
+		int i_contig)
+{
+	int l = 0, r = edges_score->n_edge - 1;
+	while (l != r) {
+		int mid = (l + r)/2;
+		if (edges_score->list_edge[mid].src < i_contig) 
+			l = mid+1;
+		else
+			r = mid;
+	}
+	return &edges_score->list_edge[l];
+}
+
+struct scaffold_edge *find_upper_bound_from(struct edges_score_type *edges_score,
+		int i_contig)
+{
+	int l = 0, r = edges_score->n_edge - 1;
+	while (l != r) {
+		int mid = (l + r)/2;
+		if (edges_score->list_edge[mid].src > i_contig) 
+			r = mid;
+		else
+			l = mid + 1;
+	}
+	return &edges_score->list_edge[l];
+}
+
+void find_edge_from(struct edges_score_type *edges_score, int i_contig, int *n_edge_adj, 
+		struct scaffold_edge **list_edge)
+{
+	struct scaffold_edge *start_pos = find_lower_bound_from(edges_score, i_contig);
+	struct scaffold_edge *end_pos = find_upper_bound_from(edges_score, i_contig);
+	*n_edge_adj = end_pos - start_pos;
+	*list_edge = start_pos;
+}
+
+void sort_edges_score(struct edges_score_type *edges_score)
+{
+	qsort(edges_score->list_edge, edges_score->n_edge, sizeof(struct scaffold_edge), ascending_edge); 
+}
+
+void print_edge_score(struct edges_score_type *edges_score) 
+{
+	for (int i = 0; i < edges_score->n_edge; i++) {
+		struct scaffold_edge *edge = &edges_score->list_edge[i];
+		VERBOSE_FLAG(0, "edges score %d %d %f %d m2score %d\n", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
+	}
+}
+

@@ -3,11 +3,9 @@
 
 #include "assembly_graph.h"
 
-float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, 
-		struct barcode_hash_t *b_left, struct barcode_hash_t *b_right,
-		struct opt_proc_t *opt);
-float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
+float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
 		float edge1_cov);
-int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, int b, float avg_bin_hash, 
-		struct opt_proc_t *opt);
+
+float get_share_mate(struct asm_graph_t *g, int i0, int i1);
+float get_share_mate_2(struct asm_graph_t *g, int i0, int i1);
 #endif

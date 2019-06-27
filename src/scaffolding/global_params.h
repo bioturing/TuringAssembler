@@ -14,6 +14,7 @@
 	X(int, global_molecule_length, -1)\
 	X(float, global_avg_sum_bin_hash, -1)\
 	X(int, global_filter_constant, -1)\
+	X(int, global_n_candidate, -1)\
 	X(int, global_number_degree, -1)\
 	X(float, global_thres_coefficent, -1); 
 

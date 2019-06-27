@@ -6,7 +6,7 @@
 
 int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e)
 {
-	int res = 0, l = 0, r = g->bin_size, sum_holes = 0;
+	int res = 0, l = 0, r = MIN_CONTIG_BARCODE, sum_holes = 0;
 //	for (int i = 0; i < e->n_holes; ++i){
 //		VERBOSE_FLAG(log_hole, "holeee %d %d %d\n" , e->seq_len, e->l_holes[i], e->p_holes[i]);
 //	}
@@ -26,46 +26,14 @@ int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e)
 int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bin_hash, 
 		struct opt_proc_t *opt)
 {
-	if (get_amount_hole(g, e)  > 0.7*g->bin_size) {
+	if (get_amount_hole(g, e)  > 0.7*MIN_CONTIG_BARCODE) {
 		VERBOSE_FLAG(2, "NNNNN size is to big ");
 		return 0;
 	}
-	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
-
-	struct barcode_hash_t *buck = &e->barcodes;
-	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->cnts[i] != (uint32_t)(-1)) {
-			cnt += buck->cnts[i];
-		}
-	}
-	assert(normal_count != 0);
-	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && !opt->metagenomics)
-	{
-		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
-		return 0;
-	}
 	return 1;
 }
 
-int check_count_hash_buck(struct asm_graph_t *g, struct asm_edge_t *e, struct barcode_hash_t *buck,
-  			float avg_bin_hash, struct opt_proc_t *opt)
-{
-	int cnt = 0, cov = global_genome_coverage, normal_count = (g->bin_size - g->ksize +1) * cov;
-	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->cnts[i] != (uint32_t)(-1)) {
-			cnt += buck->cnts[i];
-		}
-	}
-	assert(normal_count != 0);
-	if  ((cnt > 2 * normal_count || cnt < normal_count * 0.5) && opt->metagenomics)
-	{
-		VERBOSE_FLAG(2, "count hash is abnormal: %d %d\n", cnt, normal_count);
-		return 0;
-	}
-	return 1;
-}
-
-float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
+float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
 		float edge1_cov)
 {
 	const int thres_cnt = global_thres_count_kmer;
@@ -73,22 +41,17 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	float ratio0 = edge0_cov / global_genome_coverage, ratio1 = edge1_cov / global_genome_coverage;
 
 	for (uint32_t i = 0; i < buck1->size; ++i) {
-		if (buck1->cnts[i] != (uint32_t)(-1)) {
-			if (buck1->cnts[i] >= (uint32_t)thres_cnt) {
-				cnt1++;
-			}
+		if (buck1->keys[i] != (uint64_t)(-1)) {
+			cnt1++;
 		}
 	}
 
 	for (uint32_t i = 0; i < buck0->size; ++i) {
 		if ((buck0->keys[i]) != (uint64_t)(-1)){
-			if (buck0->cnts[i] >= (uint32_t)thres_cnt) {
-				cnt0 ++;
-				uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
-				if (tmp != BARCODE_HASH_END(buck1) && buck1->cnts[tmp] >= (uint32_t)thres_cnt) {
-					res2++;
-//					VERBOSE_FLAG(3, "MIN %d\n", MIN(buck0->cnts[i], buck1->cnts[tmp]));
-				}
+			cnt0++;
+			uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
+			if (tmp != BARCODE_HASH_END(buck1) && buck1->keys[tmp] != (uint64_t)(-1)) {
+				res2++;
 			}
 		}
 	}
@@ -98,24 +61,28 @@ float get_score_bucks(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1
 	return 1.0 * res2 / global_avg_sum_bin_hash; 
 }
 
-float get_score_multiple_buck(struct asm_graph_t *g, struct asm_edge_t *e, 
-		struct barcode_hash_t *b_left, struct barcode_hash_t *b_right,
-		struct opt_proc_t *opt)
+float get_share_mate(struct asm_graph_t *g, int i0, int i1)
 {
-	float avg_bin_hash = get_avg_unique_bin_hash(g);
-	float res = 0;
-	int count = 0;
-	float cov_e = __get_edge_cov(e, g->ksize);
-	for (int i = 0; i < 3; i++) if (check_count_hash_buck(g, e, &b_left[i], avg_bin_hash, opt)) {
-		for(int j = 0; j < 3; j++) if (check_count_hash_buck(g, e, &b_right[j], avg_bin_hash, opt)) {
-			count ++;
-			float t = get_score_bucks(&b_left[i], &b_right[j], cov_e, cov_e);
-//			VERBOSE_FLAG(log_check_contig, "score %f\n", t);
-			res += t;
+	int rev_i0 = g->edges[i0].rc_id;
+	struct asm_edge_t *rev_e0 = &g->edges[rev_i0];
+	int score = 0;
+	for (int i = 0; i < rev_e0->n_mate_contigs; i++){
+		if (rev_e0->mate_contigs[i] == i1) {
+			score += rev_e0->mate_barcodes[i].n_item;
 		}
 	}
-	if (count == 0)
-		return 0;
-	return res/count;
+	return score;
 }
 
+float get_share_mate_2(struct asm_graph_t *g, int i0, int i1)
+{
+	int rev_i0 = g->edges[i0].rc_id;
+	struct asm_edge_t *rev_e0 = &g->edges[rev_i0];
+	int score = 0;
+	for (int i = 0; i < rev_e0->n_mate_contigs_2; i++){
+		if (rev_e0->mate_contigs_2[i] == i1) {
+			score += rev_e0->mate_barcodes_2[i].n_item;
+		}
+	}
+	return score;
+}

@@ -55,17 +55,6 @@ int pop_queue(int *queue, int *bot) {
 	return queue[*bot-1];
 }
 
-int check_share_bc(struct asm_graph_t *g, struct barcode_hash_t *hl, struct barcode_hash_t *hr, int ie)
-{
-	struct barcode_hash_t *b = &(g->edges[ie].barcodes);
-	float cov = __get_edge_cov(&g->edges[ie], g->ksize); 
-	// todo @huu get cov of hl and hr
-	float score1 = get_score_bucks(hl, b, cov, cov);
-	float score2 = get_score_bucks(hr, b, cov, cov);
-	VERBOSE_FLAG(0, "the score we need %f %f \n", score1, score2);
-	return score1 + score2 > 1;
-}
-
 void find_path_short(int src, int des, struct asm_graph_t *g, struct contig_graph *contig_g,
 		int *n_insert_path, int **insert_path, int *mark_short, 
 		struct barcode_hash_t *hl, struct barcode_hash_t *hr)

@@ -250,6 +250,9 @@ void init_contig_map_info(struct asm_graph_t *g, const char *path,
 		g->edges[e].n_mate_contigs = 0;
 		g->edges[e].mate_contigs = NULL;
 		g->edges[e].mate_barcodes = NULL;
+		g->edges[e].n_mate_contigs_2 = 0;
+		g->edges[e].mate_contigs_2 = NULL;
+		g->edges[e].mate_barcodes_2 = NULL;
 	}
 	fclose(fp);
 	bwa_idx_build(path, path, BWTALGO_AUTO, 25000000);
@@ -330,6 +333,28 @@ static inline void add_read_pair_edge(struct asm_graph_t *g, gint_t e, gint_t ne
 		barcode_hash_init(g->edges[e].mate_barcodes + i, 4);
 	}
 	barcode_hash_add(g->edges[e].mate_barcodes + i, bc);
+	pthread_mutex_unlock(&g->edges[e].lock);
+}
+
+static inline void add_read_pair_edge_2(struct asm_graph_t *g, gint_t e, gint_t next_e, uint64_t bc)
+{
+	if (next_e == e || next_e == g->edges[e].rc_id)
+		return;
+	pthread_mutex_lock(&g->edges[e].lock);
+	gint_t i;
+	for (i = 0; i < g->edges[e].n_mate_contigs_2; ++i)
+		if (g->edges[e].mate_contigs_2[i] == next_e)
+			break;
+	if (i == g->edges[e].n_mate_contigs_2) {
+		++g->edges[e].n_mate_contigs_2;
+		g->edges[e].mate_contigs_2 = realloc(g->edges[e].mate_contigs_2,
+			g->edges[e].n_mate_contigs_2 * sizeof(gint_t));
+		g->edges[e].mate_barcodes_2 = realloc(g->edges[e].mate_barcodes_2,
+			g->edges[e].n_mate_contigs_2 * sizeof(struct barcode_hash_t));
+		g->edges[e].mate_contigs_2[i] = next_e;
+		barcode_hash_init(g->edges[e].mate_barcodes_2 + i, 4);
+	}
+	barcode_hash_add(g->edges[e].mate_barcodes_2 + i, bc);
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 
@@ -434,21 +459,37 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 		free(a.cigar);
 	}
-	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
-		for (i = 0; i < n1; ++i)
-			if (p1[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_edge(g, p1[i].e, bc);
-		for (i = 0; i < n2; ++i)
-			if (p2[i].pos <= MIN_CONTIG_BARCODE)
-				add_barcode_edge(g, p2[i].e, bc);
+	if (ar1.n <=1 &&  ar2.n <= 1)  {
+		if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
+			for (i = 0; i < n1; ++i)
+				if (p1[i].pos <= MIN_CONTIG_BARCODE)
+					add_barcode_edge(g, p1[i].e, bc);
+			for (i = 0; i < n2; ++i)
+				if (p2[i].pos <= MIN_CONTIG_BARCODE)
+					add_barcode_edge(g, p2[i].e, bc);
+		}
 	}
-	if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
-		for (i = 0; i < n1; ++i) {
-			for (k = 0; k < n2; ++k) {
-				if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
-					&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
-					add_read_pair_edge(g, p1[i].e, p2[k].e, bc);
-					add_read_pair_edge(g, p2[k].e, p1[i].e, bc);
+	if (ar1.n <= 1 && ar1.n <= 1)  {
+		if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
+			for (i = 0; i < n1; ++i) {
+				for (k = 0; k < n2; ++k) {
+					if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
+						&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
+						add_read_pair_edge(g, p1[i].e, p2[k].e, bc);
+						add_read_pair_edge(g, p2[k].e, p1[i].e, bc);
+					}
+				}
+			}
+		}
+	} else {
+		if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
+			for (i = 0; i < n1; ++i) {
+				for (k = 0; k < n2; ++k) {
+					if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
+						&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
+						add_read_pair_edge_2(g, p1[i].e, p2[k].e, bc);
+						add_read_pair_edge_2(g, p2[k].e, p1[i].e, bc);
+					}
 				}
 			}
 		}

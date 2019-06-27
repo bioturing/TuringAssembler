@@ -17,8 +17,8 @@ int decending_uint32(const void *e0,const void *e1)
 
 int decending_edge_score(const void *d0, const void *d1)
 {
-	float a =  ((struct scaffold_edge *) d0)->score0;
-	float b =  ((struct scaffold_edge *) d1)->score0;
+	float a =  ((struct scaffold_edge *) d0)->score.bc_score;
+	float b =  ((struct scaffold_edge *) d1)->score.bc_score;
 	struct scaffold_edge *e1 =  (struct scaffold_edge *) d1;
 	return (a < b) - (a > b);
 }
@@ -36,8 +36,8 @@ int ascending_edge(const void *e0, const void *e1)
 
 int decending_candidate_edge(const void *d0, const void *d1)
 {
-	float a =  ((struct candidate_edge *) d0)->score;
-	float b =  ((struct candidate_edge *) d1)->score;
+	float a =  ((struct candidate_edge *) d0)->score.bc_score;
+	float b =  ((struct candidate_edge *) d1)->score.bc_score;
 	return (a < b) - (a > b);
 }
 

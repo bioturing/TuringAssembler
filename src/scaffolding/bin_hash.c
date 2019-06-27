@@ -1,65 +1,31 @@
 #include "assembly_graph.h"
+#include "barcode_hash.h"
+#include "verbose.h"
 
 #include "scaffolding/global_params.h"
+#define K31_NULL		((k31key_t)-1)
 
-float count_unique_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
-{
-	extern int global_thres_count_kmer;
-	const int thres_cnt = global_thres_count_kmer;
-	int cnt = 0;
-	
-	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->cnts[i] != (uint32_t)(-1)) {
-			if (buck->cnts[i] >= (uint32_t)thres_cnt)
-				cnt++;
-		}
-	}
-	return cnt;
-}
-
-float count_sum_bin_hash(struct asm_graph_t *g, struct barcode_hash_t *buck)
+int count_barcode(struct asm_graph_t *g, struct barcode_hash_t *buck)
 {
 	const int thres_cnt = global_thres_count_kmer;
 	int cnt = 0;
 	
 	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->cnts[i] != (uint32_t)(-1)) {
-			cnt += buck->cnts[i];
+		if (buck->keys[i] != (uint64_t)(-1)) {
+			cnt++;
 		}
 	}
 	return cnt;
 }
 
-float get_avg_unique_bin_hash(struct asm_graph_t *g)
+float get_avg_barcode(struct asm_graph_t *g)
 {
 	int count = 0;
-	long long sum = 0;
+	uint64_t sum = 0;
 	for (int i = 0; i < g->n_e; ++i) {
-		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-		for (int j = 0; j < n_bucks - 1; j++){
-			int tmp = count_unique_bin_hash(g, &g->edges[i].barcodes);
-			if (tmp > 0) {
-				count++;
-				sum += tmp;
-			}
-		}
-	}
-	return 1.0*sum/count;
-}
-
-float get_avg_sum_bin_hash(struct asm_graph_t *g)
-{
-	int count = 0;
-	long long sum = 0;
-	for (int i = 0; i < g->n_e; ++i) {
-		int n_bucks = (get_edge_len(&g->edges[i]) + g->bin_size-1) / g->bin_size;
-		for (int j = 0; j < n_bucks - 1; j++){
-			int tmp = count_sum_bin_hash(g, &g->edges[i].barcodes);
-			if (tmp > 0) {
-				count++;
-				sum += tmp;
-			}
-		}
+		int tmp = count_barcode(g, &g->edges[i].barcodes);
+		sum += tmp;
+		count++;
 	}
 	return 1.0*sum/count;
 }
