@@ -375,13 +375,13 @@ void parallel_build_edge_score(struct params_check_edge *para, int n_threads)
 	pthread_attr_destroy(&attr);
 }
 
-void remove_lov_cov(struct asm_graph_t *g)
+void remove_lov_high_cov(struct asm_graph_t *g)
 {
 	float cvr = global_genome_coverage;
 	int count = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
-		if (edge_cov > 0.5){
+		if (edge_cov <3 ){
 			int rc_id = g->edges[i_e].rc_id;
 			g->edges[rc_id].rc_id = count;
 			g->edges[count] =  g->edges[i_e];
@@ -408,7 +408,7 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 	int i_candidate_edge = 0;
 	qsort(para->list_candidate_edges, para->n_candidate_edges, sizeof(struct candidate_edge),
 			ascending_index_edge);
-	for (int i_contig = 0; i_contig < g->n_e; i_contig++){
+	for (int i_contig = 0; i_contig < g->n_e; i_contig++) if (!is_very_short_contig(&g->edges[i_contig])) {
 		VERBOSE_FLAG(0, "i contig %d\n", i_contig);
 		struct scaffold_edge *list_edges = NULL;
 		int size_list_edge = 0; 
@@ -478,18 +478,18 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 {
 	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
 	int des = edge->des;
-	int distance = 0;
-	//todo using distance instead of /2 
 	struct pair_contigs_score *i_score; 
 	int last = get_last_n(path, is_left, 0);
 	if (is_left) last = get_rc_id(g, last);
 	i_score = get_score_edge(edges_score,last , des);
 	*score = *i_score;
-	//todo return score;
 	i_score = get_score_edge(edges_score, last, g->edges[des].rc_id);
 	score->bc_score += i_score->bc_score/2;
 	int i = 1;
+	int distance = get_edge_len(&g->edges[last]);
 	while (1) {
+		if (distance > global_distance)
+			break;
 		int src = get_last_n(path, is_left, i);
 		if (src == -1)
 			break;
@@ -497,8 +497,6 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 		i_score = get_score_edge(edges_score, src, des);
 		score->bc_score += i_score->bc_score;
 		distance += get_edge_len(&g->edges[src]);
-		if (distance > 100000)
-			break;
 	}
 	VERBOSE_FLAG(0, "scascore %d %d %f %d %d\n", last, des, score->bc_score, score->m_score, score->m2_score);
 	return score;
@@ -564,6 +562,45 @@ void mark_contig(struct asm_graph_t *g, int *mark, int i_contig)
 	mark[get_rc_id(g, i_contig)]--;
 }
 
+struct pair_contigs_score *get_score_tripple(struct edges_score_type *edges_score, int l, int m, int r)
+{
+	struct pair_contigs_score *score0 = get_score_edge(edges_score, l, m);
+	struct pair_contigs_score *score1 = get_score_edge(edges_score, m, r);
+	struct pair_contigs_score *res = calloc(1, sizeof(struct pair_contigs_score));
+	res->bc_score = score0->bc_score + score1->bc_score;
+	res->m_score = score0->m_score + score1->m_score;
+	res->m2_score = score0->m2_score + score1->m2_score;
+	return res;
+}
+
+void refine_path(struct asm_graph_t *g, struct edges_score_type *edges_score, struct scaffold_path *path) 
+{
+	int n = path->n_left_half + path->n_right_half;
+	for (int j = 1; j < n-1; j++) {
+		int left = get_last_n(path, 1, j-1);
+		int mid = get_last_n(path, 1, j);
+		int right = get_last_n(path, 1, j+1);
+		struct pair_contigs_score *normal_score = get_score_tripple(edges_score, left, mid, right);
+		struct pair_contigs_score *reverse_score = get_score_tripple(edges_score, left, get_rc_id(g, mid), right);
+		if (mid == 530) {
+			VERBOSE_FLAG(0, "zzz %d %d %d", left, mid, right);
+			VERBOSE_FLAG(0, "zzz %f %d %d", normal_score->bc_score, normal_score->m_score, normal_score->m2_score);
+			VERBOSE_FLAG(0, "zzz %f %d %d", reverse_score->bc_score, reverse_score->m_score, reverse_score->m2_score);
+		}
+		if (better_edge(reverse_score, normal_score)) {
+			reverse_n_th(g, path, 1, j);
+		}
+	}
+}
+
+void refine_scaffold(struct asm_graph_t *g, struct edges_score_type *edges_score, struct scaffold_type *scaffold) 
+{
+	for (int i = 0; i < scaffold->n_path; i++) {
+		struct scaffold_path *path = &scaffold->path[i];
+		refine_path(g, edges_score, path);
+	}
+}
+
 void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_score_type *edges_score,
  		struct scaffold_type *scaffold)
 {
@@ -571,7 +608,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	int *mark = calloc(g->n_e, sizeof(int));
 	for (int i = 0; i < g->n_e; i++) {
 		float edge_cov = __get_edge_cov(&g->edges[i], g->ksize)/global_genome_coverage;
-		mark[i] = lround(edge_cov);
+		mark[i] = MIN(lround(edge_cov), 3);
 	}
 	int found = 0;
 	for (int i = 0; i < g->n_e; i++) if (mark[i] && !is_very_short_contig(&g->edges[i])){
@@ -590,7 +627,6 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 			append_i_contig(path, next_contig);
 			VERBOSE_FLAG(0, "nextcontig %d ", next_contig);
 		}
-		add_path(scaffold, path);
 		int rc_start = get_rc_id(g, start_contig);
 		next_contig = rc_start;
 		VERBOSE_FLAG(0, "reverse\n");
@@ -602,9 +638,11 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 			prepend_i_contig(path, get_rc_id(g, next_contig));
 			VERBOSE_FLAG(0, "nextcontig %d ", next_contig);
 		}
+		add_path(scaffold, path);
 //		print_path_contig(path);
 	}
-	for (int i = 0; i < g->n_e; i++) if (!is_very_short_contig(&g->edges[i]) && mark[i]) {
+	for (int i = 0; i < g->n_e; i++) if (is_very_short_contig(&g->edges[i]) && 
+				get_edge_len(&g->edges[i]) > 1000 && mark[i]) {
 		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
 		append_i_contig(path, i);
 		add_path(scaffold, path);
@@ -623,8 +661,8 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	init_global_params(g);
 	VERBOSE_FLAG(0, "init global params done\n");
 	check_global_params(g);
-//	if (!opt->metagenomics) todo @huu uncomment
-//		remove_lov_cov(g);
+	if (!opt->metagenomics)
+		remove_lov_high_cov(g);
 
 	float cvr = global_genome_coverage;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
@@ -645,8 +683,10 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 
 	sort_edges_score(edges_score);
 	find_scaffolds(g, opt, edges_score, scaffold);
-	print_scaffold(g, out_file, scaffold);
 	insert_short_contig();
+	refine_scaffold(g, edges_score, scaffold);
+	print_scaffold_contig(scaffold);
+	print_scaffold(g, out_file, scaffold);
 }
 
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)

@@ -16,6 +16,7 @@
 	X(int, global_filter_constant, -1)\
 	X(int, global_n_candidate, -1)\
 	X(int, global_number_degree, -1)\
+	X(int, global_distance, -1)\
 	X(float, global_thres_coefficent, -1); 
 
 #define X(type, name, default_value) extern type name;

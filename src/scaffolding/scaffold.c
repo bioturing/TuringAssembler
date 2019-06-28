@@ -89,3 +89,35 @@ int get_last_n(struct scaffold_path *path, int is_left, int pos)
 		return path->left_half[pos];
 	}
 }
+
+void reverse_contig(struct asm_graph_t *g, int *i_contig)
+{
+	*i_contig = g->edges[*i_contig].rc_id;
+}
+
+void reverse_n_th(struct asm_graph_t *g, struct scaffold_path *path, int is_left, int pos)
+{
+	VERBOSE_FLAG(0, "rrreverse %d\n", pos);
+	if (is_left) {
+		if (pos + 1 <= path->n_left_half)
+			reverse_contig(g, &path->left_half[path->n_left_half-1-pos]);
+		else {
+			pos -= path->n_left_half;
+			if (pos >= path->n_right_half)
+				assert(0);
+			int x = path->right_half[pos];
+			reverse_contig(g, &path->right_half[pos]);
+			VERBOSE_FLAG(0, "sssss %d %d\n", x, path->right_half[pos]);
+		}
+	} else {
+		if (pos + 1 <= path->n_right_half)
+			reverse_contig(g, &path->right_half[path->n_right_half-1-pos]);
+		else {
+			pos -= path->n_right_half;
+			if (pos >= path->n_left_half)
+				assert(0);
+			reverse_contig(g, &path->left_half[pos]);
+		}
+	}
+}
+

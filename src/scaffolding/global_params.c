@@ -75,7 +75,8 @@ void init_global_params(struct asm_graph_t *g)
 	global_genome_coverage = get_genome_coverage(g);
 	global_thres_bucks_score = get_global_thres_score(g);
 	global_filter_constant = 30;
-	global_number_degree = 15;
-	global_n_candidate = 4000;
+	global_number_degree = 10;
+	global_n_candidate = 20;
+	global_distance = 60000;
 }
 

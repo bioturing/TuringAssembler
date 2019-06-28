@@ -459,7 +459,22 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 		free(a.cigar);
 	}
-	if (ar1.n <=1 &&  ar2.n <= 1)  {
+	float cov_avg1 = 0, cov_avg2 = 0, count1 = 0, count2 = 0;
+	for (int i = 0 ; i < n1; i++) {
+		cov_avg1 += __get_edge_cov(&g->edges[p1[i].e], g->ksize) /n1;
+	}
+	for (int i = 0 ; i < n2; i++) {
+		cov_avg2 += __get_edge_cov(&g->edges[p2[i].e], g->ksize) /n2;
+	}
+	for (int i = 0 ; i < n1; i++) {
+		if (2 * __get_edge_cov(&g->edges[p1[i].e], g->ksize) > cov_avg1) 
+			count1++;
+ 	}
+	for (int i = 0 ; i < n2; i++) {
+		if (2 * __get_edge_cov(&g->edges[p2[i].e], g->ksize) > cov_avg2) 
+			count2++;
+ 	}
+	if (count1 <=1 &&  count2 <= 1)  {
 		if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
 			for (i = 0; i < n1; ++i)
 				if (p1[i].pos <= MIN_CONTIG_BARCODE)
@@ -469,7 +484,7 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 					add_barcode_edge(g, p2[i].e, bc);
 		}
 	}
-	if (ar1.n <= 1 && ar1.n <= 1)  {
+	if (count1 <= 1 && count2 <= 1)  {
 		if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
 			for (i = 0; i < n1; ++i) {
 				for (k = 0; k < n2; ++k) {
