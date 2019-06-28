@@ -36,7 +36,6 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bi
 float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
 		float edge1_cov)
 {
-	const int thres_cnt = global_thres_count_kmer;
 	int cnt0 = 0, cnt1 = 0, res2 = 0;
 	float ratio0 = edge0_cov / global_genome_coverage, ratio1 = edge1_cov / global_genome_coverage;
 

@@ -7,7 +7,6 @@
 
 int count_barcode(struct asm_graph_t *g, struct barcode_hash_t *buck)
 {
-	const int thres_cnt = global_thres_count_kmer;
 	int cnt = 0;
 	
 	for (uint32_t i = 0; i < buck->size; ++i) {

@@ -378,17 +378,18 @@ void parallel_build_edge_score(struct params_check_edge *para, int n_threads)
 void remove_lov_high_cov(struct asm_graph_t *g)
 {
 	float cvr = global_genome_coverage;
-	int count = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
-		if (edge_cov <3 ){
-			int rc_id = g->edges[i_e].rc_id;
-			g->edges[rc_id].rc_id = count;
-			g->edges[count] =  g->edges[i_e];
-			count++;
+		if (edge_cov >= 3 || edge_cov <= 0.3 ) {
+			g->edges[i_e].seq_len = -1;
 		}
+//		if (edge_cov <3 ){
+//			int rc_id = g->edges[i_e].rc_id;
+//			g->edges[rc_id].rc_id = count;
+//			g->edges[count] =  g->edges[i_e];
+//			count++;
+//		}
 	}
-	g->n_e = count;
 }
 
 void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_score_type *edges_score)
