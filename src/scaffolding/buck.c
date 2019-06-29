@@ -57,7 +57,8 @@ float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buc
 	VERBOSE_FLAG(3, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	if (MIN(cnt0, cnt1) == 0) 
 		return 0;
-	return 1.0 * res2 / global_avg_sum_bin_hash; 
+	//todo find the best formular
+	return 1.0 * res2 / (cnt0 * cnt1); 
 }
 
 float get_share_mate(struct asm_graph_t *g, int i0, int i1)

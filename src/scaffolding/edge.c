@@ -26,9 +26,9 @@ struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int 
 	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
 	score->bc_score = get_share_barcode(&rev_e0->barcodes, &e1->barcodes, cov_rev_e0, cov_e1);
 	//todo @huu not hardcode
-	if (score->bc_score < 0.3){
-		return score;
-	}
+//	if (score->bc_score < 0.3){
+//		return score;
+//	}
 	score->m_score = get_share_mate(g, i0, i1);
 	score->m2_score = get_share_mate_2(g, i0, i1);
 	return score;
