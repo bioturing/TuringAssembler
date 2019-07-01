@@ -523,7 +523,7 @@ struct best_next_contig {
 };
 
 struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_score_type *edges_score, int start_contig,
-		struct scaffold_path *path, int *mark, int is_left)
+		struct scaffold_path *path, int *mark, int is_left, struct pair_contigs_score *thres_score)
 {
 	int n_edge_adj = 0;
 	struct scaffold_edge *list_edge_adj = NULL;
@@ -546,6 +546,8 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	struct best_next_contig *res = calloc(1, sizeof(struct best_next_contig));
 	res->i_contig = best_edge;
 	res->score = *max_score;
+	if (!better_edge(&res->score, thres_score))
+		res->i_contig = -1;
 	return res;
 }
 
@@ -614,6 +616,15 @@ void refine_scaffold(struct asm_graph_t *g, struct edges_score_type *edges_score
 	}
 }
 
+struct pair_contigs_score *div3(struct pair_contigs_score *score)
+{
+	struct pair_contigs_score *res = calloc(1, sizeof(struct pair_contigs_score));
+	res->bc_score = score->bc_score/3;
+	res->m_score = score->m_score/3;
+	res->m2_score = score->m2_score/3;
+	return res;
+}
+
 struct scaffold_path *find_path(struct asm_graph_t *g, struct edges_score_type *edges_score, int *mark, int start_contig)
 {
 	struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
@@ -621,11 +632,13 @@ struct scaffold_path *find_path(struct asm_graph_t *g, struct edges_score_type *
 //		add_i_contig(path, start_contig);
 	append_i_contig(path, start_contig);
 	int i_r_contig = start_contig, i_l_contig = get_rc_id(g, start_contig);
+	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
+	int count = 0;
 	while (1) {
-		struct best_next_contig *next_l_contig = 
-			find_best_edge(g, edges_score, i_l_contig, path, mark, 1);
-		struct best_next_contig *next_r_contig = 
-			find_best_edge(g, edges_score, i_r_contig, path, mark, 0);
+		count++;
+		struct best_next_contig *next_l_contig, *next_r_contig, *next_contig;
+		next_l_contig = find_best_edge(g, edges_score, i_l_contig, path, mark, 1, div3(thres_score));
+		next_r_contig = find_best_edge(g, edges_score, i_r_contig, path, mark, 0, div3(thres_score));
 
 		VERBOSE_FLAG(0, "qqqq %d %d\n", i_l_contig, i_r_contig);
 		if (next_r_contig->i_contig == -1 && next_l_contig->i_contig == -1) {
@@ -633,13 +646,22 @@ struct scaffold_path *find_path(struct asm_graph_t *g, struct edges_score_type *
 		}
 		if (next_r_contig->i_contig == -1 || better_edge(&next_l_contig->score, &next_r_contig->score)) {
 			prepend_i_contig(path, get_rc_id(g, next_l_contig->i_contig));
-			mark_contig(g, mark, next_l_contig->i_contig);
 			i_l_contig = next_l_contig->i_contig;
+			next_contig = next_l_contig;
 		} else {
 			append_i_contig(path, next_r_contig->i_contig);
-			mark_contig(g, mark, next_r_contig->i_contig);
 			i_r_contig = next_r_contig->i_contig;
+			next_contig = next_r_contig;
 		}
+		mark_contig(g, mark, next_contig->i_contig);
+		if (count > 1) {
+			thres_score->bc_score = (thres_score->bc_score + next_contig->score.bc_score) /2;
+			thres_score->m_score = (thres_score->m_score + next_contig->score.m_score) /2;
+			thres_score->m2_score = (thres_score->m2_score + next_contig->score.m2_score) /2;
+		} else {
+			*thres_score = next_contig->score;
+		}
+
 	}
 	return path;
 }

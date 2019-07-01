@@ -64,6 +64,7 @@ void print_scaffold_contig(struct scaffold_type *scaffold)
 		for (int j = path->n_left_half-1; j >= 0; j--) {
 			VERBOSE_FLAG(1, "contig %d ", path->left_half[j]);
 		}
+		VERBOSE_FLAG(1, "\n righthalf");
 		for(int j = 0; j < path->n_right_half; j++){
 			VERBOSE_FLAG(1, "contig %d ", path->right_half[j]);
 		}
