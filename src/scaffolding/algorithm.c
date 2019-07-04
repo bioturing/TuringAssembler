@@ -45,6 +45,7 @@ int get_new_size(int size)
 {
 	if (size == 0)
 		return 1;
+	return size*2;
 }
 
 float get_component_cov(struct asm_graph_t *g, int n_component_node, int *connected_component, int *listV)

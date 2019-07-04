@@ -4,7 +4,6 @@
 #include "assembly_graph.h"
 
 #define LIST_GLOBAL_PARAMS \
-	X(float, global_thres_bucks_score, -1)\
 	X(int, global_thres_length , -1)\
 	X(int, global_thres_short_len, -1)\
 	X(float, global_genome_coverage, -1)\
@@ -14,6 +13,7 @@
 	X(int, global_n_candidate, -1)\
 	X(int, global_number_degree, -1)\
 	X(int, global_distance, -1)\
+	X(int, global_count_bc_size, -1)\
 	X(float, global_thres_coefficent, -1); 
 
 #define X(type, name, default_value) extern type name;

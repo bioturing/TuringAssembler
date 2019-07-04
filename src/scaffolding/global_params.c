@@ -19,14 +19,6 @@ LIST_GLOBAL_PARAMS
 #undef X
 }
 
-float get_global_thres_score(struct asm_graph_t *g)
-{
-	float cvr = get_genome_coverage(g); 
-	float res = 1.0 / global_molecule_length * global_thres_coefficent;
-	VERBOSE_FLAG(1, "global thres score: %f\n", res);
-	return res;
-}
-
 int get_global_count_kmer(struct asm_graph_t *g)
 {
 	int *arr_count = NULL, n_arr = 0, *count_count = NULL; 
@@ -64,16 +56,17 @@ int get_global_count_kmer(struct asm_graph_t *g)
 
 void init_global_params(struct asm_graph_t *g)
 {
-	global_thres_length = 6000;
-	global_thres_short_len= 6000;
+	global_thres_length = 4000;
+	global_thres_short_len= 4000;
 	global_molecule_length = 20000;
 	global_avg_sum_bin_hash = get_avg_barcode(g);
 	global_thres_coefficent = 0.20;
 	global_genome_coverage = get_genome_coverage(g);
-	global_thres_bucks_score = get_global_thres_score(g);
+	VERBOSE_FLAG(1, "global genome coverrage %f\n", global_genome_coverage);
 	global_filter_constant = 30;
 	global_number_degree = 10;
-	global_n_candidate = 20;
+	global_n_candidate = 11;
+	global_count_bc_size = 3000;
 	global_distance = 60000;
 }
 

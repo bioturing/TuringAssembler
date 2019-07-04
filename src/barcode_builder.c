@@ -23,6 +23,7 @@ struct bccount_bundle_t {
 
 	pthread_mutex_t *lock;
 	uint64_t *hash_sum;
+	float genome_cov;
 };
 
 void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske);
@@ -409,11 +410,11 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			aligned + 20 < r1->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		// 	if (aligned > g->ksize)
-		// 		atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
-		// }
+		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+			int aligned = count_M_cigar(a.n_cigar, a.cigar);
+			if (aligned > g->ksize)
+				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+		}
 		if (ar1.a[i].score > best_score1 && ar1.a[i].score + 5 >= aligned) {
 			best_score1 = ar1.a[i].score;
 			p1[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
@@ -438,11 +439,11 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			aligned + 20 < r2->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		// 	if (aligned > g->ksize)
-		// 			atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
-		// }
+		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+			int aligned = count_M_cigar(a.n_cigar, a.cigar);
+			if (aligned > g->ksize)
+					atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+		}
 		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
 			best_score2 = ar2.a[i].score;
 			p2[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
@@ -459,19 +460,16 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 		free(a.cigar);
 	}
-	float cov_avg1 = 0, cov_avg2 = 0, count1 = 0, count2 = 0;
+	float count1 = 0, count2 = 0;
+	float genome_cov = bundle->genome_cov;
 	for (int i = 0 ; i < n1; i++) {
-		cov_avg1 += __get_edge_cov(&g->edges[p1[i].e], g->ksize) /n1;
-	}
-	for (int i = 0 ; i < n2; i++) {
-		cov_avg2 += __get_edge_cov(&g->edges[p2[i].e], g->ksize) /n2;
-	}
-	for (int i = 0 ; i < n1; i++) {
-		if (2 * __get_edge_cov(&g->edges[p1[i].e], g->ksize) > cov_avg1) 
+		float edge_cov = __get_edge_cov(&g->edges[p1[i].e], g->ksize);
+		if (edge_cov * 2 > genome_cov && edge_cov/2 < genome_cov) 
 			count1++;
  	}
 	for (int i = 0 ; i < n2; i++) {
-		if (2 * __get_edge_cov(&g->edges[p2[i].e], g->ksize) > cov_avg2) 
+		float edge_cov = __get_edge_cov(&g->edges[p2[i].e], g->ksize);
+		if (edge_cov * 2 > genome_cov && edge_cov/2 < genome_cov) 
 			count2++;
  	}
 	if (count1 <=1 &&  count2 <= 1)  {
@@ -590,6 +588,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 	pthread_mutex_init(&lock, NULL);
 	uint64_t hash_sum;
 	hash_sum = 0;
+	float genome_cov = get_genome_coverage(ske->g);
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].n_reads = &n_reads;
@@ -600,6 +599,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 		worker_bundles[i].barcode_calculator = ske->barcode_calculator;
 		worker_bundles[i].lock = &lock;
 		worker_bundles[i].hash_sum = &hash_sum;
+		worker_bundles[i].genome_cov = genome_cov;
 	}
 
 	pthread_t *producer_threads, *worker_threads;

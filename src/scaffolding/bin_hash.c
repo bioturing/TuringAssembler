@@ -7,14 +7,7 @@
 
 int count_barcode(struct asm_graph_t *g, struct barcode_hash_t *buck)
 {
-	int cnt = 0;
-	
-	for (uint32_t i = 0; i < buck->size; ++i) {
-		if (buck->keys[i] != (uint64_t)(-1)) {
-			cnt++;
-		}
-	}
-	return cnt;
+	return buck->n_item;
 }
 
 float get_avg_barcode(struct asm_graph_t *g)
@@ -22,9 +15,12 @@ float get_avg_barcode(struct asm_graph_t *g)
 	int count = 0;
 	uint64_t sum = 0;
 	for (int i = 0; i < g->n_e; ++i) {
-		int tmp = count_barcode(g, &g->edges[i].barcodes);
-		sum += tmp;
-		count++;
+		if (get_edge_len(&g->edges[i]) > global_count_bc_size) {
+			int tmp = count_barcode(g, &g->edges[i].barcodes);
+			VERBOSE_FLAG(0, "len and bc %d %d\n", get_edge_len(&g->edges[i]), tmp);
+			sum += tmp;
+			count++;
+		}
 	}
 	return 1.0*sum/count;
 }
