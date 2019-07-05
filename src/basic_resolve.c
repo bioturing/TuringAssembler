@@ -762,7 +762,7 @@ gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, v_rc));
 		flag_v = (int)(cov / flow_cov < 0.2);
-		if (!flag_u || !flag_v) {
+		if (flag_u || flag_v) {
 			asm_remove_edge(g0, e);
 			asm_remove_edge(g0, e_rc);
 			++cnt;
