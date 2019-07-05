@@ -723,11 +723,26 @@ gint_t resolve_bubble(struct asm_graph_t *g, double uni_cov)
 	return cnt;
 }
 
+static inline double get_max_out_cov(struct asm_graph_t *g, gint_t u)
+{
+	double cur_cov, cov;
+	gint_t k, ep;
+	cur_cov = 0.0;
+	for (k = 0; k < g->nodes[u].deg; ++k) {
+		ep = g->nodes[u].adj[k];
+		if (g->edges[ep].source == -1)
+			continue;
+		cov = __get_edge_cov(g->edges + ep, g->ksize);
+		cur_cov = __max(cur_cov, cov);
+	}
+	return cur_cov;
+}
+
 gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
-	double uni_cov, cov;
+	double uni_cov, cov, flow_cov;
 	struct cov_range_t rcov, ercov;
-	gint_t e, e_rc, k, u, v, v_rc, ep;
+	gint_t e, e_rc, k, u, u_rc, v, v_rc, ep;
 	int flag_u, flag_v;
 	uni_cov = get_genome_coverage(g0);
 	gint_t cnt = 0;
@@ -736,30 +751,16 @@ gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 			continue;
 		e_rc = g0->edges[e].rc_id;
 		u = g0->edges[e].source;
+		u_rc = g0->nodes[u].rc_id;
 		v = g0->edges[e].target;
 		v_rc = g0->nodes[v].rc_id;
-		flag_u = flag_v = 0;
-		for (k = 0; k < g0->nodes[u].deg; ++k) {
-			ep = g0->nodes[u].adj[k];
-			if (g0->edges[ep].source == -1)
-				continue;
-			ercov = get_edge_cov_range(g0, ep, uni_cov);
-			if (ercov.lo > 0)
-				flag_u = 1;
-		}
-		for (k = 0; k < g0->nodes[v_rc].deg; ++k) {
-			ep = g0->nodes[v_rc].adj[k];
-			if (g0->edges[ep].source == -1)
-				continue;
-			ercov = get_edge_cov_range(g0, ep, uni_cov);
-			if (ercov.lo > 0)
-				flag_v = 1;
-		}
-		if (!flag_u || !flag_v)
-			continue;
-		cov = __get_edge_cov(g0->edges + e, g0->ksize) / uni_cov;
-		rcov = convert_cov_range(cov);
-		if (rcov.hi == 0) {
+		flow_cov = uni_cov;
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, u));
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, u_rc));
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, v_rc));
+		cov = __get_edge_cov(g0->edges + e, g0->ksize);
+		if (cov / flow_cov < 0.2) {
 			asm_remove_edge(g0, e);
 			asm_remove_edge(g0, e_rc);
 			++cnt;
