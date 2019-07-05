@@ -754,13 +754,15 @@ gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		u_rc = g0->nodes[u].rc_id;
 		v = g0->edges[e].target;
 		v_rc = g0->nodes[v].rc_id;
+		cov = __get_edge_cov(g0->edges + e, g0->ksize);
 		flow_cov = uni_cov;
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, u));
-		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, u_rc));
+		flag_u = (int)(cov / flow_cov < 0.2);
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, v_rc));
-		cov = __get_edge_cov(g0->edges + e, g0->ksize);
-		if (cov / flow_cov < 0.2) {
+		flag_v = (int)(cov / flow_cov < 0.2);
+		if (!flag_u || !flag_v) {
 			asm_remove_edge(g0, e);
 			asm_remove_edge(g0, e_rc);
 			++cnt;
