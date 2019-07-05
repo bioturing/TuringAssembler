@@ -19,15 +19,12 @@
 #include "scaffolding/khash.h"
 #include "scaffolding/scaffold.h"
 
-static pthread_mutex_t lock_merge = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t lock_table = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_put_table = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_append_edges = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t lock_write_file = PTHREAD_MUTEX_INITIALIZER;
 
 
-struct params{
+struct params {
 	struct opt_proc_t *opt;
 	struct asm_graph_t *g;
 	int i;
@@ -54,8 +51,6 @@ void *process_build_edge_score(void *data)
 	struct params_check_edge *pa_check_edge = (struct params_check_edge *) data;
 	struct candidate_edge *list_candidate_edges = pa_check_edge->list_candidate_edges;
 	struct asm_graph_t *g = pa_check_edge->g;
-	float avg_bin_hash = pa_check_edge->avg_bin_hash;
-	FILE* out_file = pa_check_edge->out_file;
 	int n_candidate_edges = pa_check_edge->n_candidate_edges;
 	do {
 		int i_candidate;
@@ -162,7 +157,6 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	for (int i_contig = 0; i_contig < g->n_e; i_contig++) {
 		if (is_very_short_contig(&g->edges[i_contig]))
 			continue;
-		float edge_cov  = __get_edge_cov(&params->g->edges[i_contig], params->g->ksize);
 		int value = count[i_contig] ;
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct candidate_edge));
@@ -204,7 +198,6 @@ void *process_build_big_table(void *data)
 {
 	void next_index(struct params_build_big_table *params, struct asm_graph_t *g)
 	{
-		int len = 0;
 		struct asm_edge_t *e = &g->edges[params->i];
 		params->i++;
 		if (params->i == g->n_e) 
@@ -224,7 +217,6 @@ void *process_build_big_table(void *data)
 		}
 		int i_contig = params->i;
 		int new_i_contig = i_contig;
-		int new_count;
 		next_index(params, g);
 		pthread_mutex_unlock(&lock_id);
 		
@@ -422,13 +414,15 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 		int n_edges = 0;
 		while (i_candidate_edge < para->n_candidate_edges && 
 			para->list_candidate_edges[i_candidate_edge].src <= i_contig) {
-			int left = para->list_candidate_edges[i_candidate_edge].src;
-			assert(left == i_contig);
-			int i1_contig = para->list_candidate_edges[i_candidate_edge].des; 
+			int src = para->list_candidate_edges[i_candidate_edge].src;
+			assert(src == i_contig);
+			int des = para->list_candidate_edges[i_candidate_edge].des;
 			struct pair_contigs_score score = para->list_candidate_edges[i_candidate_edge].score;
+			score.m_score = get_share_mate(g, src, des);
+            score.m2_score = get_share_mate_2(g, src, des);
 			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f\n", i_candidate_edge,
-					para->list_candidate_edges[i_candidate_edge].src, i1_contig, score.bc_score);
-			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, i1_contig, &score);
+					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score);
+			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, des, &score);
 			n_edges++;
 			if (n_edges > size_list_edge) {
 				size_list_edge = get_new_size(size_list_edge);
@@ -442,7 +436,7 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			struct pair_contigs_score *score = &list_edges[i_edge].score;
 			append_edge_score(edges_score, &(list_edges[i_edge]));
 			//todo huu  not hardcode
-			if ((score->bc_score == 0) ) {
+			if (score->bc_score == 0) {
 				break;
 			}
 		}
@@ -689,7 +683,6 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 		float edge_cov = __get_edge_cov(&g->edges[i], g->ksize)/global_genome_coverage;
 		mark[i] = MIN(lround(edge_cov), 3);
 	}
-	int found = 0;
 	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
 	int count = 0;
 	for (int i = 0; i < g->n_e; i++) if (mark[i] && !is_very_short_contig(&g->edges[i])){
