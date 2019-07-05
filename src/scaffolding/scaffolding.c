@@ -152,9 +152,6 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 			if (k == kh_end(big_table))
 				continue;
 			struct list_position *pos = kh_value(big_table, k);
-			if (i_edge == 552) {
-				VERBOSE_FLAG(0, " npos552 %d \n",pos->n_pos);
-			}
 			count_pos(count, pos);
 		}
 	} 
@@ -680,27 +677,37 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	return path;
 }
 
+void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
+{
+	if (!opt->metagenomics) {
+		for (int i = 0; i < g->n_e; i++) {
+			float edge_cov = __get_edge_cov(&g->edges[i], g->ksize)/global_genome_coverage;
+			mark[i] = MIN(lround(edge_cov), 3);
+		}
+	} else {
+		for (int i = 0; i < g->n_e; i++) {
+			mark[i] = 1;
+		}
+	}
+}
+
+
 void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_score_type *edges_score,
  		struct scaffold_type *scaffold)
 {
 	VERBOSE_FLAG(0, "start find scaffold\n");
 	int *mark = calloc(g->n_e, sizeof(int));
-	for (int i = 0; i < g->n_e; i++) {
-		float edge_cov = __get_edge_cov(&g->edges[i], g->ksize)/global_genome_coverage;
-		mark[i] = MIN(lround(edge_cov), 3);
-	}
-	int found = 0;
-	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
+	init_mark(g, opt, mark);
 	int count = 0;
-	for (int i = 0; i < g->n_e; i++) if (mark[i] && !is_very_short_contig(&g->edges[i])){
+	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
+	for (int i = 0; i < g->n_e; i++) if (mark[i] && is_long_contig(&g->edges[i])){
 		int start_contig = i;
 		VERBOSE_FLAG(1, "start find scaffolds from %d\n", start_contig);
 		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig, 
 							thres_score, &count);
 		add_path(scaffold, path);
 	}
-	for (int i = 0; i < g->n_e; i++) if (is_very_short_contig(&g->edges[i]) && 
-				get_edge_len(&g->edges[i]) > 1000 && mark[i]) {
+	for (int i = 0; i < g->n_e; i++) if (is_short_contig(&g->edges[i]) && mark[i]) {
 		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
 		append_i_contig(path, i);
 		add_path(scaffold, path);
@@ -745,13 +752,6 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	struct edges_score_type *edges_score = calloc(1, sizeof(struct edges_score_type));
 	struct scaffold_type *scaffold = new_scaffold_type();
 	pre_calc_score(g, opt, edges_score);
-	//print_edge_score(edges_score);
-
-//	normalize_min_index(g, edges_score);
-//	qsort(edges_score->list_edge, edges_score->n_edge, sizeof(struct scaffold_edge), 
-//			ascending_scaffold_edge_index);
-//	unique_edge(edges_score->list_edge, &edges_score->n_edge);
-//	normalize_one_dir(g, edges_score);
 
 	sort_edges_score(edges_score);
 	print_edge_score(edges_score);
