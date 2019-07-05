@@ -329,28 +329,30 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 	dst->seq_len = seq_len;
 }
 
-void asm_append_barcode(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t aux_flag)
+void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
-	if (aux_flag & ASM_HAVE_BARCODE)
-		barcode_hash_merge(&(dst->barcodes), &(src->barcodes));
-	if (aux_flag & ASM_HAVE_READPAIR) {
+	if ((g->aux_flag & ASM_HAVE_BARCODE) && g->edges[dst].seq_len < MIN_CONTIG_BARCODE)
+		barcode_hash_merge(&(g->edges[dst].barcodes), &(g->edges[src].barcodes));
+	if ((g->aux_flag & ASM_HAVE_READPAIR) && g->edges[dst].seq_len < MIN_CONTIG_READPAIR) {
 		gint_t i, k;
-		for (i = 0; i < src->n_mate_contigs; ++i) {
-			for (k = 0; k < dst->n_mate_contigs; ++k)
-				if (dst->mate_contigs[k] == src->mate_contigs[i])
+		for (i = 0; i < g->edges[src].n_mate_contigs; ++i) {
+			if (g->edges[src].mate_contigs[i] == dst)
+				continue;
+			for (k = 0; k < g->edges[dst].n_mate_contigs; ++k)
+				if (g->edges[dst].mate_contigs[k] == g->edges[src].mate_contigs[i])
 					break;
-			if (k == dst->n_mate_contigs) {
-				++dst->n_mate_contigs;
-				dst->mate_contigs = realloc(dst->mate_contigs,
-					dst->n_mate_contigs * sizeof(gint_t));
-				dst->mate_contigs[k] = src->mate_contigs[i];
-				dst->mate_barcodes = realloc(dst->mate_barcodes,
-					dst->n_mate_contigs * sizeof(struct barcode_hash_t));
-				barcode_hash_clone(dst->mate_barcodes + k,
-							src->mate_barcodes + i);
+			if (k == g->edges[dst].n_mate_contigs) {
+				++g->edges[dst].n_mate_contigs;
+				g->edges[dst].mate_contigs = realloc(g->edges[dst].mate_contigs,
+					g->edges[dst].n_mate_contigs * sizeof(gint_t));
+				g->edges[dst].mate_contigs[k] = g->edges[src].mate_contigs[i];
+				g->edges[dst].mate_barcodes = realloc(g->edges[dst].mate_barcodes,
+					g->edges[dst].n_mate_contigs * sizeof(struct barcode_hash_t));
+				barcode_hash_clone(g->edges[dst].mate_barcodes + k,
+							g->edges[src].mate_barcodes + i);
 			} else {
-				barcode_hash_merge(dst->mate_barcodes + k,
-							src->mate_barcodes + i);
+				barcode_hash_merge(g->edges[dst].mate_barcodes + k,
+							g->edges[src].mate_barcodes + i);
 			}
 		}
 	}
@@ -421,14 +423,12 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	 *                           contig 2
 	 * Since the barcode + read pair is now preserve only on the 1st contig
 	 * we do not need to append the barcode + read pair information */
-	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
+	asm_append_barcode_readpair(g, e1, e2);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 	g->edges[e1].target = g->edges[e2].target;
 	g->edges[e1].count += g->edges[e2].count;
 
-	if (g->edges[e_rc2].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e_rc2, g->edges + e_rc1, g->aux_flag);
+	asm_append_barcode_readpair(g, e_rc2, e_rc1);
 	asm_append_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
@@ -450,20 +450,16 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	 * Since e2 is usually a repetitive edges, we need to pre-estimate the
 	 * count that e2 contributes to final edge
 	 */
-	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e1, g->edges + e2, g->aux_flag);
+	asm_append_barcode_readpair(g, e1, e2);
 	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
-	if (g->edges[e1].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e1, g->edges + e3, g->aux_flag);
+	asm_append_barcode_readpair(g, e1, e3);
 	asm_append_seq(g->edges + e1, g->edges + e3, g->ksize);
 	g->edges[e1].target = g->edges[e3].target;
 	g->edges[e1].count += g->edges[e3].count + e2_count;
 
-	if (g->edges[e_rc3].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e_rc3, g->edges + e_rc2, g->aux_flag);
+	asm_append_barcode_readpair(g, e_rc3, e_rc2);
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc2, g->ksize);
-	if (g->edges[e_rc3].seq_len < MIN_CONTIG_READPAIR)
-		asm_append_barcode(g->edges + e_rc3, g->edges + e_rc1, g->aux_flag);
+	asm_append_barcode_readpair(g, e_rc3, e_rc1);
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc3].target = g->edges[e_rc1].target;
 	g->edges[e_rc3].count += g->edges[e_rc1].count + e2_count;

@@ -729,16 +729,16 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	/* calculate the ratio of each pair */
 	if ((cnt = (check_large_pair_superior(g, legs[0], legs[2], legs[3]) +
 			check_large_pair_superior(g, legs[1], legs[3], legs[2]))) >= 1) {
+		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
+			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
+			__VERBOSE("[Large Bridge] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			return 0;
+		}
 		if (cnt == 2) {
-			if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
-				!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
-				__VERBOSE("[Large Bridge] Incompatible coverage range %ld(%ld)\n", e, e_rc);
-				return 0;
-			}
-			__VERBOSE("[Large Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large Bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			__VERBOSE("[Large Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large Bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
 			// printf("%.3f %.3f\n",
@@ -762,10 +762,10 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				__VERBOSE("[Large Bridge] Bridge coverage is too small to split %ld(%ld)\n", e, e_rc);
 				return 0;
 			}
-			__VERBOSE("[Large Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large Bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			__VERBOSE("[Large Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large Bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
 			//printf("%.3f %.3f\n",
@@ -786,16 +786,16 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		}
 	} else if ((cnt = (check_large_pair_superior(g, legs[0], legs[3], legs[2]) +
 			check_large_pair_superior(g, legs[1], legs[2], legs[3]))) >= 1) {
+		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
+			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
+			__VERBOSE("Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			return 0;
+		}
 		if (cnt == 2) {
-			if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
-				!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
-				__VERBOSE("Incompatible coverage range %ld(%ld)\n", e, e_rc);
-				return 0;
-			}
-			__VERBOSE("[Large bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			__VERBOSE("[Large bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
 			// printf("%.3f %.3f\n",
@@ -819,10 +819,10 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				__VERBOSE("[Large Bridge] Bridge coverage is too small to split %ld(%ld)\n", e, e_rc);
 				return 0;
 			}
-			__VERBOSE("[Large bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			__VERBOSE("[Large bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Large bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
 			// printf("%.3f %.3f\n",
@@ -878,16 +878,21 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	}
 	if ((cnt = (check_medium_pair_superior(g, legs[0], legs[2], legs[3]) +
 			check_medium_pair_superior(g, legs[1], legs[3], legs[2]))) >= 1) {
+		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
+			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
+			__VERBOSE("[Large Bridge] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			return 0;
+		}
 		if (cnt == 2) {
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
 			asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
 
-			__VERBOSE("[Med bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			__VERBOSE("[Med Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med Bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
 
@@ -905,10 +910,10 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
 
-			__VERBOSE("[Med Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med Bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			__VERBOSE("[Med Bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med Bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
 
@@ -916,18 +921,23 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			asm_remove_edge(g, e_rc);
 			return 2;
 		}
-	} else if ((cnt = (check_large_pair_superior(g, legs[0], legs[3], legs[2]) +
-			check_large_pair_superior(g, legs[1], legs[2], legs[3]))) >= 1) {
+	} else if ((cnt = (check_medium_pair_superior(g, legs[0], legs[3], legs[2]) +
+			check_medium_pair_superior(g, legs[1], legs[2], legs[3]))) >= 1) {
+		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
+			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
+			__VERBOSE("Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			return 0;
+		}
 		if (cnt == 2) {
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
 			asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
 
-			__VERBOSE("[Med bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			__VERBOSE("[Med bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
 
@@ -945,10 +955,10 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
 
-			__VERBOSE("[Med bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			__VERBOSE("[Med bridge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			__VERBOSE("[Med bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
 
