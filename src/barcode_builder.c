@@ -207,10 +207,11 @@ static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
 					struct asm_edge_t *e, uint32_t max_len)
 {
 	uint32_t i, j, k, len;
-	if (max_len != 0)
-		len = __min(max_len, e->seq_len);
-	else
-		len = e->seq_len;
+	// if (max_len != 0)
+	// 	len = __min(max_len, e->seq_len);
+	// else
+	// 	len = e->seq_len;
+	len = e->seq_len;
 	if (*m_seq < len + 1) {
 		*m_seq = len + 1;
 		*seq = realloc(*seq, *m_seq);
@@ -280,10 +281,11 @@ void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, ui
 		g->aux_flag |= ASM_HAVE_BARCODE;
 	if (aux_build & ASM_BUILD_READPAIR)
 		g->aux_flag |= ASM_HAVE_READPAIR;
-	if (!(g->aux_flag & ASM_BUILD_COVERAGE))
-		init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR, MIN_CONTIG_BARCODE);
-	else
-		init_contig_map_info(g, fasta_prefix, 0, 0);
+	init_contig_map_info(g, fasta_prefix, 0, 0);
+	// if (!(g->aux_flag & ASM_BUILD_COVERAGE))
+	// 	init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR, MIN_CONTIG_BARCODE);
+	// else
+	// 	init_contig_map_info(g, fasta_prefix, 0, 0);
 	struct bccount_bundle_t ske;
 	ske.g = g;
 	ske.aux_build = aux_build;
@@ -384,11 +386,10 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			aligned + 20 < r1->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		// 	if (aligned > g->ksize)
-		// 		atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
-		// }
+		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+			if (aligned > g->ksize)
+				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+		}
 		if (ar1.a[i].score > best_score1 && ar1.a[i].score + 5 >= aligned) {
 			best_score1 = ar1.a[i].score;
 			p1[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
@@ -413,11 +414,10 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			aligned + 20 < r2->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
-		// if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-		// 	int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		// 	if (aligned > g->ksize)
-		// 			atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
-		// }
+		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+			if (aligned > g->ksize)
+					atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+		}
 		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
 			best_score2 = ar2.a[i].score;
 			p2[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
