@@ -1383,7 +1383,7 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
 	gint_t u, v, u_rc, v_rc, j, e_return, e_return_rc, e_rc, e1, e2;
-	int flag1, flag2;
+	int flag1, flag2, flag3;
 	u = g->edges[e].source;
 	v = g->edges[e].target;
 	e_rc = g->edges[e].rc_id;
