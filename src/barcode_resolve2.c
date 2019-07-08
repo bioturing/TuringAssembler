@@ -1412,6 +1412,8 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 		__VERBOSE("Something happens\n");
 		return 0;
 	}
+	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		e, e_rc, e_return, e_return_rc, e, e_rc);
 	asm_unroll_loop_forward(g, e, e_return);
 	asm_unroll_loop_forward(g, e_rc, e_return_rc);
 	asm_remove_edge(g, e_return);
@@ -1426,9 +1428,11 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 
 	if (g->edges[e2].seq_len >= MIN_CONTIG_READPAIR &&
 		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
-		flag2 = check_medium_pair_positive(g, e2, e);
+		flag2 = check_medium_pair_positive(g, e2, e_rc);
 	else
 		flag2 = 1;
+
+	__VERBOSE("[deb] flag1 = %d; flag2 = %d\n", flag1, flag2);
 
 	if (flag1 && flag2) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
