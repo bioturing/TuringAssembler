@@ -1419,7 +1419,7 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	asm_remove_edge(g, e_return);
 	asm_remove_edge(g, e_return_rc);
 
-	flag1 = flag2 = 0;
+	flag1 = flag2 = flag3 = 0;
 	if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
 		flag1 = check_medium_pair_positive(g, e1, e);
@@ -1432,9 +1432,13 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	else
 		flag2 = 1;
 
-	__VERBOSE("[deb] flag1 = %d; flag2 = %d\n", flag1, flag2);
+	if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
+		g->edges[e2].seq_len >= MIN_CONTIG_READPAIR)
+		flag3 = check_medium_pair_positive(g, e1, e2);
 
-	if (flag1 && flag2) {
+	__VERBOSE("[deb] flag1 = %d; flag2 = %d; flag3 = %d\n", flag1, flag2, flag3);
+
+	if ((flag1 && flag2) | (flag3 && g->edges[e].seq_len < MIN_CONTIG_BARCODE)) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
 		return 1;

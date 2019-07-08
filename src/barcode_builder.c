@@ -382,6 +382,7 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
 			aligned + 20 < r1->len)
 			continue;
@@ -404,19 +405,19 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (k == n1)
 				p1[n1++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		}
-		free(a.cigar);
 	}
 	for (i = 0; i < (int)ar2.n; ++i) {
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
 			aligned + 20 < r2->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 			if (aligned > g->ksize)
-					atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
 		}
 		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
 			best_score2 = ar2.a[i].score;
@@ -432,7 +433,6 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (k == n2)
 				p2[n2++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		}
-		free(a.cigar);
 	}
 	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
 		for (i = 0; i < n1; ++i)
