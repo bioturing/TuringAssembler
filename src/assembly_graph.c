@@ -454,16 +454,19 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_remove_edge(g, e_rc1);
 }
 
-void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
+void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int rep)
 {
 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
 	memset(g->edges + g->n_e, 0, sizeof(struct asm_edge_t));
 	++g->n_e;
 	asm_clone_edge(g, g->n_e - 1, e1);
-	asm_append_barcode_readpair(g, e1, e2);
-	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
-	asm_append_barcode_readpair(g, e1, g->n_e - 1);
-	asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
+	int i;
+	for (i = 0; i < rep; ++i) {
+		asm_append_barcode_readpair(g, e1, e2);
+		asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+		asm_append_barcode_readpair(g, e1, g->n_e - 1);
+		asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
+	}
 	g->edges[e1].count += g->edges[e2].count;
 	asm_clean_edge(g, g->n_e - 1);
 	--g->n_e;

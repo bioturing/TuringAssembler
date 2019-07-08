@@ -1418,10 +1418,19 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 		__VERBOSE("Something happens\n");
 		return 0;
 	}
-	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
-		e, e_rc, e_return, e_return_rc, e, e_rc);
-	asm_unroll_loop_forward(g, e, e_return);
-	asm_unroll_loop_forward(g, e_rc, e_return_rc);
+	double fcov_e, fcov_e_return;
+	fcov_e = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
+	fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize) / uni_cov;
+	struct cov_range_t rcov_e, rcov_e_return;
+	rcov_e = convert_cov_range(fcov_e);
+	rcov_e_return = convert_cov_range(fcov_e_return);
+	int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
+	if (rep == 0)
+		rep = 1;
+	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
+		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
+	asm_unroll_loop_forward(g, e, e_return, rep);
+	asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
 	asm_remove_edge(g, e_return);
 	asm_remove_edge(g, e_return_rc);
 
@@ -1447,6 +1456,8 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	if ((flag1 && flag2) | (flag3 && g->edges[e].seq_len < MIN_CONTIG_BARCODE)) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
+		asm_remove_edge(g, e);
+		asm_remove_edge(g, e_rc);
 		return 1;
 	} else {
 		if (!flag1)
