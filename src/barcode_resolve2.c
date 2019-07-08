@@ -1191,6 +1191,30 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 	return ret;
 }
 
+gint_t join_1_1_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
+					khash_t(gint) *set_leg, double uni_cov)
+{
+	gint_t *legs = alloca(kh_size(set_leg) * sizeof(gint_t));
+	gint_t n_leg, e1, e2, e;
+	khiter_t k;
+	n_leg = get_array_legs(g, legs, set_e, set_leg);
+	e1 = legs[0];
+	e2 = legs[1];
+	uint32_t gap_len = 0;
+	double fcov;
+	struct cov_range_t rcov;
+	for (k = kh_begin(set_e); k != kh_end(set_e); ++k) {
+		if (!kh_exist(set_e, k))
+			continue;
+		e = kh_key(set_e, k);
+		fcov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
+		rcov = convert_cov_range(fcov);
+		gap_len += rcov.lo * (g->edges[e].seq_len - g->ksize);
+	}
+	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id, gap_len);
+	return 1;
+}
+
 gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 					khash_t(gint) *set_leg, double uni_cov)
 {
@@ -1560,6 +1584,41 @@ gint_t collapse_n_m_node(struct asm_graph_t *g)
 
 /*************************** Process entry point ******************************/
 
+void resolve_simple_complex(struct asm_graph_t *g)
+{
+	double uni_cov = get_genome_coverage(g);
+	khash_t(gint) *visited, *set_e, *set_v, *set_leg, *set_self;
+	visited = kh_init(gint);
+	set_e = kh_init(gint);
+	set_v = kh_init(gint);
+	set_leg = kh_init(gint);
+	set_self = kh_init(gint);
+	gint_t e, ret = 0;
+	uint32_t n_leg, n_self;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		uint32_t len = get_edge_len(g->edges + e);
+		if (kh_get(gint, visited, e) != kh_end(visited) || len < MIN_CONTIG_BARCODE)
+			continue;
+		find_region(g, e, MIN_CONTIG_BARCODE, MAX_EDGE_COUNT, uni_cov, set_v, set_e);
+		if (kh_size(set_e) < MAX_EDGE_COUNT) {
+			kh_merge_set(visited, set_e);
+			detect_leg(g, MIN_LONG_CONTIG, MAX_MOLECULE_LEN,
+					set_v, set_e, set_leg, set_self);
+			n_leg = kh_size(set_leg);
+			n_self = kh_size(set_self);
+			if (n_self == 0 && n_leg == 2)
+				ret += join_1_1_small_jungle(g, set_e, set_leg, uni_cov);
+		}
+		kh_clear(gint, set_leg);
+		kh_clear(gint, set_e);
+		kh_clear(gint, set_v);
+		kh_clear(gint, set_self);
+	}
+	__VERBOSE("Number of joined 1-1 pair(s) through jungle: %ld\n", ret);
+}
+
 void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t cnt = 0, cnt_local;
@@ -1572,6 +1631,7 @@ void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
 		cnt_local += collapse_n_m_bridge(g0);
 		cnt += cnt_local;
 	} while (cnt_local);
+	resolve_simple_complex(g0);
 	asm_condense(g0, g);
 }
 
