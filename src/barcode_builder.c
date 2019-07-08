@@ -43,8 +43,6 @@ uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
 			break;
 		}
 	}
-	if (len != 18)
-		return (uint64_t)-1;
 	return ret;
 }
 

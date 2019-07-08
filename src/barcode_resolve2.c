@@ -1211,7 +1211,7 @@ gint_t join_1_1_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 		rcov = convert_cov_range(fcov);
 		gap_len += rcov.lo * (g->edges[e].seq_len - g->ksize);
 	}
-	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id, gap_len);
+	asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id, gap_len / 2);
 	return 1;
 }
 
