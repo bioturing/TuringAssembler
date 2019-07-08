@@ -305,8 +305,8 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if (e_return == -1)
 			return 0;
 		e_return_rc = g->edges[e_return].rc_id;
-		if (g->edges[e].seq_len >= MIN_CONTIG_BARCODE ||
-			g->edges[e_return].seq_len >= MIN_CONTIG_BARCODE)
+		if (g->edges[e].seq_len >= MIN_CONTIG_READPAIR ||
+			g->edges[e_return].seq_len >= MIN_CONTIG_READPAIR)
 			return 0;
 		double fcov_e, fcov_e_return;
 		fcov_e = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
@@ -315,13 +315,14 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		rcov_e = convert_cov_range(fcov_e);
 		rcov_e_return = convert_cov_range(fcov_e_return);
 		int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
-		if (rep == 0)
-			rep = 1;
-		asm_unroll_loop_forward(g, e, e_return, rep);
-		asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
-		asm_remove_edge(g, e_return);
-		asm_remove_edge(g, e_return_rc);
-		return 3;
+		// rep = __min(rep, 2);
+		if (rep) {
+			asm_unroll_loop_forward(g, e, e_return, rep);
+			asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
+			asm_remove_edge(g, e_return);
+			asm_remove_edge(g, e_return_rc);
+			return 3;
+		}
 	}
 	return 0;
 }
@@ -734,10 +735,11 @@ gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		flow_cov = uni_cov;
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, u));
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, u_rc));
-		flag_u = (int)(cov / flow_cov < 0.2);
+		flag_u = (int)(cov / flow_cov < 0.1);
+		flow_cov = uni_cov;
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
 		flow_cov = __min(flow_cov, get_max_out_cov(g0, v_rc));
-		flag_v = (int)(cov / flow_cov < 0.2);
+		flag_v = (int)(cov / flow_cov < 0.1);
 		if (flag_u || flag_v) {
 			asm_remove_edge(g0, e);
 			asm_remove_edge(g0, e_rc);

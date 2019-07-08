@@ -466,6 +466,8 @@ void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int re
 		asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
 		asm_append_barcode_readpair(g, e1, g->n_e - 1);
 		asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
+		if (g->edges[e1].seq_len >= 2000)
+			break;
 	}
 	g->edges[e1].count += g->edges[e2].count;
 	asm_clean_edge(g, g->n_e - 1);
