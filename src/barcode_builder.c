@@ -169,8 +169,8 @@ void print_test_pair_end(struct asm_graph_t *g, gint_t e)
 	printf("number of mate = %u\n", g->edges[e].n_mate_contigs);
 	gint_t k;
 	for (k = 0; k < g->edges[e].n_mate_contigs; ++k) {
-		printf("mate = %ld; number of unique barcode = %u\n",
-			g->edges[e].mate_contigs[k], g->edges[e].mate_barcodes[k].n_item);
+		printf("mate = %ld; number of reads = %ld\n",
+			g->edges[e].mate_contigs[k], g->edges[e].mate_counts[k]);
 	}
 	printf("-----------------------------------------------------------\n");
 }
@@ -250,7 +250,8 @@ void init_contig_map_info(struct asm_graph_t *g, const char *path,
 			barcode_hash_init(&g->edges[e].barcodes, 4);
 		g->edges[e].n_mate_contigs = 0;
 		g->edges[e].mate_contigs = NULL;
-		g->edges[e].mate_barcodes = NULL;
+		g->edges[e].mate_counts = NULL;
+		// g->edges[e].mate_barcodes = NULL;
 	}
 	fclose(fp);
 	bwa_idx_build(path, path, BWTALGO_AUTO, 25000000);
@@ -326,12 +327,16 @@ static inline void add_read_pair_edge(struct asm_graph_t *g, gint_t e, gint_t ne
 		++g->edges[e].n_mate_contigs;
 		g->edges[e].mate_contigs = realloc(g->edges[e].mate_contigs,
 			g->edges[e].n_mate_contigs * sizeof(gint_t));
-		g->edges[e].mate_barcodes = realloc(g->edges[e].mate_barcodes,
-			g->edges[e].n_mate_contigs * sizeof(struct barcode_hash_t));
+		g->edges[e].mate_counts = realloc(g->edges[e].mate_counts,
+			g->edges[e].n_mate_contigs * sizeof(gint_t));
+		// g->edges[e].mate_barcodes = realloc(g->edges[e].mate_barcodes,
+		// 	g->edges[e].n_mate_contigs * sizeof(struct barcode_hash_t));
 		g->edges[e].mate_contigs[i] = next_e;
-		barcode_hash_init(g->edges[e].mate_barcodes + i, 4);
+		g->edges[e].mate_counts[i] = 0;
+		// barcode_hash_init(g->edges[e].mate_barcodes + i, 4);
 	}
-	barcode_hash_add(g->edges[e].mate_barcodes + i, bc);
+	++g->edges[e].mate_counts[i];
+	// barcode_hash_add(g->edges[e].mate_barcodes + i, bc);
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 

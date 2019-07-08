@@ -232,7 +232,7 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 	h2 = &g->edges[e2].barcodes;
 	h2a = &g->edges[e2a].barcodes;
 
-	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a, cnt2, cnt2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
 		if (h1->keys[i] == (uint64_t)-1)
@@ -278,42 +278,47 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 			return 0;
 		}
 	} else {
-		h2 = NULL;
-		h2a = NULL;
 		gint_t k;
+		cnt2 = cnt2a = 0;
 		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
 			if (g->edges[e1].mate_contigs[k] == e2)
-				h2 = g->edges[e1].mate_barcodes + k;
-			if (g->edges[e1].mate_contigs[k] == e2a)
-				h2a = g->edges[e1].mate_barcodes + k;
+				cnt2 = g->edges[e1].mate_counts[k];
+			if (g->edges[e1].mate_counts[k] == e2a)
+				cnt2a = g->edges[e1].mate_counts[k];
 		}
-		if (h2 == NULL)
+		if (cnt2 < MIN_READPAIR_COUNT)
 			return 0;
-		if (h2->n_item < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_barcodes[k].n_item > h2->n_item)
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+			if (g->edges[e1].mate_counts[k] > cnt2)
 				return 0;
-		}
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
-			if (g->edges[e2].mate_barcodes[k].n_item > h2->n_item)
+		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+			if (g->edges[e2].mate_counts[k] > cnt2)
 				return 0;
-		}
-		if (h2a == NULL)
+		if (cnt2 > cnt2a * 2)
 			return 1;
-		if (h2->n_item > h2a->n_item * 2)
-			return 1;
-		uint32_t shared = count_shared_bc(h2, h2a);
-		if ((h2->n_item - shared) > (h2a->n_item - shared) * 2 &&
-			h2->n_item - shared > h2a->n_item - shared + 10)
-			return 1;
+		return 0;
 	}
+	return 0;
+}
+
+static inline int check_large_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
+							&g->edges[e2].barcodes);
+	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item +
+					g->edges[e2].barcodes.n_item);
+	if (ratio + EPS > MIN_BARCODE_RATIO)
+		return 1;
 	return 0;
 }
 
 static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
+	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE)
+		return check_large_pair_positive(g, e1, e2);
+	uint32_t shared, cnt;
+	shared = count_shared_bc(&g->edges[e1].barcodes,
 							&g->edges[e2].barcodes);
 	/* hard count */
 	// if (shared >= MIN_BARCODE_COUNT)
@@ -322,26 +327,29 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item + g->edges[e2].barcodes.n_item);
 	if (ratio + EPS > MIN_BARCODE_RATIO)
 		return 1;
-	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
-		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE)
-		return 0;
 	gint_t k;
-	struct barcode_hash_t *h = NULL;
+	cnt = 0;
 	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (g->edges[e1].mate_contigs[k] == e2)
-			h = g->edges[e1].mate_barcodes + k;
+		if (g->edges[e1].mate_counts[k] == e2)
+			cnt = g->edges[e1].mate_counts[k];
 	}
-	if (h == NULL)
-		return 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (h->n_item <= g->edges[e1].mate_barcodes[k].n_item)
-			return 0;
-	}
-	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
-		if (h->n_item <= g->edges[e2].mate_barcodes[k].n_item)
-			return 0;
-	}
-	return (h->n_item >= MIN_READPAIR_COUNT);
+	return (cnt >= MIN_READPAIR_COUNT);
+	// struct barcode_hash_t *h = NULL;
+	// for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+	// 	if (g->edges[e1].mate_contigs[k] == e2)
+	// 		h = g->edges[e1].mate_barcodes + k;
+	// }
+	// if (h == NULL)
+	// 	return 0;
+	// for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+	// 	if (h->n_item <= g->edges[e1].mate_barcodes[k].n_item)
+	// 		return 0;
+	// }
+	// for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
+	// 	if (h->n_item <= g->edges[e2].mate_barcodes[k].n_item)
+	// 		return 0;
+	// }
+	// return (h->n_item >= MIN_READPAIR_COUNT);
 }
 
 static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
@@ -380,12 +388,16 @@ static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gin
 
 static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
+	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
+		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE &&
+		g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
+		return check_large_pair_greater(g, e1, e2, e2a);
 	struct barcode_hash_t *h1, *h2, *h2a;
 	h1 = &g->edges[e1].barcodes;
 	h2 = &g->edges[e2].barcodes;
 	h2a = &g->edges[e2a].barcodes;
 
-	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a, cnt2, cnt2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
 		if (h1->keys[i] == (uint64_t)-1)
@@ -421,31 +433,25 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 			return 0;
 		}
 	} else {
-		h2 = NULL;
-		h2a = NULL;
+		cnt2 = cnt2a = 0;
 		gint_t k;
 		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
 			if (g->edges[e1].mate_contigs[k] == e2)
-				h2 = g->edges[e1].mate_barcodes + k;
-			if (g->edges[e1].mate_contigs[k] == e2a)
-				h2a = g->edges[e1].mate_barcodes + k;
+				cnt2 = g->edges[e1].mate_counts[k];
+			if (g->edges[e1].mate_counts[k] == e2a)
+				cnt2a = g->edges[e1].mate_counts[k];
 		}
-		if (h2 == NULL)
+		if (cnt2 < MIN_READPAIR_COUNT)
 			return 0;
-		if (h2->n_item < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_barcodes[k].n_item > h2->n_item)
+		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+			if (g->edges[e1].mate_counts[k] > cnt2)
 				return 0;
-		}
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
-			if (g->edges[e2].mate_barcodes[k].n_item > h2->n_item)
+		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+			if (g->edges[e2].mate_counts[k] > cnt2)
 				return 0;
-		}
-		if (h2a == NULL)
+		if (cnt2 > cnt2a)
 			return 1;
-		if (h2->n_item > h2a->n_item)
-			return 1;
+		return 0;
 	}
 	return 0;
 }

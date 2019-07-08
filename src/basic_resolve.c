@@ -661,7 +661,7 @@ static void bubble_keep_best(struct asm_graph_t *g, gint_t *edges, gint_t n)
 	g->edges[g->edges[keep_e].rc_id].count = sum_count;
 }
 
-gint_t test_bubble(struct asm_graph_t *g, gint_t e_id, double uni_cov)
+static gint_t test_bubble(struct asm_graph_t *g, gint_t e_id, double uni_cov)
 {
 	gint_t u, j, e, n, v;
 	u = g->edges[e_id].source;

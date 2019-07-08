@@ -36,9 +36,10 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t barcodes;		/* mapped barcode */
-	struct barcode_hash_t *mate_barcodes;
-	gint_t *mate_contigs;
 	int n_mate_contigs;
+	// struct barcode_hash_t *mate_barcodes;
+	gint_t *mate_counts;
+	gint_t *mate_contigs;
 	// struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
 	// gint_t best_mate_contigs;		/* best mate contigs picker */
 };
@@ -71,10 +72,10 @@ struct asm_graph_t {
 #define MAX_MOLECULE_LEN		30000
 
 #define MIN_BARCODE_COUNT		150
-#define MIN_READPAIR_COUNT		20
+#define MIN_READPAIR_COUNT		15
 
-#define MIN_BARCODE_RATIO		0.077
-#define MIN_SUB_BARCODE_RATIO		0.044
+#define MIN_BARCODE_RATIO		0.044
+#define MIN_SUB_BARCODE_RATIO		0.022
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
