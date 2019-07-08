@@ -174,19 +174,6 @@ static gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	// 		get_edge_len(g->edges + e), fcov);
 // }
 
-void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
-{
-	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
-	memset(g->edges + g->n_e, 0, sizeof(struct asm_edge_t));
-	++g->n_e;
-	asm_clone_edge(g, g->n_e - 1, e1);
-	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
-	asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
-	g->edges[e1].count += g->edges[e2].count;
-	asm_clean_edge(g, g->n_e - 1);
-	--g->n_e;
-}
-
 // void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
 // {
 // 	double fcov1, fcov2;
@@ -281,6 +268,10 @@ void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 		for (i = 0; i < g->edges[dst].n_mate_contigs; ++i)
 			barcode_hash_clone(g->edges[dst].mate_barcodes + i,
 						g->edges[src].mate_barcodes + i);
+	} else {
+		g->edges[dst].n_mate_contigs = 0;
+		g->edges[dst].mate_contigs = NULL;
+		g->edges[dst].mate_barcodes = NULL;
 	}
 }
 
@@ -438,6 +429,21 @@ void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
+}
+
+void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
+	memset(g->edges + g->n_e, 0, sizeof(struct asm_edge_t));
+	++g->n_e;
+	asm_clone_edge(g, g->n_e - 1, e1);
+	asm_append_barcode_readpair(g, e1, e2);
+	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+	asm_append_barcode_readpair(g, e1, g->n_e - 1);
+	asm_append_seq(g->edges + e1, g->edges + (g->n_e - 1), g->ksize);
+	g->edges[e1].count += g->edges[e2].count;
+	asm_clean_edge(g, g->n_e - 1);
+	--g->n_e;
 }
 
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,

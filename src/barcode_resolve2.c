@@ -1083,6 +1083,17 @@ gint_t check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	return ret;
 }
 
+static inline void isolate_edge(struct asm_graph_t *g, gint_t e)
+{
+	asm_remove_node_adj(g, g->edges[e].source, e);
+	gint_t n = asm_create_node(g);
+	g->edges[e].source = n;
+	g->nodes[n].adj = malloc(sizeof(gint_t));
+	g->nodes[n].adj[0] = e;
+	g->nodes[n].deg = 1;
+	g->edges[g->edges[e].rc_id].target = g->nodes[n].rc_id;
+}
+
 gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 {
 	gint_t u_rc;
@@ -1158,13 +1169,7 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 				asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				++ret;
 			} else {
-				asm_remove_node_adj(g, g->edges[e1].source, e1);
-				gint_t n = asm_create_node(g);
-				g->edges[e1].source = n;
-				g->nodes[n].adj = malloc(sizeof(gint_t));
-				g->nodes[n].adj[0] = e1;
-				g->nodes[n].deg = 1;
-				g->edges[g->edges[e1].rc_id].target = g->nodes[n].rc_id;
+				isolate_edge(g, e1);
 			}
 		} else {
 			if (__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
@@ -1173,13 +1178,7 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 				asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				++ret;
 			} else {
-				asm_remove_node_adj(g, g->edges[e1].source, e1);
-				gint_t n = asm_create_node(g);
-				g->edges[e1].source = n;
-				g->nodes[n].adj = malloc(sizeof(gint_t));
-				g->nodes[n].adj[0] = e1;
-				g->nodes[n].deg = 1;
-				g->edges[g->edges[e1].rc_id].target = g->nodes[n].rc_id;
+				isolate_edge(g, e1);
 			}
 		}
 	}
@@ -1377,6 +1376,71 @@ gint_t join_n_m_complex_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 	} while (resolve);
 	free(path_seq);
 	return ret;
+}
+
+/*************************** long loop ****************************************/
+
+static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
+{
+	gint_t u, v, u_rc, v_rc, j, e_return, e_return_rc, e_rc, e1, e2;
+	int flag1, flag2;
+	u = g->edges[e].source;
+	v = g->edges[e].target;
+	e_rc = g->edges[e].rc_id;
+	u_rc = g->nodes[u].rc_id;
+	v_rc = g->nodes[v].rc_id;
+	if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
+		g->nodes[u_rc].deg > 2 || g->nodes[v].deg > 2)
+		return 0;
+	e2 = e_return = -1;
+	for (j = 0; j < g->nodes[v].deg; ++j) {
+		if (g->edges[g->nodes[v].adj[j]].target == u)
+			e_return = g->nodes[v].adj[j];
+		else
+			e2 = g->nodes[v].adj[j];
+	}
+	if (e_return == -1 || e2 == -1)
+		return 0;
+	e1 = e_return_rc = -1;
+	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+		if (g->edges[g->nodes[u_rc].adj[j]].target == v_rc)
+			e_return_rc = g->nodes[u_rc].adj[j];
+		else
+			e1 = g->nodes[u_rc].adj[j];
+	}
+	if (e_return_rc != g->edges[e_return].rc_id) {
+		__VERBOSE("Something happens\n");
+		return 0;
+	}
+	asm_unroll_loop_forward(g, e, e_return);
+	asm_unroll_loop_forward(g, e_rc, e_return_rc);
+	asm_remove_edge(g, e_return);
+	asm_remove_edge(g, e_return_rc);
+
+	flag1 = flag2 = 0;
+	if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
+		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
+		flag1 = check_medium_pair_positive(g, e1, e);
+	else
+		flag1 = 1;
+
+	if (g->edges[e2].seq_len >= MIN_CONTIG_READPAIR &&
+		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
+		flag2 = check_medium_pair_positive(g, e2, e);
+	else
+		flag2 = 1;
+
+	if (flag1 && flag2) {
+		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
+				e2, g->edges[e2].rc_id, g->edges[e].count);
+		return 1;
+	} else {
+		if (!flag1)
+			isolate_edge(g, e);
+		if (!flag2)
+			isolate_edge(g, e2);
+		return 0;
+	}
 }
 
 /*************************** Iterate regions **********************************/
