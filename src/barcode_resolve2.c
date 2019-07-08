@@ -1459,7 +1459,7 @@ gint_t collapse_2_2_large_bridge(struct asm_graph_t *g)
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
-			ret = check_simple_loop(g, e, uni_cov);
+			ret = check_long_loop(g, e, uni_cov);
 			if (ret == 0) {
 				ret = check_2_2_large_bridge(g, e, uni_cov);
 				cnt_local += ret;
@@ -1483,7 +1483,7 @@ gint_t collapse_2_2_medium_bridge(struct asm_graph_t *g)
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
-			ret = check_simple_loop(g, e, uni_cov);
+			ret = check_long_loop(g, e, uni_cov);
 			if (ret == 0) {
 				ret = check_2_2_medium_bridge(g, e, uni_cov);
 				cnt_local += ret;
@@ -1507,7 +1507,7 @@ gint_t collapse_n_m_bridge(struct asm_graph_t *g)
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
-			ret = check_simple_loop(g, e, uni_cov);
+			ret = check_long_loop(g, e, uni_cov);
 			if (ret == 0) {
 				ret = check_n_m_bridge(g, e, uni_cov);
 				cnt_local += ret;
