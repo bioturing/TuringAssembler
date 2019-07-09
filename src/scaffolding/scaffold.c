@@ -17,6 +17,7 @@ void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type 
 			list_contig[path->n_left_half - 1 - i] = path->left_half[i];
 		COPY_ARR(path->right_half, list_contig + path->n_left_half, path->n_right_half);
 		print_contig(g, out_file, i, sum_n, list_contig);
+		free(list_contig);
 	}
 }
 
@@ -45,7 +46,10 @@ void add_path(struct scaffold_type *scaffold, struct scaffold_path *path)
 	scaffold->n_path++;
 	int n = scaffold->n_path;
 	scaffold->path = realloc(scaffold->path, n*sizeof(struct scaffold_path));
-	scaffold->path[n-1] = *path;
+	scaffold->path[n-1].n_right_half = path->n_right_half;
+	scaffold->path[n-1].n_left_half = path->n_left_half;
+	scaffold->path[n-1].right_half = path->right_half;
+	scaffold->path[n-1].left_half = path->left_half;
 }
 
 void destroy_path(struct scaffold_path *path)

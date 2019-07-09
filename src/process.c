@@ -9,6 +9,7 @@
 #include "time_utils.h"
 #include "verbose.h"
 #include "scaffolding/scaffolding.h"
+#include "barcode_resolve2.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -79,6 +80,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	free(out_name);
 	fclose(out_file);
 	asm_graph_destroy(g0);
+	free(g0);
 }
 
 void build_scaffolding_test_process(struct opt_proc_t *opt)
