@@ -67,21 +67,9 @@ float get_share_mate(struct asm_graph_t *g, int i0, int i1)
 	int score = 0;
 	for (int i = 0; i < rev_e0->n_mate_contigs; i++){
 		if (rev_e0->mate_contigs[i] == i1) {
-			score += rev_e0->mate_barcodes[i].n_item;
+			score += rev_e0->mate_counts[i];
 		}
 	}
 	return score;
 }
 
-float get_share_mate_2(struct asm_graph_t *g, int i0, int i1)
-{
-	int rev_i0 = g->edges[i0].rc_id;
-	struct asm_edge_t *rev_e0 = &g->edges[rev_i0];
-	int score = 0;
-	for (int i = 0; i < rev_e0->n_mate_contigs_2; i++){
-		if (rev_e0->mate_contigs_2[i] == i1) {
-			score += rev_e0->mate_barcodes_2[i].n_item;
-		}
-	}
-	return score;
-}

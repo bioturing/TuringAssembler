@@ -30,7 +30,6 @@ struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int 
 //		return score;
 //	}
 	score->m_score = get_share_mate(g, i0, i1);
-	score->m2_score = get_share_mate_2(g, i0, i1);
 	return score;
 }
 
