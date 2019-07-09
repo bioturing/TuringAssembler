@@ -274,30 +274,26 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 				if (len2a + 1000 > len2)
 					return 1;
 			}
-		} else {
-			return 0;
 		}
-	} else {
-		gint_t k;
-		cnt2 = cnt2a = 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_contigs[k] == e2)
-				cnt2 = g->edges[e1].mate_counts[k];
-			if (g->edges[e1].mate_counts[k] == e2a)
-				cnt2a = g->edges[e1].mate_counts[k];
-		}
-		if (cnt2 < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-			if (g->edges[e1].mate_counts[k] > cnt2)
-				return 0;
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-			if (g->edges[e2].mate_counts[k] > cnt2)
-				return 0;
-		if (cnt2 > cnt2a * 2)
-			return 1;
-		return 0;
 	}
+	gint_t k;
+	cnt2 = cnt2a = 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (g->edges[e1].mate_contigs[k] == e2)
+			cnt2 = g->edges[e1].mate_counts[k];
+		if (g->edges[e1].mate_counts[k] == e2a)
+			cnt2a = g->edges[e1].mate_counts[k];
+	}
+	if (cnt2 < MIN_READPAIR_COUNT)
+		return 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+		if (g->edges[e1].mate_counts[k] > cnt2)
+			return 0;
+	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+		if (g->edges[e2].mate_counts[k] > cnt2)
+			return 0;
+	if (cnt2 > cnt2a * 2)
+		return 1;
 	return 0;
 }
 
@@ -429,30 +425,26 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 				if (len2a + 1000 > len2)
 					return 1;
 			}
-		} else {
-			return 0;
 		}
-	} else {
-		cnt2 = cnt2a = 0;
-		gint_t k;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_contigs[k] == e2)
-				cnt2 = g->edges[e1].mate_counts[k];
-			if (g->edges[e1].mate_counts[k] == e2a)
-				cnt2a = g->edges[e1].mate_counts[k];
-		}
-		if (cnt2 < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-			if (g->edges[e1].mate_counts[k] > cnt2)
-				return 0;
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-			if (g->edges[e2].mate_counts[k] > cnt2)
-				return 0;
-		if (cnt2 > cnt2a)
-			return 1;
-		return 0;
 	}
+	gint_t k;
+	cnt2 = cnt2a = 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (g->edges[e1].mate_contigs[k] == e2)
+			cnt2 = g->edges[e1].mate_counts[k];
+		if (g->edges[e1].mate_counts[k] == e2a)
+			cnt2a = g->edges[e1].mate_counts[k];
+	}
+	if (cnt2 < MIN_READPAIR_COUNT)
+		return 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+		if (g->edges[e1].mate_counts[k] > cnt2)
+			return 0;
+	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+		if (g->edges[e2].mate_counts[k] > cnt2)
+			return 0;
+	if (cnt2 > cnt2a)
+		return 1;
 	return 0;
 }
 
@@ -596,6 +588,7 @@ static gint_t bc_find_pair(struct asm_graph_t *g, gint_t se, gint_t *adj, gint_t
 	if (ret_e == -1)
 		return -1;
 	if (sec_e != -1 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {
+		// printf("ret_e = %ld; sec_e = %ld\n", ret_e, sec_e);
 		return -2;
 	}
 	return ret_e;
