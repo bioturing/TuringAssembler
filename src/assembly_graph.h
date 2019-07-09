@@ -36,12 +36,10 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t barcodes;		/* mapped barcode */
-	struct barcode_hash_t *mate_barcodes;
-	gint_t *mate_contigs;
 	int n_mate_contigs;
-	struct barcode_hash_t *mate_barcodes_2;
-	gint_t *mate_contigs_2;
-	int n_mate_contigs_2;
+	// struct barcode_hash_t *mate_barcodes;
+	gint_t *mate_counts;
+	gint_t *mate_contigs;
 	// struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
 	// gint_t best_mate_contigs;		/* best mate contigs picker */
 };
@@ -74,7 +72,10 @@ struct asm_graph_t {
 #define MAX_MOLECULE_LEN		30000
 
 #define MIN_BARCODE_COUNT		150
-#define MIN_READPAIR_COUNT		20
+#define MIN_READPAIR_COUNT		15
+
+#define MIN_BARCODE_RATIO		0.044
+#define MIN_SUB_BARCODE_RATIO		0.022
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
@@ -151,7 +152,7 @@ void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t ove
 void asm_clean_edge(struct asm_graph_t *g, gint_t e);
 void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
-void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2);
+void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int rep);
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 					gint_t e2, gint_t e_rc2);

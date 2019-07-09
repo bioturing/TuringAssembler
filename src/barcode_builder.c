@@ -23,7 +23,6 @@ struct bccount_bundle_t {
 
 	pthread_mutex_t *lock;
 	uint64_t *hash_sum;
-	float genome_cov;
 };
 
 void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske);
@@ -44,8 +43,6 @@ uint64_t ust_get_barcode(struct read_t *r1, struct read_t *r2)
 			break;
 		}
 	}
-	if (len != 18)
-		return (uint64_t)-1;
 	return ret;
 }
 
@@ -170,8 +167,8 @@ void print_test_pair_end(struct asm_graph_t *g, gint_t e)
 	printf("number of mate = %u\n", g->edges[e].n_mate_contigs);
 	gint_t k;
 	for (k = 0; k < g->edges[e].n_mate_contigs; ++k) {
-		printf("mate = %ld; number of unique barcode = %u\n",
-			g->edges[e].mate_contigs[k], g->edges[e].mate_barcodes[k].n_item);
+		printf("mate = %ld; number of reads = %ld\n",
+			g->edges[e].mate_contigs[k], g->edges[e].mate_counts[k]);
 	}
 	printf("-----------------------------------------------------------\n");
 }
@@ -208,10 +205,11 @@ static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
 					struct asm_edge_t *e, uint32_t max_len)
 {
 	uint32_t i, j, k, len;
-	if (max_len != 0)
-		len = __min(max_len, e->seq_len);
-	else
-		len = e->seq_len;
+	// if (max_len != 0)
+	// 	len = __min(max_len, e->seq_len);
+	// else
+	// 	len = e->seq_len;
+	len = e->seq_len;
 	if (*m_seq < len + 1) {
 		*m_seq = len + 1;
 		*seq = realloc(*seq, *m_seq);
@@ -250,10 +248,8 @@ void init_contig_map_info(struct asm_graph_t *g, const char *path,
 			barcode_hash_init(&g->edges[e].barcodes, 4);
 		g->edges[e].n_mate_contigs = 0;
 		g->edges[e].mate_contigs = NULL;
-		g->edges[e].mate_barcodes = NULL;
-		g->edges[e].n_mate_contigs_2 = 0;
-		g->edges[e].mate_contigs_2 = NULL;
-		g->edges[e].mate_barcodes_2 = NULL;
+		g->edges[e].mate_counts = NULL;
+		// g->edges[e].mate_barcodes = NULL;
 	}
 	fclose(fp);
 	bwa_idx_build(path, path, BWTALGO_AUTO, 25000000);
@@ -284,10 +280,11 @@ void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, ui
 		g->aux_flag |= ASM_HAVE_BARCODE;
 	if (aux_build & ASM_BUILD_READPAIR)
 		g->aux_flag |= ASM_HAVE_READPAIR;
-	if (!(g->aux_flag & ASM_BUILD_COVERAGE))
-		init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR, MIN_CONTIG_BARCODE);
-	else
-		init_contig_map_info(g, fasta_prefix, 0, 0);
+	init_contig_map_info(g, fasta_prefix, 0, 0);
+	// if (!(g->aux_flag & ASM_BUILD_COVERAGE))
+	// 	init_contig_map_info(g, fasta_prefix, MIN_CONTIG_READPAIR, MIN_CONTIG_BARCODE);
+	// else
+	// 	init_contig_map_info(g, fasta_prefix, 0, 0);
 	struct bccount_bundle_t ske;
 	ske.g = g;
 	ske.aux_build = aux_build;
@@ -328,34 +325,16 @@ static inline void add_read_pair_edge(struct asm_graph_t *g, gint_t e, gint_t ne
 		++g->edges[e].n_mate_contigs;
 		g->edges[e].mate_contigs = realloc(g->edges[e].mate_contigs,
 			g->edges[e].n_mate_contigs * sizeof(gint_t));
-		g->edges[e].mate_barcodes = realloc(g->edges[e].mate_barcodes,
-			g->edges[e].n_mate_contigs * sizeof(struct barcode_hash_t));
+		g->edges[e].mate_counts = realloc(g->edges[e].mate_counts,
+			g->edges[e].n_mate_contigs * sizeof(gint_t));
+		// g->edges[e].mate_barcodes = realloc(g->edges[e].mate_barcodes,
+		// 	g->edges[e].n_mate_contigs * sizeof(struct barcode_hash_t));
 		g->edges[e].mate_contigs[i] = next_e;
-		barcode_hash_init(g->edges[e].mate_barcodes + i, 4);
+		g->edges[e].mate_counts[i] = 0;
+		// barcode_hash_init(g->edges[e].mate_barcodes + i, 4);
 	}
-	barcode_hash_add(g->edges[e].mate_barcodes + i, bc);
-	pthread_mutex_unlock(&g->edges[e].lock);
-}
-
-static inline void add_read_pair_edge_2(struct asm_graph_t *g, gint_t e, gint_t next_e, uint64_t bc)
-{
-	if (next_e == e || next_e == g->edges[e].rc_id)
-		return;
-	pthread_mutex_lock(&g->edges[e].lock);
-	gint_t i;
-	for (i = 0; i < g->edges[e].n_mate_contigs_2; ++i)
-		if (g->edges[e].mate_contigs_2[i] == next_e)
-			break;
-	if (i == g->edges[e].n_mate_contigs_2) {
-		++g->edges[e].n_mate_contigs_2;
-		g->edges[e].mate_contigs_2 = realloc(g->edges[e].mate_contigs_2,
-			g->edges[e].n_mate_contigs_2 * sizeof(gint_t));
-		g->edges[e].mate_barcodes_2 = realloc(g->edges[e].mate_barcodes_2,
-			g->edges[e].n_mate_contigs_2 * sizeof(struct barcode_hash_t));
-		g->edges[e].mate_contigs_2[i] = next_e;
-		barcode_hash_init(g->edges[e].mate_barcodes_2 + i, 4);
-	}
-	barcode_hash_add(g->edges[e].mate_barcodes_2 + i, bc);
+	++g->edges[e].mate_counts[i];
+	// barcode_hash_add(g->edges[e].mate_barcodes + i, bc);
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 
@@ -406,12 +385,12 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
 			aligned + 20 < r1->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-			int aligned = count_M_cigar(a.n_cigar, a.cigar);
 			if (aligned > g->ksize)
 				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
 		}
@@ -429,20 +408,19 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (k == n1)
 				p1[n1++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		}
-		free(a.cigar);
 	}
 	for (i = 0; i < (int)ar2.n; ++i) {
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
 			aligned + 20 < r2->len)
 			continue;
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-			int aligned = count_M_cigar(a.n_cigar, a.cigar);
 			if (aligned > g->ksize)
-					atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
+				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
 		}
 		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
 			best_score2 = ar2.a[i].score;
@@ -458,51 +436,33 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (k == n2)
 				p2[n2++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 		}
-		free(a.cigar);
 	}
-	float count1 = 0, count2 = 0;
-	float genome_cov = bundle->genome_cov;
-	for (int i = 0 ; i < n1; i++) {
-		float edge_cov = __get_edge_cov(&g->edges[p1[i].e], g->ksize);
-		if (edge_cov * 2 > genome_cov && edge_cov/2 < genome_cov) 
-			count1++;
- 	}
-	for (int i = 0 ; i < n2; i++) {
-		float edge_cov = __get_edge_cov(&g->edges[p2[i].e], g->ksize);
-		if (edge_cov * 2 > genome_cov && edge_cov/2 < genome_cov) 
-			count2++;
- 	}
-	if (count1 <=1 &&  count2 <= 1)  {
-		if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
-			for (i = 0; i < n1; ++i)
-				if (p1[i].pos <= MIN_CONTIG_BARCODE)
-					add_barcode_edge(g, p1[i].e, bc);
-			for (i = 0; i < n2; ++i)
-				if (p2[i].pos <= MIN_CONTIG_BARCODE)
-					add_barcode_edge(g, p2[i].e, bc);
-		}
+	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
+		for (i = 0; i < n1; ++i)
+			if (p1[i].pos <= MIN_CONTIG_BARCODE)
+				add_barcode_edge(g, p1[i].e, bc);
+		for (i = 0; i < n2; ++i)
+			if (p2[i].pos <= MIN_CONTIG_BARCODE)
+				add_barcode_edge(g, p2[i].e, bc);
+		// for (i = 0; i < n1; ++i) {
+		// 	if (p1[i].pos > MIN_CONTIG_BARCODE)
+		// 		continue;
+		// 	for (k = 0; k < n2; ++k) {
+		// 		if (p2[k].pos <= MIN_CONTIG_BARCODE &&
+		// 			p1[i].e == p2[k].e) {
+		// 			add_barcode_edge(g, p1[i].e, bc);
+		// 			break;
+		// 		}
+		// 	}
+		// }
 	}
-	if (count1 <= 1 && count2 <= 1)  {
-		if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
-			for (i = 0; i < n1; ++i) {
-				for (k = 0; k < n2; ++k) {
-					if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
-						&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
-						add_read_pair_edge(g, p1[i].e, p2[k].e, bc);
-						add_read_pair_edge(g, p2[k].e, p1[i].e, bc);
-					}
-				}
-			}
-		}
-	} else {
-		if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
-			for (i = 0; i < n1; ++i) {
-				for (k = 0; k < n2; ++k) {
-					if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
-						&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
-						add_read_pair_edge_2(g, p1[i].e, p2[k].e, bc);
-						add_read_pair_edge_2(g, p2[k].e, p1[i].e, bc);
-					}
+	if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
+		for (i = 0; i < n1; ++i) {
+			for (k = 0; k < n2; ++k) {
+				if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
+					&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
+					add_read_pair_edge(g, p1[i].e, p2[k].e, bc);
+					add_read_pair_edge(g, p2[k].e, p1[i].e, bc);
 				}
 			}
 		}
@@ -588,7 +548,6 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 	pthread_mutex_init(&lock, NULL);
 	uint64_t hash_sum;
 	hash_sum = 0;
-	float genome_cov = get_genome_coverage(ske->g);
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].n_reads = &n_reads;
@@ -599,7 +558,6 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 		worker_bundles[i].barcode_calculator = ske->barcode_calculator;
 		worker_bundles[i].lock = &lock;
 		worker_bundles[i].hash_sum = &hash_sum;
-		worker_bundles[i].genome_cov = genome_cov;
 	}
 
 	pthread_t *producer_threads, *worker_threads;

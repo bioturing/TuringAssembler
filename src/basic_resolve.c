@@ -305,44 +305,24 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if (e_return == -1)
 			return 0;
 		e_return_rc = g->edges[e_return].rc_id;
-		fcov1 = fcov2 = -1;
-		for (j = 0; j < g->nodes[v].deg; ++j) {
-			if (g->nodes[v].adj[j] != e_return)
-				fcov1 = __get_edge_cov(g->edges + g->nodes[v].adj[j], g->ksize);
-		}
-		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-			if (g->nodes[u_rc].adj[j] != e_return_rc)
-				fcov2 = __get_edge_cov(g->edges + g->nodes[u_rc].adj[j], g->ksize);
-		}
-		if (fcov1 > 0 && fcov2 > 0) {
-			if ((int)(fcov1 / fcov2 + 0.499999999) > 2)
-				return 0;
-			fcov_mean = (fcov1 + fcov2) / 2;
-		} else if (fcov1 > 0) {
-			fcov_mean = fcov1;
-		} else if (fcov2 > 0) {
-			fcov_mean = fcov2;
-		} else {
-			fcov_mean = uni_cov;
-		}
-		rep_e = __get_edge_cov_int(g, e, fcov_mean) - 1;
-		rep_e_return = __get_edge_cov_int(g, e_return, fcov_mean);
-		if (rep_e_return == 0) {
+		if (g->edges[e].seq_len >= MIN_CONTIG_READPAIR ||
+			g->edges[e_return].seq_len >= MIN_CONTIG_READPAIR)
+			return 0;
+		double fcov_e, fcov_e_return;
+		fcov_e = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
+		fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize) / uni_cov;
+		struct cov_range_t rcov_e, rcov_e_return;
+		rcov_e = convert_cov_range(fcov_e);
+		rcov_e_return = convert_cov_range(fcov_e_return);
+		int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
+		// rep = __min(rep, 2);
+		if (rep) {
+			asm_unroll_loop_forward(g, e, e_return, rep);
+			asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
 			asm_remove_edge(g, e_return);
 			asm_remove_edge(g, e_return_rc);
-			return -1;
+			return 3;
 		}
-		if (g->edges[e].seq_len > g->edges[e_return].seq_len)
-			rep = rep_e - 1;
-		else
-			rep = rep_e_return;
-		if (rep > 0) {
-			asm_unroll_loop_forward(g, e, e_return);
-			asm_unroll_loop_forward(g, e_rc, e_return_rc);
-		}
-		asm_remove_edge(g, e_return);
-		asm_remove_edge(g, e_return_rc);
-		return 3;
 	}
 	return 0;
 }
@@ -658,7 +638,7 @@ static void bubble_keep_best(struct asm_graph_t *g, gint_t *edges, gint_t n)
 	g->edges[g->edges[keep_e].rc_id].count = sum_count;
 }
 
-gint_t test_bubble(struct asm_graph_t *g, gint_t e_id, double uni_cov)
+static gint_t test_bubble(struct asm_graph_t *g, gint_t e_id, double uni_cov)
 {
 	gint_t u, j, e, n, v;
 	u = g->edges[e_id].source;
@@ -720,11 +700,26 @@ gint_t resolve_bubble(struct asm_graph_t *g, double uni_cov)
 	return cnt;
 }
 
+static inline double get_max_out_cov(struct asm_graph_t *g, gint_t u)
+{
+	double cur_cov, cov;
+	gint_t k, ep;
+	cur_cov = 0.0;
+	for (k = 0; k < g->nodes[u].deg; ++k) {
+		ep = g->nodes[u].adj[k];
+		if (g->edges[ep].source == -1)
+			continue;
+		cov = __get_edge_cov(g->edges + ep, g->ksize);
+		cur_cov = __max(cur_cov, cov);
+	}
+	return cur_cov;
+}
+
 gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
-	double uni_cov, cov;
+	double uni_cov, cov, flow_cov;
 	struct cov_range_t rcov, ercov;
-	gint_t e, e_rc, k, u, v, v_rc, ep;
+	gint_t e, e_rc, k, u, u_rc, v, v_rc, ep;
 	int flag_u, flag_v;
 	uni_cov = get_genome_coverage(g0);
 	gint_t cnt = 0;
@@ -733,30 +728,19 @@ gint_t remove_low_cov_edge(struct asm_graph_t *g0, struct asm_graph_t *g1)
 			continue;
 		e_rc = g0->edges[e].rc_id;
 		u = g0->edges[e].source;
+		u_rc = g0->nodes[u].rc_id;
 		v = g0->edges[e].target;
 		v_rc = g0->nodes[v].rc_id;
-		flag_u = flag_v = 0;
-		for (k = 0; k < g0->nodes[u].deg; ++k) {
-			ep = g0->nodes[u].adj[k];
-			if (g0->edges[ep].source == -1)
-				continue;
-			ercov = get_edge_cov_range(g0, ep, uni_cov);
-			if (ercov.lo > 0)
-				flag_u = 1;
-		}
-		for (k = 0; k < g0->nodes[v_rc].deg; ++k) {
-			ep = g0->nodes[v_rc].adj[k];
-			if (g0->edges[ep].source == -1)
-				continue;
-			ercov = get_edge_cov_range(g0, ep, uni_cov);
-			if (ercov.lo > 0)
-				flag_v = 1;
-		}
-		if (!flag_u || !flag_v)
-			continue;
-		cov = __get_edge_cov(g0->edges + e, g0->ksize) / uni_cov;
-		rcov = convert_cov_range(cov);
-		if (rcov.hi == 0) {
+		cov = __get_edge_cov(g0->edges + e, g0->ksize);
+		flow_cov = uni_cov;
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, u));
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, u_rc));
+		flag_u = (int)(cov / flow_cov < 0.1);
+		flow_cov = uni_cov;
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, v));
+		flow_cov = __min(flow_cov, get_max_out_cov(g0, v_rc));
+		flag_v = (int)(cov / flow_cov < 0.1);
+		if (flag_u || flag_v) {
 			asm_remove_edge(g0, e);
 			asm_remove_edge(g0, e_rc);
 			++cnt;
