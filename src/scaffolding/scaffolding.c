@@ -420,7 +420,6 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			int des = para->list_candidate_edges[i_candidate_edge].des;
 			struct pair_contigs_score score = para->list_candidate_edges[i_candidate_edge].score;
 			score.m_score = get_share_mate(g, src, des);
-            score.m2_score = get_share_mate_2(g, src, des);
 			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f\n", i_candidate_edge,
 					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score);
 			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, des, &score);
