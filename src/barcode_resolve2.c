@@ -274,30 +274,26 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 				if (len2a + 1000 > len2)
 					return 1;
 			}
-		} else {
-			return 0;
 		}
-	} else {
-		gint_t k;
-		cnt2 = cnt2a = 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_contigs[k] == e2)
-				cnt2 = g->edges[e1].mate_counts[k];
-			if (g->edges[e1].mate_counts[k] == e2a)
-				cnt2a = g->edges[e1].mate_counts[k];
-		}
-		if (cnt2 < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-			if (g->edges[e1].mate_counts[k] > cnt2)
-				return 0;
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-			if (g->edges[e2].mate_counts[k] > cnt2)
-				return 0;
-		if (cnt2 > cnt2a * 2)
-			return 1;
-		return 0;
 	}
+	gint_t k;
+	cnt2 = cnt2a = 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (g->edges[e1].mate_contigs[k] == e2)
+			cnt2 = g->edges[e1].mate_counts[k];
+		if (g->edges[e1].mate_counts[k] == e2a)
+			cnt2a = g->edges[e1].mate_counts[k];
+	}
+	if (cnt2 < MIN_READPAIR_COUNT)
+		return 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+		if (g->edges[e1].mate_counts[k] > cnt2)
+			return 0;
+	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+		if (g->edges[e2].mate_counts[k] > cnt2)
+			return 0;
+	if (cnt2 > cnt2a * 2)
+		return 1;
 	return 0;
 }
 
@@ -429,30 +425,26 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 				if (len2a + 1000 > len2)
 					return 1;
 			}
-		} else {
-			return 0;
 		}
-	} else {
-		cnt2 = cnt2a = 0;
-		gint_t k;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-			if (g->edges[e1].mate_contigs[k] == e2)
-				cnt2 = g->edges[e1].mate_counts[k];
-			if (g->edges[e1].mate_counts[k] == e2a)
-				cnt2a = g->edges[e1].mate_counts[k];
-		}
-		if (cnt2 < MIN_READPAIR_COUNT)
-			return 0;
-		for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-			if (g->edges[e1].mate_counts[k] > cnt2)
-				return 0;
-		for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-			if (g->edges[e2].mate_counts[k] > cnt2)
-				return 0;
-		if (cnt2 > cnt2a)
-			return 1;
-		return 0;
 	}
+	gint_t k;
+	cnt2 = cnt2a = 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (g->edges[e1].mate_contigs[k] == e2)
+			cnt2 = g->edges[e1].mate_counts[k];
+		if (g->edges[e1].mate_counts[k] == e2a)
+			cnt2a = g->edges[e1].mate_counts[k];
+	}
+	if (cnt2 < MIN_READPAIR_COUNT)
+		return 0;
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
+		if (g->edges[e1].mate_counts[k] > cnt2)
+			return 0;
+	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
+		if (g->edges[e2].mate_counts[k] > cnt2)
+			return 0;
+	if (cnt2 > cnt2a)
+		return 1;
 	return 0;
 }
 
@@ -596,6 +588,7 @@ static gint_t bc_find_pair(struct asm_graph_t *g, gint_t se, gint_t *adj, gint_t
 	if (ret_e == -1)
 		return -1;
 	if (sec_e != -1 && !check_medium_pair_superior(g, se, ret_e, sec_e)) {
+		// printf("ret_e = %ld; sec_e = %ld\n", ret_e, sec_e);
 		return -2;
 	}
 	return ret_e;
@@ -1450,7 +1443,7 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	rcov_e_return = convert_cov_range(fcov_e_return);
 	int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
 	// rep = __min(rep, 2);
-	if (rep == 0)
+	if (rep < 0)
 		rep = 1;
 	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
 		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
@@ -1460,25 +1453,30 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	asm_remove_edge(g, e_return_rc);
 
 	flag1 = flag2 = flag3 = 0;
-	if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
-		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
-		flag1 = check_medium_pair_positive(g, e1, e);
-	else
-		flag1 = 1;
+	if (e1 != -1) {
+		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
+			g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
+			flag1 = check_medium_pair_positive(g, e1, e);
+		else
+			flag1 = 1;
+	}
 
-	if (g->edges[e2].seq_len >= MIN_CONTIG_READPAIR &&
-		g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
-		flag2 = check_medium_pair_positive(g, e2, e_rc);
-	else
-		flag2 = 1;
+	if (e2 != -1) {
+		if (g->edges[e2].seq_len >= MIN_CONTIG_READPAIR &&
+			g->edges[e].seq_len >= MIN_CONTIG_READPAIR)
+			flag2 = check_medium_pair_positive(g, e2, e_rc);
+		else
+			flag2 = 1;
+	}
 
-	if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
+	if (e1 != -1 && e2 != -1 &&
+		g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 		g->edges[e2].seq_len >= MIN_CONTIG_READPAIR)
 		flag3 = check_medium_pair_positive(g, e1, e2);
 
 	__VERBOSE("[deb] flag1 = %d; flag2 = %d; flag3 = %d\n", flag1, flag2, flag3);
 
-	if ((flag1 && flag2) | (flag3 && g->edges[e].seq_len < MIN_CONTIG_BARCODE)) {
+	if ((flag1 && flag2) || (flag3 && (flag1 || flag2 || g->edges[e].seq_len < MIN_CONTIG_BARCODE))) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
 		asm_remove_edge(g, e);
