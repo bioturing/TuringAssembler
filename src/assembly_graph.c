@@ -124,6 +124,25 @@ double get_genome_coverage(struct asm_graph_t *g)
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
+		if (g->edges[e].seq_len > max_len) {
+			max_len = g->edges[e].seq_len;
+			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
+		}
+	}
+	return ret_cov;
+}
+
+double get_genome_coverage_h(struct asm_graph_t *g)
+{
+	/* Using the coverage of the longest contigs */
+	gint_t e;
+	double ret_cov = 0.0;
+	uint32_t max_len = 0;
+	uint32_t sum_len = 0;
+	double sum_cov = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 //		if (g->edges[e].seq_len > max_len) {
 //			max_len = g->edges[e].seq_len;
 //			ret_cov = __get_edge_cov(g->edges + e, g->ksize);

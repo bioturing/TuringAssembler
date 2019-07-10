@@ -144,6 +144,7 @@ static inline struct cov_range_t convert_cov_range(double fcov)
 }
 /* Estimate coverage of 1 walk on genome */
 double get_genome_coverage(struct asm_graph_t *g);
+double get_genome_coverage_h(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src);
 gint_t asm_create_node(struct asm_graph_t *g);
