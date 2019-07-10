@@ -1476,7 +1476,7 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 
 	__VERBOSE("[deb] flag1 = %d; flag2 = %d; flag3 = %d\n", flag1, flag2, flag3);
 
-	if ((flag1 && flag2) | (flag3 && (flag1 | flag2 | g->edges[e].seq_len < MIN_CONTIG_BARCODE))) {
+	if ((flag1 && flag2) || (flag3 && (flag1 || flag2 || g->edges[e].seq_len < MIN_CONTIG_BARCODE))) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
 		asm_remove_edge(g, e);
