@@ -315,6 +315,8 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		rcov_e = convert_cov_range(fcov_e);
 		rcov_e_return = convert_cov_range(fcov_e_return);
 		int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
+		if (rep < 0)
+			rep = 1;
 		// rep = __min(rep, 2);
 		if (rep) {
 			asm_unroll_loop_forward(g, e, e_return, rep);

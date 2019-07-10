@@ -1443,7 +1443,7 @@ static inline gint_t check_long_loop(struct asm_graph_t *g, gint_t e, double uni
 	rcov_e_return = convert_cov_range(fcov_e_return);
 	int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
 	// rep = __min(rep, 2);
-	if (rep == 0)
+	if (rep < 0)
 		rep = 1;
 	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
 		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
