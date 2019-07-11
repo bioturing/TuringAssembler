@@ -408,7 +408,7 @@ void find_topo(struct asm_graph_t *g, gint_t *d, uint32_t max_len)
 			v = g->nodes[v_rc].rc_id;
 			--deg[v];
 			if (d[v] == -1 || d[u] + g->edges[e].seq_len - ksize > d[v])
-				d[v] = g->edges[e].seq_len - ksize > d[v];
+				d[v] = g->edges[e].seq_len - ksize;
 			if (d[v] > max_len)
 				d[v] = max_len;
 			if (deg[v] == 0) {
@@ -416,7 +416,6 @@ void find_topo(struct asm_graph_t *g, gint_t *d, uint32_t max_len)
 			}
 		}
 	}
-	printf("l = %ld; r = %ld\n", l, r);
 	free(q);
 	free(deg);
 }
@@ -465,6 +464,7 @@ void remove_tips_topo(struct asm_graph_t *g, uint32_t max_len)
 		for (c = 0; c < cnt && deg > 1; ++c) {
 			e = tmp[c].e;
 			e_rc = g->edges[e].rc_id;
+			// fprintf(stdout, "Remove edge (%ld, %ld)\n", e, e_rc);
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			--deg;
@@ -610,8 +610,6 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
-	// if (e == 620 || e == 621)
-	// 	__VERBOSE("enter\n");
 	gint_t u, v, u_rc, v_rc, e_rc, ec, ec_rc, j, k;
 	u = g->edges[e].source;
 	v = g->edges[e].target;
@@ -645,8 +643,6 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 	}
 	if (e_len > MIN_NOTICE_LEN && max_len < e_len)
 		return 0;
-	// if (e == 620 || e == 621)
-	// 	__VERBOSE("e_len = %u; max_len = %u\n", e_len, max_len);
 	if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
 		// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
 		if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
@@ -663,8 +659,6 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 			}
 		}
 	}
-	// if (e == 620 || e == 621)
-	// 	__VERBOSE("here\n");
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[j];
@@ -672,8 +666,6 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 		if (n == e || n_rc == e)
 			return 0;
 	}
-	// if (e == 620 || e == 621)
-	// 	__VERBOSE("there\n");
 	while (g->nodes[u_rc].deg) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[0];
