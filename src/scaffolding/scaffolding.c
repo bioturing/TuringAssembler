@@ -391,6 +391,7 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 
 void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_score_type *edges_score)
 { 
+	VERBOSE_FLAG(1, "start build big table");
 	khash_t(big_table) *big_table = build_big_table(g, opt);
 	struct params_build_candidate_edges *params_candidate = 
 		new_params_build_candidate_edges(g, opt, big_table);
@@ -467,14 +468,22 @@ int get_highest_cov_contig(struct asm_graph_t *g, int *mark, int start)
 
 struct pair_contigs_score *get_score_edge(struct edges_score_type *edges_score, int src, int des)
 {
-	// todo @huu use binary search or matrix to speed up
 	struct pair_contigs_score *sc = calloc(1, sizeof(struct pair_contigs_score));
-	for (int i = 0; i < edges_score->n_edge; i++){
-		struct scaffold_edge *edge = &edges_score->list_edge[i];
-		if (edge->src == src && edge->des == des) {
+	int l = 0, r = edges_score->n_edge - 1;
+	while (l != r) {
+		int mid = (l + r)/2;
+		if (edges_score->list_edge[mid].src < src) 
+			l = mid+1;
+		else
+			r = mid;
+	}
+	while (l < edges_score->n_edge && edges_score->list_edge[l].src == src) {
+		struct scaffold_edge *edge = &edges_score->list_edge[l];
+		if (edge->des == des) {
 			*sc = edge->score;
 			return sc;
 		}
+		l++;
 	}
 	sc->bc_score = 0;
 	return sc;
@@ -507,7 +516,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	score->bc_score += i_score->bc_score/2;
 	int i = 0;
 	int distance = get_edge_len(&g->edges[last]);
-	VERBOSE_FLAG(0, "scascore %d %d %f\n", last, des, score->bc_score);
+	VERBOSE_FLAG(3, "scascore %d %d %f\n", last, des, score->bc_score);
 	while (1) {
 		if (distance > global_distance)
 			break;
@@ -518,12 +527,12 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 			src = get_rc_id(g, src);
 		i_score = get_score_edge(edges_score, src, des);
 		second_score->bc_score += i_score->bc_score;
-		VERBOSE_FLAG(0, "more %d %f ", src, second_score->bc_score);
+		VERBOSE_FLAG(3, "more %d %f ", src, second_score->bc_score);
 		distance += get_edge_len(&g->edges[src]);
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
-	VERBOSE_FLAG(0, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
+	VERBOSE_FLAG(3, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
@@ -700,7 +709,6 @@ void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
 	}
 }
 
-
 void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_score_type *edges_score,
  		struct scaffold_type *scaffold)
 {
@@ -756,7 +764,8 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 
 	float cvr = global_genome_coverage;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
-		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
+		struct asm_edge_t *edge = &g->edges[i_e];
+		float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
 		VERBOSE_FLAG(0, "edge %d len:%d cov: %f count_bc %d\n", 
 				i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes.n_item);
 	}
@@ -782,6 +791,5 @@ void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 		__VERBOSE("edge %d length %d\n", i, g->edges[i].seq_len);
 
 	check_global_params(g);
-	//build_big_table(g, opt);
 }
 
