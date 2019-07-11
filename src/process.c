@@ -51,7 +51,8 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE("Removing tips using graph topology\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
-	remove_tips_topology(g0, g);
+	resolve_tips_topo(g0, g);
+	// remove_tips_topology(g0, g);
 	test_asm_graph(g);
 	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
 }

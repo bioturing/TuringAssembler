@@ -9,6 +9,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
 void asm_lazy_condense(struct asm_graph_t *g);
 void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g);
 void remove_tips_topology(struct asm_graph_t *g0, struct asm_graph_t *g);
+void resolve_tips_topo(struct asm_graph_t *g0, struct asm_graph_t *g);
 void detect_simple_tandem(struct asm_graph_t *g0);
 // void graph_expanding(struct asm_graph_t *g);
 void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1);
