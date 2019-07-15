@@ -516,7 +516,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	score->bc_score += i_score->bc_score/2;
 	int i = 0;
 	int distance = get_edge_len(&g->edges[last]);
-	VERBOSE_FLAG(3, "scascore %d %d %f\n", last, des, score->bc_score);
+	VERBOSE_FLAG(0, "scascore %d %d %f\n", last, des, score->bc_score);
 	while (1) {
 		if (distance > global_distance)
 			break;
@@ -527,12 +527,12 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 			src = get_rc_id(g, src);
 		i_score = get_score_edge(edges_score, src, des);
 		second_score->bc_score += i_score->bc_score;
-		VERBOSE_FLAG(3, "more %d %f ", src, second_score->bc_score);
+		VERBOSE_FLAG(0, "more %d %f ", src, second_score->bc_score);
 		distance += get_edge_len(&g->edges[src]);
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
-	VERBOSE_FLAG(3, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
+	VERBOSE_FLAG(0, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
