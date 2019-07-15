@@ -10,6 +10,7 @@
 #include "verbose.h"
 #include "scaffolding/scaffolding.h"
 #include "barcode_resolve2.h"
+#include "basic_resolve.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -240,6 +241,20 @@ void assembly3_process(struct opt_proc_t *opt)
 	// asm_graph_destroy(&g2);
 }
 
+void build_h_0_1(struct asm_graph_t *g)
+{
+	set_time_now();
+	float thres = MIN(get_genome_coverage_h(g) / 3, 25);
+	for (int i = 0; i < g->n_e; i++) {
+		float cov = __get_edge_cov(&g->edges[i], g->ksize);
+		if (cov < thres) {
+			asm_remove_edge(g, i);
+			asm_remove_edge(g, g->edges[i].rc_id);
+		}
+	}
+	asm_condense_h(g);
+	test_asm_graph(g);
+}
 void build_0_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
@@ -287,6 +302,15 @@ void build_3_4_process(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g2, "level_4");
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
+}
+
+void build_h_0_1_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1;
+	load_asm_graph(&g1, opt->in_file);
+	build_h_0_1(&g1);
+	save_graph_info(opt->out_dir, &g1, "level_h_1");
+	asm_graph_destroy(&g1);
 }
 
 void build_3_4_no_bc_rebuild_process(struct opt_proc_t *opt)

@@ -90,6 +90,26 @@ void asm_lazy_condense(struct asm_graph_t *g)
 	}
 }
 
+void asm_condense_h(struct asm_graph_t *g)
+{
+	int new_n_e = 0;
+	for (int i = 0; i < g->n_e; i++) {
+		if (g->edges[i].source == -1) {
+			continue;
+		}
+		int old_e = i, new_e = new_n_e;
+		g->edges[new_n_e++] = g->edges[i];
+		int rc_e = g->edges[old_e].rc_id;
+		g->edges[rc_e].rc_id = new_e;
+		int src, des;
+		src = g->edges[i].source;
+		for (int j = 0; j < g->nodes[src].deg; j++) if (g->nodes[src].adj[j] == old_e)
+			g->nodes[src].adj[j] = new_e;
+		__VERBOSE("wtf\n");
+	}
+	g->n_e = new_n_e;
+}
+
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t *node_id;

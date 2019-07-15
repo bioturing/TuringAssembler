@@ -521,6 +521,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 		if (distance > global_distance)
 			break;
 		int src = get_last_n(path, is_left, i);
+		i++;
 		if (src == -1)
 			break;
 		if (is_left) 
