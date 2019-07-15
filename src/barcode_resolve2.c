@@ -368,6 +368,10 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 		if (g->edges[e1].mate_contigs[k] == e2)
 			cnt = g->edges[e1].mate_counts[k];
 	}
+	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
+		if (cnt * 2 < g->edges[e1].mate_counts[k] || cnt + 15 < g->edges[e1].mate_counts[k])
+			return 0;
+	}
 	return (cnt >= MIN_READPAIR_COUNT);
 	// struct barcode_hash_t *h = NULL;
 	// for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {

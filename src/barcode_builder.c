@@ -354,7 +354,13 @@ static inline int count_M_cigar(int n_cigar, uint32_t *cigar)
 
 static inline int check_clip_both_end(int n_cigar, uint32_t *cigar)
 {
-	return (n_cigar > 2 && (cigar[0] & 0xf) == 3 && (cigar[n_cigar - 1] & 0xf) == 3);
+	if (n_cigar > 2 && (cigar[0] & 0xf) == 3 && (cigar[n_cigar - 1] & 0xf) == 3)
+		return 0;
+	int k;
+	for (k = 0; k < n_cigar; ++k)
+		if ((cigar[0] & 0xf) != 3 && (cigar[0] & 0xf) != 0)
+			return 0;
+	return 1;
 }
 
 int is_contain_N(struct read_t *r)
@@ -385,16 +391,18 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
-			aligned + 20 < r1->len)
+			aligned + 20 < r1->len) {
+			free(a.cigar);
 			continue;
+		}
+		free(a.cigar);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 			if (aligned > g->ksize)
 				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
 		}
-		if (ar1.a[i].score > best_score1 && ar1.a[i].score + 5 >= aligned) {
+		if (ar1.a[i].score > best_score1) {
 			best_score1 = ar1.a[i].score;
 			p1[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 			n1 = 1;
@@ -413,16 +421,18 @@ void barcode_read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		mem_aln_t a;
 		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
 		int aligned = count_M_cigar(a.n_cigar, a.cigar);
-		free(a.cigar);
 		if (check_clip_both_end(a.n_cigar, a.cigar) ||
-			aligned + 20 < r2->len)
+			aligned + 20 < r2->len) {
+			free(a.cigar);
 			continue;
+		}
+		free(a.cigar);
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 			if (aligned > g->ksize)
 				atomic_add_and_fetch64(&g->edges[e].count, aligned - g->ksize);
 		}
-		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
+		if (ar2.a[i].score > best_score2) {
 			best_score2 = ar2.a[i].score;
 			p2[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
 			n2 = 1;
