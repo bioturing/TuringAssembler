@@ -224,6 +224,51 @@ int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
 	return 0;
 }
 
+static inline int check_large_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
+							&g->edges[e2].barcodes);
+	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item +
+					g->edges[e2].barcodes.n_item);
+	if (ratio + EPS > MIN_BARCODE_RATIO)
+		return 1;
+	return 0;
+}
+
+static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
+{
+	struct barcode_hash_t *h1, *h2, *h2a;
+	h1 = &g->edges[e1].barcodes;
+	h2 = &g->edges[e2].barcodes;
+	h2a = &g->edges[e2a].barcodes;
+
+	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
+	share_1_2 = share_1_2a = share_1_2_2a = 0;
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1)
+			continue;
+		k2 = barcode_hash_get(h2, h1->keys[i]);
+		k2a = barcode_hash_get(h2a, h1->keys[i]);
+		share_1_2 += (k2 != BARCODE_HASH_END(h2));
+		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
+		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
+					k2a != BARCODE_HASH_END(h2a));
+	}
+	uint32_t sub_share_1_2, sub_share_1_2a, total;
+	/* hard count */
+	// if (share_1_2 < MIN_BARCODE_COUNT)
+	// 	return 0;
+	/* ratio count */
+	double ratio_1_2;
+	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
+	ratio_1_2 = share_1_2 * 1.0 / total;
+	if (ratio_1_2 + EPS < MIN_BARCODE_RATIO)
+		return 0;
+	if (share_1_2 > share_1_2a)
+		return 1;
+	return 0;
+}
+
 int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 							gint_t e2, gint_t e2a)
 {
@@ -274,6 +319,9 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 				if (len2a + 1000 > len2)
 					return 1;
 			}
+		} else if (share_1_2a > share_1_2) {
+			if (len2 + 1000 > len2a)
+				return 0;
 		}
 	}
 	gint_t k;
@@ -293,17 +341,6 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 		if (g->edges[e2].mate_counts[k] > cnt2)
 			return 0;
 	if (cnt2 > cnt2a * 2)
-		return 1;
-	return 0;
-}
-
-static inline int check_large_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
-{
-	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
-							&g->edges[e2].barcodes);
-	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item +
-					g->edges[e2].barcodes.n_item);
-	if (ratio + EPS > MIN_BARCODE_RATIO)
 		return 1;
 	return 0;
 }
@@ -348,40 +385,6 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 	// return (h->n_item >= MIN_READPAIR_COUNT);
 }
 
-static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
-{
-	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
-
-	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
-	share_1_2 = share_1_2a = share_1_2_2a = 0;
-	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] == (uint64_t)-1)
-			continue;
-		k2 = barcode_hash_get(h2, h1->keys[i]);
-		k2a = barcode_hash_get(h2a, h1->keys[i]);
-		share_1_2 += (k2 != BARCODE_HASH_END(h2));
-		share_1_2a += (k2a != BARCODE_HASH_END(h2a));
-		share_1_2_2a += (k2 != BARCODE_HASH_END(h2) &&
-					k2a != BARCODE_HASH_END(h2a));
-	}
-	uint32_t sub_share_1_2, sub_share_1_2a, total;
-	/* hard count */
-	// if (share_1_2 < MIN_BARCODE_COUNT)
-	// 	return 0;
-	/* ratio count */
-	double ratio_1_2;
-	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
-	ratio_1_2 = share_1_2 * 1.0 / total;
-	if (ratio_1_2 + EPS < MIN_BARCODE_RATIO)
-		return 0;
-	if (share_1_2 > share_1_2a)
-		return 1;
-	return 0;
-}
-
 static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
 	if (g->edges[e1].seq_len >= MIN_CONTIG_BARCODE &&
@@ -410,6 +413,8 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
 	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
 
+	if (share_1_2a > share_1_2 && len2 + 1000 > len2a)
+		return 0;
 	/* hard count */
 	// if (share_1_2 >= MIN_BARCODE_COUNT) {
 	/* ratio count */
