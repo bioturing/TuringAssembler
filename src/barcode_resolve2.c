@@ -297,9 +297,14 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 	/* hard count */
 	// if (share_1_2 >= MIN_BARCODE_COUNT) {
 	/* ratio count */
-	double ratio_1_2;
+	double ratio_1_2, ratio_1_2a;
 	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
 	ratio_1_2 = share_1_2 * 1.0 / total;
+	ratio_1_2a = share_1_2a * 1.0 / total;
+	if (ratio_1_2a + EPS > MIN_BARCODE_RATIO) {
+		if (share_1_2a > share_1_2 && len2 + 1000 > len2a)
+			return 0;
+	}
 	if (ratio_1_2 + EPS > MIN_BARCODE_RATIO) {
 		if (share_1_2 > share_1_2a * 2) {
 			if (len2a + 1000 > len2)
@@ -319,9 +324,6 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 				if (len2a + 1000 > len2)
 					return 1;
 			}
-		} else if (share_1_2a > share_1_2) {
-			if (len2 + 1000 > len2a)
-				return 0;
 		}
 	}
 	gint_t k;
@@ -413,14 +415,17 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 	len2 = __min(g->edges[e2].seq_len, MIN_CONTIG_BARCODE);
 	len2a = __min(g->edges[e2a].seq_len, MIN_CONTIG_BARCODE);
 
-	if (share_1_2a > share_1_2 && len2 + 1000 > len2a)
-		return 0;
 	/* hard count */
 	// if (share_1_2 >= MIN_BARCODE_COUNT) {
 	/* ratio count */
-	double ratio_1_2;
+	double ratio_1_2, ratio_1_2a;
 	total = h1->n_item + (h2->n_item + h2a->n_item) / 2;
 	ratio_1_2 = share_1_2 * 1.0 / total;
+	ratio_1_2a = share_1_2a * 1.0 / total;
+	if (ratio_1_2a + EPS > MIN_BARCODE_RATIO) {
+		if (share_1_2a > share_1_2 && len2 + 1000 > len2a)
+			return 0;
+	}
 	if (ratio_1_2 + EPS > MIN_BARCODE_RATIO) {
 		if (share_1_2 > share_1_2a) {
 			sub_share_1_2 = share_1_2 - share_1_2_2a;
@@ -745,12 +750,6 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			__VERBOSE("[Large Bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[0], legs[2]),
-			// 	get_barcode_ratio_unique(g, legs[0], legs[2]));
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[1], legs[3]),
-			// 	get_barcode_ratio_unique(g, legs[1], legs[3]));
 
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
@@ -772,12 +771,6 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			__VERBOSE("[Large Bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id);
-			//printf("%.3f %.3f\n",
-			//	get_barcode_ratio(g, legs[0], legs[2]),
-			//	get_barcode_ratio_unique(g, legs[0], legs[2]));
-			//printf("%.3f %.3f\n",
-			//	get_barcode_ratio(g, legs[1], legs[3]),
-			//	get_barcode_ratio_unique(g, legs[1], legs[3]));
 
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
@@ -802,12 +795,6 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			__VERBOSE("[Large bridge 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[0], legs[3]),
-			// 	get_barcode_ratio_unique(g, legs[0], legs[3]));
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[1], legs[2]),
-			// 	get_barcode_ratio_unique(g, legs[1], legs[2]));
 
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
@@ -829,12 +816,6 @@ gint_t check_2_2_large_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			__VERBOSE("[Large bridge 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
 				g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id);
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[0], legs[3]),
-			// 	get_barcode_ratio_unique(g, legs[0], legs[3]));
-			// printf("%.3f %.3f\n",
-			// 	get_barcode_ratio(g, legs[1], legs[2]),
-			// 	get_barcode_ratio_unique(g, legs[1], legs[2]));
 
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[3], g->edges[legs[3]].rc_id, g->edges[e].count / 2);
@@ -909,6 +890,7 @@ gint_t check_2_2_medium_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				__VERBOSE("[Med Bridge] Bridge coverage is too small to split %ld(%ld)\n", e, e_rc);
 				return 0;
 			}
+
 			asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 				legs[2], g->edges[legs[2]].rc_id, g->edges[e].count / 2);
 			asm_join_edge3(g, g->edges[legs[1]].rc_id, legs[1], e, e_rc,
