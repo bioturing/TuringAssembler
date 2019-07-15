@@ -315,16 +315,13 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
 		rcov_e = convert_cov_range(fcov_e);
 		rcov_e_return = convert_cov_range(fcov_e_return);
 		int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
-		if (rep < 0)
+		if (rep <= 0)
 			rep = 1;
-		// rep = __min(rep, 2);
-		if (rep) {
-			asm_unroll_loop_forward(g, e, e_return, rep);
-			asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
-			asm_remove_edge(g, e_return);
-			asm_remove_edge(g, e_return_rc);
-			return 3;
-		}
+		asm_unroll_loop_forward(g, e, e_return, rep);
+		asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
+		asm_remove_edge(g, e_return);
+		asm_remove_edge(g, e_return_rc);
+		return 3;
 	}
 	return 0;
 }
@@ -591,7 +588,7 @@ void remove_tips(struct asm_graph_t *g0, struct asm_graph_t *g)
 				continue;
 			cov = g0->edges[e_id].count * 1.0 /
 					(g0->edges[e_id].seq_len - g0->ksize);
-			if (cov / max_cov < TIPS_RATIO_THRESHOLD && max_cov < 600.0) {
+			if (cov / max_cov < TIPS_RATIO_THRESHOLD && cov < TIPS_THRESHOLD) {
 				gint_t v, v_rc;
 				v = g0->edges[e_id].target;
 				v_rc = g0->nodes[v].rc_id;
@@ -618,36 +615,46 @@ int test_split(struct asm_graph_t *g, gint_t e, double uni_cov)
 	v_rc = g->nodes[v].rc_id;
 	if (g->nodes[u_rc].deg < 1 || g->nodes[u].deg != 1 || g->nodes[v].deg > 1)
 		return 0;
-	double e_cov, cov, sum_fcov = 0;
+	double e_cov, cov, min_cov = 1e9, sum_fcov = 0;
 	struct cov_range_t e_rcov, rcov;
 	int sum_min_cov = 0;
 	e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
 	e_rcov = convert_cov_range(e_cov);
 	// fprintf(stderr, "consider edge %ld: cov = %.3lf\n", e, e_cov);
-	uint32_t e_len, max_len;
+	uint32_t e_len, max_len, min_len;
 	e_len = get_edge_len(g->edges + e);
+	min_len = 0;
 	// if (e_len > 2000)
 	// 	return -1;
-	max_len = 0;
+	// max_len = 0;
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t n, n_rc;
 		n_rc = g->nodes[u_rc].adj[j];
 		n = g->edges[n_rc].rc_id;
 		cov = __get_edge_cov(g->edges + n, g->ksize) / uni_cov;
+		min_cov = __min(min_cov, cov);
 		sum_fcov += cov;
 		rcov = convert_cov_range(cov);
 		sum_min_cov += rcov.lo;
 		// fprintf(stderr, "\tsattelite: edge %ld ~ %.3lf\n", n, cov);
-		uint32_t len = get_edge_len(g->edges + n);
-		max_len = __max(max_len, len);
+		if (min_len == 0 || (uint32_t)g->edges[n].seq_len < min_len)
+			min_len = g->edges[n].seq_len;
+		// uint32_t len = get_edge_len(g->edges + n);
+		// max_len = __max(max_len, len);
 	}
-	if (e_len > MIN_NOTICE_LEN && max_len < e_len)
+	if (e_len > MIN_NOTICE_LEN && min_len + MIN_NOTICE_LEN < e_len)
 		return 0;
-	if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
-		// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
-		if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
+	// if (e_len > MIN_NOTICE_LEN && max_len < e_len)
+	// 	return 0;
+	if (e_len > MIN_NOTICE_LEN || min_len > MIN_NOTICE_LEN) {
+		if (e_cov + min_cov / 2 < sum_fcov)
 			return 0;
 	}
+	// if (e_len > MIN_NOTICE_LEN || max_len > MIN_NOTICE_LEN) {
+	// 	// if (e_rcov.hi < sum_min_cov || !__diff_accept(sum_fcov, e_cov))
+	// 	if (e_rcov.hi < sum_min_cov || e_cov + 0.5 < sum_fcov)
+	// 		return 0;
+	// }
 	/* check if on-going edges have same source */
 	for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 		gint_t e1, e2;
