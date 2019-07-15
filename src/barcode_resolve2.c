@@ -281,7 +281,7 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
 		if (g->edges[e1].mate_contigs[k] == e2)
 			cnt2 = g->edges[e1].mate_counts[k];
-		if (g->edges[e1].mate_counts[k] == e2a)
+		if (g->edges[e1].mate_contigs[k] == e2a)
 			cnt2a = g->edges[e1].mate_counts[k];
 	}
 	if (cnt2 < MIN_READPAIR_COUNT)
@@ -326,7 +326,7 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 	gint_t k;
 	cnt = 0;
 	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (g->edges[e1].mate_counts[k] == e2)
+		if (g->edges[e1].mate_contigs[k] == e2)
 			cnt = g->edges[e1].mate_counts[k];
 	}
 	return (cnt >= MIN_READPAIR_COUNT);
@@ -432,7 +432,7 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
 		if (g->edges[e1].mate_contigs[k] == e2)
 			cnt2 = g->edges[e1].mate_counts[k];
-		if (g->edges[e1].mate_counts[k] == e2a)
+		if (g->edges[e1].mate_contigs[k] == e2a)
 			cnt2a = g->edges[e1].mate_counts[k];
 	}
 	if (cnt2 < MIN_READPAIR_COUNT)

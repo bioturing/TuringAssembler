@@ -142,7 +142,7 @@ void graph_query_process(struct opt_proc_t *opt)
 			print_test_pair_end(g0, u);
 			print_test_pair_end(g0, v);
 			print_test_pair_end(g0, v2);
-			if (check_large_pair_superior(g0, u, v, v2)) {
+			if (check_medium_pair_superior(g0, u, v, v2)) {
 				printf("success\n");
 			} else {
 				printf("failed\n");
