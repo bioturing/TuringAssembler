@@ -58,9 +58,14 @@ struct asm_graph_t {
 #define MIN_UNIQUE_BARCODE		100
 #define MIN_NOTICE_LEN			200
 #define MIN_CONNECT_SIZE		500
-#define MAX_TIPS_LEN			250
-#define TIPS_THRESHOLD			5.0
-#define TIPS_RATIO_THRESHOLD		0.1
+
+#define TIPS_RATIO_THRES		0.33
+#define TIPS_COV_THRES			20
+#define TIPS_LEN_THRES			250
+#define MIN_TIPS_LEG			1000
+
+#define CHIMERIC_RATIO_THRES		0.1
+#define CHIMERIC_COV_THRES		10
 
 /* Add barcode upto prefix length */
 #define MIN_CONTIG_BARCODE		3000
