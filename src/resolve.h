@@ -3,8 +3,6 @@
 
 #include "assembly_graph.h"
 
-int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov);
-
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g);
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
