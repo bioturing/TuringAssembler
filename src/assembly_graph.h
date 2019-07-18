@@ -65,7 +65,7 @@ struct asm_graph_t {
 #define MIN_TIPS_LEG			2000
 
 #define CHIMERIC_RATIO_THRES		0.1
-#define CHIMERIC_COV_THRES		10
+#define CHIMERIC_COV_THRES		30
 
 /* Add barcode upto prefix length */
 #define MIN_CONTIG_BARCODE		3000
