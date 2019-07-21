@@ -292,8 +292,7 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 
 void build_barcode_process_fastg(struct opt_proc_t *opt)
 {
-	struct asm_graph_t g;
-	load_asm_graph_fasta(&g, opt->in_fastg, opt->k0);
+	struct asm_graph_t g, g2;
+	load_asm_graph_fastg(&g, opt->in_fastg, opt->k0);
     test_asm_graph(&g);
-	asm_graph_destroy(&g);
 }

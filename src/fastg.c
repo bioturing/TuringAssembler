@@ -10,7 +10,6 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-#include "scaffolding/global_params.h"
 #include "../include/kmc_skipping.h"
 
 KSEQ_INIT(gzFile, gzread);
