@@ -11,6 +11,7 @@ void build_3_4_process(struct opt_proc_t *opt);
 void build_4_5_process(struct opt_proc_t *opt);
 void build_barcode_process(struct opt_proc_t *opt);
 void build_barcode_process_fasta(struct opt_proc_t *opt);
+void build_barcode_process_fastg(struct opt_proc_t *opt);
 void graph_query_process(struct opt_proc_t *opt);
 void assembly_process(struct opt_proc_t *opt);
 void assembly2_process(struct opt_proc_t *opt);

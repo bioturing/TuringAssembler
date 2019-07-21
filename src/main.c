@@ -93,6 +93,7 @@ struct opt_proc_t *init_opt_proc()
 	opt->files_1 = opt->files_2 = NULL;
 	opt->in_file = NULL;
 	opt->in_fasta = NULL;
+    opt->in_fastg = NULL;
 	opt->out_dir = ".";
 	opt->lib_type = 0;
 	opt->mmem = 32;
@@ -277,6 +278,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
+        } else if (!strcmp(argv[pos], "-fg")) {
+            opt->in_fastg = argv[pos + 1];
+            pos += 2;
 		} else if (!strcmp(argv[pos], "-l")) {
 			opt->lib_type = get_library_index(argv[pos + 1]);
 			if (opt->lib_type == -1)
@@ -413,6 +417,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_barcode_process);
 	else if (!strcmp(argv[1], "build_barcode_fasta"))
 		build_opt_process(argc, argv, &build_barcode_process_fasta);
+	else if (!strcmp(argv[1], "build_barcode_fastg"))
+		build_opt_process(argc, argv, &build_barcode_process_fastg);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build_opt_process(argc, argv, &build_0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))

@@ -42,6 +42,7 @@ SRC = src/assembly_graph.c 				\
       src/time_utils.c 					\
       src/utils.c 					\
       src/verbose.c 					\
+      src/fastg.c 					\
       src/main.c
 
 OBJ = $(SRC:.c=.o)
