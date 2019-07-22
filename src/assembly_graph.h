@@ -54,9 +54,7 @@ struct asm_graph_t {
 	struct asm_edge_t *edges;	/* list of edges */
 };
 
-#define MIN_FRAG_LEN			200
-#define MIN_UNIQUE_BARCODE		100
-#define MIN_NOTICE_LEN			200
+#define MIN_NOTICE_LEN			250
 #define MIN_CONNECT_SIZE		500
 
 #define TIPS_RATIO_THRES		0.1
@@ -67,11 +65,14 @@ struct asm_graph_t {
 #define CHIMERIC_RATIO_THRES		0.1
 #define CHIMERIC_COV_THRES		30
 
+#define CONTIG_RP_LEN			500
+#define CONTIG_BC_LEN_1			1500
+#define CONTIG_BC_LEN_2			3000
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE		3000
+// #define MIN_CONTIG_BARCODE		3000
 /* Only add and use barcode for contig with length minimum */
-#define MIN_LONG_CONTIG			1000
-#define MIN_CONTIG_READPAIR		500
+// #define MIN_LONG_CONTIG			1000
+// #define MIN_CONTIG_READPAIR		500
 
 #define MAX_PAIR_LEN			700
 #define MAX_MOLECULE_LEN		30000

@@ -582,61 +582,6 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
  * return 3: double - loop
  * return -1: false loop, just go through
  */
-// int check_simple_loop(struct asm_graph_t *g, gint_t e, double uni_cov)
-// {
-// 	gint_t e_rc, u, v, u_rc, v_rc, e1, e2, e_rc1, e_rc2, e_return, e_return_rc;
-// 	int cov, rep, rep_e, rep_e_return;
-// 	double fcov, fcov1, fcov2, fcov_mean;
-// 	e_rc = g->edges[e].rc_id;
-// 	u = g->edges[e].source;
-// 	v = g->edges[e].target;
-// 	u_rc = g->nodes[u].rc_id;
-// 	v_rc = g->nodes[v].rc_id;
-// 	cov = __get_edge_cov_int(g, e, uni_cov);
-// 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-// 	if (u == v) { /* self loop */
-// 		if (cov == 0 && get_edge_len(g->edges + e) < MIN_NOTICE_LEN) {
-// 			asm_remove_edge(g, e);
-// 			asm_remove_edge(g, e_rc);
-// 			return -1;
-// 		}
-// 		if (g->nodes[u_rc].deg > 2 || g->nodes[u].deg > 2)
-// 			return 0;
-// 		// asm_duplicate_edge_seq(g, e, cov);
-// 		// asm_duplicate_edge_seq(g, e_rc, cov);
-// 	} else if (u == v_rc) { /* self loop reverse */
-// 		if (cov == 0) {
-// 			__VERBOSE("Remove edges %ld[len=%u]\n", e, get_edge_len(g->edges + e));
-// 			asm_remove_edge(g, e);
-// 			asm_remove_edge(g, e_rc);
-// 			return -1;
-// 		}
-// 		// if (g->nodes[u].deg > 2)
-// 		// 	return 0;
-// 		// if (g->nodes[v].deg == 1) {
-// 		// 	e_rc1 = g->nodes[v].adj[0];
-// 		// 	e1 = g->edges[e_rc1].rc_id;
-// 		// 	asm_join_edge_loop_reverse(g, e1, e, e_rc, e_rc1);
-// 		// 	asm_remove_edge(g, e);
-// 		// 	asm_remove_edge(g, e_rc);
-// 		// 	return 2;
-// 		// } else if (g->nodes[v].deg == 2) {
-// 		// 	e_rc1 = g->nodes[v].adj[0];
-// 		// 	e1 = g->edges[e_rc1].rc_id;
-// 		// 	e2 = g->nodes[v].adj[1];
-// 		// 	e_rc2 = g->edges[e2].rc_id;
-// 		// 	asm_join_edge3(g, e1, e_rc1, e, e_rc, e2, e_rc2,
-// 		// 				g->edges[e].count);
-// 		// 	asm_remove_edge(g, e);
-// 		// 	asm_remove_edge(g, e_rc);
-// 		// 	return 2;
-// 		// }
-// 		return 0;
-// 	} else {
-// 	}
-// 	return 0;
-// }
-
 gint_t unroll_simple_loop(struct asm_graph_t *g)
 {
 	gint_t e, cnt_self, cnt_self_rv, cnt_double, cnt_false, ret;
@@ -692,19 +637,19 @@ static int bubble_check_align_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	int *A = malloc((m + 1) * (n + 1) * sizeof(int));
 	A[0] = 0;
 	for (i = 1; i <= m; ++i)
-		A[i * (n + 1)] = -i;
+		A[i * (n + 1)] = -i * 3;
 	for (j = 1; j <= n; ++j)
-		A[j] = -j;
+		A[j] = -j * 3;
 	for (i = 1; i <= m; ++i) {
 		for (j = 1; j <= n; ++j) {
 			c1 = __binseq_get(g->edges[e1].seq, i - 1);
 			c2 = __binseq_get(g->edges[e2].seq, j - 1);
 			score = (c1 == c2 && c1 < 4) ? 1 : -1;
-			A[i * (n + 1) + j] = __max(A[i * (n + 1) + j - 1], A[(i - 1) * (n + 1) + j]) - 1;
+			A[i * (n + 1) + j] = __max(A[i * (n + 1) + j - 1], A[(i - 1) * (n + 1) + j]) - 3;
 			A[i * (n + 1) + j] = __max(A[i * (n + 1) + j], A[(i - 1) * (n + 1) + j - 1] + score);
 		}
 	}
-	ret = (A[(m + 1) * (n + 1) - 1] * 100 > 90 * (int)__max(m, n) && __max(m, n) - A[(m + 1) * (n + 1) - 1] < MIN_NOTICE_LEN);
+	ret = (A[(m + 1) * (n + 1) - 1] * 100 > 50 * (int)__max(m, n) && __max(m, n) - A[(m + 1) * (n + 1) - 1] < MIN_NOTICE_LEN * 2);
 	free(A);
 	return ret;
 }
