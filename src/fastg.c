@@ -14,12 +14,9 @@
 
 KSEQ_INIT(gzFile, gzread);
 
-static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int is_comp)
+static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int added)
 {
-  if (g->edges[id].seq != NULL)
-    return 0;
-  g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
-  if (id >= g->n_e) {
+  if (id > g->n_e) {
     // +1 is used for the reverse complement of the new edge
     g->edges = realloc(g->edges, (id + 1) * sizeof(struct asm_edge_t));
     g->n_e = id + 1;
@@ -27,11 +24,15 @@ static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int is_co
   
   //add an edge, not a neighbor
   if (seq != NULL) {
-    if (!asm_fasta_edge_convert(g, id - (!is_comp), seq))
+    if (!asm_fasta_edge_convert(g, id - 1, seq))
       return 1;
-    asm_clone_seq_reverse(g->edges + (id - is_comp), g->edges + g->n_e + id - (!is_comp));
+    asm_clone_seq_reverse(g->edges + id, g->edges + id - 1);
   }
 
+  if (seq != NULL && added)
+    return 0;
+
+  g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
   // edge id starts from zero
   g->edges[id - 1].rc_id = id;
   g->edges[id].rc_id = id - 1;
@@ -62,12 +63,15 @@ static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int is_co
 
 static int add_one_connection(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-  assert(g->edges[e1].seq != NULL);
-  assert(g->edges[e2].seq != NULL);
-  gint_t e1_rc = g->edges[e1].rc_id;
-  gint_t e2_rc = g->edges[e2].rc_id;
-  g->edges[e1].target = g->edges[e2].source;
-  g->edges[e2_rc].target = g->edges[e1_rc].source;
+  if (g->edges[e1].target == g->edges[e2].source) {
+    return 0;
+  }
+  gint_t e1_target = g->edges[e1].target;
+  g->nodes[e1_target].adj = realloc(g->nodes[e1_target].adj, (g->nodes[e1_target].deg + 1) * sizeof(gint_t));
+  g->nodes[e1_target].adj[g->nodes[e1_target].deg++] = e2;
+  g->nodes[g->edges[e2].source].deg--;
+  g->edges[e2].source = e1_target;
+  g->edges[g->edges[e2].rc_id].target = g->nodes[e1_target].rc_id;
 }
 
 void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
@@ -79,6 +83,7 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 	g->n_v = g->n_e = 0;
     int c;
     char *p_i;
+    int *added;
 	gzFile fp = gzopen(path, "r");
 	if (!fp)
 		__ERROR("Unable to open file [%s] to read", path);
@@ -95,9 +100,13 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
       if (is_comp) *(p-1) = 0;
       if (!is_comp) {
         for(p_i = p; *p_i != '_'; --p_i);
-        add_one_edge(g, atoi(p_i + 1), seq, 0);
+        add_one_edge(g, atoi(p_i + 1), seq, g->n_e > 0 && added[atoi(p_i + 1)]);
       //printf("S\t%s\t%s\tLN:i:%ld\n", s, seq->seq.s, (long)strlen(seq->seq.s));
       }
+      if (atoi(p_i + 1) + 1 == g->n_e)
+        added = realloc(added, sizeof(int) * g->n_e);
+      added[atoi(p_i + 1)] = 1;
+      added[atoi(p_i + 1) - 1] = 1;
       if (c == ':') { // have neighbors
         char *q = p + 1;
         do {
@@ -108,15 +117,27 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
           if (is_comp2) *(p-1) = 0;
           char *q_i;
           for(q_i = p; *q_i != '_'; --q_i);
-          gint_t q_id= atoi(q_i + 1);
-          add_one_edge(g, q_id - !(q_id & 1), NULL, is_comp2);
-          add_one_connection(g, atoi(p_i + 1), atoi(q_i + 1));
+          gint_t q_id = atoi(q_i + 1);
+          gint_t p_id = atoi(p_i + 1);
+          if (q_id > p_id) {
+            if (q_id > g->n_e || !added[q_id]) {
+              add_one_edge(g, q_id , NULL, 0);
+              added = realloc(added, sizeof(int) * g->n_e);
+            }
+            added[q_id] = 1;
+            added[q_id - 1] = 1;
+          }
+          add_one_connection(g, p_id - 1 + is_comp, q_id - 1 + is_comp2);
           //printf("L\t%s\t%c\t%s\t%c\t0M\n", s, "+-"[!!is_comp], q, "+-"[!!is_comp2]);
           q = p + 1;
         } while (c != 0 && c != ';');
       }
+      //__VERBOSE("ID %d\n", atoi(p_i + 1));
+      //assert(g->n_v > g->n_e);
     }
 	kseq_destroy(seq);
 	gzclose(fp);
 
+    __VERBOSE("Number of nodes: %d\n", g->n_v);
+    __VERBOSE("Number of edges: %d\n", g->n_e);
 }
