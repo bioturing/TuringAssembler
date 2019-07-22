@@ -45,6 +45,7 @@ SRC = src/assembly_graph.c 				\
       src/time_utils.c 					\
       src/utils.c 					\
       src/verbose.c 					\
+      src/fastg.c 					\
       src/scaffolding/bin_hash.c 						\
       src/scaffolding/algorithm.c 						\
       src/scaffolding/compare.c 						\

@@ -50,6 +50,7 @@ struct opt_proc_t {
 	char *out_dir;
 	char *in_file;
 	char *in_fasta;
+	char *in_fastg;
 	char *in_contig_file;
 	int mmem;
 };
