@@ -74,12 +74,19 @@ static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int added
 
 static void add_one_connection(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
+	// Short-hand for variable
 	gint_t e1_target = g->edges[e1].target;
+	// To avoid re-add a reverse complement connection
 	if (find_adj_idx(g->nodes[e1_target].adj, g->nodes[e1_target].deg, e2) == -1) {
+		// allocate 1 more room for target of e1
 		g->nodes[e1_target].adj = realloc(g->nodes[e1_target].adj, (g->nodes[e1_target].deg + 1) * sizeof(gint_t));
+		// add e2 as an out-going edge of e1_target
 		g->nodes[e1_target].adj[g->nodes[e1_target].deg++] = e2;
+		// e2.source is useless now, we must decrease its degree by 1
 		g->nodes[g->edges[e2].source].deg--;
+		// Assign new source for e2
 		g->edges[e2].source = e1_target;
+		// Do the reverse complement thing
 		g->edges[g->edges[e2].rc_id].target = g->nodes[e1_target].rc_id;
 	} 
 }
