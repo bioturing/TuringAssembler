@@ -6,51 +6,68 @@
 #include "attribute.h"
 
 #define TYPE_FASTQ		0
-#define	TYPE_FASTA		1
+#define TYPE_FASTA		1
+#define TYPE_
 
 // #define BUF_OK			0
 // #define BUF_FAIL		1
 
 #define BUF_SIZE		SIZE_1MB
 
-int get_format(const char *file_path);
-
 struct gb_file_inf {
-	gzFile fi;
-	int size;
+	gzFile fp;
+	int buf_size;
 	int is_eof;
 	char *buf;
-	char *name;
-	long processed;
+	const char *name;
+	int64_t processed;
 };
 
 /* pair */
 
 struct gb_pair_data {
-	struct gb_file_inf file1;
-	struct gb_file_inf file2;
+	struct gb_file_inf R1;
+	struct gb_file_inf R2;
+	int64_t compressed_size;
 	int finish_flag;
 	int warning_flag;
 	int type;
-	int file_id;
-	int offset;
+	int64_t processed;
 };
 
-void gb_pair_init(struct gb_pair_data *data, char *file_path1, char *file_path2);
+void gb_pair_init(struct gb_pair_data *data, const char *R1_path, const char *R2_path);
 void gb_pair_destroy(struct gb_pair_data *data);
-int gb_get_pair(struct gb_pair_data *data, char **buf1, char **buf2);
+int gb_get_pair(struct gb_pair_data *data, char **R1_buf, char **R2_buf);
+
+/* triplet-barcoding */
+
+struct gb_trip_data {
+	struct gb_file_inf R1;
+	struct gb_file_inf R2;
+	struct gb_file_inf I;
+	int64_t compressed_size;
+	int finish_flag;
+	int warning_flag;
+	int type;
+	int64_t processed;
+};
+
+void gb_trip_init(struct gb_trip_data *data, const char *R1_path,
+				const char *R2_path, const char *I_path);
+void gb_trip_destroy(struct gb_trip_data *data);
+int gb_get_trip(struct gb_trip_data *data, char **R1_buf, char **R2_buf, char **I_buf);
 
 /* single */
 
 struct gb_single_data {
-	struct gb_file_inf file;
+	struct gb_file_inf R;
+	int64_t compressed_size;
 	int finish_flag;
 	int type;
-	int file_id;
-	int offset;
+	int64_t processed;
 };
 
-void gb_single_init(struct gb_single_data *data, char *file_path);
+void gb_single_init(struct gb_single_data *data, char *R_path);
 void gb_single_destroy(struct gb_single_data *data);
 int gb_get_single(struct gb_single_data *data, char **buf);
 

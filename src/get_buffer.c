@@ -4,7 +4,7 @@
 #include "utils.h"
 #include "verbose.h"
 
-int get_format(const char *file_path)
+static int get_format(const char *file_path)
 {
 	char buf[1024];
 	gzFile file;
@@ -27,6 +27,32 @@ int get_format(const char *file_path)
 
 	gzclose(file);
 	return ret;
+}
+
+static void gb_file_init(struct gb_file_inf *f, const char *path)
+{
+	f->name = path;
+	f->fp = gzopen(path, "r");
+	f->buf = malloc(BUF_SIZE + 1);
+	f->buf_size = 0;
+	f->is_eof = 0;
+	f->processed = 0;
+}
+
+void gb_trip_init(struct gb_trip_data *data, const char *R1_path,
+				const char *R2_path, const char *I_path)
+{
+	if (!strcmp(R1_path, R2_path) || !strcmp(R1_path, I_path) || !strcmp(R2_path, I_path))
+		__ERROR("Two identical read files");
+
+	data->type = get_format(R1_path);
+	if (get_format(R2_path) != data->type || get_format(I_path) != data->type)
+		__ERROR("Error in three read files are not equal");
+	gb_file_init(&(data->R1), R1_path);
+	gb_file_init(&(data->R2), R2_path);
+	gb_file_init(&(data->I), I_path);
+	data->finish_flag = 0;
+	data->warning_flag = 0;
 }
 
 void gb_pair_init(struct gb_pair_data *data, char *file_path1, char *file_path2)

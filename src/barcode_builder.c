@@ -173,34 +173,6 @@ void print_test_pair_end(struct asm_graph_t *g, gint_t e)
 	printf("-----------------------------------------------------------\n");
 }
 
-// static inline gint_t find_best_mate(struct barcode_hash_t *h)
-// {
-// 	gint_t best, second_best;
-// 	uint32_t cnt_best, cnt_2nd_best, i;
-// 	best = second_best = -1;
-// 	cnt_best = cnt_2nd_best = 0;
-// 	for (i = 0; i < h->size; ++i) {
-// 		if (h->keys[i] == (uint64_t)-1)
-// 			continue;
-// 		if (h->cnts[i] > cnt_best) {
-// 			cnt_2nd_best = cnt_best;
-// 			second_best = best;
-// 			cnt_best = h->cnts[i];
-// 			best = (gint_t)h->keys[i];
-// 		} else if (h->cnts[i] > cnt_2nd_best) {
-// 			cnt_2nd_best = h->cnts[i];
-// 			second_best = (gint_t)h->keys[i];
-// 		}
-// 	}
-// 	if (best != -1) {
-// 		if (second_best == -1 || cnt_best > cnt_2nd_best * 2)
-// 			return best;
-// 		return -1;
-// 	} else {
-// 		return -1;
-// 	}
-// }
-
 static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
 					struct asm_edge_t *e, uint32_t max_len)
 {
@@ -256,17 +228,16 @@ void init_contig_map_info(struct asm_graph_t *g, const char *path,
 	__VERBOSE("Done indexing contigs\n");
 }
 
-// void graph_aux_refine(struct asm_graph_t *g)
+// void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g, uint32_t aux_build)
 // {
-// 	gint_t e;
-// 	for (e = 0; e < g->n_e; ++e) {
-// 		// if (g->aux_flag & ASM_HAVE_BARCODE)
-// 		// 	barcode_hash_filter(&g->edges[e].barcodes, 1);
-// 		if (g->aux_flag & ASM_HAVE_READPAIR) {
-// 			g->edges[e].best_mate_contigs = find_best_mate(&g->edges[e].mate_contigs);
-// 			// barcode_hash_filter(&g->edges[e].mate_contigs, 0);
-// 		}
-// 	}
+// 	g->aux_flag = 0;
+// 	if (aux_build & ASM_BUILD_BARCODE)
+// 		g->aux_flag |= ASM_HAVE_BARCODE;
+// 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
+// 	struct bccount_bundle_t ske;
+// 	ske.g = g;
+// 	ske.aux_build = aux_build;
+// 	ske.barcode_calculator = barcode_calculators[opt
 // }
 
 void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, uint32_t aux_build)
@@ -291,7 +262,6 @@ void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, ui
 	ske.barcode_calculator = barcode_calculators[opt->lib_type];
 	ske.bwa_idx = bwa_idx_load(fasta_prefix, BWA_IDX_ALL);
 	ske.bwa_opt = mem_opt_init();
-	ske.bwa_opt->max_XA_hits = 100;
 	barcode_start_count(opt, &ske);
 	bwa_idx_destroy(ske.bwa_idx);
 	free(ske.bwa_opt);
@@ -304,13 +274,6 @@ static inline void add_barcode_edge(struct asm_graph_t *g, gint_t e, uint64_t bc
 	barcode_hash_add(&g->edges[e].barcodes, bc);
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
-
-// static inline void add_barcode_edge_unique(struct asm_graph_t *g, gint_t e, uint64_t bc)
-// {
-// 	pthread_mutex_lock(&g->edges[e].lock);
-// 	barcode_hash_add_unique(&g->edges[e].barcodes, bc);
-// 	pthread_mutex_unlock(&g->edges[e].lock);
-// }
 
 static inline void add_read_pair_edge(struct asm_graph_t *g, gint_t e, gint_t next_e, uint64_t bc)
 {
