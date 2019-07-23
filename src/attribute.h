@@ -15,6 +15,11 @@
 #define KMCP			"KMCP"
 #define KMCS			"KMCS"
 
+#define LIB_TYPE_SORTED		0
+#define LIB_TYPE_BIOT		1
+#define LIB_TYPE_UST		2
+#define LIB_TYPE_10X		3
+
 #if !defined(GIT_SHA)
 #define GIT_SHA			"unknown"
 #endif
@@ -43,34 +48,11 @@ struct opt_proc_t {
 	int split_len;
 	int lib_type;
 	int n_files;
-	char **files_1, **files_2;
+	char **files_1, **files_2, **files_I;
 	char *out_dir;
 	char *in_file;
 	char *in_fasta;
 	int mmem;
-};
-
-struct opt_count_t {
-	int n_threads;
-	int hash_size;
-	int k0;
-	int k1;
-	int k2;
-	int split_len;
-	int n_files;
-	char **files_1, **files_2;
-	char *out_dir;
-};
-
-struct opt_build_t {
-	int n_threads;
-	int hash_size;
-	char *in_file;
-	char *in_path;
-	char *out_dir;
-	int n_files;
-	char **files_1, **files_2;
-	int split_len;
 };
 
 #endif

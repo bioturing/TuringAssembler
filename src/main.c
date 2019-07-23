@@ -16,8 +16,8 @@
 #include "utils.h"
 #include "verbose.h"
 
-char *lib_str[] = {"ust", "10x"};
-int n_lib = 2;
+char *lib_str[] = {"sorted", "bioturing", "ust", "10x"};
+int n_lib = 4;
 
 int get_library_index(const char *str)
 {
@@ -99,37 +99,6 @@ struct opt_proc_t *init_opt_proc()
 	return opt;
 }
 
-struct opt_count_t *init_opt_count()
-{
-	struct opt_count_t *opt;
-	opt = calloc(1, sizeof(struct opt_count_t));
-	opt->n_threads = 1;
-	opt->hash_size = 1 << 24;
-	opt->k0 = 17;
-	opt->k1 = 31;
-	opt->k2 = 55;
-	opt->n_files = 0;
-	opt->split_len = 1000;
-	opt->files_1 = opt->files_2 = NULL;
-	opt->out_dir = ".";
-	return opt;
-}
-
-struct opt_build_t *init_opt_build()
-{
-	struct opt_build_t *opt;
-	opt = calloc(1, sizeof(struct opt_build_t));
-	opt->n_threads = 1;
-	opt->hash_size = 1 << 24;
-	opt->out_dir = ".";
-	opt->in_path = NULL;
-	opt->in_file = NULL;
-	opt->split_len = 1000;
-	opt->files_1 = opt->files_2 = NULL;
-	opt->out_dir = ".";
-	return opt;
-}
-
 int opt_count_list(int argc, char *argv[])
 {
 	int n;
@@ -140,112 +109,6 @@ int opt_count_list(int argc, char *argv[])
 	if (n == 0)
 		__ERROR("Emtpy list %s", argv[0]);
 	return n;
-}
-
-struct opt_build_t *parse_build_option(int argc, char *argv[])
-{
-	int pos = 0, n;
-	struct opt_build_t *opt = init_opt_build();
-	while (pos < argc) {
-		if (!strcmp(argv[pos], "-t")) {
-			opt->n_threads = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-o")) {
-			opt->out_dir = argv[pos + 1];
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-i")) {
-			opt->in_file = argv[pos + 1];
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-s")) {
-			opt->hash_size = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-sl")) {
-			opt->split_len = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-1")) {
-			n = opt_count_list(argc - pos, argv + pos);
-			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
-			opt->n_files = n;
-			opt->files_1 = argv + pos + 1;
-			pos += (n + 1);
-		} else if (!strcmp(argv[pos], "-2")) {
-			n = opt_count_list(argc - pos, argv + pos);
-			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
-			opt->n_files = n;
-			opt->files_2 = argv + pos + 1;
-			pos += (n + 1);
-		} else {
-			__ERROR("Unknown option %s", argv[pos]);
-		}
-	}
-	if (opt->in_path == NULL) {
-		free(opt);
-		return NULL;
-	}
-	mkdir(opt->out_dir, 0755);
-	return opt;
-}
-
-struct opt_count_t *parse_count_option(int argc, char *argv[])
-{
-	int pos = 0, n;
-	struct opt_count_t *opt = init_opt_count();
-	while (pos < argc) {
-		if (!strcmp(argv[pos], "-t")) {
-			opt->n_threads = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-s")) {
-			opt->hash_size = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-k0")) {
-			opt->k0 = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-k1")) {
-			opt->k1 = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-k2")) {
-			opt->k2 = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-o")) {
-			opt->out_dir = argv[pos + 1];
-			pos += 2;
-		} else if (!strcmp(argv[pos], "-1")) {
-			n = opt_count_list(argc - pos, argv + pos);
-			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
-			opt->n_files = n;
-			opt->files_1 = argv + pos + 1;
-			pos += (n + 1);
-		} else if (!strcmp(argv[pos], "-2")) {
-			n = opt_count_list(argc - pos, argv + pos);
-			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
-			opt->n_files = n;
-			opt->files_2 = argv + pos + 1;
-			pos += (n + 1);
-		} else if (!strcmp(argv[pos], "-sl")) {
-			opt->split_len = atoi(argv[pos + 1]);
-			pos += 2;
-		} else if (argv[pos][0] != '-') {
-			if (opt->n_files != 0)
-				__ERROR("Unknown %s", argv[pos]);
-			opt->files_1 = argv + pos;
-			while (pos < argc && argv[pos][0] != '-') {
-				++pos;
-				++opt->n_files;
-			}
-		} else {
-			__ERROR("Unknown option %s", argv[pos]);
-		}
-	}
-	if (opt->n_files == 0) {
-		free(opt);
-		return NULL;
-	}
-	mkdir(opt->out_dir, 0755);
-	return opt;
 }
 
 struct opt_proc_t *parse_proc_option(int argc, char *argv[])
@@ -298,6 +161,13 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 				__ERROR("Inconsistent number of files");
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
+			pos += (n + 1);
+		} else if (!strcmp(argv[pos], "-I")) {
+			n = opt_count_list(argc - pos, argv + pos);
+			if (opt->n_files > 0 && opt->n_files != n)
+				__ERROR("Inconsistent number of files");
+			opt->n_files = n;
+			opt->files_I = argv + pos + 1;
 			pos += (n + 1);
 		} else if (!strcmp(argv[pos], "-sl")) {
 			opt->split_len = atoi(argv[pos + 1]);

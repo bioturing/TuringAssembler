@@ -40,7 +40,6 @@ SRC = src/assembly_graph.c 				\
       src/process.c 					\
       src/pthread_barrier.c 				\
       src/semaphore_wrapper.c 				\
-      src/test_hash_count.c 				\
       src/time_utils.c 					\
       src/utils.c 					\
       src/verbose.c 					\
