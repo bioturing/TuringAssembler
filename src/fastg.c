@@ -145,7 +145,6 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 					added[q_id - 1] = 1;
 				}
 				add_one_connection(g, p_id - 1 + is_comp, q_id - 1 + is_comp2);
-				assert(g->nodes[1].deg == 0);
 				q = p + 1;
 			} while (c != 0 && c != ';');
 		}
