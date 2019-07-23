@@ -29,6 +29,15 @@ static int get_format(const char *file_path)
 	return ret;
 }
 
+static int64_t gb_file_get_size(const char *path)
+{
+	FILE *fp = xfopen(path, "rb");
+	fseek(fp, 0L, SEEK_END);
+	int64_t ret = ftell(fp);
+	fclose(fp);
+	return ret;
+}
+
 static void gb_file_init(struct gb_file_inf *f, const char *path)
 {
 	f->name = path;
@@ -37,6 +46,7 @@ static void gb_file_init(struct gb_file_inf *f, const char *path)
 	f->buf_size = 0;
 	f->is_eof = 0;
 	f->processed = 0;
+	f->compressed_size = gb_file_get_size(path);
 }
 
 void gb_trip_init(struct gb_trip_data *data, const char *R1_path,
@@ -53,69 +63,67 @@ void gb_trip_init(struct gb_trip_data *data, const char *R1_path,
 	gb_file_init(&(data->I), I_path);
 	data->finish_flag = 0;
 	data->warning_flag = 0;
+	data->compressed_size = data->R1.compressed_size + data->R2.compressed_size + data->I.compressed_size;
 }
 
-void gb_pair_init(struct gb_pair_data *data, char *file_path1, char *file_path2)
+void gb_trip_destroy(struct gb_trip_data *data)
 {
-	if (!strcmp(file_path1, file_path2))
+	free(data->R1.buf);
+	free(data->R2.buf);
+	free(data->I.buf);
+	gzclose(data->R1.fp);
+	gzclose(data->R2.fp);
+	gzclose(data->I.fp);
+}
+
+void gb_pair_init(struct gb_pair_data *data, const char *R1_path, const char *R2_path)
+{
+	if (!strcmp(R1_path, R2_path))
 		__ERROR("Two identical read files");
 
-	data->type = get_format(file_path1);
-	if (get_format(file_path2) != data->type)
+	data->type = get_format(R1_path);
+	if (get_format(R2_path) != data->type)
 		__ERROR("Format in two read files are not equal");
-	data->offset = 0;
 
-	data->file1.name = file_path1;
-	data->file2.name = file_path2;
-	data->file1.fi = gzopen(file_path1, "r");
-	data->file2.fi = gzopen(file_path2, "r");
-	data->file1.buf = malloc(BUF_SIZE + 1);
-	data->file2.buf = malloc(BUF_SIZE + 1);
-	data->file1.size = data->file2.size = 0;
-	data->file1.is_eof = data->file2.is_eof = 0;
+	gb_file_init(&(data->R1), R1_path);
+	gb_file_init(&(data->R2), R2_path);
 	data->finish_flag = 0;
 	data->warning_flag = 0;
-	data->file1.processed = 0;
-	data->file2.processed = 0;
+	data->compressed_size = data->R1.compressed_size + data->R2.compressed_size;
 }
 
 void gb_pair_destroy(struct gb_pair_data *data)
 {
-	free(data->file1.buf);
-	free(data->file2.buf);
-	gzclose(data->file1.fi);
-	gzclose(data->file2.fi);
+	free(data->R1.buf);
+	free(data->R2.buf);
+	gzclose(data->R1.fp);
+	gzclose(data->R2.fp);
 }
 
 void gb_single_init(struct gb_single_data *data, char *file_path)
 {
 	data->type = get_format(file_path);
-	data->file.name = file_path;
-	data->offset = 0;
-	data->file.fi = gzopen(file_path, "r");
-
-	data->file.buf = malloc(BUF_SIZE + 1);
-	data->file.size = 0;
-	data->file.is_eof = 0;
+	gb_file_init(&(data->R), file_path);
 	data->finish_flag = 0;
-	data->file.processed = 0;
+	data->warning_flag = 0;
+	data->compressed_size = data->R.compressed_size;
 }
 
 void gb_single_destroy(struct gb_single_data *data)
 {
-	free(data->file.buf);
-	gzclose(data->file.fi);
+	free(data->R.buf);
+	gzclose(data->R.fp);
 }
 
 /*
  * return 0 if read is not found
  * otherwise return the next read's position
  */
-static int get_nxt_pos(struct gb_file_inf *data, int prev, int type)
+static int get_next_pos(struct gb_file_inf *data, int prev, int type)
 {
 	int i = prev;
 	char *buf = data->buf;
-	int size = data->size;
+	int size = data->buf_size;
 	int id = 0;
 	int mod = (type == TYPE_FASTQ ? 3 : 1);
 
@@ -144,47 +152,40 @@ static int get_nxt_pos(struct gb_file_inf *data, int prev, int type)
 
 static void load_buffer(struct gb_file_inf *data)
 {
-	// int n_byte = gzread(data->fi, data->buf + data->size, BUF_SIZE);
-	int size = BUF_SIZE - data->size;
-	int n_byte = gzread(data->fi, data->buf + data->size, size);
-	data->size += n_byte;
-	// data->processed = gzoffset(data->fi);
-	// if (n_byte < BUF_SIZE)
-	// 	data->is_eof = 1;
+	int size = BUF_SIZE - data->buf_size;
+	int n_byte = gzread(data->fp, data->buf + data->buf_size, size);
+	data->buf_size += n_byte;
+	data->processed = gzoffset(data->fi);
 	if (n_byte < size)
 		data->is_eof = 1;
 }
 
 static void split_buffer(struct gb_file_inf *data, char *old_buf, int prev)
 {
-	int padding = data->size - prev;
+	int padding = data->buf_size - prev;
 	/* BUF_SIZE + 1 for case end of file is not '/n' */
-	// data->buf = malloc(padding + BUF_SIZE + 1);
-	// data->buf = kk
 	memcpy(data->buf, old_buf + prev, padding);
-	data->size = padding;
+	data->buf_size = padding;
 	data->buf[padding] = '\0';
 	old_buf[prev] = '\0';
 }
 
 int gb_get_pair(struct gb_pair_data *data, char **buf1, char **buf2)
 {
-	// buf1, buf2 must first be initilized
-	// *buf1 = *buf2 = NULL;
 	if (data->finish_flag)
 		return -1;
 
 	int prev1, prev2, new_pos1, new_pos2;
 	int cnt, ret;
 
-	load_buffer(&data->file1);
-	load_buffer(&data->file2);
+	load_buffer(&data->R1);
+	load_buffer(&data->R2);
 	prev1 = prev2 = 0;
 
 	cnt = 0;
 	while (1) {
-		new_pos1 = get_nxt_pos(&data->file1, prev1, data->type);
-		new_pos2 = get_nxt_pos(&data->file2, prev2, data->type);
+		new_pos1 = get_next_pos(&data->R1, prev1, data->type);
+		new_pos2 = get_next_pos(&data->R2, prev2, data->type);
 		if (!new_pos1 || !new_pos2) 
 			break;
 		++cnt;
@@ -210,8 +211,8 @@ int gb_get_pair(struct gb_pair_data *data, char **buf1, char **buf2)
 	__SWAP(*buf2, data->file2.buf);
 	// *buf1 = data->file1.buf;
 	// *buf2 = data->file2.buf;
-	split_buffer(&data->file1, *buf1, prev1);
-	split_buffer(&data->file2, *buf2, prev2);
+	split_buffer(&data->R1, *buf1, prev1);
+	split_buffer(&data->R2, *buf2, prev2);
 
 	ret = data->offset;
 	data->offset += cnt;

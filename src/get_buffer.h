@@ -21,6 +21,7 @@ struct gb_file_inf {
 	char *buf;
 	const char *name;
 	int64_t processed;
+	int64_t compressed_size;
 };
 
 /* pair */
