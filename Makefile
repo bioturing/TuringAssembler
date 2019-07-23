@@ -4,7 +4,7 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -pthread -O3 -std=c++11 \
+LIBS = -g -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
        -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
        libs/libbwa.a -lm
