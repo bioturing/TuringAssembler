@@ -73,12 +73,4 @@ struct opt_build_t {
 	int split_len;
 };
 
-struct producer_bundle_t {
-	struct dqueue_t *q;
-	int *n_consumer;
-	void *stream;
-	pthread_barrier_t *barrier;
-	pthread_mutex_t *lock;
-};
-
 #endif

@@ -105,7 +105,6 @@ void gb_single_init(struct gb_single_data *data, char *file_path)
 	data->type = get_format(file_path);
 	gb_file_init(&(data->R), file_path);
 	data->finish_flag = 0;
-	data->warning_flag = 0;
 	data->compressed_size = data->R.compressed_size;
 }
 
@@ -119,7 +118,7 @@ void gb_single_destroy(struct gb_single_data *data)
  * return 0 if read is not found
  * otherwise return the next read's position
  */
-static int get_next_pos(struct gb_file_inf *data, int prev, int type)
+static inline int get_next_pos(struct gb_file_inf *data, int prev, int type)
 {
 	int i = prev;
 	char *buf = data->buf;
@@ -130,10 +129,10 @@ static int get_next_pos(struct gb_file_inf *data, int prev, int type)
 	while (1) {
 		for (; buf[i] != '\n' && i < size; ++i);
 		if (i == size) {
-			if (!data->is_eof) 
-				break; 
-		} else { 
-			++i; 
+			if (!data->is_eof)
+				break;
+		} else {
+			++i;
 		}
 		id = (id + 1) & mod;
 		if (id == 0)
@@ -155,7 +154,7 @@ static void load_buffer(struct gb_file_inf *data)
 	int size = BUF_SIZE - data->buf_size;
 	int n_byte = gzread(data->fp, data->buf + data->buf_size, size);
 	data->buf_size += n_byte;
-	data->processed = gzoffset(data->fi);
+	data->processed = gzoffset(data->fp);
 	if (n_byte < size)
 		data->is_eof = 1;
 }
@@ -170,73 +169,117 @@ static void split_buffer(struct gb_file_inf *data, char *old_buf, int prev)
 	old_buf[prev] = '\0';
 }
 
-int gb_get_pair(struct gb_pair_data *data, char **buf1, char **buf2)
+int64_t gb_get_trip(void *vdata, void *vp)
 {
+	struct gb_trip_data *data = (struct gb_trip_data *)vdata;
+	struct trip_buffer_t *p = (struct trip_buffer_t *)vp;
 	if (data->finish_flag)
 		return -1;
 
-	int prev1, prev2, new_pos1, new_pos2;
-	int cnt, ret;
+	int prev1, prev2, prevI, new_pos1, new_pos2, new_posI;
 
 	load_buffer(&data->R1);
 	load_buffer(&data->R2);
-	prev1 = prev2 = 0;
+	data->processed = data->R1.processed + data->R2.processed;
+	prev1 = prev2 = prevI = 0;
 
-	cnt = 0;
 	while (1) {
 		new_pos1 = get_next_pos(&data->R1, prev1, data->type);
 		new_pos2 = get_next_pos(&data->R2, prev2, data->type);
-		if (!new_pos1 || !new_pos2) 
+		new_posI = get_next_pos(&data->I, prevI, data->type);
+		if (!new_pos1 || !new_pos2 || !new_posI)
 			break;
-		++cnt;
 		prev1 = new_pos1;
 		prev2 = new_pos2;
+		prevI = new_posI;
 	}
 
 	/* no more read to get */
-	if (!prev1 && !new_pos1 && !new_pos2) {
+	if (!prev1 && !new_pos1 && !new_pos2 && !new_posI) {
 		data->finish_flag = 1;
 		return -1;
 	}
 
 	/* read of two files are not equal */
-	if (!prev1) {
+	if (!prev1 || !prev2 || !prevI) {
 		data->warning_flag = 1;
+		data->finish_flag = 1;
+		return -2;
+	}
+
+	/* split complete buffer */
+	__SWAP(p->R1_buf, data->R1.buf);
+	__SWAP(p->R2_buf, data->R2.buf);
+	__SWAP(p->I_buf, data->I.buf);
+	split_buffer(&data->R1, p->R1_buf, prev1);
+	split_buffer(&data->R2, p->R2_buf, prev2);
+	split_buffer(&data->I, p->I_buf, prevI);
+	p->input_format = data->type;
+	return data->processed;
+}
+
+int64_t gb_get_pair(void *vdata, void *vp)
+{
+	struct gb_pair_data *data = (struct gb_pair_data *)vdata;
+	struct pair_buffer_t *p = (struct pair_buffer_t *)vp;
+	if (data->finish_flag)
+		return -1;
+
+	int prev1, prev2, new_pos1, new_pos2;
+
+	load_buffer(&data->R1);
+	load_buffer(&data->R2);
+	data->processed = data->R1.processed + data->R2.processed;
+	prev1 = prev2 = 0;
+
+	while (1) {
+		new_pos1 = get_next_pos(&data->R1, prev1, data->type);
+		new_pos2 = get_next_pos(&data->R2, prev2, data->type);
+		if (!new_pos1 || !new_pos2)
+			break;
+		prev1 = new_pos1;
+		prev2 = new_pos2;
+	}
+
+	/* no more read to get */
+	if (!prev1 && !prev2 && !new_pos1 && !new_pos2) {
 		data->finish_flag = 1;
 		return -1;
 	}
 
-	/* split complete buffer */
-	__SWAP(*buf1, data->file1.buf);
-	__SWAP(*buf2, data->file2.buf);
-	// *buf1 = data->file1.buf;
-	// *buf2 = data->file2.buf;
-	split_buffer(&data->R1, *buf1, prev1);
-	split_buffer(&data->R2, *buf2, prev2);
+	/* read of two files are not equal */
+	if (!prev1 || !prev2) {
+		data->warning_flag = 1;
+		data->finish_flag = 1;
+		return -2;
+	}
 
-	ret = data->offset;
-	data->offset += cnt;
-	return ret;
+	/* split complete buffer */
+	__SWAP(p->R1_buf, data->R1.buf);
+	__SWAP(p->R2_buf, data->R2.buf);
+	split_buffer(&data->R1, p->R1_buf, prev1);
+	split_buffer(&data->R2, p->R2_buf, prev2);
+	p->input_format = data->type;
+	return data->processed;
 }
 
-int gb_get_single(struct gb_single_data *data, char **buf)
+int64_t gb_get_single(void *vdata, void *vp)
 {
-	// *buf = NULL;
+	struct gb_single_data *data = (struct gb_single_data *)vdata;
+	struct single_buffer_t *p = (struct single_buffer_t *)vp;
 	if (data->finish_flag)
 		return -1;
 
 	int prev, new_pos;
-	int cnt, ret;
 
-	load_buffer(&data->file);
+	load_buffer(&data->R);
+	data->processed = data->R.processed;
 	prev = 0;
 
-	cnt = 0;
 	while (1) {
-		new_pos = get_nxt_pos(&data->file, prev, data->type);
+		new_pos = get_next_pos(&data->R, prev, data->type);
 		if (!new_pos) 
 			break;
-		++cnt;
 		prev = new_pos;
 	}
 
@@ -247,24 +290,20 @@ int gb_get_single(struct gb_single_data *data, char **buf)
 	}
 
 	/* split complete buffer */
-	__SWAP(*buf, data->file.buf);
-	// *buf = data->file.buf;
-	split_buffer(&data->file, *buf, prev);
-	ret = data->offset;
-	data->offset += cnt;
-	return ret;
+	__SWAP(p->R_buf, data->R.buf);
+	split_buffer(&data->R, p->R_buf, prev);
+	p->input_format = data->type;
+	return data->processed;
 }
 
-void read_destroy(struct read_t *read, int is_buf)
+void read_destroy(struct read_t *read, int is_allocated)
 {
-	if (!is_buf) {
+	if (!is_allocated) {
 		free(read->seq);
 		free(read->qual);
 		free(read->name);
 		free(read->note);
 	}
-	// free(read->rseq);
-	// free(read->rqual);
 }
 
 int get_read_from_fq(struct read_t *read, char *buf, int *pos)

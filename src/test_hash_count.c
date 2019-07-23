@@ -95,8 +95,8 @@ static void *PE_count(void *data)
 		d_enqueue_out(q, own_buf);
 		own_buf = ext_buf;
 		pos1 = pos2 = 0;
-		buf1 = ext_buf->buf1;
-		buf2 = ext_buf->buf2;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
 		input_format = ext_buf->input_format;
 
 		int64_t n_reads = 0;
@@ -140,7 +140,7 @@ static void count_kmer(struct opt_count_t *opt, khash_t(kmap_t) *h, int ksize)
 	int i;
 
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 						opt->files_1, opt->files_2);
 
 	struct count_bundle_t *worker_bundles;
@@ -163,7 +163,7 @@ static void count_kmer(struct opt_count_t *opt, khash_t(kmap_t) *h, int ksize)
 	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
 
 	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
+		pthread_create(producer_threads + i, &attr, fastq_producer,
 				producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
@@ -176,7 +176,7 @@ static void count_kmer(struct opt_count_t *opt, khash_t(kmap_t) *h, int ksize)
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 
-	free_fastq_PE(producer_bundles, opt->n_files);
+	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
 	free(worker_threads);

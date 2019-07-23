@@ -469,8 +469,8 @@ void *barcode_buffer_iterator(void *data)
 		d_enqueue_out(q, own_buf);
 		own_buf = ext_buf;
 		pos1 = pos2 = 0;
-		buf1 = ext_buf->buf1;
-		buf2 = ext_buf->buf2;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
 		input_format = ext_buf->input_format;
 
 		n_reads = 0;
@@ -510,7 +510,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int i;
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_PE(opt->n_threads, opt->n_files,
+	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 						opt->files_1, opt->files_2);
 
 	struct bccount_bundle_t *worker_bundles;
@@ -538,7 +538,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
 
 	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_PE_producer,
+		pthread_create(producer_threads + i, &attr, fastq_producer,
 				producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
@@ -553,7 +553,7 @@ void barcode_start_count(struct opt_proc_t *opt, struct bccount_bundle_t *ske)
 
 	// __VERBOSE("hash sum = %lu\n", hash_sum);
 
-	free_fastq_PE(producer_bundles, opt->n_files);
+	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
 	free(producer_threads);
