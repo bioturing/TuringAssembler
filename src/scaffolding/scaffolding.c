@@ -196,10 +196,7 @@ void *process_build_big_table(void *data)
 {
 	void next_index(struct params_build_big_table *params, struct asm_graph_t *g)
 	{
-		struct asm_edge_t *e = &g->edges[params->i];
 		params->i++;
-		if (params->i == g->n_e) 
-			return;
 	}
 	
 	// ________________________________________BEGIN___________________________________
@@ -217,8 +214,10 @@ void *process_build_big_table(void *data)
 		int new_i_contig = i_contig;
 		next_index(params, g);
 		pthread_mutex_unlock(&lock_id);
-		
+
 		struct asm_edge_t *e = &g->edges[i_contig];
+        if (!is_long_contig(e))
+            continue;
 		struct barcode_hash_t *buck = &e->barcodes;
 		for (int l = 0; l < buck->size; l++){
 			if (buck->keys[l] != (uint64_t)(-1)){
@@ -300,7 +299,7 @@ void *process_build_candidate_edges(void *data)
 		pthread_mutex_unlock(&lock_id);
 		int n_local_edges = 0; 
 		struct candidate_edge *list_local_edges = NULL; 
-		if (is_very_short_contig(&g->edges[i_contig]))
+		if (!is_long_contig(&g->edges[i_contig]))
 			continue;
 		find_local_nearby_contig(i_contig, params_candidate,
 				&n_local_edges,
@@ -660,7 +659,6 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 {
 	struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
 	mark_contig(g, mark, start_contig);
-//		add_i_contig(path, start_contig);
 	append_i_contig(path, start_contig);
 	int i_r_contig = start_contig, i_l_contig = get_rc_id(g, start_contig);
 	if (opt->metagenomics) {
