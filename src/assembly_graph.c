@@ -1294,6 +1294,7 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 
 		g->edges[g->n_e].source = g->n_v;
 		g->edges[g->n_e].target = g->n_v + 1;
+		g->edges[g->n_e].count = 0;
 		g->nodes[g->n_v].adj = malloc(sizeof(gint_t));
 		g->nodes[g->n_v].adj[0] = g->n_e;
 		g->nodes[g->n_v].deg = 1;
@@ -1302,6 +1303,7 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 
 		g->edges[g->n_e + 1].source = g->n_v + 2;
 		g->edges[g->n_e + 1].target = g->n_v + 3;
+        g->edges[g->n_e + 1].count = 0;
 		g->nodes[g->n_v + 2].adj = malloc(sizeof(gint_t));
 		g->nodes[g->n_v + 2].adj[0] = g->n_e + 1;
 		g->nodes[g->n_v + 2].deg = 1;
