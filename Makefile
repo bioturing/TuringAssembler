@@ -4,7 +4,7 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -g -pthread -O3 -std=c++11 \
+LIBS = -g -pthread -O1 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
        -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
        libs/libbwa.a -lm
@@ -13,7 +13,7 @@ LIBS = -g -pthread -O3 -std=c++11 \
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -O1 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
