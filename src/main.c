@@ -52,7 +52,7 @@ void print_usage_build0(const char *prog)
 	__VERBOSE("         -k0                    <1st kmer size>\n");
 	__VERBOSE("         -k1                    <2nd kmer size>\n");
 	__VERBOSE("         -k2                    <3rd kmer size>\n");
-	__VERBOSE("         -l                     <lib type [ust, 10x]>\n");
+	__VERBOSE("         -l                     <lib type [bioturing, ust, 10x]>\n");
 	__VERBOSE("         -sm                    <maximal ammount memory for kmer counting [in GiB]>\n");
 }
 
@@ -274,7 +274,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	if (!strcmp(argv[1], "assembly"))
-		build_opt_process(argc, argv, &assembly3_process);
+		build_opt_process(argc, argv, &assembly_process);
 	else if (!strcmp(argv[1], "assembly3"))
 		build_opt_process(argc, argv, &assembly3_process);
 	else if (!strcmp(argv[1], "build_0"))

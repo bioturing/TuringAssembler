@@ -88,8 +88,9 @@ void *fastq_producer(void *data)
 		own_buf = external_buf;
 		global_processed = atomic_add_and_fetch64(bundle->processed_size,
 						cur_processed - prev_processed);
+		prev_processed = cur_processed;
 		percentage = global_processed * 100 / total_size;
-		percentage = __min(percentage, 99);
+		// percentage = __min(percentage, 99);
 		__VERBOSE("\r%ld%%", percentage);
 	}
 	buffer_free(own_buf);

@@ -180,7 +180,8 @@ int64_t gb_get_trip(void *vdata, void *vp)
 
 	load_buffer(&data->R1);
 	load_buffer(&data->R2);
-	data->processed = data->R1.processed + data->R2.processed;
+	load_buffer(&data->I);
+	data->processed = data->R1.processed + data->R2.processed + data->I.processed;
 	prev1 = prev2 = prevI = 0;
 
 	while (1) {

@@ -5,8 +5,9 @@
 #include "io_utils.h"
 #include "process.h"
 #include "resolve.h"
-#include "utils.h"
+#include "sort_read.h"
 #include "time_utils.h"
+#include "utils.h"
 #include "verbose.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
@@ -171,6 +172,11 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 	snprintf(path, 1024, "%s/graph_k_%d_%s.bin",
 						out_dir, g->ksize, suffix);
 	save_asm_graph(g, path);
+}
+
+void assembly_process(struct opt_proc_t *opt)
+{
+	sort_read(opt);
 }
 
 void assembly3_process(struct opt_proc_t *opt)

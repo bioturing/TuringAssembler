@@ -20,6 +20,8 @@
 #define LIB_TYPE_UST		2
 #define LIB_TYPE_10X		3
 
+#define MAX_PATH 4096
+
 #if !defined(GIT_SHA)
 #define GIT_SHA			"unknown"
 #endif
