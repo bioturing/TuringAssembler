@@ -774,8 +774,8 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 			bf_write(&f_idx, tmp_buf, 40);
 			poffset_R1 = offset_R1;
 			poffset_R2 = offset_R2;
-			pbarcode = cur_bc;
 		}
+		pbarcode = cur_bc;
 		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}
 	pack_int64((uint8_t *)tmp_buf, pbarcode);
