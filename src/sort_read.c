@@ -714,7 +714,7 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 {
 	int64_t sm_per_file;
 	char *tmp_buf, *buf, *path;
-	struct buffered_file_t *fp, fo1, fo2;
+	struct buffered_file_t *fp, fo1, fo2, f_idx;
 	fp = malloc(n_file * sizeof(struct buffered_file_t));
 	struct readbc_t *reads;
 	int i, m_buf;
@@ -723,7 +723,7 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 	if (sm_per_file * (n_file + 2) > sm + SIZE_16MB)
 		sm_per_file >>= 1;
 	reads = malloc(n_file * sizeof(struct readbc_t));
-	tmp_buf = malloc(16);
+	tmp_buf = malloc(40);
 	path = malloc(MAX_PATH);
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s/thread_%d.tmp", prefix, i);
@@ -734,10 +734,16 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 	bf_open(&fo1, path, "wb", sm_per_file);
 	sprintf(path, "%s/R2.sorted.fq", prefix);
 	bf_open(&fo2, path, "wb", sm_per_file);
+	sprintf(path, "%s/barcode.idx", prefix);
+	bf_open(&f_idx, path, "wb", SIZE_2MB);
 	m_buf = 0x100;
 	buf = malloc(m_buf);
+	int64_t offset_R1, offset_R2, poffset_R1, poffset_R2;
+	offset_R1 = offset_R2 = poffset_R1 = poffset_R2 = 0;
+	uint64_t pbarcode, cur_bc;
+	pbarcode = (uint64_t)-1;
 	while (1) {
-		uint64_t cur_bc = (uint64_t)-1;
+		cur_bc = (uint64_t)-1;
 		int idx = -1;
 		for (i = 0; i < n_file; ++i) {
 			if (reads[i].barcode != (uint64_t)-1 &&
@@ -757,8 +763,27 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 			__ERROR("[large merge] Corrupted temporary files");
 		bf_write(&fo1, buf, reads[idx].len1);
 		bf_write(&fo2, buf + reads[idx].len1, reads[idx].len2);
+		offset_R1 += reads[idx].len1;
+		offset_R2 += reads[idx].len2;
+		if (cur_bc != pbarcode && pbarcode != (uint64_t)-1) {
+			pack_int64((uint8_t *)tmp_buf, pbarcode);
+			pack_int64((uint8_t *)tmp_buf + 8, poffset_R1);
+			pack_int64((uint8_t *)tmp_buf + 16, poffset_R2);
+			pack_int64((uint8_t *)tmp_buf + 24, offset_R1 - poffset_R1);
+			pack_int64((uint8_t *)tmp_buf + 32, offset_R2 - poffset_R2);
+			bf_write(&f_idx, tmp_buf, 40);
+			poffset_R1 = offset_R1;
+			poffset_R2 = offset_R2;
+			pbarcode = cur_bc;
+		}
 		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}
+	pack_int64((uint8_t *)tmp_buf, pbarcode);
+	pack_int64((uint8_t *)tmp_buf + 8, poffset_R1);
+	pack_int64((uint8_t *)tmp_buf + 16, poffset_R2);
+	pack_int64((uint8_t *)tmp_buf + 24, offset_R1 - poffset_R1);
+	pack_int64((uint8_t *)tmp_buf + 32, offset_R2 - poffset_R2);
+	bf_write(&f_idx, tmp_buf, 40);
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s/thread_%d.tmp", prefix, i);
 		bf_close(fp + i);
@@ -771,6 +796,7 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 	free(fp);
 	bf_close(&fo1);
 	bf_close(&fo2);
+	bf_close(&f_idx);
 }
 
 void sort_read(struct opt_proc_t *opt)
