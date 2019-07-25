@@ -35,6 +35,91 @@ struct readsort_bundle_t {
 	int64_t sm;
 };
 
+struct buffered_file_t {
+	FILE *fp;
+	char *buf;
+	int64_t buf_len;
+	int64_t buf_size;
+	int64_t buf_pos;
+	int mode;
+};
+
+#define BF_READ		0
+#define BF_WRITE	1
+
+void bf_open(struct buffered_file_t *bfp, const char *path, const char *mode, int64_t buf_size)
+{
+	bfp->fp = xfopen(path, mode);
+	bfp->buf_size = buf_size;
+	bfp->buf = malloc(buf_size);
+	if (!strcmp(mode, "rb") || !strcmp(mode, "r")) {
+		bfp->buf_len = fread(bfp->buf, 1, bfp->buf_size, bfp->fp);
+		bfp->mode = BF_READ;
+	} else {
+		bfp->buf_len = 0;
+		bfp->mode = BF_WRITE;
+	}
+	bfp->buf_pos = 0;
+}
+
+static inline int64_t bf_read(struct buffered_file_t *bfp, void *ptr, int64_t sz)
+{
+	if (bfp->buf_len - bfp->buf_pos >= sz) {
+		memcpy(ptr, bfp->buf + bfp->buf_pos, sz);
+		bfp->buf_pos += sz;
+		return sz;
+	}
+	int64_t rem_fill, rem_buf, to_fill;
+	rem_fill = sz;
+	do {
+		rem_buf = bfp->buf_len - bfp->buf_pos;
+		if (rem_buf == 0 && bfp->buf_len < bfp->buf_size)
+			return sz - rem_fill; /* EOF */
+		to_fill = __min(rem_buf, rem_fill);
+		memcpy(ptr + sz - rem_fill, bfp->buf + bfp->buf_pos, to_fill);
+		rem_fill -= to_fill;
+		rem_buf -= to_fill;
+		bfp->buf_pos += to_fill;
+		if (rem_buf == 0) {
+			bfp->buf_len = fread(bfp->buf, 1, bfp->buf_size, bfp->fp);
+			bfp->buf_pos = 0;
+		}
+	} while (rem_fill);
+	return sz;
+}
+
+static inline int64_t bf_write(struct buffered_file_t *bfp, const void *ptr, int64_t sz)
+{
+	if (bfp->buf_size - bfp->buf_len >= sz) {
+		memcpy(bfp->buf + bfp->buf_len, ptr, sz);
+		bfp->buf_len += sz;
+		return sz;
+	}
+	int64_t rem_buf, rem_fill, to_fill;
+	rem_fill = sz;
+	do {
+		rem_buf = bfp->buf_size - bfp->buf_len;
+		to_fill = __min(rem_buf, rem_fill);
+		memcpy(bfp->buf + bfp->buf_len, ptr + sz - rem_fill, to_fill);
+		rem_fill -= to_fill;
+		rem_buf -= to_fill;
+		bfp->buf_len += to_fill;
+		if (rem_buf == 0) {
+			xfwrite(bfp->buf, 1, bfp->buf_len, bfp->fp);
+			bfp->buf_len = 0;
+		}
+	} while (rem_fill);
+	return sz;
+}
+
+void bf_close(struct buffered_file_t *bfp)
+{
+	if (bfp->mode == BF_WRITE)
+		xfwrite(bfp->buf, 1, bfp->buf_len, bfp->fp);
+	free(bfp->buf);
+	fclose(bfp->fp);
+}
+
 static inline uint32_t unpack_int32(uint8_t *buf)
 {
 	uint32_t ret = 0;
@@ -91,18 +176,18 @@ static inline uint64_t get_barcode_ust_raw(struct read_t *I)
 }
 
 static inline void write_buffer_to_file(struct readbc_t *p, int n, char *buf,
-		int64_t buf_len, char *fbuf, int64_t fbuf_size, const char *path)
+					int64_t file_buf_sz, const char *path)
 {
 	/* sort p */
 	rs_sort(read_sort, p, p + n);
 	/*******/
-	FILE *fp = xfopen(path, "wb");
-	setbuffer(fp, fbuf, fbuf_size);
+	struct buffered_file_t fp;
+	bf_open(&fp, path, "wb", file_buf_sz);
 	int i;
 	for (i = 0; i < n; ++i) {
-		fwrite(buf + p->offset, p->len1 + p->len2 + 16, 1, fp);
+		bf_write(&fp, buf + p[i].offset, p[i].len1 + p[i].len2 + 16);
 	}
-	fclose(fp);
+	bf_close(&fp);
 }
 
 static inline int ust_add_record(struct read_t *r, struct read_t *rI,
@@ -146,13 +231,13 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 	return len;
 }
 
-static inline void extract_read_barcode(FILE *fp, struct readbc_t *r, char *buf)
+static inline void extract_read_barcode(struct buffered_file_t *fp, struct readbc_t *r, char *buf)
 {
-	size_t ret = fread(buf, 1, 16, fp);
+	int64_t ret = bf_read(fp, buf, 16);
 	if (ret == 0) {
 		r->barcode = (uint64_t)-1;
 	} else if (ret < 16) {
-		__ERROR("Corrupted temporary files");
+		__ERROR("Corrupted temporary files %lu", ret);
 	} else {
 		r->barcode = unpack_int64((uint8_t *)buf);
 		r->len1 = unpack_int32((uint8_t *)buf + 8);
@@ -163,30 +248,25 @@ static inline void extract_read_barcode(FILE *fp, struct readbc_t *r, char *buf)
 void merge_sorted_small(const char *prefix, int64_t sm, int n_file)
 {
 	int64_t sm_per_file;
-	char **fbuf, *tmp_buf, *obuf, *buf, *path;
-	FILE **fp, *fo;
+	char *tmp_buf, *buf, *path;
+	struct buffered_file_t *fp, fo;
+	fp = malloc(n_file * sizeof(struct buffered_file_t));
 	struct readbc_t *reads;
 	int i, m_buf;
-	sm_per_file = sm / n_file;
+	sm_per_file = sm / (n_file + 1);
 	__round_up_64(sm_per_file);
-	if (sm_per_file > sm / n_file)
+	if (sm_per_file * (n_file + 1) > sm + SIZE_16MB)
 		sm_per_file >>= 1;
-	fp = malloc(n_file * sizeof(FILE *));
-	fbuf = malloc(n_file * sizeof(char *));
 	reads = malloc(n_file * sizeof(struct readbc_t));
 	tmp_buf = malloc(16);
 	path = malloc(MAX_PATH);
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s.tmp.%d", prefix, i);
-		fp[i] = xfopen(path, "rb");
-		fbuf[i] = malloc(sm_per_file);
-		setbuffer(fp[i], fbuf[i], sm_per_file);
-		extract_read_barcode(fp[i], reads + i, tmp_buf);
+		bf_open(fp + i, path, "rb", sm_per_file);
+		extract_read_barcode(fp + i, reads + i, tmp_buf);
 	}
 	sprintf(path, "%s.tmp", prefix);
-	fo = xfopen(path, "wb");
-	obuf = malloc(SIZE_2MB);
-	setbuffer(fo, obuf, SIZE_2MB);
+	bf_open(&fo, path, "wb", sm_per_file);
 	m_buf = 0x100;
 	buf = malloc(m_buf);
 	while (1) {
@@ -208,27 +288,24 @@ void merge_sorted_small(const char *prefix, int64_t sm, int n_file)
 		pack_int64((uint8_t *)tmp_buf, reads[idx].barcode);
 		pack_int32((uint8_t *)tmp_buf + 8, reads[idx].len1);
 		pack_int32((uint8_t *)tmp_buf + 12, reads[idx].len2);
-		fwrite(tmp_buf, 16, 1, fo);
-		size_t byte_read = fread(buf, 1, reads[idx].len1 + reads[idx].len2, fp[idx]);
-		if ((int64_t)byte_read < reads[idx].len1 + reads[idx].len2)
-			__ERROR("Corrupted temporary files");
-		fwrite(buf, reads[idx].len1 + reads[idx].len2, 1, fo);
-		extract_read_barcode(fp[idx], reads + idx, tmp_buf);
+		bf_write(&fo, tmp_buf, 16);
+		int64_t byte_read = bf_read(fp + idx, buf, reads[idx].len1 + reads[idx].len2);
+		if (byte_read < reads[idx].len1 + reads[idx].len2)
+			__ERROR("small merge Corrupted temporary files");
+		bf_write(&fo, buf, reads[idx].len1 + reads[idx].len2);
+		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s.tmp.%d", prefix, i);
-		fclose(fp[i]);
-		free(fbuf[i]);
+		bf_close(fp + i);
 		remove(path);
 	}
 	free(buf);
-	free(obuf);
 	free(path);
 	free(tmp_buf);
 	free(reads);
-	free(fbuf);
 	free(fp);
-	fclose(fo);
+	bf_close(&fo);
 }
 
 void *biot_buffer_iterator(void *data)
@@ -254,12 +331,10 @@ void *ust_buffer_iterator(void *data)
 	fprintf(stderr, "thread info: prefix = %s; sm = %ld\n", prefix, sm);
 
 	char *buf, *fbuf;
-	int64_t buf_len, buf_size, fbuf_size;
+	int64_t buf_len, buf_size;
 	buf = malloc(sm);
 	buf_len = 0;
 	buf_size = sm;
-	fbuf = malloc(SIZE_2MB);
-	fbuf_size = SIZE_2MB;
 
 	int m_read, n_read, n_file;
 	struct readbc_t *rbc;
@@ -315,8 +390,7 @@ void *ust_buffer_iterator(void *data)
 			if (record_len > buf_size - buf_len) {
 				/* sort and flush buffer */;
 				sprintf(path, "%s.tmp.%d", prefix, n_file);
-				write_buffer_to_file(rbc, n_read, buf, buf_len,
-							fbuf, fbuf_size, path);
+				write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
 				++n_file;
 				n_read = 0;
 				buf_len = 0;
@@ -350,13 +424,12 @@ void *ust_buffer_iterator(void *data)
 	}
 	if (n_read) {
 		sprintf(path, "%s.tmp.%d", prefix, n_file);
-		write_buffer_to_file(rbc, n_read, buf, buf_len, fbuf, fbuf_size, path);
+		write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
 		++n_file;
 		n_read = 0;
 		buf_len = 0;
 	}
 	free(buf);
-	free(fbuf);
 	free(path);
 	free(rbc);
 	merge_sorted_small(prefix, sm, n_file);
@@ -366,34 +439,27 @@ void *ust_buffer_iterator(void *data)
 void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 {
 	int64_t sm_per_file;
-	char **fbuf, *tmp_buf, *obuf1, *obuf2, *buf, *path;
-	FILE **fp, *fo1, *fo2;
+	char *tmp_buf, *buf, *path;
+	struct buffered_file_t *fp, fo1, fo2;
+	fp = malloc(n_file * sizeof(struct buffered_file_t));
 	struct readbc_t *reads;
 	int i, m_buf;
-	sm_per_file = sm / n_file;
+	sm_per_file = sm / (n_file + 2);
 	__round_up_64(sm_per_file);
-	if (sm_per_file > sm / n_file)
+	if (sm_per_file * (n_file + 2) > sm + SIZE_16MB)
 		sm_per_file >>= 1;
-	fp = malloc(n_file * sizeof(FILE *));
-	fbuf = malloc(n_file * sizeof(char *));
 	reads = malloc(n_file * sizeof(struct readbc_t));
 	tmp_buf = malloc(16);
 	path = malloc(MAX_PATH);
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s/thread_%d.tmp", prefix, i);
-		fp[i] = xfopen(path, "rb");
-		fbuf[i] = malloc(sm_per_file);
-		setbuffer(fp[i], fbuf[i], sm_per_file);
-		extract_read_barcode(fp[i], reads + i, tmp_buf);
+		bf_open(fp + i, path, "rb", sm_per_file);
+		extract_read_barcode(fp + i, reads + i, tmp_buf);
 	}
 	sprintf(path, "%s/R1.sorted.fq", prefix);
-	fo1 = xfopen(path, "wb");
+	bf_open(&fo1, path, "wb", sm_per_file);
 	sprintf(path, "%s/R2.sorted.fq", prefix);
-	fo2 = xfopen(path, "wb");
-	obuf1 = malloc(SIZE_2MB);
-	obuf2 = malloc(SIZE_2MB);
-	setbuffer(fo1, obuf1, SIZE_2MB);
-	setbuffer(fo2, obuf2, SIZE_2MB);
+	bf_open(&fo2, path, "wb", sm_per_file);
 	m_buf = 0x100;
 	buf = malloc(m_buf);
 	while (1) {
@@ -412,34 +478,25 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 			m_buf = reads[idx].len1 + reads[idx].len2;
 			buf = realloc(buf, m_buf);
 		}
-		// pack_int64((uint8_t *)tmp_buf, reads[idx].barcode);
-		// pack_int32((uint8_t *)tmp_buf + 8, reads[idx].len1);
-		// pack_int32((uint8_t *)tmp_buf + 12, reads[idx].len2);
-		// fwrite(tmp_buf, 16, 1, fo);
-		size_t byte_read = fread(buf, 1, reads[idx].len1 + reads[idx].len2, fp[idx]);
-		if ((int64_t)byte_read < reads[idx].len1 + reads[idx].len2)
-			__ERROR("Corrupted temporary files");
-		fwrite(buf, reads[idx].len1, 1, fo1);
-		fwrite(buf + reads[idx].len1, reads[idx].len2, 1, fo2);
-		// fwrite(buf, reads[idx].len1 + reads[idx].len2, 1, fo);
-		extract_read_barcode(fp[idx], reads + idx, tmp_buf);
+		int64_t byte_read = bf_read(fp + idx, buf, reads[idx].len1 + reads[idx].len2);
+		if (byte_read < reads[idx].len1 + reads[idx].len2)
+			__ERROR("[large merge] Corrupted temporary files");
+		bf_write(&fo1, buf, reads[idx].len1);
+		bf_write(&fo2, buf + reads[idx].len1, reads[idx].len2);
+		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}
 	for (i = 0; i < n_file; ++i) {
 		sprintf(path, "%s/thread_%d.tmp", prefix, i);
-		fclose(fp[i]);
-		free(fbuf[i]);
+		bf_close(fp + i);
 		remove(path);
 	}
 	free(buf);
 	free(path);
 	free(tmp_buf);
 	free(reads);
-	free(fbuf);
 	free(fp);
-	fclose(fo1);
-	fclose(fo2);
-	free(obuf1);
-	free(obuf2);
+	bf_close(&fo1);
+	bf_close(&fo2);
 }
 
 void sort_read(struct opt_proc_t *opt)
@@ -507,6 +564,7 @@ void sort_read(struct opt_proc_t *opt)
 		free_fastq_triple(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
+	__VERBOSE("\nMerge large sorted files\n");
 	merge_sorted_large(read_dir, sm_in_byte, opt->n_threads);
 
 	free(producer_threads);
