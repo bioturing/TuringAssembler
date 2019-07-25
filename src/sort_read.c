@@ -175,6 +175,53 @@ static inline uint64_t get_barcode_ust_raw(struct read_t *I)
 	return ret;
 }
 
+static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
+{
+	if (s == NULL) {
+		r->seq = r->qual = NULL;
+		return (uint64_t)-1;
+	}
+	int i, len = 0;
+	uint64_t ret = 0;
+	char *p;
+	p = strstr(s, "BX:Z:");
+	if (p == NULL) {
+		r->seq = r->qual = NULL;
+		return (uint64_t)-1;
+	}
+	r->seq = p += 5;
+	for (i = 0; p[i] && !__is_sep(p[i]); ++i) {
+		ret = ret * 5 + nt4_table[(int)p[i]];
+		++len;
+	}
+	p = strstr(s, "QB:Z:");
+	if (p == NULL)
+		r->qual = NULL;
+	else
+		r->qual = p + 5;
+	r->len = len;
+	return ret;
+}
+
+static inline uint64_t get_barcode_10x(struct read_t *r1, struct read_t *rbc)
+{
+	if (r1->len < 23) {
+		rbc->seq = rbc->qual = NULL;
+		return (uint64_t)-1;
+	}
+	uint64_t ret = 0;
+	int i;
+	char *s = r1->seq;
+	for (i = 0; i < 16; ++i)
+		ret = ret * 5 + nt4_table[(int)s[i]];
+	rbc->seq = r1->seq;
+	rbc->qual = r1->qual;
+	rbc->len = 16;
+	r1->seq += 23;
+	r1->qual += 23;
+	return ret;
+}
+
 static inline void write_buffer_to_file(struct readbc_t *p, int n, char *buf,
 					int64_t file_buf_sz, const char *path)
 {
@@ -197,20 +244,22 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 	tlen = strlen(r->name);
 	memcpy(buf, r->name, tlen);
 	len = tlen;
-	buf[len++] = '\t';
-	memcpy(buf + len, "BX:Z:", 5);
-	len += 5;
-	memcpy(buf + len, rI->seq, rI->len);
-	len += rI->len;
-	buf[len++] = '\t';
-	memcpy(buf + len, "QB:Z:", 5);
-	len += 5;
-	if (input_format == TYPE_FASTQ) {
-		memcpy(buf + len, rI->qual, rI->len);
+	if (rI->seq != NULL) {
+		buf[len++] = '\t';
+		memcpy(buf + len, "BX:Z:", 5);
+		len += 5;
+		memcpy(buf + len, rI->seq, rI->len);
 		len += rI->len;
-	} else {
-		for (i = 0; i < rI->len; ++i) {
-			buf[len++] = nt4_table[(int)rI->seq[i]] < 4 ? 'F' : '#';
+		if (input_format == TYPE_FASTQ && rI->qual != NULL) {
+			buf[len++] = '\t';
+			memcpy(buf + len, "QB:Z:", 5);
+			len += 5;
+			memcpy(buf + len, rI->qual, rI->len);
+			len += rI->len;
+		} else {
+			for (i = 0; i < rI->len; ++i) {
+				buf[len++] = nt4_table[(int)rI->seq[i]] < 4 ? 'F' : '#';
+			}
 		}
 	}
 	buf[len++] = '\n';
@@ -219,7 +268,7 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 	buf[len++] = '\n';
 	memcpy(buf + len, "+\n", 2);
 	len += 2;
-	if (input_format == TYPE_FASTQ) {
+	if (input_format == TYPE_FASTQ && r->qual != NULL) {
 		memcpy(buf + len, r->qual, r->len);
 		len += r->len;
 	} else {
@@ -310,11 +359,237 @@ void merge_sorted_small(const char *prefix, int64_t sm, int n_file)
 
 void *biot_buffer_iterator(void *data)
 {
+	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *)data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2, readbc;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_trip_buffer();
+	char *prefix = bundle->prefix;
+	int64_t sm = bundle->sm;
+	char *path = malloc(MAX_PATH);
+
+	char *buf, *fbuf;
+	int64_t buf_len, buf_size;
+	buf = malloc(sm);
+	buf_len = 0;
+	buf_size = sm;
+
+	int m_read, n_read, n_file;
+	struct readbc_t *rbc;
+	m_read = sm / 600;
+	__round_up_32(m_read);
+	rbc = malloc(m_read * sizeof(struct readbc_t));
+	n_read = 0;
+	n_file = 0;
+
+	char *R1_buf, *R2_buf;
+	int pos1, pos2, rc1, rc2, input_format;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf)
+			break;
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		R1_buf = ext_buf->R1_buf;
+		R2_buf = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read1, R1_buf, &pos1) :
+				get_read_from_fa(&read1, R1_buf, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read2, R2_buf, &pos2) :
+				get_read_from_fa(&read2, R2_buf, &pos2);
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				__ERROR("\nWrong format file\n");
+
+			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
+			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
+			int record_len, len1, len2;
+			if (barcode != (uint64_t)-1) {
+				record_len = strlen(read1.name) + strlen(read2.name) +
+					2 * (1 + (readbc.len + 6) * 2) +
+					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
+					8 + 4 * 2;
+			} else {
+				record_len = strlen(read1.name) + strlen(read2.name) +
+					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
+					8 + 4 * 2;
+			}
+			if (record_len > buf_size) {
+				/* extend buf size */
+				buf_size = record_len;
+				buf = realloc(buf, buf_size);
+			}
+			if (record_len > buf_size - buf_len) {
+				/* sort and flush buffer */;
+				sprintf(path, "%s.tmp.%d", prefix, n_file);
+				write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
+				++n_file;
+				n_read = 0;
+				buf_len = 0;
+			}
+			/* append record */
+			pack_int64((uint8_t *)buf + buf_len, barcode);
+			len1 = ust_add_record(&read1, &readbc,
+					buf + buf_len + 16, input_format);
+			len2 = ust_add_record(&read2, &readbc,
+				buf + buf_len + 16 + len1, input_format);
+			if (record_len != len1 + len2 + 16) {
+				fprintf(stderr, "record_len = %d; sum_len = %d\n",
+					record_len, len1 + len2 + 16);
+				assert(0);
+			}
+			pack_int32((uint8_t *)buf + buf_len + 8, len1);
+			pack_int32((uint8_t *)buf + buf_len + 12, len2);
+			if (n_read == m_read) {
+				m_read <<= 1;
+				rbc = realloc(rbc, m_read * sizeof(struct readbc_t));
+			}
+			rbc[n_read].barcode = barcode;
+			rbc[n_read].offset = buf_len;
+			rbc[n_read].len1 = len1;
+			rbc[n_read].len2 = len2;
+			buf_len += len1 + len2 + 16;
+			++n_read;
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+	if (n_read) {
+		sprintf(path, "%s.tmp.%d", prefix, n_file);
+		write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
+		++n_file;
+		n_read = 0;
+		buf_len = 0;
+	}
+	free(buf);
+	free(path);
+	free(rbc);
+	merge_sorted_small(prefix, sm, n_file);
 	return NULL;
 }
 
 void *x10_buffer_iterator(void *data)
 {
+	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *)data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2, readbc;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_trip_buffer();
+	char *prefix = bundle->prefix;
+	int64_t sm = bundle->sm;
+	char *path = malloc(MAX_PATH);
+
+	char *buf, *fbuf;
+	int64_t buf_len, buf_size;
+	buf = malloc(sm);
+	buf_len = 0;
+	buf_size = sm;
+
+	int m_read, n_read, n_file;
+	struct readbc_t *rbc;
+	m_read = sm / 600;
+	__round_up_32(m_read);
+	rbc = malloc(m_read * sizeof(struct readbc_t));
+	n_read = 0;
+	n_file = 0;
+
+	char *R1_buf, *R2_buf;
+	int pos1, pos2, rc1, rc2, input_format;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf)
+			break;
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		R1_buf = ext_buf->R1_buf;
+		R2_buf = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read1, R1_buf, &pos1) :
+				get_read_from_fa(&read1, R1_buf, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read2, R2_buf, &pos2) :
+				get_read_from_fa(&read2, R2_buf, &pos2);
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				__ERROR("\nWrong format file\n");
+
+			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
+			uint64_t barcode = get_barcode_10x(&read1, &readbc);
+			int record_len, len1, len2;
+			if (barcode != (uint64_t)-1) {
+				record_len = strlen(read1.name) + strlen(read2.name) +
+					2 * (1 + (readbc.len + 6) * 2) +
+					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
+					8 + 4 * 2;
+			} else {
+				record_len = strlen(read1.name) + strlen(read2.name) +
+					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
+					8 + 4 * 2;
+			}
+			if (record_len > buf_size) {
+				/* extend buf size */
+				buf_size = record_len;
+				buf = realloc(buf, buf_size);
+			}
+			if (record_len > buf_size - buf_len) {
+				/* sort and flush buffer */;
+				sprintf(path, "%s.tmp.%d", prefix, n_file);
+				write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
+				++n_file;
+				n_read = 0;
+				buf_len = 0;
+			}
+			/* append record */
+			pack_int64((uint8_t *)buf + buf_len, barcode);
+			len1 = ust_add_record(&read1, &readbc,
+					buf + buf_len + 16, input_format);
+			len2 = ust_add_record(&read2, &readbc,
+				buf + buf_len + 16 + len1, input_format);
+			if (record_len != len1 + len2 + 16) {
+				fprintf(stderr, "record_len = %d; sum_len = %d\n",
+					record_len, len1 + len2 + 16);
+				assert(0);
+			}
+			pack_int32((uint8_t *)buf + buf_len + 8, len1);
+			pack_int32((uint8_t *)buf + buf_len + 12, len2);
+			if (n_read == m_read) {
+				m_read <<= 1;
+				rbc = realloc(rbc, m_read * sizeof(struct readbc_t));
+			}
+			rbc[n_read].barcode = barcode;
+			rbc[n_read].offset = buf_len;
+			rbc[n_read].len1 = len1;
+			rbc[n_read].len2 = len2;
+			buf_len += len1 + len2 + 16;
+			++n_read;
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+	if (n_read) {
+		sprintf(path, "%s.tmp.%d", prefix, n_file);
+		write_buffer_to_file(rbc, n_read, buf, SIZE_16MB, path);
+		++n_file;
+		n_read = 0;
+		buf_len = 0;
+	}
+	free(buf);
+	free(path);
+	free(rbc);
+	merge_sorted_small(prefix, sm, n_file);
 	return NULL;
 }
 
@@ -328,7 +603,6 @@ void *ust_buffer_iterator(void *data)
 	char *prefix = bundle->prefix;
 	int64_t sm = bundle->sm;
 	char *path = malloc(MAX_PATH);
-	fprintf(stderr, "thread info: prefix = %s; sm = %ld\n", prefix, sm);
 
 	char *buf, *fbuf;
 	int64_t buf_len, buf_size;
@@ -564,7 +838,6 @@ void sort_read(struct opt_proc_t *opt)
 		free_fastq_triple(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	__VERBOSE("\nMerge large sorted files\n");
 	merge_sorted_large(read_dir, sm_in_byte, opt->n_threads);
 
 	free(producer_threads);
