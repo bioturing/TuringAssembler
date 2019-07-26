@@ -1,19 +1,156 @@
-#include <stdlib.h>
 #include <string.h>
 
 #include "assembly_graph.h"
-#include "barcode_hash.h"
-#include "fastq_producer.h"
 #include "io_utils.h"
-#include "kmer_build.h"
 #include "kseq.h"
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-#include "../include/kmc_skipping.h"
+#include "khash.h"
+#include "kmhash.h"
+
+#include <zlib.h>
+
+#if defined(_MSC_VER)
+
+#define FORCE_INLINE	__forceinline
+
+#include <stdlib.h>
+
+#define ROTL32(x,y)	_rotl(x,y)
+#define ROTL64(x,y)	_rotl64(x,y)
+
+#define BIG_CONSTANT(x) (x)
+
+// Other compilers
+
+#else	// defined(_MSC_VER)
+
+#define	FORCE_INLINE inline __attribute__((always_inline))
+
+inline uint32_t rotl32(uint32_t x, int8_t r)
+{
+	return (x << r) | (x >> (32 - r));
+}
+
+inline uint64_t rotl64(uint64_t x, int8_t r)
+{
+	return (x << r) | (x >> (64 - r));
+}
+
+#define	ROTL32(x,y)	rotl32(x,y)
+#define ROTL64(x,y)	rotl64(x,y)
+
+#define BIG_CONSTANT(x) (x##LLU)
+
+#endif // !defined(_MSC_VER)
 
 KSEQ_INIT(gzFile, gzread);
 
+static inline uint64_t getblock64(const uint64_t * p, int i)
+{
+	return p[i];
+}
+
+static inline uint64_t fmix64(uint64_t k)
+{
+	k ^= k >> 33;
+	k *= BIG_CONSTANT(0xff51afd7ed558ccd);
+	k ^= k >> 33;
+	k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
+	k ^= k >> 33;
+
+	return k;
+}
+
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  asm_fasta_edge_convert
+ *  Description:  Dump the nucleotide sequence into the binary format
+ * =====================================================================================
+ */
+static int asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
+{
+	uint32_t *p_holes, *l_holes, *bseq;
+	uint32_t n_holes, i, j, k, c, last_c, m_seq;
+	p_holes = NULL;
+	l_holes = NULL;
+	m_seq = 0x100;
+	bseq = calloc(m_seq, sizeof(uint32_t));
+	last_c = 0;
+	n_holes = 0;
+	for (i = k = 0; i < seq->seq.l; ++i) {
+		c = nt4_table[(int)seq->seq.s[i]];
+		if (c >= 4) {
+			if (last_c >= 4) {
+				++l_holes[j];
+			} else {
+				if (k == 0) {
+					free(bseq);
+					return 0;
+				}
+				p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
+				l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
+				j = n_holes;
+				++n_holes;
+				p_holes[j] = k - 1;
+				l_holes[j] = 1;
+			}
+		} else {
+			/* append new char */
+			if (((k + 15) >> 4) >= m_seq) {
+				uint32_t new_m = m_seq << 1;
+				bseq = realloc(bseq, new_m * sizeof(uint32_t));
+				memset(bseq + m_seq, 0, m_seq * sizeof(uint32_t));
+				m_seq = new_m;
+			}
+			__binseq_set(bseq, k, c);
+			++k;
+		}
+		last_c = c;
+	}
+	g->edges[e].seq_len = k;
+	g->edges[e].seq = realloc(bseq, ((k + 15) >> 4) * sizeof(uint32_t));
+	g->edges[e].count = 0;
+	g->edges[e].n_holes = n_holes;
+	g->edges[e].l_holes = l_holes;
+	g->edges[e].p_holes = p_holes;
+	return 1;
+}
+
+KHASH_MAP_INIT_INT64(khInt, uint64_t);
+
+// shorthand way to get the key from hashtable or defVal if not found
+#define kh_get_val(kname, hash, key, defVal) ({k=kh_get(kname, hash, key);(k!=kh_end(hash)?kh_val(hash,k):defVal);})
+// // returns 0=replaced existing item, 1=bucket empty (new key), 2-adding element previously deleted
+#define kh_set(kname, hash, key, val) ({int ret; k = kh_put(kname, hash,key,&ret); kh_value(hash,k) = val; ret;})
+
+static unsigned char seq_nt6_table[256] = {
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5
+};
+
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  find_adj_idx
+ *  Description:  Find the index of an edge in the adjacencies list of one node
+ *  Return     :  Return -1 is the edge doesn't exists
+ * =====================================================================================
+ */
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -25,85 +162,111 @@ static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 	return ret;
 }
 
-static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int added)
+static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 {
-	if (id > g->n_e) {
-		// +1 is used for the reverse complement of the new edge
-		g->edges = realloc(g->edges, (id + 1) * sizeof(struct asm_edge_t));
-		g->n_e = id + 1;
-	} 
+	int n_blocks = len >> 4;
+	uint64_t h1 = BIG_CONSTANT(0x13097);
+	uint64_t h2 = BIG_CONSTANT(0x13097);
 
-	//add an edge, not a neighbor
-	if (seq != NULL) {
-		if (!asm_fasta_edge_convert(g, id - 1, seq))
-			return 1;
-		asm_clone_seq_reverse(g->edges + id, g->edges + id - 1);
+	const uint64_t c1 = BIG_CONSTANT(0x87c37b91114253d5);
+	const uint64_t c2 = BIG_CONSTANT(0x4cf5ad432745937f);
+
+	const uint64_t *blocks = (const uint64_t *)(data);
+
+	int i;
+	for (i = 0; i < n_blocks; ++i) {
+		uint64_t k1 = getblock64(blocks, i << 1);
+		uint64_t k2 = getblock64(blocks, (i << 1) + 1);
+		k1 *= c1; k1 = ROTL64(k1, 31); k1 *= c2; h1 ^= k1;
+		h1 = ROTL64(h1, 27); h1 += h2; h1 = h1 * 5 + 0x52dce729;
+		k2 *= c2; k2 = ROTL64(k2, 33); k2 *= c1; h2 ^= k2;
+		h2 = ROTL64(h2, 31); h2 += h1; h2 = h2 * 5 + 0x38495ab5;
 	}
 
-	if (seq != NULL && added)
-		return 0;
+	const uint8_t *tail = (const uint8_t *)(data + (n_blocks << 4));
+	uint64_t k1 = 0;
+	uint64_t k2 = 0;
 
-	g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
-	// edge id starts from zero
-	g->edges[id - 1].rc_id = id;
-	g->edges[id].rc_id = id - 1;
+	switch (len & 15) {
+	case 15: k2 ^= ((uint64_t)tail[14]) << 48;
+	case 14: k2 ^= ((uint64_t)tail[13]) << 40;
+	case 13: k2 ^= ((uint64_t)tail[12]) << 32;
+	case 12: k2 ^= ((uint64_t)tail[11]) << 24;
+	case 11: k2 ^= ((uint64_t)tail[10]) << 16;
+	case 10: k2 ^= ((uint64_t)tail[ 9]) << 8;
+	case  9: k2 ^= ((uint64_t)tail[ 8]) << 0;
+		k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
 
-	g->edges[id - 1].source = g->n_v;
-	g->edges[id - 1].target = g->n_v + 1;
-	g->edges[id - 1].count = 0;
-	g->nodes[g->n_v].adj = malloc(sizeof(gint_t));
-	g->nodes[g->n_v].adj[0] = id - 1;
-	g->nodes[g->n_v].deg = 1;
-	g->nodes[g->n_v + 1].adj = NULL;
-	g->nodes[g->n_v + 1].deg = 0;
+	case  8: k1 ^= ((uint64_t)tail[ 7]) << 56;
+	case  7: k1 ^= ((uint64_t)tail[ 6]) << 48;
+	case  6: k1 ^= ((uint64_t)tail[ 5]) << 40;
+	case  5: k1 ^= ((uint64_t)tail[ 4]) << 32;
+	case  4: k1 ^= ((uint64_t)tail[ 3]) << 24;
+	case  3: k1 ^= ((uint64_t)tail[ 2]) << 16;
+	case  2: k1 ^= ((uint64_t)tail[ 1]) << 8;
+	case  1: k1 ^= ((uint64_t)tail[ 0]) << 0;
+		k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
+	}
 
-	g->edges[id].source = g->n_v + 2;
-	g->edges[id].target = g->n_v + 3;
-	g->edges[id].count = 0;
-	g->nodes[g->n_v + 2].adj = malloc(sizeof(gint_t));
-	g->nodes[g->n_v + 2].adj[0] = id;
-	g->nodes[g->n_v + 2].deg = 1;
-	g->nodes[g->n_v + 3].adj = NULL;
-	g->nodes[g->n_v + 3].deg = 0;
+	h1 ^= len; h2 ^= len;
 
-	g->nodes[g->n_v].rc_id = g->n_v + 3;
-	g->nodes[g->n_v + 3].rc_id = g->n_v;
-	g->nodes[g->n_v + 1].rc_id = g->n_v + 2;
-	g->nodes[g->n_v + 2].rc_id = g->n_v + 1;
-	g->n_v += 4;
-	return 0;
+	h1 += h2;
+	h2 += h1;
+
+	h1 = fmix64(h1);
+	h2 = fmix64(h2);
+
+	h1 += h2;
+	h2 += h1;
+
+	return h2;
 }
 
-static void add_one_connection(struct asm_graph_t *g, gint_t e1, gint_t e2)
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  fastg_hash_kmer1
+ *  Description:  Hash the prefix length k of the sequence seq
+ * =====================================================================================
+ */
+static uint64_t fastg_hash_kmer1(char *seq, int k, int l)
 {
-	// Short-hand for variable
-	gint_t e1_target = g->edges[e1].target;
-	gint_t e1rc = g->edges[e1].rc_id;
-	// To avoid re-add a reverse complement connection
-	if (e1 == 5651 && e2 == 5173){
-		__VERBOSE("Herer");
-	}
-	if (find_adj_idx(g->nodes[e1_target].adj, g->nodes[e1_target].deg, e2) == -1) {
-		// allocate 1 more room for target of e1
-		g->nodes[e1_target].adj = realloc(g->nodes[e1_target].adj, (g->nodes[e1_target].deg + 1) * sizeof(gint_t));
-		// add e2 as an out-going edge of e1_target
-		g->nodes[e1_target].adj[g->nodes[e1_target].deg++] = e2;
-		// e2.source is useless now, we must decrease its degree by 1
-		--g->nodes[g->edges[e2].source].deg;
-		// Assign new source for e2
-		g->edges[e2].source = e1_target;
-		// Do the reverse complement thing
-		g->edges[g->edges[e2].rc_id].target = g->nodes[e1_target].rc_id;
-		//g->nodes[g->edges[e1].target].rc_id = g->edges[e1rc].source;
-		//g->nodes[g->edges[e1rc].source].rc_id = g->edges[e1].target;
-	} else{
-		__VERBOSE("Reverse complement!\n");
-	}
-	gint_t e1rc_src = g->edges[g->edges[e1].rc_id].source;
-	assert(find_adj_idx(g->nodes[e1_target].adj, g->nodes[e1_target].deg, e2) != -1 &&
-			find_adj_idx(g->nodes[e1rc_src].adj, g->nodes[e1rc_src].deg, g->edges[e1].rc_id) != -1);
+	uint64_t hash = MurmurHash3_x64_64((const uint8_t *) seq, k);
+	return hash;
 }
 
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  fastg_hash_kmer2
+ *  Description:  Hash the suffix length k of sequence seq
+ * =====================================================================================
+ */
+static uint64_t fastg_hash_kmer2(char *seq, int k, int l)
+{
+	int i, j = 0;
+	char *s = malloc(k * sizeof(char));
+	for (i = l - k; i < l; s[j++] = seq[i++]);
+	uint64_t hash = MurmurHash3_x64_64((const uint8_t *) s, k);
+	free(s);
+	return hash;
+}
+
+static void insert_one_edge(struct asm_graph_t *g, gint_t u, gint_t v, gint_t e, kseq_t *seq)
+{
+	g->edges[e].source = u;
+	g->edges[e].target = v;
+	g->edges[e].count = 1;
+	assert(asm_fasta_edge_convert(g, e, seq) && "Can not serialize sequence into edge!\n");
+	g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t) * (g->nodes[u].deg + 1));
+	g->nodes[u].adj[g->nodes[u].deg++] = e;
+}
+
+/* 
+ * ===  FUNCTION  ======================================================================
+ *         Name:  load_asm_graph_fastg
+ *  Description:  Load the assembly graph as fastg format into the skipping graph structure. 
+ *  Haven't test for graph from other assembler except for MEGAHIT
+ * =====================================================================================
+ */
 void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 {
 	g->ksize = ksize;
@@ -113,61 +276,79 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 	g->n_v = g->n_e = 0;
 	gint_t p_id = 0, q_id = 0;
 	int c;
-	char *p_i, *q_i, *p, *q;
-	p_i = 0;
-	q_i = 0;
-	int *added = calloc(1, sizeof(int));
+	khint_t k;
+	int absent;
 	gzFile fp = gzopen(path, "r");
+	gzFile fp_edge = gzopen(path, "r");
+	int v_cnt = 0;
+	int edges_cnt = 0;
+	
+	// Keeping inserted kmer node
+	khash_t(khInt) *map_v = kh_init(khInt);
+
 	if (!fp)
 		__ERROR("Unable to open file [%s] to read", path);
 	kseq_t *seq = kseq_init(fp);
+
 	while (kseq_read(seq) >= 0) {
-		/* add new edge */
-		if ((int)seq->seq.l < ksize)
-			continue;
-		char *s = seq->name.s;
+		g->edges = realloc(g->edges, sizeof(struct asm_edge_t) * (g->n_e + 1));
+		// Hash kmer1
+		uint64_t hash1 = fastg_hash_kmer1(seq->seq.s, ksize, seq->seq.l);
+		uint64_t hash2 = fastg_hash_kmer2(seq->seq.s, ksize, seq->seq.l);
+
+		//__VERBOSE("Hashed kmer1: %u, kmer2: %u\n", hash1, hash2);
+		char *p, *s = seq->name.s;
 		int is_comp;
 		for (p = s; *p && *p != ':' && *p != ';'; ++p);
 		c = *p, *p = 0;
 		is_comp = (p > s && *(p-1) == '\''); // if we are looking at a complement segment
 		if (is_comp) *(p-1) = 0;
-		for(p_i = p; *p_i != '_'; --p_i);
-		p_id = atoi(p_i + 1);
-		if (!is_comp) {
-			add_one_edge(g, p_id, seq, g->n_e > 0 && added[p_id]);
+
+		if (kh_get(khInt, map_v, hash1) == kh_end(map_v)) {
+			g->nodes = realloc(g->nodes, sizeof(struct asm_node_t) * (g->n_v + 1));
+			k = kh_put(khInt, map_v, hash1, &absent);
+			kh_value(map_v, k) = g->n_v;
+			g->nodes[g->n_v].deg = 0;
+			g->nodes[g->n_v].adj = NULL;
+			++g->n_v;
 		}
-		if (p_id + 1 == g->n_e)
-			added = realloc(added, sizeof(int) * g->n_e);
-		added[p_id] = 1;
-		added[p_id - 1] = 1;
-		if (c == ':') { // have neighbors
-			q = p + 1;
-			do {
-				int is_comp2 = 0;
-				for (p = q; *p && *p != ',' && *p != ';'; ++p);
-				c = *p, *p = 0;
-				is_comp2 = (p > q && *(p-1) == '\'');
-				if (is_comp2) *(p-1) = 0;
-				for(q_i = p; *q_i != '_'; --q_i);
-				q_id = atoi(q_i + 1);
-				if (q_id > p_id) {
-					if (q_id > g->n_e || !added[q_id]) {
-						add_one_edge(g, q_id , NULL, 0);
-						added = realloc(added, sizeof(int) * g->n_e);
-					}
-					added[q_id] = 1;
-					added[q_id - 1] = 1;
-				}
-				add_one_connection(g, p_id - 1 + is_comp, q_id - 1 + is_comp2);
-				q = p + 1;
-			} while (c != 0 && c != ';');
+		if (kh_get(khInt, map_v, hash2) == kh_end(map_v)) {
+			g->nodes = realloc(g->nodes, sizeof(struct asm_node_t) * (g->n_v + 1));
+			k = kh_put(khInt, map_v, hash2, &absent);
+			kh_value(map_v, k) = g->n_v;
+			g->nodes[g->n_v].deg = 0;
+			g->nodes[g->n_v].adj = NULL;
+			++g->n_v;
 		}
-		__VERBOSE("EDGE %d\n", p_id);
-		assert(g->edges[0].source == 0 && g->edges[0].target == 1);
+
+		gint_t u = kh_get_val(khInt, map_v, hash1, (uint64_t)-1 );
+		gint_t v = kh_get_val(khInt, map_v, hash2, (uint64_t)-1 );
+
+		if (find_adj_idx(g->nodes[u].adj, g->nodes[u].deg, g->n_e) == -1) {
+			insert_one_edge(g, u, v, g->n_e, seq);
+		}
+		++g->n_e;
+	}	
+	
+	__VERBOSE("Number of nodes: %d\n", (int) g->n_v);
+	__VERBOSE("Number of edges: %d\n", (int) g->n_e);
+
+	// Set the reverse complement of node and edge
+	int i;
+	for (i = 0; i < g->n_e; ++i) {
+		if (!(i & 1)) {
+			gint_t e_rc = i + 1; // 1 and 2 is the reverse complement of each other
+			gint_t src = g->edges[i].source; 
+			gint_t dst = g->edges[i].target;
+			g->nodes[src].rc_id = g->edges[e_rc].target; // Set the reverse complement of node
+			g->nodes[g->edges[e_rc].target].rc_id = src; 
+			g->nodes[dst].rc_id = g->edges[e_rc].source;
+			g->nodes[g->edges[e_rc].source].rc_id = dst;
+			g->edges[i].rc_id = e_rc; // Set the reverse complement of edge
+			g->edges[e_rc].rc_id = i;
+		}
 	}
+
 	kseq_destroy(seq);
 	gzclose(fp);
-
-	__VERBOSE("Number of nodes: %d\n", (int)g->n_v);
-	__VERBOSE("Number of edges: %d\n", (int)g->n_e);
 }
