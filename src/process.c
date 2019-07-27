@@ -297,8 +297,8 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	test_asm_graph(&g1);
 	asm_condense(&g1, &g2);
 	build_barcode_read(opt, &g1);
-	build_3_4(&g1, &g2);
-	save_graph_info(opt->out_dir, &g2, "level_4");
+	//build_3_4(&g1, &g2);
+	save_graph_info(opt->out_dir, &g1, "added_barcode_fastg");
 	asm_graph_destroy(&g1);
-	asm_graph_destroy(&g2);
+	//asm_graph_destroy(&g2);
 }
