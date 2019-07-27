@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "fastg.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
