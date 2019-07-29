@@ -250,10 +250,10 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 		len += 5;
 		memcpy(buf + len, rI->seq, rI->len);
 		len += rI->len;
+		buf[len++] = '\t';
+		memcpy(buf + len, "QB:Z:", 5);
+		len += 5;
 		if (input_format == TYPE_FASTQ && rI->qual != NULL) {
-			buf[len++] = '\t';
-			memcpy(buf + len, "QB:Z:", 5);
-			len += 5;
 			memcpy(buf + len, rI->qual, rI->len);
 			len += rI->len;
 		} else {
@@ -441,6 +441,8 @@ void *biot_buffer_iterator(void *data)
 			len2 = ust_add_record(&read2, &readbc,
 				buf + buf_len + 16 + len1, input_format);
 			if (record_len != len1 + len2 + 16) {
+				buf[buf_len + len1 + len2 + 16] = '\0';
+				fprintf(stdout, "%s", buf + buf_len + 16);
 				fprintf(stderr, "record_len = %d; sum_len = %d\n",
 					record_len, len1 + len2 + 16);
 				assert(0);
