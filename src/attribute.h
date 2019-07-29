@@ -57,4 +57,10 @@ struct opt_proc_t {
 	int mmem;
 };
 
+struct read_path_t {
+	char *R1_path;
+	char *R2_path;
+	char *idx_path;
+};
+
 #endif

@@ -47,6 +47,19 @@ void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 1 time: %.3f\n", sec_from_prev_time());
 }
 
+void build_1_2b(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Resolving graph using barcode (local assembly included)\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	set_time_now();
+	// resolve_tips_topo(g0, g);
+	// remove_tips_topology(g0, g);
+	// test_asm_graph(g);
+	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
+
+}
+
 void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -98,7 +111,7 @@ void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR);
+	// construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
@@ -108,7 +121,7 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE("Building barcode information\n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
-	construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR | ASM_BUILD_COVERAGE);
+	// construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR | ASM_BUILD_COVERAGE);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
@@ -176,7 +189,13 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 
 void assembly_process(struct opt_proc_t *opt)
 {
-	sort_read(opt);
+	struct asm_graph_t g1, g2;
+	struct read_path_t read_sorted_path;
+
+	load_asm_graph(&g1, opt->in_file);
+	sort_read(opt, &read_sorted_path);
+	resolve_n_m_local(opt, &read_sorted_path, &g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_2");
 }
 
 void assembly3_process(struct opt_proc_t *opt)

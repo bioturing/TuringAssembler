@@ -712,7 +712,8 @@ void *ust_buffer_iterator(void *data)
 	return NULL;
 }
 
-void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
+void merge_sorted_large(const char *prefix, int64_t sm, int n_file,
+						struct read_path_t *rpath)
 {
 	int64_t sm_per_file;
 	char *tmp_buf, *buf, *path;
@@ -733,10 +734,13 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 		extract_read_barcode(fp + i, reads + i, tmp_buf);
 	}
 	sprintf(path, "%s/R1.sorted.fq", prefix);
+	rpath->R1_path = strdup(path);
 	bf_open(&fo1, path, "wb", sm_per_file);
 	sprintf(path, "%s/R2.sorted.fq", prefix);
+	rpath->R2_path = strdup(path);
 	bf_open(&fo2, path, "wb", sm_per_file);
 	sprintf(path, "%s/barcode.idx", prefix);
+	rpath->idx_path = strdup(path);
 	bf_open(&f_idx, path, "wb", SIZE_2MB);
 	m_buf = 0x100;
 	buf = malloc(m_buf);
@@ -801,7 +805,7 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file)
 	bf_close(&f_idx);
 }
 
-void sort_read(struct opt_proc_t *opt)
+void sort_read(struct opt_proc_t *opt, struct read_path_t *rpath)
 {
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -866,7 +870,7 @@ void sort_read(struct opt_proc_t *opt)
 		free_fastq_triple(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	merge_sorted_large(read_dir, sm_in_byte, opt->n_threads);
+	merge_sorted_large(read_dir, sm_in_byte, opt->n_threads, rpath);
 
 	free(producer_threads);
 	free(worker_threads);
