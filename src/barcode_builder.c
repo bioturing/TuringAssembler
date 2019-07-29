@@ -437,6 +437,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	int i, n1, n2, count, best_score_1, best_score_2;
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
+	fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
 	r1_seq = malloc(r1->len);
 	r2_seq = malloc(r2->len);
 	for (i = 0; i < r1->len; ++i)
@@ -472,6 +473,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	for (i = 0; i < (int)ar2.n; ++i) {
 		struct asm_align_t a;
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
+		fprintf(stderr, "a.rid = %d\n", a.rid);
 		if (a.rid == -1)
 			continue;
 		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);

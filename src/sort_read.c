@@ -241,9 +241,10 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 						char *buf, int input_format)
 {
 	int len = 0, tlen, i;
+	buf[len++] = '@';
 	tlen = strlen(r->name);
-	memcpy(buf, r->name, tlen);
-	len = tlen;
+	memcpy(buf + len, r->name, tlen);
+	len += tlen;
 	if (rI->seq != NULL) {
 		buf[len++] = '\t';
 		memcpy(buf + len, "BX:Z:", 5);
@@ -412,12 +413,12 @@ void *biot_buffer_iterator(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			int record_len, len1, len2;
 			if (barcode != (uint64_t)-1) {
-				record_len = strlen(read1.name) + strlen(read2.name) +
+				record_len = strlen(read1.name) + strlen(read2.name) + 2 +
 					2 * (1 + (readbc.len + 6) * 2) +
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			} else {
-				record_len = strlen(read1.name) + strlen(read2.name) +
+				record_len = strlen(read1.name) + strlen(read2.name) + 2 +
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			}
@@ -532,12 +533,12 @@ void *x10_buffer_iterator(void *data)
 			uint64_t barcode = get_barcode_10x(&read1, &readbc);
 			int record_len, len1, len2;
 			if (barcode != (uint64_t)-1) {
-				record_len = strlen(read1.name) + strlen(read2.name) +
+				record_len = strlen(read1.name) + strlen(read2.name) + 2 +
 					2 * (1 + (readbc.len + 6) * 2) +
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			} else {
-				record_len = strlen(read1.name) + strlen(read2.name) +
+				record_len = strlen(read1.name) + strlen(read2.name) + 2 +
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			}
@@ -654,7 +655,7 @@ void *ust_buffer_iterator(void *data)
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_ust_raw(&readI);
 			int record_len, len1, len2;
-			record_len = strlen(read1.name) + strlen(read2.name) +
+			record_len = strlen(read1.name) + strlen(read2.name) + 2 +
 				2 * (1 + (readI.len + 6) * 2) +
 				(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 				sizeof(barcode) + sizeof(len1) * 2;

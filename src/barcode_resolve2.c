@@ -1700,7 +1700,9 @@ void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 {
 	char path[MAX_PATH];
 	strcpy(path, opt->out_dir);
-	strcat(path, "/level4_working/ref.fasta");
+	strcat(path, "/level4_working/");
+	mkdir(path, 0755);
+	strcat(path, "ref.fasta");
 	construct_fasta(g0, path);
 	construct_aux_info(opt, g0, rpath, path, 0);
 }
