@@ -506,8 +506,6 @@ void barcode_read_mapper_h(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 			atomic_add_and_fetch64(&g->edges[e].count, MAX(aligned - g->ksize, 1));
-			VERBOSE_FLAG(0, "aligned %d\n", aligned);
-			assert(g->edges[e].count < 1000000);
 		}
 		if (ar1.a[i].score > best_score1 && ar1.a[i].score + 5 >= aligned) {
 			best_score1 = ar1.a[i].score;
@@ -537,8 +535,6 @@ void barcode_read_mapper_h(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		gint_t e = atol(idx->bns->anns[a.rid].name);
 		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
 			atomic_add_and_fetch64(&g->edges[e].count, MAX(aligned - g->ksize, 1));
-			VERBOSE_FLAG(0, "aligned %d\n", aligned);
-			assert(g->edges[e].count < 1000000);
 		}
 		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
 			best_score2 = ar2.a[i].score;
