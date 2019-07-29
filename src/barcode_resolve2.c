@@ -1662,3 +1662,45 @@ void resolve_complex(struct asm_graph_t *g, struct asm_graph_t *gd)
 	__VERBOSE("Number of joined pair(s) through jungle: %ld\n", ret);
 	asm_condense(g, gd);
 }
+
+static inline void dump_edge_fasta(char **seq, int *m_seq, struct asm_edge_t *e)
+{
+	int len, i, k;
+	len = e->seq_len + (e->seq_len / 80) + (e->seq_len % 80 != 0);
+	if (*m_seq < len + 1) {
+		*m_seq = len + 1;
+		*seq = realloc(*seq, *m_seq);
+	}
+	for (i = k = 0; i < (int)e->seq_len; ++i) {
+		(*seq)[k++] = nt4_char[__binseq_get(e->seq, i)];
+		if ((i + 1) % 80 == 0)
+			(*seq)[k++] = '\n';
+	}
+	if (e->seq_len % 80 != 0)
+		(*seq)[k++] = '\n';
+	(*seq)[k] = '\0';
+}
+
+void construct_fasta(struct asm_graph_t *g, const char *fasta_path)
+{
+	FILE *fp = xfopen(fasta_path, "wb");
+	gint_t e;
+	char *seq = NULL;
+	int m_seq = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		dump_edge_fasta(&seq, &m_seq, g->edges + e);
+		fprintf(fp, ">SEQ_%ld\n%s", e, seq);
+	}
+	free(seq);
+	fclose(fp);
+}
+
+void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
+				struct asm_graph_t *g0, struct asm_graph_t *g1)
+{
+	char path[MAX_PATH];
+	strcpy(path, opt->out_dir);
+	strcat(path, "/level4_working/ref.fasta");
+	construct_fasta(g0, path);
+	construct_aux_info(opt, g0, rpath, path, 0);
+}

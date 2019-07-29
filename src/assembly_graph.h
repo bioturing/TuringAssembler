@@ -66,8 +66,8 @@ struct asm_graph_t {
 #define CHIMERIC_COV_THRES		30
 
 #define CONTIG_RP_LEN			500
-#define CONTIG_BC_LEN_1			1500
-#define CONTIG_BC_LEN_2			3000
+#define CONTIG_LEVEL_1			1500
+#define CONTIG_LEVEL_2			3000
 /* Add barcode upto prefix length */
 #define MIN_CONTIG_BARCODE		3000
 /* Only add and use barcode for contig with length minimum */
@@ -97,6 +97,8 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, uint32_t aux_build);
+void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
+	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build);
 
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
