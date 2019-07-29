@@ -143,17 +143,15 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
-//		if (g->edges[e].seq_len > max_len) {
-//			max_len = g->edges[e].seq_len;
-//			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
-//		}
-//		todo @huu choose right method
 		int len = get_edge_len(&g->edges[e]);
+		float cov = __get_edge_cov(g->edges +e, g->ksize);
 		if (len < 1000)
 			continue;
 		sum_len += g->edges[e].seq_len;
-		sum_cov += g->edges[e].seq_len * __get_edge_cov(g->edges +e, g->ksize);
+		sum_cov += g->edges[e].seq_len * cov;
+		VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	}
+	VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	return sum_cov/sum_len;
 }
 

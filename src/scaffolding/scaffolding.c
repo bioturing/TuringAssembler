@@ -46,6 +46,13 @@ void destroy_params_check_edge(struct params_check_edge *para)
 	free(para->list_contig);
 }
 
+int too_different(float a, float b)
+{
+	if ((a < 1.0/3 *b) || (a > 3*b))
+		return 1;
+	return 0;
+}
+
 void *process_build_edge_score(void *data)
 {
 	struct params_check_edge *pa_check_edge = (struct params_check_edge *) data;
@@ -159,6 +166,10 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		struct candidate_edge *new_candidate_edge = calloc(1, sizeof(struct candidate_edge));
 		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = i_contig;
+		float e1_cov = __get_edge_cov(&g->edges[i_edge], g->ksize);
+		float e2_cov = __get_edge_cov(&g->edges[i_contig], g->ksize);
+		if (too_different(e1_cov, e2_cov))
+			value = 0;
 		if (value != 0) {
 			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes.n_item ;
 			int cnt1 = g->edges[i_contig].barcodes.n_item;
@@ -418,7 +429,11 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			int src = para->list_candidate_edges[i_candidate_edge].src;
 			assert(src == i_contig);
 			int des = para->list_candidate_edges[i_candidate_edge].des;
+			float e1_cov = __get_edge_cov(&g->edges[src], g->ksize);
+			float e2_cov = __get_edge_cov(&g->edges[des], g->ksize);
 			struct pair_contigs_score score = para->list_candidate_edges[i_candidate_edge].score;
+			if (too_different(e1_cov, e2_cov))
+				score.bc_score = -1;
 			score.m_score = get_share_mate(g, src, des);
 			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f\n", i_candidate_edge,
 					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score);

@@ -50,6 +50,7 @@ static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int added
 
 	g->edges[id - 1].source = g->n_v;
 	g->edges[id - 1].target = g->n_v + 1;
+	g->edges[id - 1].count = 0;
 	g->nodes[g->n_v].adj = malloc(sizeof(gint_t));
 	g->nodes[g->n_v].adj[0] = id - 1;
 	g->nodes[g->n_v].deg = 1;
@@ -58,6 +59,7 @@ static int add_one_edge(struct asm_graph_t *g, gint_t id, kseq_t *seq, int added
 
 	g->edges[id].source = g->n_v + 2;
 	g->edges[id].target = g->n_v + 3;
+	g->edges[id].count = 0;
 	g->nodes[g->n_v + 2].adj = malloc(sizeof(gint_t));
 	g->nodes[g->n_v + 2].adj[0] = id;
 	g->nodes[g->n_v + 2].deg = 1;
