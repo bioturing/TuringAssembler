@@ -293,13 +293,12 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 
 void build_barcode_process_fastg(struct opt_proc_t *opt)
 {
-	struct asm_graph_t g1, g2;
-	load_asm_graph_fastg(&g1, opt->in_fastg, opt->k0);
-	test_asm_graph(&g1);
-	asm_condense(&g1, &g2);
-	build_barcode_read(opt, &g1);
-	//build_3_4(&g1, &g2);
-	save_graph_info(opt->out_dir, &g1, "added_barcode_fastg");
+	struct asm_graph_t g, g1;
+	load_asm_graph_fastg(&g, opt->in_fastg, opt->k0);
+	test_asm_graph(&g);
+	build_barcode_read(opt, &g);
+	build_3_4(&g, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4");
+	asm_graph_destroy(&g);
 	asm_graph_destroy(&g1);
-	//asm_graph_destroy(&g2);
 }
