@@ -251,6 +251,7 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
 		worker_bundles[i].lock = &lock;
+		worker_bundles[i].aux_build = aux_build;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -540,8 +541,9 @@ void *barcode_buffer_iterator(void *data)
 
 	while (1) {
 		ext_buf = d_dequeue_in(q);
-		if (!ext_buf)
+		if (!ext_buf) {
 			break;
+		}
 		d_enqueue_out(q, own_buf);
 		own_buf = ext_buf;
 		pos1 = pos2 = 0;
@@ -571,7 +573,6 @@ void *barcode_buffer_iterator(void *data)
 	}
 
 	free_pair_buffer(own_buf);
-	fprintf(stderr, "we are done\n");
 	pthread_exit(NULL);
 }
 
