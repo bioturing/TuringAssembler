@@ -82,6 +82,7 @@ void *fastq_producer(void *data)
 	int64_t total_size = bundle->total_size;
 
 	int64_t prev_processed = 0, cur_processed, global_processed, percentage;
+	percentage = 0;
 	while ((cur_processed = gb_get_data(input_stream, own_buf)) >= 0) {
 		external_buf = d_dequeue_out(q);
 		d_enqueue_in(q, own_buf);
@@ -90,7 +91,7 @@ void *fastq_producer(void *data)
 						cur_processed - prev_processed);
 		prev_processed = cur_processed;
 		percentage = global_processed * 100 / total_size;
-		// percentage = __min(percentage, 99);
+		percentage = __min(percentage, 99);
 		__VERBOSE("\rLoad %ld%%", percentage);
 	}
 	buffer_free(own_buf);

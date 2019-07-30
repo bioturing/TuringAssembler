@@ -18,6 +18,7 @@ struct pair_buffer_t {
 	char *R1_buf;
 	char *R2_buf;
 	int input_format;
+	int percentage;
 };
 
 struct trip_buffer_t {
@@ -25,11 +26,13 @@ struct trip_buffer_t {
 	char *R2_buf;
 	char *I_buf;
 	int input_format;
+	int percentage;
 };
 
 struct single_buffer_t {
 	char *R_buf;
 	int input_format;
+	int percentage;
 };
 
 struct gb_file_inf {

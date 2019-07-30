@@ -331,25 +331,31 @@ struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 	const uint8_t *pac, int l_query, const uint8_t *query, const mem_alnreg_t *ar)
 {
 	struct asm_align_t a;
-	memset(&a, 0, sizeof(mem_aln_t));
+	memset(&a, 0, sizeof(struct asm_align_t));
 	if (ar == 0 || ar->rb < 0 || ar->re < 0) { /* unmapped record */
 		a.rid = -1;
 		return a;
 	}
-	int64_t qb, qe, pos;
-	int is_rev, tmp, w2, score, last_sc, i, rb, re, l_ref,
+	// fprintf(stderr, "%ld %ld\n", ar->rb, ar->re);
+	// fprintf(stderr, "%d %d\n", ar->qb, ar->qe);
+	// fprintf(stderr, "%d %d\n", ar->score, ar->truesc);
+	int64_t rb, re, pos;
+	int is_rev, tmp, w2, score, last_sc, i, qb, qe, l_ref,
 				clip5, clip3, dist5, dist3, ext5, ext3;
 	qb = ar->qb; qe = ar->qe;
 	rb = ar->rb; re = ar->re;
 	l_ref = re - rb;
 	pos = bns_depos(bns, rb < bns->l_pac ? rb : re - 1, &is_rev);
+	// fprintf(stderr, "%ld\n", pos);
 	a.rid = bns_pos2rid(bns, pos);
+	// fprintf(stderr, "%d\n", a.rid);
 	clip5 = is_rev ? l_query - qe : qb;
 	clip3 = is_rev ? qb : l_query - qe;
 	dist5 = pos - bns->anns[a.rid].offset;
 	dist3 = bns->anns[a.rid + 1].offset - pos - l_ref;
 	ext5 = __min(clip5, dist5);
 	ext3 = __min(clip3, dist3);
+	// fprintf(stderr, "lquery = %d; ext5 = %d, ext3 = %d\n", l_query, ext5, ext3);
 	if (ext5 >= 10 || ext3 >= 10) {
 		a.rid = -1;
 		return a;
@@ -371,9 +377,11 @@ struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 	last_sc = - (1 << 30);
 	do {
 		w2 = __min(w2, opt->w << 2);
+		// fprintf(stderr, "w2 = %d\n", w2);
 		score = asm_get_score(opt->mat, opt->o_del, opt->e_del,
 			opt->o_ins, opt->e_ins, w2, bns->l_pac, pac, qe - qb,
 						(uint8_t*)&query[qb], rb, re);
+		// fprintf(stderr, "score = %d\n", score);
 		if (score == last_sc || w2 == (opt->w << 2))
 			break;
 		last_sc = score;
@@ -437,7 +445,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	int i, n1, n2, count, best_score_1, best_score_2;
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
-	fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
+	// fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
 	r1_seq = malloc(r1->len);
 	r2_seq = malloc(r2->len);
 	for (i = 0; i < r1->len; ++i)
@@ -473,7 +481,6 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	for (i = 0; i < (int)ar2.n; ++i) {
 		struct asm_align_t a;
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
-		fprintf(stderr, "a.rid = %d\n", a.rid);
 		if (a.rid == -1)
 			continue;
 		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
@@ -564,6 +571,7 @@ void *barcode_buffer_iterator(void *data)
 	}
 
 	free_pair_buffer(own_buf);
+	fprintf(stderr, "we are done\n");
 	pthread_exit(NULL);
 }
 

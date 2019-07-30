@@ -195,7 +195,7 @@ void assembly_process(struct opt_proc_t *opt)
 	load_asm_graph(&g1, opt->in_file);
 	sort_read(opt, &read_sorted_path);
 	resolve_n_m_local(opt, &read_sorted_path, &g1, &g2);
-	save_graph_info(opt->out_dir, &g2, "level_2");
+	// save_graph_info(opt->out_dir, &g2, "level_2");
 }
 
 void assembly3_process(struct opt_proc_t *opt)
