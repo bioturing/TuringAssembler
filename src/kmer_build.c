@@ -26,7 +26,7 @@ struct kmbuild_bundle_t {
 	uint8_t *k2_rc;
 };
 
-void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
+void build_asm_graph_from_kmhash(int n_threads, int ksize,
 				struct kmhash_t *h, struct asm_graph_t *g);
 void assign_edge_kmer_count(struct opt_proc_t *opt, struct kmhash_t *h,
 							struct asm_graph_t *g);
@@ -379,7 +379,7 @@ void build_asm_graph_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *
 	__VERBOSE("Number of kmer = %lu\n", kmer_table.n_item);
 	// test_kmhash(&kmer_table, ksize);
 	__VERBOSE("|-------- Build kmer graph from kmer table\n");
-	build_asm_graph_from_kmhash(opt, ksize, &kmer_table, g);
+	build_asm_graph_from_kmhash(opt->n_threads, ksize, &kmer_table, g);
 	__VERBOSE("Number of nodes: %ld; Number of edges: %ld\n", g->n_v, g->n_e);
 
 	kmhash_destroy(&kmer_table);
@@ -390,6 +390,85 @@ void build_asm_graph_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *
 	// build_edge_kmer_index(&kmer_table, g);
 	__VERBOSE("|-------- Assign edge kmer count\n");
 	/* FIXME: parallel */
+	assign_edge_kmer_count(opt, &kmer_table, g);
+	kmhash_destroy(&kmer_table);
+}
+
+void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
+{
+	set_time_now();
+	__VERBOSE("|----Estimating kmer\n");
+	char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
+	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
+	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
+	KMC_build_kmer_database(ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
+						opt->n_files * 2, tmp_files);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("----Building assembly graph\n");
+	build_asm_graph_KMC(opt, ksize, g);
+	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
+}
+
+void build_local_graph(int ksize, int n_threads, int mmem, int n_files,
+			char **files_1, char **files_2, char *work_dir,
+						struct asm_graph_t *g)
+{
+	set_time_now();
+	__VERBOSE("Building local graph\n");
+	__VERBOSE("|---- Counting kmer\n");
+	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
+	memcpy(tmp_files, files_1, n_files * sizeof(char *));
+	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
+	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
+							n_files * 2, tmp_files);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("TIMER", "KMC count kmer time: %.3f\n", sec_from_prev_time());
+	set_time_now();
+
+	__VERBOSE("|---- Retrieving kmer from KMC database\n");
+	struct kmhash_t kmer_table;
+	char *kmc_pre = alloca(strlen(work_dir) + 50);
+	char *kmc_suf = alloca(strlen(work_dir) + 50);
+	sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", work_dir, ksize + 1);
+	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
+	struct kmc_info_t kmc_inf;
+	KMC_read_prefix(kmc_pre, &kmc_inf);
+	struct kmbuild_bundle_t bundle;
+	kmbuild_bundle_init(&bundle, &kmer_table, ksize);
+	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf, (void *)(&bundle),
+						split_kmer_from_kedge_multi);
+	kmbuild_bundle_destroy(&bundle);
+	destroy_kmc_info(&kmc_inf);
+	uint64_t size = kmer_table.size;
+	__VERBOSE_LOG("BUILD", "Number of kmer: %lu\n", kmer_table.n_item);
+
+	__VERBOSE("|-------- Build kmer graph from kmer table\n");
+	build_asm_graph_from_kmhash(n_threads, ksize, &kmer_table, g);
+	__VERBOSE("Number of nodes: %ld; Number of edges: %ld\n", g->n_v, g->n_e);
+
+	kmhash_destroy(&kmer_table);
+	__VERBOSE("|-------- Build edge index\n");
+	kmhash_init(&kmer_table, opt->hash_size, (ksize + 4) >> 2, KM_AUX_IDX, opt->n_threads);
+	/* FIXME: parallel */
+	build_edge_kmer_index_multi(opt, &kmer_table, g);
+	// build_edge_kmer_index(&kmer_table, g);
+	__VERBOSE("|-------- Assign edge kmer count\n");
+	/* FIXME: parallel */
+	assign_edge_kmer_count(opt, &kmer_table, g);
+	kmhash_destroy(&kmer_table);
+
+	__VERBOSE("|---- Building graph connection\n");
+	build_asm_graph_from_kmhash(n_threads, ksize, &kmer_table, g);
+	__VERBOSE_LOG("BUILD", "Number of nodes: %ld; Number of edges: %ld\n", g->n_v, g->n_e);
+	kmhash_destroy(&kmer_table);
+
+	__VERBOSE("|---- Assigning edge count\n");
+	kmhash_init(&kmer_table, size, (ksize + 4) >> 2, KM_AUX_IDX, n_threads);
+	build_edge_kmer_index_multi(opt, &kmer_table, g);
+
 	assign_edge_kmer_count(opt, &kmer_table, g);
 	kmhash_destroy(&kmer_table);
 }
@@ -759,7 +838,7 @@ static void *build_graph_worker(void *data)
 	return NULL;
 }
 
-void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
+void build_asm_graph_from_kmhash(int n_threads, int ksize,
 				struct kmhash_t *h, struct asm_graph_t *g)
 {
 	kmhash_alloc_aux(h, KM_AUX_IDX);
@@ -793,12 +872,12 @@ void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
 	g->bin_size = 0;
 
 	struct kmgraph_bundle_t *bundle;
-	bundle = calloc(opt->n_threads, sizeof(struct kmgraph_bundle_t));
+	bundle = calloc(n_threads, sizeof(struct kmgraph_bundle_t));
 
-	kmint_t cap = h->size / opt->n_threads + 1;
+	kmint_t cap = h->size / n_threads + 1;
 	n_e = 0;
 	int k;
-	for (k = 0; k < opt->n_threads; ++k) {
+	for (k = 0; k < n_threads; ++k) {
 		bundle[k].h = h;
 		bundle[k].g = g;
 		bundle[k].ksize = ksize;
@@ -831,10 +910,10 @@ void build_asm_graph_from_kmhash(struct opt_proc_t *opt, int ksize,
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
-	for (k = 0; k < opt->n_threads; ++k)
+	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
+	for (k = 0; k < n_threads; ++k)
 		pthread_create(threads + k, &attr, build_graph_worker, bundle + k);
-	for (k =0; k < opt->n_threads; ++k)
+	for (k =0; k < n_threads; ++k)
 		pthread_join(threads[k], NULL);
 	free(threads);
 	free(bundle);

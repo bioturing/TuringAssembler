@@ -54,24 +54,6 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 	g->nodes[u].adj[j] = g->nodes[u].adj[--g->nodes[u].deg];
 }
 
-void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
-{
-	set_time_now();
-	__VERBOSE("|----Estimating kmer\n");
-	char **tmp_files = alloca(opt->n_files * 2 * sizeof(char *));
-	memcpy(tmp_files, opt->files_1, opt->n_files * sizeof(char *));
-	memcpy(tmp_files + opt->n_files, opt->files_2, opt->n_files * sizeof(char *));
-	KMC_build_kmer_database(ksize + 1, opt->out_dir, opt->n_threads, opt->mmem,
-						opt->n_files * 2, tmp_files);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("TIMER", "Estimating kmer time: %.3f\n", sec_from_prev_time());
-	set_time_now();
-
-	__VERBOSE("----Building assembly graph\n");
-	build_asm_graph_KMC(opt, ksize, g);
-	__VERBOSE_LOG("TIMER", "Building graph time: %.3f\n", sec_from_prev_time());
-}
-
 static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
 						uint32_t *seq2, uint32_t l2)
 {

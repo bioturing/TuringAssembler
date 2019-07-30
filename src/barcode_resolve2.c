@@ -1695,6 +1695,103 @@ void construct_fasta(struct asm_graph_t *g, const char *fasta_path)
 	fclose(fp);
 }
 
+struct read_index_t {
+	int64_t r1_offset;
+	int64_t r2_offset;
+	int64_t r1_len;
+	int64_t r2_len;
+};
+
+KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
+
+void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
+{
+	FILE *fp = xfopen(rpath->idx_path, "rb");
+	size_t byte_read;
+	khint_t k;
+	int ret;
+	uint64_t barcode;
+	while (byte_read = fread(buf, 1, 40, fp)) {
+		if (byte_read != 40)
+			__ERROR("Corrupted barcode in read index file");
+		barcode = unpack_int64((uint8_t *)buf);
+		k = kh_put(bcpos, h, barcode, &ret);
+		if (ret != 1)
+			__ERROR("Insert barcode failed");
+		kh_value(h, k).r1_offset = unpack_int64((uint8_t *)buf + 8);
+		kh_value(h, k).r2_offset = unpack_int64((uint8_t *)buf + 16);
+		kh_value(h, k).r1_len = unpack_int64((uint8_t *)buf + 24);
+		kh_value(h, k).r2_len = unpack_int64((uint8_t *)buf + 32);
+	}
+	fclose(fp);
+}
+
+void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
+		struct read_path_t *ans, uint64_t *shared, int n_shared)
+{
+	struct read_index_t *pos;
+	pos = malloc(n_shared * sizeof(struct read_index_t));
+	for (i = 0; i < n_shared; ++i) {
+		k = kh_get(bcpos, dict, shared[i]);
+		pos[i] = kh_value(dict, k);
+	}
+	rs_sort(rindex, pos, pos + n_shared);
+	bf_open(&fo1, ans->R1_path, "wb", SIZE_16MB);
+	bf_open(&fo2, ans->R2_path, "wb", SIZE_16MB);
+	FILE *fi1 = xfopen(ref->R1_path, "rb");
+	FILE *fi2 = xfopen(ref->R2_path, "rb");
+	for (i = 0; i < n_shared; ++i) {
+		len = __max(pos[i].r1_len, pos[i].r2_len);
+		if (len > m_buf) {
+			m_buf = len;
+			buf = realloc(buf, m_buf);
+		}
+		fseek(fi1, pos[i].r1_offset, SEEK_SET);
+		xfread(buf, 1, pos[i].r1_len, fi1);
+		bf_write(&fo1, buf, pos[i].r1_len);
+		fseek(fi2, pos[i].r2_offset, SEEK_SET);
+		xfread(buf, 1, pos[i].r2_len, fi2);
+		bf_write(&fo2, buf, pos[i].r2_len);
+	}
+	fclose(fi1);
+	fclose(fi2);
+	bf_close(&fo1);
+	bf_close(&fo2);
+	free(buf);
+	free(pos);
+}
+
+void local_assembly(struct opt_proc_t *opt, struct read_path_t *reads, khash_t(bcpos) *dict,
+	struct asm_graph_t *g, gint_t e1, gint_t e2, const char *prefix)
+{
+	struct read_path_t rpath;
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath.R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath.R2_path = strdup(path);
+	struct barcode_hash_t *h1, *h2;
+	h1 = g->edges[e1].barcodes + 1;
+	h2 = g->edges[e2].barcodes + 1;
+	int n_shared, m_shared;
+	n_shared = 0;
+	m_shared = 0x100;
+	uint64_t *shared = malloc(m_shared);
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] == (uint64_t)-1 || h1->vals[i] < 2)
+			continue;
+		k = barcode_hash_get(h2, h1->keys[i]);
+		if (k != BARCODE_HASH_END(h2) && h2->vals[k] >= 2) {
+			if (n_shared == m_shared) {
+				m_shared <<= 1;
+				shared = realloc(shared, m_shared * sizeof(uint64_t));
+			}
+			shared[n_shared++] = h1->keys[i];
+		}
+	}
+	filter_read(reads, dict, &rpath, shared, n_shared);
+}
+
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 				struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
