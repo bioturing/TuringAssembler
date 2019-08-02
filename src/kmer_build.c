@@ -628,10 +628,10 @@ void add_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t *g, gint
 
 			if (km_cmp(knum, krev, word_size) <= 0) {
 				k = kmhash_put(h, knum);
-				kmhash_set_adj(h, k, c + 4);
+				kmhash_set_adj(h, k, kc + 4);
 			} else {
 				k = kmhash_put(h, krev);
-				kmhash_set_adj(h, k, c);
+				kmhash_set_adj(h, k, kc);
 			}
 		}
 		km_shift_append(pknum, ksize, word_size, c);
