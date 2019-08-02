@@ -556,6 +556,7 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 
+	kmhash_init(&kmer_table, SIZE_16MB, (ksize + 3) >> 2, KM_AUX_ADJ, n_threads);
 	struct kmbuild_bundle_t kmbuild_bundle;
 	kmbuild_bundle_init(&kmbuild_bundle, &kmer_table, ksize);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
@@ -699,6 +700,7 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 
+	kmhash_init(&kmer_table, SIZE_1MB, (ksize + 3) >> 2, KM_AUX_ADJ, n_threads);
 	struct kmbuild_bundle_t kmbuild_bundle;
 	kmbuild_bundle_init(&kmbuild_bundle, &kmer_table, ksize);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
