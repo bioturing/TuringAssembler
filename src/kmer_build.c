@@ -634,8 +634,8 @@ void add_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t *g, gint
 				kmhash_set_adj(h, k, c);
 			}
 		}
-		km_shift_append(knum, ksize, word_size, c);
-		km_shift_append_rv(krev, ksize, word_size, c ^ 3);
+		km_shift_append(pknum, ksize, word_size, c);
+		km_shift_append_rv(pkrev, ksize, word_size, c ^ 3);
 	}
 }
 
