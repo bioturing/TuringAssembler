@@ -707,8 +707,8 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 			(void *)(&kmbuild_bundle), split_kmer_from_kedge_multi);
 	kmbuild_bundle_destroy(&kmbuild_bundle);
 
-	add_garbage(ksize, &kmer_table, g, e1);
-	add_garbage(ksize, &kmer_table, g, e2);
+	add_garbage(ksize, &kmer_table, g0, e1);
+	add_garbage(ksize, &kmer_table, g0, e2);
 	__VERBOSE_LOG("BUILD", "Number of kmer: %lu\n", kmer_table.n_item);
 
 	__VERBOSE("|---- Building graph connection\n");
