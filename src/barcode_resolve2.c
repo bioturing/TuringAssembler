@@ -8,10 +8,11 @@
 #include "buffer_file_wrapper.h"
 #include "io_utils.h"
 #include "khash.h"
+#include "sort_read.h"
 #include "radix_sort.h"
 #include "resolve.h"
-#include "utils.h"
 #include "time_utils.h"
+#include "utils.h"
 #include "utils.h"
 #include "verbose.h"
 
@@ -1775,9 +1776,10 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
 	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
+	struct asm_graph_t lg;
 	build_local_assembly_graph(g->ksize, opt->n_threads, opt->mmem, 1,
 		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
-		g, e1, e2);
+		&lg, g, e1, e2);
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
