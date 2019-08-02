@@ -110,9 +110,9 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 	printf("--------------- TEST %ld <-> (%ld, %ld) -----------------\n",
 								e1, e2, e2a);
 	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
+	h2a = g->edges[e2a].barcodes;
 	printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
 	printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
 	printf("Number of barcode of %ld: %u\n", e2a, h2a->n_item);
@@ -140,8 +140,8 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	printf("---------------- TEST %ld <-> %ld-------------------\n", e1, e2);
 	struct barcode_hash_t *h1, *h2;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
 	printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
 	printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
 
@@ -157,77 +157,21 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 	// printf("Ratio = %.3f\n", get_barcode_ratio_unique(g, e1, e2));
 }
 
-void print_test_pair_end(struct asm_graph_t *g, gint_t e)
+void init_barcode_graph(struct asm_graph_t *g)
 {
-	printf("---------------- TEST %ld-------------------\n", e);
-	struct barcode_hash_t *h;
-	printf("number of mate = %u\n", g->edges[e].n_mate_contigs);
-	gint_t k;
-	for (k = 0; k < g->edges[e].n_mate_contigs; ++k) {
-		printf("mate = %ld; number of reads = %ld\n",
-			g->edges[e].mate_contigs[k], g->edges[e].mate_counts[k]);
-	}
-	printf("-----------------------------------------------------------\n");
-}
-
-static inline uint32_t dump_edge_seq(char **seq, uint32_t *m_seq,
-					struct asm_edge_t *e, uint32_t max_len)
-{
-	uint32_t i, j, k, len;
-	// if (max_len != 0)
-	// 	len = __min(max_len, e->seq_len);
-	// else
-	// 	len = e->seq_len;
-	len = e->seq_len;
-	if (*m_seq < len + 1) {
-		*m_seq = len + 1;
-		*seq = realloc(*seq, *m_seq);
-	}
-	j = k = 0;
-	for (i = 0; i < len; ++i)
-		(*seq)[i] = nt4_char[__binseq_get(e->seq, i)];
-	(*seq)[len] = '\0';
-	return len;
-}
-
-void init_contig_map_info(struct asm_graph_t *g, const char *path,
-				uint32_t min_len, uint32_t max_len)
-{
-	FILE *fp = xfopen(path, "wb");
 	gint_t e;
-	char *seq = NULL;
-	uint32_t seq_len = 0;
-	char *buf = alloca(81);
 	for (e = 0; e < g->n_e; ++e) {
-		pthread_mutex_init(&(g->edges[e].lock), NULL);
-		uint32_t len, k, l;
-		len = dump_edge_seq(&seq, &seq_len, g->edges + e, max_len);
-		if (g->edges[e].seq_len >= min_len) {
-			fprintf(fp, ">%ld\n", e);
-			k = 0;
-			while (k < len) {
-				l = __min(80, len - k);
-				memcpy(buf, seq + k, l);
-				buf[l] = '\0';
-				fprintf(fp, "%s\n", buf);
-				k += l;
-			}
-		}
-		if (g->aux_flag & ASM_HAVE_BARCODE)
-			barcode_hash_init(&g->edges[e].barcodes, 4);
-		g->edges[e].n_mate_contigs = 0;
-		g->edges[e].mate_contigs = NULL;
-		g->edges[e].mate_counts = NULL;
-		// g->edges[e].mate_barcodes = NULL;
+		g->edges[e].barcodes = calloc(2, sizeof(struct barcode_hash_t));
+		barcode_hash_init(g->edges[e].barcodes, 4);
+		barcode_hash_init(g->edges[e].barcodes + 1, 4);
 	}
-	fclose(fp);
-	bwa_idx_build(path, path, BWTALGO_AUTO, 25000000);
-	__VERBOSE("Done indexing contigs\n");
 }
 
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build)
 {
+	if (aux_build | ASM_BUILD_BARCODE)
+		init_barcode_graph(g);
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
 	mem_opt_t *bwa_opt = asm_memopt_init();
@@ -431,7 +375,7 @@ static inline void add_barcode_edge(struct asm_graph_t *g, gint_t e,
 							int lvl, uint64_t bc)
 {
 	pthread_mutex_lock(&g->edges[e].lock);
-	barcode_hash_add(&g->edges[e].barcodes + lvl, bc);
+	barcode_hash_add(g->edges[e].barcodes + lvl, bc);
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 

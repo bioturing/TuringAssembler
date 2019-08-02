@@ -1,12 +1,18 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "assembly_graph.h"
+#include "buffer_file_wrapper.h"
 #include "io_utils.h"
 #include "khash.h"
+#include "radix_sort.h"
 #include "resolve.h"
 #include "utils.h"
 #include "time_utils.h"
+#include "utils.h"
 #include "verbose.h"
 
 KHASH_SET_INIT_INT64(gint);
@@ -177,9 +183,9 @@ int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
 							gint_t e2, gint_t e2a)
 {
 	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
+	h2a = g->edges[e2a].barcodes;
 
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
@@ -226,10 +232,10 @@ int check_large_pair_superior(struct asm_graph_t *g, gint_t e1,
 
 static inline int check_large_pair_positive(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
-	uint32_t shared = count_shared_bc(&g->edges[e1].barcodes,
-							&g->edges[e2].barcodes);
-	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item +
-					g->edges[e2].barcodes.n_item);
+	uint32_t shared = count_shared_bc(g->edges[e1].barcodes,
+							g->edges[e2].barcodes);
+	double ratio = shared * 1.0 / (g->edges[e1].barcodes->n_item +
+					g->edges[e2].barcodes->n_item);
 	if (ratio + EPS > MIN_BARCODE_RATIO)
 		return 1;
 	return 0;
@@ -238,9 +244,9 @@ static inline int check_large_pair_positive(struct asm_graph_t *g, gint_t e1, gi
 static inline int check_large_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
 {
 	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
+	h2a = g->edges[e2a].barcodes;
 
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
@@ -273,9 +279,9 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 							gint_t e2, gint_t e2a)
 {
 	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
+	h2a = g->edges[e2a].barcodes;
 
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a, cnt2, cnt2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
@@ -326,24 +332,6 @@ int check_medium_pair_superior(struct asm_graph_t *g, gint_t e1,
 			}
 		}
 	}
-	gint_t k;
-	cnt2 = cnt2a = 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (g->edges[e1].mate_contigs[k] == e2)
-			cnt2 = g->edges[e1].mate_counts[k];
-		if (g->edges[e1].mate_contigs[k] == e2a)
-			cnt2a = g->edges[e1].mate_counts[k];
-	}
-	if (cnt2 < MIN_READPAIR_COUNT)
-		return 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-		if (g->edges[e1].mate_counts[k] > cnt2)
-			return 0;
-	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-		if (g->edges[e2].mate_counts[k] > cnt2)
-			return 0;
-	if (cnt2 > cnt2a * 2)
-		return 1;
 	return 0;
 }
 
@@ -353,42 +341,16 @@ static inline int check_medium_pair_positive(struct asm_graph_t *g, gint_t e1, g
 		g->edges[e2].seq_len >= MIN_CONTIG_BARCODE)
 		return check_large_pair_positive(g, e1, e2);
 	uint32_t shared, cnt;
-	shared = count_shared_bc(&g->edges[e1].barcodes,
-							&g->edges[e2].barcodes);
+	shared = count_shared_bc(g->edges[e1].barcodes, g->edges[e2].barcodes);
 	/* hard count */
 	// if (shared >= MIN_BARCODE_COUNT)
 	// 	return 1;
 	/* ratio count */
-	double ratio = shared * 1.0 / (g->edges[e1].barcodes.n_item + g->edges[e2].barcodes.n_item);
+	double ratio = shared * 1.0 / (g->edges[e1].barcodes->n_item +
+						g->edges[e2].barcodes->n_item);
 	if (ratio + EPS > MIN_BARCODE_RATIO)
 		return 1;
-	gint_t k;
-	cnt = 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (g->edges[e1].mate_contigs[k] == e2)
-			cnt = g->edges[e1].mate_counts[k];
-	}
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (cnt * 2 < g->edges[e1].mate_counts[k] || cnt + 15 < g->edges[e1].mate_counts[k])
-			return 0;
-	}
-	return (cnt >= MIN_READPAIR_COUNT);
-	// struct barcode_hash_t *h = NULL;
-	// for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-	// 	if (g->edges[e1].mate_contigs[k] == e2)
-	// 		h = g->edges[e1].mate_barcodes + k;
-	// }
-	// if (h == NULL)
-	// 	return 0;
-	// for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-	// 	if (h->n_item <= g->edges[e1].mate_barcodes[k].n_item)
-	// 		return 0;
-	// }
-	// for (k = 0; k < g->edges[e2].n_mate_contigs; ++k) {
-	// 	if (h->n_item <= g->edges[e2].mate_barcodes[k].n_item)
-	// 		return 0;
-	// }
-	// return (h->n_item >= MIN_READPAIR_COUNT);
+	return 0;
 }
 
 static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e2a)
@@ -398,9 +360,9 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 		g->edges[e2a].seq_len >= MIN_CONTIG_BARCODE)
 		return check_large_pair_greater(g, e1, e2, e2a);
 	struct barcode_hash_t *h1, *h2, *h2a;
-	h1 = &g->edges[e1].barcodes;
-	h2 = &g->edges[e2].barcodes;
-	h2a = &g->edges[e2a].barcodes;
+	h1 = g->edges[e1].barcodes;
+	h2 = g->edges[e2].barcodes;
+	h2a = g->edges[e2a].barcodes;
 
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a, cnt2, cnt2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
@@ -441,24 +403,6 @@ static inline int check_medium_pair_greater(struct asm_graph_t *g, gint_t e1, gi
 			}
 		}
 	}
-	gint_t k;
-	cnt2 = cnt2a = 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k) {
-		if (g->edges[e1].mate_contigs[k] == e2)
-			cnt2 = g->edges[e1].mate_counts[k];
-		if (g->edges[e1].mate_contigs[k] == e2a)
-			cnt2a = g->edges[e1].mate_counts[k];
-	}
-	if (cnt2 < MIN_READPAIR_COUNT)
-		return 0;
-	for (k = 0; k < g->edges[e1].n_mate_contigs; ++k)
-		if (g->edges[e1].mate_counts[k] > cnt2)
-			return 0;
-	for (k = 0; k < g->edges[e2].n_mate_contigs; ++k)
-		if (g->edges[e2].mate_counts[k] > cnt2)
-			return 0;
-	if (cnt2 > cnt2a)
-		return 1;
 	return 0;
 }
 
@@ -1681,7 +1625,7 @@ static inline void dump_edge_fasta(char **seq, int *m_seq, struct asm_edge_t *e)
 	(*seq)[k] = '\0';
 }
 
-void construct_fasta(struct asm_graph_t *g, const char *fasta_path)
+void write_fasta_seq(struct asm_graph_t *g, const char *fasta_path)
 {
 	FILE *fp = xfopen(fasta_path, "wb");
 	gint_t e;
@@ -1702,6 +1646,9 @@ struct read_index_t {
 	int64_t r2_len;
 };
 
+#define read_index_get_key(p) ((p).r1_offset)
+RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
+
 KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
 void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
@@ -1711,7 +1658,8 @@ void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
 	khint_t k;
 	int ret;
 	uint64_t barcode;
-	while (byte_read = fread(buf, 1, 40, fp)) {
+	char *buf = alloca(40);
+	while ((byte_read = fread(buf, 1, 40, fp))) {
 		if (byte_read != 40)
 			__ERROR("Corrupted barcode in read index file");
 		barcode = unpack_int64((uint8_t *)buf);
@@ -1731,15 +1679,21 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 {
 	struct read_index_t *pos;
 	pos = malloc(n_shared * sizeof(struct read_index_t));
+	int i;
+	khiter_t k;
 	for (i = 0; i < n_shared; ++i) {
 		k = kh_get(bcpos, dict, shared[i]);
 		pos[i] = kh_value(dict, k);
 	}
-	rs_sort(rindex, pos, pos + n_shared);
+	rs_sort(read_index, pos, pos + n_shared);
+	struct buffered_file_t fo1, fo2;
 	bf_open(&fo1, ans->R1_path, "wb", SIZE_16MB);
 	bf_open(&fo2, ans->R2_path, "wb", SIZE_16MB);
 	FILE *fi1 = xfopen(ref->R1_path, "rb");
 	FILE *fi2 = xfopen(ref->R2_path, "rb");
+	int64_t m_buf, len;
+	m_buf = 0x100;
+	char *buf = malloc(m_buf);
 	for (i = 0; i < n_shared; ++i) {
 		len = __max(pos[i].r1_len, pos[i].r2_len);
 		if (len > m_buf) {
@@ -1761,7 +1715,7 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
-void local_assembly(struct opt_proc_t *opt, struct read_path_t *reads, khash_t(bcpos) *dict,
+void local_assembly(struct read_path_t *reads, khash_t(bcpos) *dict,
 	struct asm_graph_t *g, gint_t e1, gint_t e2, const char *prefix)
 {
 	struct read_path_t rpath;
@@ -1777,11 +1731,12 @@ void local_assembly(struct opt_proc_t *opt, struct read_path_t *reads, khash_t(b
 	n_shared = 0;
 	m_shared = 0x100;
 	uint64_t *shared = malloc(m_shared);
+	kmint_t i, k;
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] == (uint64_t)-1 || h1->vals[i] < 2)
+		if (h1->keys[i] == (uint64_t)-1)
 			continue;
 		k = barcode_hash_get(h2, h1->keys[i]);
-		if (k != BARCODE_HASH_END(h2) && h2->vals[k] >= 2) {
+		if (k != BARCODE_HASH_END(h2)) {
 			if (n_shared == m_shared) {
 				m_shared <<= 1;
 				shared = realloc(shared, m_shared * sizeof(uint64_t));
@@ -1795,11 +1750,11 @@ void local_assembly(struct opt_proc_t *opt, struct read_path_t *reads, khash_t(b
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 				struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
-	char path[MAX_PATH];
-	strcpy(path, opt->out_dir);
-	strcat(path, "/level4_working/");
-	mkdir(path, 0755);
-	strcat(path, "ref.fasta");
-	construct_fasta(g0, path);
-	construct_aux_info(opt, g0, rpath, path, 0);
+	// char path[MAX_PATH];
+	// strcpy(path, opt->out_dir);
+	// strcat(path, "/level4_working/");
+	// mkdir(path, 0755);
+	// strcat(path, "ref.fasta");
+	// construct_fasta(g0, path);
+	// construct_aux_info(opt, g0, rpath, path, 0);
 }

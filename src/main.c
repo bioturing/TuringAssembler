@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
-		build_opt_process(argc, argv, &build_barcode_process);
+		build_opt_process(argc, argv, &build_barcode_info);
 	else if (!strcmp(argv[1], "build_barcode_fasta"))
 		build_opt_process(argc, argv, &build_barcode_process_fasta);
 	else if (!strcmp(argv[1], "build_0_1"))

@@ -9,6 +9,7 @@
 #include <sys/time.h>
 
 #include "attribute.h"
+#include "buffer_file_wrapper.h"
 #include "fastq_producer.h"
 #include "io_utils.h"
 #include "radix_sort.h"
@@ -24,147 +25,14 @@ struct readbc_t {
 	int len2;
 };
 
-#define bc_get_block(p, s, mask) ((p).barcode >> (s) & (mask))
-#define bc_less_than(x, y) ((x).barcode < (y).barcode)
-
-RS_IMPL(read_sort, struct readbc_t, 64, 8, bc_less_than, bc_get_block)
+#define read_sort_get_key(p) ((p).barcode)
+RS_IMPL(read_sort, struct readbc_t, 64, 8, read_sort_get_key);
 
 struct readsort_bundle_t {
 	struct dqueue_t *q;
 	char prefix[MAX_PATH];
 	int64_t sm;
 };
-
-struct buffered_file_t {
-	FILE *fp;
-	char *buf;
-	int64_t buf_len;
-	int64_t buf_size;
-	int64_t buf_pos;
-	int mode;
-};
-
-#define BF_READ		0
-#define BF_WRITE	1
-
-void bf_open(struct buffered_file_t *bfp, const char *path, const char *mode, int64_t buf_size)
-{
-	bfp->fp = xfopen(path, mode);
-	bfp->buf_size = buf_size;
-	bfp->buf = malloc(buf_size);
-	if (!strcmp(mode, "rb") || !strcmp(mode, "r")) {
-		bfp->buf_len = fread(bfp->buf, 1, bfp->buf_size, bfp->fp);
-		bfp->mode = BF_READ;
-	} else {
-		bfp->buf_len = 0;
-		bfp->mode = BF_WRITE;
-	}
-	bfp->buf_pos = 0;
-}
-
-static inline int64_t bf_read(struct buffered_file_t *bfp, void *ptr, int64_t sz)
-{
-	if (bfp->buf_len - bfp->buf_pos >= sz) {
-		memcpy(ptr, bfp->buf + bfp->buf_pos, sz);
-		bfp->buf_pos += sz;
-		return sz;
-	}
-	int64_t rem_fill, rem_buf, to_fill;
-	rem_fill = sz;
-	do {
-		rem_buf = bfp->buf_len - bfp->buf_pos;
-		if (rem_buf == 0 && bfp->buf_len < bfp->buf_size)
-			return sz - rem_fill; /* EOF */
-		to_fill = __min(rem_buf, rem_fill);
-		memcpy(ptr + sz - rem_fill, bfp->buf + bfp->buf_pos, to_fill);
-		rem_fill -= to_fill;
-		rem_buf -= to_fill;
-		bfp->buf_pos += to_fill;
-		if (rem_buf == 0) {
-			bfp->buf_len = fread(bfp->buf, 1, bfp->buf_size, bfp->fp);
-			bfp->buf_pos = 0;
-		}
-	} while (rem_fill);
-	return sz;
-}
-
-static inline int64_t bf_write(struct buffered_file_t *bfp, const void *ptr, int64_t sz)
-{
-	if (bfp->buf_size - bfp->buf_len >= sz) {
-		memcpy(bfp->buf + bfp->buf_len, ptr, sz);
-		bfp->buf_len += sz;
-		return sz;
-	}
-	int64_t rem_buf, rem_fill, to_fill;
-	rem_fill = sz;
-	do {
-		rem_buf = bfp->buf_size - bfp->buf_len;
-		to_fill = __min(rem_buf, rem_fill);
-		memcpy(bfp->buf + bfp->buf_len, ptr + sz - rem_fill, to_fill);
-		rem_fill -= to_fill;
-		rem_buf -= to_fill;
-		bfp->buf_len += to_fill;
-		if (rem_buf == 0) {
-			xfwrite(bfp->buf, 1, bfp->buf_len, bfp->fp);
-			bfp->buf_len = 0;
-		}
-	} while (rem_fill);
-	return sz;
-}
-
-void bf_close(struct buffered_file_t *bfp)
-{
-	if (bfp->mode == BF_WRITE)
-		xfwrite(bfp->buf, 1, bfp->buf_len, bfp->fp);
-	free(bfp->buf);
-	fclose(bfp->fp);
-}
-
-static inline uint32_t unpack_int32(uint8_t *buf)
-{
-	uint32_t ret = 0;
-	ret =	(uint32_t)buf[0]		|
-		((uint32_t)buf[1] << 8)	|
-		((uint32_t)buf[2] << 16)	|
-		((uint32_t)buf[3] << 24);
-	return ret;
-}
-
-static inline uint64_t unpack_int64(uint8_t *buf)
-{
-	uint64_t ret = 0;
-	ret =	(uint64_t)buf[0]		|
-		((uint64_t)buf[1] << 8)	|
-		((uint64_t)buf[2] << 16)	|
-		((uint64_t)buf[3] << 24)	|
-
-		((uint64_t)buf[4] << 32)	|
-		((uint64_t)buf[5] << 40)	|
-		((uint64_t)buf[6] << 48)	|
-		((uint64_t)buf[7] << 56);
-	return ret;
-}
-
-static inline void pack_int32(uint8_t *buffer, uint32_t value)
-{
-	buffer[0] = value;
-	buffer[1] = value >> 8;
-	buffer[2] = value >> 16;
-	buffer[3] = value >> 24;
-}
-
-static inline void pack_int64(uint8_t *buffer, uint64_t value)
-{
-	buffer[0] = value;
-	buffer[1] = value >> 8;
-	buffer[2] = value >> 16;
-	buffer[3] = value >> 24;
-
-	buffer[4] = value >> 32;
-	buffer[5] = value >> 40;
-	buffer[6] = value >> 48;
-	buffer[7] = value >> 56;
-}
 
 static inline uint64_t get_barcode_ust_raw(struct read_t *I)
 {

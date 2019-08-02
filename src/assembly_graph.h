@@ -35,11 +35,11 @@ struct asm_edge_t {
 	gint_t target;		/* end node */
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
-	struct barcode_hash_t barcodes;		/* mapped barcode */
-	int n_mate_contigs;
+	struct barcode_hash_t *barcodes;		/* mapped barcode */
+	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
-	gint_t *mate_counts;
-	gint_t *mate_contigs;
+	// gint_t *mate_counts;
+	// gint_t *mate_contigs;
 	// struct barcode_hash_t mate_contigs;	/* list of mate contigs (build process only) */
 	// gint_t best_mate_contigs;		/* best mate contigs picker */
 };
@@ -87,7 +87,7 @@ struct asm_graph_t {
 /******************************************************************************/
 
 /* Build graph using KMC module for kmer counting */
-void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
+void build_initial_graph(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
 
 /*************************** Barcoding ultilities *****************************/
 /******************************************************************************/
@@ -96,7 +96,6 @@ void graph_build_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g);
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
-void construct_aux_information(struct opt_proc_t *opt, struct asm_graph_t *g, uint32_t aux_build);
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build);
 
@@ -189,6 +188,7 @@ void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 void write_fasta(struct asm_graph_t *g, const char *path);
 /* Write graph as gfa format */
 void write_gfa(struct asm_graph_t *g, const char *path);
+void write_fasta_seq(struct asm_graph_t *g, const char *fasta_path);
 /* Save graph topology as binary format */
 void save_asm_graph(struct asm_graph_t *g, const char *path);
 /* Load graph, auto detect saved type */

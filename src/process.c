@@ -31,7 +31,8 @@ void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize);
-	graph_build_KMC(opt, ksize, g);
+	build_initial_graph(opt, ksize, g);
+	// graph_build_KMC(opt, ksize, g);
 	test_asm_graph(g);
 }
 
@@ -125,6 +126,22 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
+void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2)
+{
+	// struct read_path_t read_sorted_path;
+	// char path[MAX_PATH];
+	// sprintf(path, "%s/test_local_assembly_%ld_%ld/", opt->out_dir, e1, e2);
+	// if (opt->lib_type == LIB_TYPE_SORTED) {
+	// 	read_sorted_path.R1_path = opt->files_1[0];
+	// 	read_sorted_path.R2_path = opt->files_2[0];
+	// 	read_sorted_path.idx_path = opt->files_I[0];
+	// } else {
+	// 	sort_read(opt, &read_sorted_path);
+	// }
+	
+}
+
 void graph_query_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g0;
@@ -146,17 +163,12 @@ void graph_query_process(struct opt_proc_t *opt)
 		if (c == 'L') {
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
-			print_test_pair_end(g0, u);
-			print_test_pair_end(g0, v);
 		} else if (c == 'P') {
-			fscanf(fp, "\n");
-			print_test_pair_end(g0, u);
+			fscanf(fp, "%ld\n", &v);
+			test_local_assembly(opt, g0, u, v);
 		} else if (c == 'S') {
 			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
-			print_test_pair_end(g0, u);
-			print_test_pair_end(g0, v);
-			print_test_pair_end(g0, v2);
 			if (check_medium_pair_superior(g0, u, v, v2)) {
 				printf("success\n");
 			} else {
@@ -185,6 +197,25 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 	snprintf(path, 1024, "%s/graph_k_%d_%s.bin",
 						out_dir, g->ksize, suffix);
 	save_asm_graph(g, path);
+}
+
+void build_barcode_info(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	struct read_path_t read_sorted_path;
+
+	load_asm_graph(&g, opt->in_file);
+	char fasta_path[MAX_PATH];
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g, fasta_path);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
 }
 
 void assembly_process(struct opt_proc_t *opt)

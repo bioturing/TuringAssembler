@@ -6,7 +6,7 @@
 #define RS_PROTO(name, rs_type)						       \
 void rs_sort_##name(rs_type *beg, rs_type *end);
 
-#define RS_IMPL(name, rs_type, width, block, less_than, get_block)	       \
+#define RS_IMPL(name, rs_type, width, block, get_key)			       \
 struct rs_bucket_##name {						       \
 	rs_type *b, *e;							       \
 }; \
@@ -14,9 +14,9 @@ static inline void is_sort_##name(rs_type *beg, rs_type *end) \
 { \
 	rs_type *i, *j, tmp; \
 	for (i = beg + 1; i < end; ++i) { \
-		if (less_than(*i, *(i - 1))) { \
+		if (get_key(*i) < get_key(*(i - 1))) { \
 			tmp = *i; \
-			for (j = i; j > beg && less_than(tmp, *(j - 1)); --j) \
+			for (j = i; j > beg && get_key(tmp) < get_key(*(j - 1)); --j) \
 				*j = *(j - 1); \
 			*j = tmp; \
 		} \
@@ -28,19 +28,19 @@ static void recursive_sort_##name(rs_type *beg, rs_type *end, int n_bits, int s)
 	int size = 1 << n_bits, m = size - 1; \
 	struct rs_bucket_##name *k, b[size], *be = b + size; \
 	for (k = b; k != be; ++k) k->b = k->e = beg; \
-	for (i = beg; i != end; ++i) ++b[get_block(*i, s, m)].e; \
+	for (i = beg; i != end; ++i) ++b[get_key(*i) >> s & m].e; \
 	for (k = b + 1; k != be; ++k) \
 		k->e += (k - 1)->e - beg, k->b = (k - 1)->e; \
 	for (k = b; k != be;) { \
 		if (k->b != k->e) { \
 			struct rs_bucket_##name *l; \
-			if ((l = b + get_block(*k->b, s, m)) != k) { \
+			if ((l = b + (get_key(*k->b) >> s & m)) != k) { \
 				rs_type tmp = *k->b, swap; \
 				do { \
 					swap = tmp; \
 					tmp = *l->b; \
 					*l->b++ = swap; \
-					l = b + get_block(tmp, s, m); \
+					l = b + (get_key(tmp) >> s & m); \
 				} while (l != k); \
 				*k->b++ = tmp; \
 			} else ++k->b; \

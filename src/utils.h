@@ -7,10 +7,10 @@
 #pragma warning(disable:4996)
 #endif
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 #include <assert.h>
 #include "pthread_barrier.h"
 // #include <stdint.h>
@@ -144,5 +144,51 @@ char *num2seq(int64_t num, int len);
 
 extern int8_t nt4_table[256];
 extern char *nt4_char, *rev_nt4_char;
+
+static inline uint32_t unpack_int32(uint8_t *buf)
+{
+	uint32_t ret = 0;
+	ret =	(uint32_t)buf[0]		|
+		((uint32_t)buf[1] << 8)	|
+		((uint32_t)buf[2] << 16)	|
+		((uint32_t)buf[3] << 24);
+	return ret;
+}
+
+static inline uint64_t unpack_int64(uint8_t *buf)
+{
+	uint64_t ret = 0;
+	ret =	(uint64_t)buf[0]		|
+		((uint64_t)buf[1] << 8)	|
+		((uint64_t)buf[2] << 16)	|
+		((uint64_t)buf[3] << 24)	|
+
+		((uint64_t)buf[4] << 32)	|
+		((uint64_t)buf[5] << 40)	|
+		((uint64_t)buf[6] << 48)	|
+		((uint64_t)buf[7] << 56);
+	return ret;
+}
+
+static inline void pack_int32(uint8_t *buffer, uint32_t value)
+{
+	buffer[0] = value;
+	buffer[1] = value >> 8;
+	buffer[2] = value >> 16;
+	buffer[3] = value >> 24;
+}
+
+static inline void pack_int64(uint8_t *buffer, uint64_t value)
+{
+	buffer[0] = value;
+	buffer[1] = value >> 8;
+	buffer[2] = value >> 16;
+	buffer[3] = value >> 24;
+
+	buffer[4] = value >> 32;
+	buffer[5] = value >> 40;
+	buffer[6] = value >> 48;
+	buffer[7] = value >> 56;
+}
 
 #endif /* _UTILS_H_ */
