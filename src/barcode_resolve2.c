@@ -1780,6 +1780,7 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	build_local_assembly_graph(g->ksize, opt->n_threads, opt->mmem, 1,
 		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
 		&lg, g, e1, e2);
+	save_graph_info(work_dir, &lg, "local");
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
