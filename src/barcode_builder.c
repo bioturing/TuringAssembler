@@ -140,8 +140,8 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	printf("---------------- TEST %ld <-> %ld-------------------\n", e1, e2);
 	struct barcode_hash_t *h1, *h2;
-	h1 = g->edges[e1].barcodes;
-	h2 = g->edges[e2].barcodes;
+	h1 = g->edges[e1].barcodes + 1;
+	h2 = g->edges[e2].barcodes + 1;
 	printf("Number of barcode of %ld: %u\n", e1, h1->n_item);
 	printf("Number of barcode of %ld: %u\n", e2, h2->n_item);
 

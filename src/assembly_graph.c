@@ -1043,6 +1043,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	/* load the barcode information */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
+			g->edges[e].barcodes = calloc(2, sizeof(struct barcode_hash_t));
 			struct barcode_hash_t *h = g->edges[e].barcodes;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);

@@ -126,22 +126,6 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
-void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
-							gint_t e1, gint_t e2)
-{
-	// struct read_path_t read_sorted_path;
-	// char path[MAX_PATH];
-	// sprintf(path, "%s/test_local_assembly_%ld_%ld/", opt->out_dir, e1, e2);
-	// if (opt->lib_type == LIB_TYPE_SORTED) {
-	// 	read_sorted_path.R1_path = opt->files_1[0];
-	// 	read_sorted_path.R2_path = opt->files_2[0];
-	// 	read_sorted_path.idx_path = opt->files_I[0];
-	// } else {
-	// 	sort_read(opt, &read_sorted_path);
-	// }
-	
-}
-
 void graph_query_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g0;

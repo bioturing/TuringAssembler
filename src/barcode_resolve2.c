@@ -1733,10 +1733,7 @@ void local_assembly(struct read_path_t *reads, khash_t(bcpos) *dict,
 	uint64_t *shared = malloc(m_shared);
 	kmint_t i, k;
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] == (uint64_t)-1)
-			continue;
-		k = barcode_hash_get(h2, h1->keys[i]);
-		if (k != BARCODE_HASH_END(h2)) {
+		if (h1->keys[i] != (uint64_t)-1) {
 			if (n_shared == m_shared) {
 				m_shared <<= 1;
 				shared = realloc(shared, m_shared * sizeof(uint64_t));
@@ -1744,7 +1741,39 @@ void local_assembly(struct read_path_t *reads, khash_t(bcpos) *dict,
 			shared[n_shared++] = h1->keys[i];
 		}
 	}
+	for (i = 0; i < h2->size; ++i) {
+		if (h2->keys[i] == (uint64_t)-1)
+			continue;
+		k = barcode_hash_get(h1, h2->keys[i]);
+		if (k == BARCODE_HASH_END(h1)) {
+			if (n_shared == m_shared) {
+				m_shared <<= 1;
+				shared = realloc(shared, m_shared * sizeof(uint64_t));
+			}
+			shared[n_shared++] = h2->keys[i];
+		}
+	}
 	filter_read(reads, dict, &rpath, shared, n_shared);
+}
+
+void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	local_assembly(&read_sorted_path, dict, g, e1, e2, work_dir);
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
