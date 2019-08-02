@@ -218,6 +218,8 @@ void build_barcode_info(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
+	save_graph_info(opt->out_dir, &g, "added_barcode");
+	asm_graph_destroy(&g);
 }
 
 void assembly_process(struct opt_proc_t *opt)

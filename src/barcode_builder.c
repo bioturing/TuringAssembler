@@ -159,6 +159,7 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 
 void init_barcode_graph(struct asm_graph_t *g)
 {
+	g->aux_flag |= ASM_HAVE_BARCODE;
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
 		g->edges[e].barcodes = calloc(2, sizeof(struct barcode_hash_t));
