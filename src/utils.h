@@ -18,8 +18,8 @@
 // #include <math.h>
 // #include <errno.h>
 // #include <ctype.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 // #include <pthread.h>
 // #if defined(_MSC_VER)
 // #include <time.h>

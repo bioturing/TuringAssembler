@@ -213,6 +213,8 @@ void build_barcode_info(struct opt_proc_t *opt)
 	} else {
 		sort_read(opt, &read_sorted_path);
 	}
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
