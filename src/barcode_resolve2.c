@@ -1715,22 +1715,22 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
-void local_assembly(struct read_path_t *reads, khash_t(bcpos) *dict,
-	struct asm_graph_t *g, gint_t e1, gint_t e2, const char *prefix)
+void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
+			khash_t(bcpos) *dict, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, const char *prefix)
 {
-	struct read_path_t rpath;
 	char path[MAX_PATH];
 	sprintf(path, "%s/R1.sub.fq", prefix);
-	rpath.R1_path = strdup(path);
+	rpath->R1_path = strdup(path);
 	sprintf(path, "%s/R2.sub.fq", prefix);
-	rpath.R2_path = strdup(path);
+	rpath->R2_path = strdup(path);
 	struct barcode_hash_t *h1, *h2;
 	h1 = g->edges[e1].barcodes + 1;
 	h2 = g->edges[e2].barcodes + 1;
 	int n_shared, m_shared;
 	n_shared = 0;
 	m_shared = 0x100;
-	uint64_t *shared = malloc(m_shared);
+	uint64_t *shared = malloc(m_shared * sizeof(uint64_t));
 	kmint_t i, k;
 	for (i = 0; i < h1->size; ++i) {
 		if (h1->keys[i] != (uint64_t)-1) {
@@ -1753,13 +1753,14 @@ void local_assembly(struct read_path_t *reads, khash_t(bcpos) *dict,
 			shared[n_shared++] = h2->keys[i];
 		}
 	}
-	filter_read(reads, dict, &rpath, shared, n_shared);
+	filter_read(reads, dict, rpath, shared, n_shared);
+	free(shared);
 }
 
 void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2)
 {
-	struct read_path_t read_sorted_path;
+	struct read_path_t read_sorted_path, local_read_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
 		read_sorted_path.R1_path = opt->files_1[0];
 		read_sorted_path.R2_path = opt->files_2[0];
@@ -1773,7 +1774,10 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
-	local_assembly(&read_sorted_path, dict, g, e1, e2, work_dir);
+	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
+	build_local_assembly_graph(g->ksize, opt->n_threads, opt->mmem, 1,
+		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
+		g, e1, e2);
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
