@@ -5,6 +5,7 @@
 
 #include "attribute.h"
 #include "barcode_hash.h"
+#include "khash.h"
 
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
@@ -12,6 +13,18 @@
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
 #define ASM_BUILD_COVERAGE		0x4
+
+struct pair_contig_t {
+	gint_t e1;
+	gint_t e2;
+};
+
+struct contig_count_t {
+	int n_read;
+	int n_pair;
+};
+
+KHASH_DECLARE(pair_contig_count, struct pair_contig_t, struct contig_count_t);
 
 struct asm_node_t {
 	gint_t rc_id;		/* reverse complement link */
@@ -36,6 +49,7 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
+	khash_t(pair_contig_count) *candidates;
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;

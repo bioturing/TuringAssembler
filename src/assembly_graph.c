@@ -5,6 +5,7 @@
 #include "barcode_hash.h"
 #include "fastq_producer.h"
 #include "io_utils.h"
+#include "khash.h"
 #include "kmer_build.h"
 #include "kseq.h"
 #include "utils.h"
@@ -13,6 +14,13 @@
 #include "../include/kmc_skipping.h"
 
 KSEQ_INIT(gzFile, gzread);
+
+#define __mix_2_64(x) (((x).e1 << 11) ^ ((x).e1 >> 33) ^ (x).e1 ^ (x).e2 ^ ((x).e2 << 11) ^ ((x).e2 >> 33))
+
+#define __cmp_2_64(x, y) ((x).e1 == (y).e1 && (x).e2 == (y).e2)
+
+__KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
+							__mix_2_64, __cmp_2_64);
 
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
