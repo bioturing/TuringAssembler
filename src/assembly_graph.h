@@ -9,10 +9,12 @@
 
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
+#define ASM_HAVE_CANDIDATE		0x8
 
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
 #define ASM_BUILD_COVERAGE		0x4
+#define ASM_BUILD_CANDIDATE		0x8
 
 struct pair_contig_t {
 	gint_t e1;
@@ -49,7 +51,6 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
-	khash_t(pair_contig_count) *candidates;
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -66,6 +67,8 @@ struct asm_graph_t {
 
 	struct asm_node_t *nodes;	/* list of nodes */
 	struct asm_edge_t *edges;	/* list of edges */
+
+	khash_t(pair_contig_count) *candidates;
 };
 
 #define MIN_NOTICE_LEN			250
@@ -82,6 +85,9 @@ struct asm_graph_t {
 #define CONTIG_READPAIR_LEN		500
 #define CONTIG_LEVEL_1			1500
 #define CONTIG_LEVEL_2			3000
+
+#define MAX_READ_FRAG_LEN		700
+
 /* Add barcode upto prefix length */
 #define MIN_CONTIG_BARCODE		3000
 /* Only add and use barcode for contig with length minimum */

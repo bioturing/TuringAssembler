@@ -1766,7 +1766,7 @@ static void add_2_2_path(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e, 
 	e1_len = g->edges[e1].seq_len;
 	l1 = __min(g->edges[e1].seq_len, 200);
 	l2 = __min(g->edges[e2].seq_len, 200);
-	char *seq = malloc(l1 + l2 + e_len - g->ksize * 2);
+	char *seq = malloc(l1 + l2 + e_len - g->ksize * 2 + 1);
 	p1 = l1;
 	p2 = p1 + g->edges[e].seq_len - 2 * g->ksize + 1;
 	l = 0;
@@ -1778,7 +1778,12 @@ static void add_2_2_path(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e, 
 	for (i = g->ksize; i < l2; ++i) {
 		seq[l++] = nt4_char[__binseq_get(g->edges[e2].seq, i)];
 	}
-	fprintf(fp, ">QRY_%ld_%ld_%u_%u\n", e1, e2, p1, p2);
+	struct pair_contig_t key = (struct pair_contig_t){e1, e2};
+	int ret;
+	khint_t k = kh_put(pair_contig_count, g->candidates, key, &ret);
+	kh_value(g->candidates, k) = (struct contig_count_t){(int)0, (int)0};
+	seq[l] = '\0';
+	fprintf(fp, ">QRY_%ld_%ld_%u_%u_\n", e1, e2, p1, p2);
 	fprintf(fp, "%s\n", seq);
 	free(seq);
 }
@@ -1803,18 +1808,54 @@ static void list_2_2_bridge(struct asm_graph_t *g, gint_t e, FILE *fp)
 	}
 }
 
-void resolve_local(struct asm_graph_t *g, const char *work_dir)
+static int check_2_2_work(struct asm_graph_t *g, gint_t e)
+{
+	gint_t e_rc, v, v_rc, u, u_rc;
+	int i, k, flag, cnt;
+	e_rc = g->edges[e].rc_id;
+	v = g->edges[e].target;
+	v_rc = g->nodes[v].rc_id;
+	u = g->edges[e].source;
+	u_rc = g->nodes[u].rc_id;
+	/* condition for 2-2 edge */
+	if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
+		g->nodes[u_rc].deg != 2 || g->nodes[v].deg != 2)
+		return 0;
+	for (i = 0; i < 2; ++i) {
+		for (k = 0; k < 2; ++k) {
+			struct pair_contig_t key = (struct pair_contig_t){g->nodes[u_rc].adj[i], g->nodes[v].adj[k]};
+			khint_t it = kh_get(pair_contig_count, g->candidates, key);
+			if (it == kh_end(g->candidates))
+				fprintf(stdout, "wowowowo\n");
+			else
+				fprintf(stdout, "%ld\t%ld\t%d\t%d\n", key.e1, key.e2,
+					kh_value(g->candidates, it).n_read, kh_value(g->candidates, it).n_pair);
+		}
+	}
+	return 0;
+}
+
+void resolve_local(struct opt_proc_t *opt, struct read_path_t *read_path,
+				struct asm_graph_t *g, const char *work_dir)
 {
 	char path[MAX_PATH];
 	sprintf(path, "%s/candidate.fasta", work_dir);
 	FILE *fp = xfopen(path, "wb");
 	gint_t e;
+	g->candidates = kh_init(pair_contig_count);
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
 		list_2_2_bridge(g, e, fp);
 	}
 	fclose(fp);
+	construct_aux_info(opt, g, read_path, path, ASM_BUILD_CANDIDATE);
+	int resolved = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		resolved += check_2_2_work(g, e);
+	}
 }
 
 void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -1841,6 +1882,7 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local");
+	resolve_local(opt, &local_read_path, &lg1, work_dir);
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,

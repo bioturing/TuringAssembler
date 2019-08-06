@@ -350,12 +350,27 @@ struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 
 struct fasta_ref_t {
 	int type;
-	gint_t e;
 	gint_t e1;
 	gint_t e2;
 	int pos1;
 	int pos2;
 };
+
+static inline void parse_int_array(const char *s, gint_t *a)
+{
+	int i, k;
+	gint_t num;
+	for (i = k = 0, num = 0; s[i]; ++i) {
+		if (s[i] =='_') {
+			a[k++] = num;
+			num = 0;
+		} else {
+			if (s[i] < '0' || s[i] > '9')
+				__ERROR("Parse QRY fail: %s", s);
+			num = num * 10 + s[i] - '0';
+		}
+	}
+}
 
 static inline struct fasta_ref_t parse_fasta_ref(const char *name)
 {
@@ -363,9 +378,15 @@ static inline struct fasta_ref_t parse_fasta_ref(const char *name)
 	if (!strncmp(name, "SEQ", 3)) {
 		ret.type = FASTA_REF_SEQ;
 		const char *p = name + 4;
-		ret.e = atol(p);
+		ret.e1 = atol(p);
 	} else if (!strncmp(name, "QRY", 3)) {
 		ret.type = FASTA_REF_QRY;
+		gint_t tmp[4];
+		parse_int_array(name + 4, tmp);
+		ret.e1 = tmp[0];
+		ret.e2 = tmp[1];
+		ret.pos1 = tmp[2];
+		ret.pos2 = tmp[3];
 	} else {
 		ret.type = FASTA_REF_UNKNOWN;
 	}
@@ -380,6 +401,28 @@ static inline void add_barcode_edge(struct asm_graph_t *g, gint_t e,
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 
+static inline void add_read_count_candidate(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	struct pair_contig_t key = (struct pair_contig_t){e1, e2};
+	khint_t k = kh_get(pair_contig_count, g->candidates, key);
+	//if (k == kh_end(g->candidates))
+	//	__ERROR("candidate is not initilized");
+	if (k == kh_end(g->candidates))
+		return;
+	atomic_add_and_fetch32(&(kh_value(g->candidates, k).n_read), 1);
+}
+
+static inline void add_readpair_count_candidate(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	struct pair_contig_t key = (struct pair_contig_t){e1, e2};
+	khint_t k = kh_get(pair_contig_count, g->candidates, key);
+	// if (k == kh_end(g->candidates))
+	// 	__ERROR("candidate is not initilized");
+	if (k == kh_end(g->candidates))
+		return;
+	atomic_add_and_fetch32(&(kh_value(g->candidates, k).n_pair), 1);
+}
+
 void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 						struct bccount_bundle_t *bundle)
 {
@@ -388,7 +431,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	mem_opt_t *opt = bundle->bwa_opt;
 	mem_alnreg_v ar1, ar2;
 	uint8_t *r1_seq, *r2_seq;
-	int i, n1, n2, count, best_score_1, best_score_2;
+	int i, k, n1, n2, count, best_score_1, best_score_2;
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
 	// fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
@@ -408,20 +451,12 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r1->len, r1_seq, ar1.a + i);
 		if (a.rid == -1)
 			continue;
-		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
-		if (r.type == FASTA_REF_SEQ) {
-			if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-				count = __max(a.aligned, 1);
-				atomic_add_and_fetch64(&g->edges[r.e].count, count);
-				atomic_add_and_fetch64(&g->edges[g->edges[r.e].rc_id].count, count);
-			}
-			if (a.score > best_score_1) {
-				best_score_1 = a.score;
-				p1[0] = a;
-				n1 = 1;
-			} else if (a.score == best_score_1) {
-				p1[n1++] = a;
-			}
+		if (a.score > best_score_1) {
+			best_score_1 = a.score;
+			p1[0] = a;
+			n1 = 1;
+		} else if (a.score == best_score_1) {
+			p1[n1++] = a;
 		}
 	}
 	for (i = 0; i < (int)ar2.n; ++i) {
@@ -430,37 +465,102 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		if (a.rid == -1)
 			continue;
 		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
-		if (r.type == FASTA_REF_SEQ) {
-			if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-				count = __max(a.aligned, 1);
-				atomic_add_and_fetch64(&g->edges[r.e].count, count);
-				atomic_add_and_fetch64(&g->edges[g->edges[r.e].rc_id].count, count);
+		if (a.score > best_score_2) {
+			best_score_2 = a.score;
+			p2[0] = a;
+			n2 = 1;
+		} else if (a.score == best_score_2) {
+			p2[n2++] = a;
+		}
+	}
+	if (bundle->aux_build & ASM_BUILD_CANDIDATE) {
+		/* read information */
+		for (i = 0; i < n1; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			if (ref.type != FASTA_REF_QRY)
+				continue;
+			if (p1[i].pos < ref.pos1 - 10 && p1[i].pos + p1[i].aligned > ref.pos2 + 10)
+				add_read_count_candidate(g, ref.e1, ref.e2);
+		}
+		/* read pair information on candidate bridges */
+		for (i = 0; i < n1; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			if (ref.type != FASTA_REF_QRY)
+				continue;
+			for (k = 0; k < n2; ++k) {
+				if (p2[k].rid != p1[i].rid) /* map to the same candidate */
+					continue;
+				int l, r;
+				l = __min(p1[i].pos, p2[i].pos);
+				r = __max(p1[i].pos + p1[i].aligned, p2[i].pos + p2[i].aligned);
+				if (l < ref.pos1 - 10 && r > ref.pos2 + 10)
+					add_readpair_count_candidate(g, ref.e1, ref.e2);
 			}
-			if (a.score > best_score_2) {
-				best_score_2 = a.score;
-				p2[0] = a;
-				n2 = 1;
-			} else if (a.score == best_score_2) {
-				p2[n2++] = a;
+		}
+		for (i = 0; i < n1; ++i) {
+			struct fasta_ref_t ref1, ref2;
+			ref1 = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			if (ref1.type != FASTA_REF_SEQ)
+				continue;
+			for (k = 0; k < n2; ++k) {
+				ref2 = parse_fasta_ref(idx->bns->anns[p2[k].rid].name);
+				if (ref2.type != FASTA_REF_SEQ)
+					continue;
+				if (p1[i].pos + p2[k].pos < MAX_READ_FRAG_LEN &&
+					ref1.e1 != ref2.e1 &&
+					ref1.e1 != g->edges[ref2.e1].rc_id) {
+					add_readpair_count_candidate(g, ref1.e1, ref2.e1);
+					add_readpair_count_candidate(g, ref2.e1, ref1.e1);
+				}
 			}
 		}
 	}
 	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
 		for (i = 0; i < n1; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			if (ref.type != FASTA_REF_SEQ)
+				continue;
 			if (p1[i].pos <= CONTIG_LEVEL_1) {
-				add_barcode_edge(g, p1[i].rid, 0, bc);
-				add_barcode_edge(g, p1[i].rid, 1, bc);
+				add_barcode_edge(g, ref.e1, 0, bc);
+				add_barcode_edge(g, ref.e1, 1, bc);
 			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
-				add_barcode_edge(g, p1[i].rid, 1, bc);
+				add_barcode_edge(g, ref.e1, 1, bc);
 			}
 		}
 		for (i = 0; i < n2; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
+			if (ref.type != FASTA_REF_SEQ)
+				continue;
 			if (p2[i].pos <= CONTIG_LEVEL_1) {
-				add_barcode_edge(g, p2[i].rid, 0, bc);
-				add_barcode_edge(g, p2[i].rid, 1, bc);
+				add_barcode_edge(g, ref.e1, 0, bc);
+				add_barcode_edge(g, ref.e1, 1, bc);
 			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
-				add_barcode_edge(g, p2[i].rid, 1, bc);
+				add_barcode_edge(g, ref.e1, 1, bc);
 			}
+		}
+	}
+	if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+		for (i = 0; i < n1; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			if (ref.type != FASTA_REF_SEQ)
+				continue;
+			int added_count = __max(p1[i].aligned - g->ksize, 1);
+			atomic_add_and_fetch32(&g->edges[ref.e1].count, added_count);
+			atomic_add_and_fetch32(&g->edges[g->edges[ref.e1].rc_id].count, added_count);
+		}
+		for (i = 0; i < n2; ++i) {
+			struct fasta_ref_t ref;
+			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
+			if (ref.type != FASTA_REF_SEQ)
+				continue;
+			int added_count = __max(p1[i].aligned - g->ksize, 1);
+			atomic_add_and_fetch32(&g->edges[ref.e1].count, added_count);
+			atomic_add_and_fetch32(&g->edges[g->edges[ref.e1].rc_id].count, added_count);
 		}
 	}
 	free(ar1.a);

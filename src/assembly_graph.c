@@ -247,6 +247,7 @@ void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 	g->edges[dst].target = g->edges[src].target;
 	/* clone the barcode */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
+		g->edges[dst].barcodes = calloc(2, sizeof(struct barcode_hash_t));
 		barcode_hash_clone(g->edges[dst].barcodes, g->edges[src].barcodes);
 		barcode_hash_clone(g->edges[dst].barcodes + 1, g->edges[src].barcodes + 1);
 	}
