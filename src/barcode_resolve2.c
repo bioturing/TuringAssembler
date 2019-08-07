@@ -1264,10 +1264,14 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 	struct cov_range_t rcov_e, rcov_e_return;
 	rcov_e = convert_cov_range(fcov_e);
 	rcov_e_return = convert_cov_range(fcov_e_return);
-	int rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
+	int rep = __min(rcov_e.hi - 1, rcov_e_return.hi);
 	// rep = __min(rep, 2);
-	if (rep <= 0)
-		rep = 1;
+	if (rep <= 0) {
+		__VERBOSE("[Loop] Remove edge %ld(%ld)\n", e_return, e_return_rc);
+		asm_remove_edge(g, e_return);
+		asm_remove_edge(g, e_return_rc);
+		return 1;
+	}
 	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
 		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
 	asm_unroll_loop_forward(g, e, e_return, rep);
@@ -1296,8 +1300,6 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 		g->edges[e1].seq_len >= CONTIG_USE_BARCODE &&
 		g->edges[e2].seq_len >= CONTIG_USE_BARCODE)
 		flag3 = check_barcode_positive(g, e1, e2);
-
-	__VERBOSE("[deb] flag1 = %d; flag2 = %d; flag3 = %d\n", flag1, flag2, flag3);
 
 	if ((flag1 && flag2) || (flag3 && (flag1 || flag2 || g->edges[e].seq_len < MIN_NOTICE_LEN))) {
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
