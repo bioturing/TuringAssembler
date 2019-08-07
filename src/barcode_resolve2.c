@@ -1302,12 +1302,14 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 		flag3 = check_barcode_positive(g, e1, e2);
 
 	if ((flag1 && flag2) || (flag3 && (flag1 || flag2 || g->edges[e].seq_len < MIN_NOTICE_LEN))) {
+		__VERBOSE("[Loop] Join\n");
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
 		asm_remove_edge(g, e);
 		asm_remove_edge(g, e_rc);
 		return 1;
 	} else {
+		__VERBOSE("[Loop] Break\n");
 		if (!flag1)
 			isolate_edge(g, e);
 		if (!flag2)
