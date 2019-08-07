@@ -213,7 +213,7 @@ static int check_barcode_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, g
 	h2 = get_max_barcode_set(g, e2, len2);
 	h2a = get_max_barcode_set(g, e2a, len2);
 	if (h1 == NULL || h2 == NULL || h2a == NULL)
-		return 0;
+		return -1;
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
@@ -243,7 +243,7 @@ static int check_barcode_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gi
 	h2 = get_max_barcode_set(g, e2, len2);
 	h2a = get_max_barcode_set(g, e2a, len2);
 	if (h1 == NULL || h2 == NULL || h2a == NULL)
-		return 0;
+		return -1;
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
@@ -540,12 +540,12 @@ int check_2_2_high_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov
 		if (check_barcode_superior(g, legs[1], legs[3], legs[2]) == 0 ||
 			check_barcode_superior(g, legs[2], legs[0], legs[1]) == 0 ||
 			check_barcode_superior(g, legs[3], legs[1], legs[0]) == 0) {
-			__VERBOSE("[High strict 1] Not enough constrast for superior pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[High strict 1] Not enough condition for superior pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 0) {
-			__VERBOSE("[High strict 1] Not enough constrast for positive pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[High strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
@@ -570,12 +570,12 @@ int check_2_2_high_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov
 		if (check_barcode_superior(g, legs[1], legs[2], legs[3]) == 0 ||
 			check_barcode_superior(g, legs[2], legs[1], legs[0]) == 0 ||
 			check_barcode_superior(g, legs[3], legs[0], legs[1]) == 0) {
-			__VERBOSE("[High strict 2] Not enough constrast for superior pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[High strict 2] Not enough condition for superior pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 0) {
-			__VERBOSE("[High strict 2] Not enough constrast for positive pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[High strict 2] Contradict for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
@@ -636,12 +636,12 @@ int check_2_2_med_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			check_barcode_greater(g, legs[1], legs[2], legs[3]) == 1 ||
 			check_barcode_greater(g, legs[2], legs[1], legs[0]) == 1 ||
 			check_barcode_greater(g, legs[3], legs[0], legs[1]) == 1) {
-			__VERBOSE("[Med strict 1] Constradict pair chosen %ld %ld\n", e, e_rc);
+			__VERBOSE("[Med strict 1] Contradict pair chosen %ld %ld\n", e, e_rc);
 			return 0;
 		}
-		if (check_barcode_positive(g, legs[0], legs[2]) == 0 &&
+		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 0) {
-			__VERBOSE("[Med strict 1] Not enough constrast for positive pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[Med strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
@@ -673,9 +673,9 @@ int check_2_2_med_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			__VERBOSE("[Med strict 2] Constradict pair chosen %ld %ld\n", e, e_rc);
 			return 0;
 		}
-		if (check_barcode_positive(g, legs[0], legs[3]) == 0 &&
+		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 0) {
-			__VERBOSE("[Med strict 2] Not enough constrast for positive pairs %ld %ld\n", e, e_rc);
+			__VERBOSE("[Med strict 2] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
@@ -732,7 +732,12 @@ int check_2_2_low_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		check_barcode_positive(g, legs[1], legs[3]) == 1) {
 		if (check_barcode_positive(g, legs[0], legs[3]) == 1 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 1) {
-			__VERBOSE("[Low strict 1] Constradict pair chosen %ld %ld\n", e, e_rc);
+			__VERBOSE("[Low strict 1] Contradict pair chosen %ld %ld\n", e, e_rc);
+			return 0;
+		}
+		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
+			check_barcode_positive(g, legs[1], legs[3]) == 0) {
+			__VERBOSE("[Med strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
@@ -757,7 +762,12 @@ int check_2_2_low_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		check_barcode_positive(g, legs[1], legs[2]) == 1) {
 		if (check_barcode_positive(g, legs[0], legs[2]) == 1 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 1) {
-			__VERBOSE("[Low strict 2] Constradict pair chosen %ld %ld\n", e, e_rc);
+			__VERBOSE("[Low strict 2] Contradict pair chosen %ld %ld\n", e, e_rc);
+			return 0;
+		}
+		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
+			check_barcode_positive(g, legs[1], legs[2]) == 0) {
+			__VERBOSE("[Low strict 2] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
@@ -1630,8 +1640,8 @@ void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
 	struct barcode_hash_t *h1, *h2;
-	h1 = g->edges[e1].barcodes + 1;
-	h2 = g->edges[e2].barcodes + 1;
+	h1 = g->edges[e1].barcodes + 2;
+	h2 = g->edges[e2].barcodes + 2;
 	int n_shared, m_shared;
 	n_shared = 0;
 	m_shared = 0x100;
@@ -1786,7 +1796,7 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local");
-	resolve_local(opt, &local_read_path, &lg1, work_dir);
+	// resolve_local(opt, &local_read_path, &lg1, work_dir);
 }
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
