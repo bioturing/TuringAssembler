@@ -162,9 +162,10 @@ void init_barcode_graph(struct asm_graph_t *g)
 	g->aux_flag |= ASM_HAVE_BARCODE;
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
-		g->edges[e].barcodes = calloc(2, sizeof(struct barcode_hash_t));
+		g->edges[e].barcodes = calloc(3, sizeof(struct barcode_hash_t));
 		barcode_hash_init(g->edges[e].barcodes, 4);
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
+		barcode_hash_init(g->edges[e].barcodes + 2, 4);
 	}
 }
 
@@ -523,11 +524,15 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p1[i].pos <= CONTIG_LEVEL_1) {
+			if (p1[i].pos <= CONTIG_LEVEL_0) {
 				add_barcode_edge(g, ref.e1, 0, bc);
 				add_barcode_edge(g, ref.e1, 1, bc);
-			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
+				add_barcode_edge(g, ref.e1, 2, bc);
+			} else if (p1[i].pos <= CONTIG_LEVEL_1) {
 				add_barcode_edge(g, ref.e1, 1, bc);
+				add_barcode_edge(g, ref.e1, 2, bc);
+			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
+				add_barcode_edge(g, ref.e1, 2, bc);
 			}
 		}
 		for (i = 0; i < n2; ++i) {
@@ -535,11 +540,15 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p2[i].pos <= CONTIG_LEVEL_1) {
+			if (p2[i].pos <= CONTIG_LEVEL_0) {
 				add_barcode_edge(g, ref.e1, 0, bc);
 				add_barcode_edge(g, ref.e1, 1, bc);
-			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
+				add_barcode_edge(g, ref.e1, 2, bc);
+			} else if (p2[i].pos <= CONTIG_LEVEL_1) {
 				add_barcode_edge(g, ref.e1, 1, bc);
+				add_barcode_edge(g, ref.e1, 2, bc);
+			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
+				add_barcode_edge(g, ref.e1, 2, bc);
 			}
 		}
 	}
