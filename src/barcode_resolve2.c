@@ -1267,10 +1267,14 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 	int rep = __min(rcov_e.hi - 1, rcov_e_return.hi);
 	// rep = __min(rep, 2);
 	if (rep <= 0) {
-		__VERBOSE("[Loop] Remove edge %ld(%ld)\n", e_return, e_return_rc);
-		asm_remove_edge(g, e_return);
-		asm_remove_edge(g, e_return_rc);
-		return 1;
+		if (g->edges[e_return].seq_len < MIN_NOTICE_LEN || fcov_e < fcov_e_return) {
+			__VERBOSE("[Loop] Remove edge %ld(%ld)\n", e_return, e_return_rc);
+			asm_remove_edge(g, e_return);
+			asm_remove_edge(g, e_return_rc);
+			return 1;
+		} else {
+			rep = 1;
+		}
 	}
 	__VERBOSE("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
 		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
