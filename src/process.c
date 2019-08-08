@@ -106,6 +106,16 @@ void build_4_5(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 5 time: %.3f\n", sec_from_prev_time());
 }
 
+void build_h_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Resolving graph \n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	resolve_loop(g0, g);
+	test_asm_graph(g);
+	__VERBOSE_LOG("TIMER", "Build graph h_0_1 time: %.3f\n", sec_from_prev_time());
+}
+
 void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -227,7 +237,7 @@ void assembly3_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	build_0_KMC(opt, opt->k0, &g1);
-	// save_graph_info(opt->out_dir, &g1, "level_0");
+	save_graph_info(opt->out_dir, &g1, "level_0");
 
 	build_0_1(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");
@@ -312,6 +322,16 @@ void build_4_5_process(struct opt_proc_t *opt)
 	build_barcode(opt, &g1);
 	build_4_5(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_5");
+	asm_graph_destroy(&g1);
+	asm_graph_destroy(&g2);
+}
+
+void build_h_0_1_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+	load_asm_graph(&g1, opt->in_file);
+	build_h_0_1(&g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_h_1");
 	asm_graph_destroy(&g1);
 	asm_graph_destroy(&g2);
 }

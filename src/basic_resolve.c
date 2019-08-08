@@ -764,3 +764,91 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
 }
 
+int check_loop(struct asm_graph_t *g, int i_e2)
+{
+	/*
+ 	 *
+ 	 * -------a'<------b'------
+ 	 *        |\      /|   
+ 	 *        | \    / |   
+ 	 *        |  \  /  |  
+ 	 *        |   \/   |     
+ 	 *        |   /\   |    
+ 	 *        |  /  \  |       
+ 	 *        | /    \ |          
+ 	 *        |/      \|          
+ 	 *        |v      v|          
+ 	 * ------>a ------>b ----->
+ 	 *    e1      e2     e3
+ 	 * check deg 
+ 	 * check dep of e2 > e4 leng e4 < 200
+ 	 * leng e1 > 1000 leng e3 > 1000
+ 	 */
+	struct asm_edge_t *e2 = &g->edges[i_e2];
+	int i_a = e2->source, i_b = e2->target;
+	struct asm_node_t *a = &g->nodes[i_a], *b = &g->nodes[i_b];
+	int i_a_rc = a->rc_id, i_b_rc = b->rc_id;
+	struct asm_node_t *a_rc = &g->nodes[i_a_rc], *b_rc = &g->nodes[i_b_rc];
+	if (a->deg != 1)
+		return 0;
+	if (b->deg != 1)
+		return 0;
+	if (a_rc->deg != 2) 
+		return 0;
+	if (b_rc->deg != 2)
+		return 0;
+	int b1 = 0;
+	int i_e4 = 0, i_e1 = 0, i_e3 = 0;
+	struct asm_edge_t *e1 = NULL, *e3 = NULL, *e4 = NULL;
+	for (int i = 0; i < 2; i++) {
+		struct asm_edge_t *e = &g->edges[a_rc->adj[i]];
+		if (e->target != i_b)  {
+			i_e1 = e->rc_id;
+		} else {
+			b1 = 1;
+		}
+	}
+	if (b1 == 0) 
+		return 0;
+	i_e3 = b->adj[0];
+	for (int i = 0; i < 2; i++) {
+		struct asm_edge_t *e = &g->edges[b_rc->adj[i]];
+		if (e->target == i_a) {
+			i_e4 = b_rc->adj[i];
+		} else {
+			if (e->target != i_a_rc)
+				return 0;
+		}
+	}
+	e1 = &g->edges[i_e1];
+	e3 = &g->edges[i_e3];
+	e4 = &g->edges[i_e4];
+	if (e1->seq_len < 1000)
+		return 0;
+	if (e3->seq_len < 1000)
+		return 0;
+	float cov_e2 = __get_edge_cov(e2, g->ksize);
+	float cov_e4 = __get_edge_cov(e4, g->ksize);
+	__VERBOSE("cov e2 %f e4 %f e4len %d\n", cov_e2, cov_e4, e4->seq_len);
+	if (cov_e2 < cov_e4)
+		return 0;
+	if (e4->seq_len > 200)
+		return 0;
+	__VERBOSE("check cov ok\n");
+	asm_remove_edge(g, i_e4);
+	int i_e4_rc = g->edges[i_e4].rc_id;
+	asm_remove_edge(g, i_e4_rc);
+	return 1;
+}
+
+void resolve_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	int count = 0;
+	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++) {
+		count += check_loop(g0, i_e2);
+	}
+	__VERBOSE("remove %d loop\n", count);
+	asm_condense(g0, g);
+}
+
+
