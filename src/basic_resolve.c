@@ -433,7 +433,7 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 		cov_rv = __min(cov_rv, get_max_out_cov(g, v_rc));
 		if ((cov < CHIMERIC_RATIO_THRES * cov_fw ||
 			cov < CHIMERIC_RATIO_THRES * cov_rv) &&
-			cov < CHIMERIC_COV_THRES) {
+			g->edges[e].seq_len < CHIMERIC_LEN_THRES) {
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			++cnt_removed;

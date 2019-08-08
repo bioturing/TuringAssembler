@@ -80,7 +80,8 @@ struct asm_graph_t {
 #define MIN_TIPS_LEG			2000
 
 #define CHIMERIC_RATIO_THRES		0.1
-#define CHIMERIC_COV_THRES		30
+#define CHIMERIC_COV_THRES		100
+#define CHIMERIC_LEN_THRES		200
 
 #define CONTIG_USE_BARCODE		200
 #define CONTIG_LEVEL_0			500
