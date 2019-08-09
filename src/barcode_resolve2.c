@@ -8,6 +8,7 @@
 #include "buffer_file_wrapper.h"
 #include "io_utils.h"
 #include "khash.h"
+#include "kmer.h"
 #include "sort_read.h"
 #include "radix_sort.h"
 #include "resolve.h"
@@ -1780,6 +1781,120 @@ void resolve_local(struct opt_proc_t *opt, struct read_path_t *read_path,
 	}
 }
 
+static inline void get_first_edge_kmer(uint8_t *buf, int ksize, int word_size,
+								uint32_t *seq)
+{
+	uint32_t c;
+	int i;
+	memset(buf, 0, word_size);
+	for (i = 0; i < ksize; ++i) {
+		c = __binseq_get(seq, i);
+		km_shift_append(buf, ksize, word_size, c);
+	}
+}
+
+static int find_path_label_helper(struct asm_graph_t *g,
+		uint32_t *seq, uint32_t seq_len, gint_t **path, int *path_len,
+						gint_t e, uint32_t e_begin)
+{
+	uint32_t i, k, cseq, cedge, ksize, word_size;
+	uint8_t *kseq, *kedge;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	kseq = alloca(word_size);
+	kedge = alloca(word_size);
+	*path = malloc(sizeof(gint_t));
+	*path_len = 1;
+	(*path)[0] = e;
+	for (i = 0, k = e_begin; i < seq_len; ++i) {
+		cseq = __binseq_get(seq, i);
+		km_shift_append(kseq, ksize, word_size, cseq);
+		if (k == g->edges[e].seq_len) {
+			if (i + 1 < ksize) {
+				free(*path);
+				*path = NULL;
+				*path_len = 0;
+				return 0;
+			}
+			gint_t v = g->edges[e].target, j, next_e;
+			e = -1;
+			for (j = 0; j < g->nodes[v].deg; ++j) {
+				next_e = g->nodes[v].adj[j];
+				get_first_edge_kmer(kedge, ksize, word_size,
+					g->edges[next_e].seq);
+				if (km_cmp(kseq, kedge, word_size) == 0) {
+					e = next_e;
+					break;
+				}
+			}
+			if (e == -1) {
+				free(*path);
+				*path = NULL;
+				*path_len = 0;
+				return 0;
+			}
+			*path = realloc(*path, (*path_len + 1) * sizeof(gint_t));
+			(*path)[*path_len++] = e;
+			k = ksize;
+		} else {
+			cedge = __binseq_get(g->edges[e].seq, k);
+			km_shift_append(kedge, ksize, word_size, cedge);
+			++k;
+		}
+		if (i + 1 >= ksize) {
+			if (km_cmp(kseq, kedge, word_size) != 0) {
+				free(*path);
+				*path = NULL;
+				*path_len = 0;
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+int find_path_label(struct asm_graph_t *g, uint32_t *seq, uint32_t seq_len, gint_t **path, int *path_len)
+{
+	/* get first (k + 1)-mer of seq */
+	uint32_t i, c, ksize, word_size;
+	int ret;
+	uint8_t *kseq, *kedge;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	kseq = alloca(word_size);
+	kedge = alloca(word_size);
+	gint_t e;
+	get_first_edge_kmer(kseq, ksize, word_size, seq);
+	for (e = 0; e < g->n_e; ++e) {
+		for (i = 0; i < g->edges[e].seq_len; ++i) {
+			c = __binseq_get(g->edges[e].seq, i);
+			km_shift_append(kedge, ksize, word_size, c);
+			if (i + 1 >= ksize && km_cmp(kseq, kedge, word_size) == 0) {
+				ret = find_path_label_helper(g, seq, seq_len, path, path_len, e, i + 1 - ksize);
+				if (ret)
+					return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+void find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+	gint_t *epath = NULL;
+	int epath_len = 0, i, ret;
+	ret = find_path_label(g, g0->edges[e1].seq, g->edges[e1].seq_len, &epath, &epath_len);
+	if (ret) {
+		fprintf(stdout, "e1: ");
+		for (i = 0; i < epath_len; ++i) {
+			fprintf(stdout, "%ld, ", epath[i]);
+			fprintf(stdout, "\n");
+		}
+	} else {
+		fprintf(stdout, "e1: NULL\n");
+	}
+}
+
 void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2)
 {
@@ -1804,8 +1919,10 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local");
+	find_path_local(g, &lg1, e1, e2);
 	// resolve_local(opt, &local_read_path, &lg1, work_dir);
 }
+
 
 void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 				struct asm_graph_t *g0, struct asm_graph_t *g1)
