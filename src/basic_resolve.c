@@ -755,12 +755,14 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			cnt_loop = unroll_simple_loop(g0);
 			cnt_collapse = resolve_simple_bubble(g0);
 			cnt_collapse += resolve_align_bubble(g0);
+			cnt_loop += resolve_loop(g0);
 			asm_lazy_condense(g0);
 		} while (cnt_loop + cnt_collapse);
 
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
+
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
 }
 
@@ -823,10 +825,10 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 	e1 = &g->edges[i_e1];
 	e3 = &g->edges[i_e3];
 	e4 = &g->edges[i_e4];
-	if (e1->seq_len < 1000)
-		return 0;
-	if (e3->seq_len < 1000)
-		return 0;
+//	if (e1->seq_len < 1000)
+//		return 0;
+//	if (e3->seq_len < 1000)
+//		return 0;
 	float cov_e2 = __get_edge_cov(e2, g->ksize);
 	float cov_e4 = __get_edge_cov(e4, g->ksize);
 	__VERBOSE("cov e2 %f e4 %f e4len %d\n", cov_e2, cov_e4, e4->seq_len);
@@ -841,14 +843,14 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 	return 1;
 }
 
-void resolve_loop(struct asm_graph_t *g0, struct asm_graph_t *g)
+int resolve_loop(struct asm_graph_t *g0)
 {
 	int count = 0;
-	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++) {
+	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++) if (g0->edges[i_e2].source != -1) {
 		count += check_loop(g0, i_e2);
 	}
 	__VERBOSE("remove %d loop\n", count);
-	asm_condense(g0, g);
+	return count;
 }
 
 

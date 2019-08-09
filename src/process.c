@@ -111,7 +111,7 @@ void build_h_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 	__VERBOSE("Resolving graph \n");
 	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
-	resolve_loop(g0, g);
+//	resolve_loop(g0);
 	test_asm_graph(g);
 	__VERBOSE_LOG("TIMER", "Build graph h_0_1 time: %.3f\n", sec_from_prev_time());
 }
