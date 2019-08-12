@@ -227,7 +227,7 @@ void assembly3_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	build_0_KMC(opt, opt->k0, &g1);
-	// save_graph_info(opt->out_dir, &g1, "level_0");
+	save_graph_info(opt->out_dir, &g1, "level_0");
 
 	build_0_1(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");

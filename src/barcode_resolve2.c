@@ -1778,6 +1778,7 @@ int find_path_label(struct asm_graph_t *g, uint32_t *seq, uint32_t seq_len, gint
 			c = __binseq_get(g->edges[e].seq, i);
 			km_shift_append(kedge, ksize, word_size, c);
 			if (i + 1 >= ksize && km_cmp(kseq, kedge, word_size) == 0) {
+				__VERBOSE("Try %ld(%u)\n", e, i);
 				ret = find_path_label_helper(g, seq, seq_len, path, path_len, e, i + 1 - ksize);
 				if (ret)
 					return 1;
@@ -1791,20 +1792,22 @@ void find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g, gint_t e1, g
 {
 	gint_t *ep1, *ep2;
 	ep1 = ep2 = NULL;
-	int eplen1, eplen2, i, ret;
+	int eplen1, eplen2, i, ret1, ret2;
 	eplen1 = eplen2 = 0;
 	gint_t e1_rc;
-	e1_rc = g->edges[e1].rc_id;
-	ret = find_path_label(g, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1, &eplen1);
-	if (!ret) {
-		fprintf(stdout, "e1: NULL\n");
-		return;
+	e1_rc = g0->edges[e1].rc_id;
+	__VERBOSE("Find path for e1\n");
+	ret1 = find_path_label(g, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1, &eplen1);
+	if (!ret1) {
+		__VERBOSE_LOG("", "e1: NULL\n");
 	}
-	ret = find_path_label(g, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2, &eplen2);
-	if (!ret) {
-		fprintf(stdout, "e2: NULL\n");
-		return;
+	__VERBOSE("Find path for e2\n");
+	ret2 = find_path_label(g, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2, &eplen2);
+	if (!ret2) {
+		__VERBOSE_LOG("", "e2: NULL\n");
 	}
+	if (!ret1 || !ret2)
+		return;
 	fprintf(stdout, "success\n");
 	gint_t s, t;
 	s = ep1[eplen1 - 1];
