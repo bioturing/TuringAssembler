@@ -1847,6 +1847,7 @@ void local_assembly(struct opt_proc_t *opt, struct read_path_t *read_path,
 {
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", out_dir, e1, e2);
+	mkdir(work_dir, 0755);
 	struct read_path_t local_read;
 	get_local_reads(read_path, &local_read, dict, g, e1, e2, work_dir);
 	struct asm_graph_t lg, lg1;
