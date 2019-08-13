@@ -124,7 +124,7 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2);
-void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/

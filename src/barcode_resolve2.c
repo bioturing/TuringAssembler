@@ -1780,7 +1780,7 @@ void resolve_local(struct opt_proc_t *opt, struct read_path_t *read_path,
 	}
 }
 
-void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2)
 {
 	struct read_path_t read_sorted_path, local_read_path;
@@ -1804,6 +1804,7 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local");
+	return lg1;
 	// resolve_local(opt, &local_read_path, &lg1, work_dir);
 }
 

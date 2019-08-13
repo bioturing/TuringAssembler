@@ -180,6 +180,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 				++pos;
 				++opt->n_files;
 			}
+		} else if (!strcmp(argv[pos], "-lc")){
+			opt->lc = argv[pos + 1];
+			pos += 2;
 		} else {
 			__ERROR("Unknown option %s", argv[pos]);
 		}
