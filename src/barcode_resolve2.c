@@ -1761,7 +1761,7 @@ static int find_path_label_helper(struct asm_graph_t *g,
 	return 1;
 }
 
-int find_path_label(struct asm_graph_t *g, uint32_t *seq, uint32_t seq_len, gint_t **path, int *path_len)
+uint32_t find_path_label(struct asm_graph_t *g, uint32_t *seq, uint32_t seq_len, gint_t **path, int *path_len)
 {
 	/* get first (k + 1)-mer of seq */
 	uint32_t i, c, ksize, word_size;
@@ -1781,39 +1781,123 @@ int find_path_label(struct asm_graph_t *g, uint32_t *seq, uint32_t seq_len, gint
 				__VERBOSE("Try %ld(%u)\n", e, i);
 				ret = find_path_label_helper(g, seq, seq_len, path, path_len, e, i + 1 - ksize);
 				if (ret)
-					return 1;
+					return i + 1 - ksize;
 			}
 		}
 	}
-	return 0;
+	return (uint32_t)-1;
 }
 
-void find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g, gint_t e1, gint_t e2)
+int reconstruct_edge_path(struct asm_graph_t *g, gint_t *ep1, int eplen1, uint32_t pos1, uint32_t e1_len,
+					gint_t *ep2, int eplen2, uint32_t pos2, uint32_t e2_len,
+					uint32_t **ret_seq, uint32_t *ret_len)
+{
+	uint32_t len, m_len, s, j, k, c, n_char, old_m_len;
+	int i;
+	gint_t e;
+	m_len = 0x400;
+	len = 0;
+	*ret_seq = calloc((m_len >> 4), sizeof(uint32_t));
+	s = pos1;
+	j = 0;
+	for (i = 0; i < eplen1; ++i) {
+		e = ep1[i];
+		n_char = __min(g->edges[e].seq_len - s, e1_len - j);
+		old_m_len = m_len;
+		for (; len + n_char > m_len; m_len <<= 1);
+		if (m_len > old_m_len) {
+			*ret_seq = realloc(*ret_seq, (m_len >> 4) * sizeof(uint32_t));
+			memset(*ret_seq, 0, ((m_len - old_m_len) >> 4) * sizeof(uint32_t));
+		}
+		for (k = 0; k < n_char; ++k, ++s, ++j) {
+			c = __binseq_get(g->edges[e].seq, s);
+			__binseq_set(*ret_seq, len, c);
+			++len;
+		}
+		if (s == g->edges[e].seq_len)
+			s = g->ksize;
+	}
+	if (s > pos2 + g->ksize) {
+		free(*ret_seq);
+		return 0;
+	}
+	if (s < pos2) {
+		n_char = pos2 - s;
+		old_m_len = m_len;
+		for (; len + n_char > m_len; m_len <<= 1);
+		if (m_len > old_m_len) {
+			*ret_seq = realloc(*ret_seq, (m_len >> 4) * sizeof(uint32_t));
+			memset(*ret_seq, 0, ((m_len - old_m_len) >> 4) * sizeof(uint32_t));
+		}
+		for (k = s; k < pos2; ++k) {
+			c = __binseq_get(g->edges[ep1[eplen1 - 1]].seq, k);
+			__binseq_set(*ret_seq, len, c);
+			++len;
+		}
+		s = pos2;
+		j = 0;
+	} else {
+		j = s - pos2;
+	}
+	for (i = 0; i < eplen2; ++i) {
+		e = ep2[i];
+		n_char = __min(g->edges[e].seq_len - s, e2_len - j);
+		old_m_len = m_len;
+		for (; len + n_char > m_len; m_len <<= 1);
+		if (m_len > old_m_len) {
+			*ret_seq = realloc(*ret_seq, (m_len >> 4) * sizeof(uint32_t));
+			memset(*ret_seq, 0, ((m_len - old_m_len) >> 4) * sizeof(uint32_t));
+		}
+		for (k = 0; k < n_char; ++k, ++s, ++j) {
+			c = __binseq_get(g->edges[e].seq, s);
+			__binseq_set(*ret_seq, len, c);
+			++len;
+		}
+		if (s == g->edges[e].seq_len)
+			s = g->ksize;
+	}
+	*ret_seq = realloc(*ret_seq, ((len + 15) >> 4) * sizeof(uint32_t));
+	*ret_len = len;
+	return 1;
+}
+
+int find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
+		gint_t e1, gint_t e2, uint32_t **ret_seq, uint32_t *ret_len)
 {
 	gint_t *ep1, *ep2;
 	ep1 = ep2 = NULL;
-	int eplen1, eplen2, i, ret1, ret2;
+	int eplen1, eplen2, i;
+	uint32_t pos1, pos2;
 	eplen1 = eplen2 = 0;
 	gint_t e1_rc;
 	e1_rc = g0->edges[e1].rc_id;
 	__VERBOSE("Find path for e1\n");
-	ret1 = find_path_label(g, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1, &eplen1);
-	if (!ret1) {
+	pos1 = find_path_label(g, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1, &eplen1);
+	if (pos1 == (uint32_t)-1) {
 		__VERBOSE_LOG("", "e1: NULL\n");
 	}
 	__VERBOSE("Find path for e2\n");
-	ret2 = find_path_label(g, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2, &eplen2);
-	if (!ret2) {
+	pos2 = find_path_label(g, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2, &eplen2);
+	if (pos2 == (uint32_t)-1) {
 		__VERBOSE_LOG("", "e2: NULL\n");
 	}
-	if (!ret1 || !ret2)
-		return;
-	fprintf(stdout, "success\n");
+	if (pos1 == (uint32_t)-1 || pos2 == (uint32_t)-1)
+		return 0;
 	gint_t s, t;
 	s = ep1[eplen1 - 1];
 	t = ep2[0];
-	if (s == t)
-		__VERBOSE_LOG("", "Easy peasy case: %ld <-> %ld\n", e1, e2);
+	if (s == t) {
+		int ret = reconstruct_edge_path(g, ep1, eplen1, pos1, g0->edges[e1].seq_len,
+			ep2, eplen2, pos2, g0->edges[e2].seq_len, ret_seq, ret_len);
+		if (ret) {
+			__VERBOSE_LOG("", "Easy peasy case: %ld <-> %ld: success\n", e1, e2);
+			return 1;
+		} else {
+			__VERBOSE_LOG("", "Easy peasy case: %ld <-> %ld: fail\n", e1, e2);
+		}
+	}
+	__VERBOSE_LOG("", "Not yet consider case: %ld <-> %ld\n", e1, e2);
+	return 0;
 }
 
 void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -1840,13 +1924,18 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local");
-	find_path_local(g, &lg1, e1, e2);
+	uint32_t *ret_seq, ret_len;
+	int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
+	if (ret) {
+		free(ret_seq);
+	}
 	// resolve_local(opt, &local_read_path, &lg1, work_dir);
 }
 
-void local_assembly(struct opt_proc_t *opt, struct read_path_t *read_path,
+int local_assembly(struct opt_proc_t *opt, struct read_path_t *read_path,
 				khash_t(bcpos) *dict, char *out_dir,
-				struct asm_graph_t *g, gint_t e1, gint_t e2)
+				struct asm_graph_t *g, gint_t e1, gint_t e2,
+				uint32_t **ret_seq, uint32_t *ret_len)
 {
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", out_dir, e1, e2);
@@ -1857,11 +1946,16 @@ void local_assembly(struct opt_proc_t *opt, struct read_path_t *read_path,
 	build_local_assembly_graph(g->ksize, opt->n_threads, opt->mmem, 1,
 		&(local_read.R1_path), &(local_read.R2_path), work_dir, &lg, g, e1, e2);
 	build_0_1(&lg, &lg1);
-	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	find_path_local(g, &lg1, e1, e2);
+	asm_graph_destroy(&lg);
+	// save_graph_info(work_dir, &lg1, "local_lvl_1");
+	int ret = find_path_local(g, &lg1, e1, e2, ret_seq, ret_len);
+	if (!ret)
+		save_graph_info(work_dir, &lg1, "local_lvl_1");
+	asm_graph_destroy(&lg1);
+	return ret;
 }
 
-gint_t barcode_find_pair_alter(struct asm_graph_t *g, khash_t(gint) *set_leg, gint_t se, gint_t ae)
+gint_t barcode_find_pair_alter(struct asm_graph_t *g, khash_t(gint) *set_leg, gint_t se, gint_t ae, int *stat)
 {
 	gint_t e, ret_e, sec_e;
 	khiter_t k;
@@ -1886,10 +1980,22 @@ gint_t barcode_find_pair_alter(struct asm_graph_t *g, khash_t(gint) *set_leg, gi
 		return -1;
 	}
 	if (sec_e != -1 && !check_barcode_superior(g, se, ret_e, sec_e)) {
-		return -2;
+		*stat = 0;
+	} else {
+		*stat = 1;
 	}
 	return ret_e;
+}
 
+void get_rc_seq(uint32_t **seq, uint32_t *ref, uint32_t len)
+{
+	uint32_t i, k, c;
+	*seq = calloc((len + 15) >> 4, sizeof(uint32_t));
+	for (i = 0; i < len; ++i) {
+		k = len - i - 1;
+		c = __binseq_get(ref, k) ^ 3;
+		__binseq_set(*seq, i, c);
+	}
 }
 
 int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
@@ -1899,19 +2005,56 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 {
 	int resolve;
 	khint_t k;
-	gint_t e1, e2, e2a;
+	gint_t e1, e2_rc, e2, e2a, et, et_rc;
 	resolve = 0;
-	for (k = kh_begin(set_leg); k != kh_end(set_leg); ++k) {
+	for (k = kh_begin(set_leg); k < kh_end(set_leg); ++k) {
 		if (!kh_exist(set_leg, k))
 			continue;
 		e1 = kh_key(set_leg, k);
-		e2 = barcode_find_pair_alter(g, set_leg, e1, -1);
+		int stat;
+		e2 = barcode_find_pair_alter(g, set_leg, e1, -1, &stat);
 		if (e2 < 0)
 			continue;
-		e2a = barcode_find_pair_alter(g, set_self, e1, e2);
-		if (e2a >= 0)
-			e2 = e2a;
-		local_assembly(opt, read_path, dict, work_dir, g, e1, e2);
+		e2a = barcode_find_pair_alter(g, set_self, e1, e2, &stat);
+		if (e2a >= 0) {
+			if (e2a != e2 && stat == 0)
+				continue;
+			if (e2a != e2) {
+				e2 = e2a;
+				stat = 0;
+			} else {
+				stat = 1;
+			}
+		}
+		uint32_t *ret_seq, ret_len;
+		ret_seq = NULL;
+		int ret = local_assembly(opt, read_path, dict, work_dir, g, e1, e2, &ret_seq, &ret_len);
+		if (ret) {
+			double cov1, cov2, cov;
+			cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+			cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+			cov = (cov1 + cov2) / 2;
+			et = g->edges[e1].rc_id;
+			et_rc = g->edges[e2].rc_id;
+			e2_rc = g->edges[e2].rc_id;
+			uint64_t count = (uint64_t)(cov * ret_len);
+			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
+			g->edges[et].count = g->edges[et_rc].count = count;
+			free(g->edges[et].seq);
+			free(g->edges[et_rc].seq);
+			g->edges[et].seq = ret_seq;
+			g->edges[et].seq_len = ret_len;
+			get_rc_seq(&(g->edges[et_rc].seq), ret_seq, ret_len);
+			g->edges[et_rc].seq_len = ret_len;
+			kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
+			if (stat) {
+				kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
+			} else {
+				kh_del(gint, set_self, kh_get(gint, set_self, e2));
+				kh_del(gint, set_self, kh_get(gint, set_self, e2_rc));
+				kh_put(gint, set_leg, e2_rc, &stat);
+			}
+		}
 		++resolve;
 	}
 	return resolve;
@@ -1952,7 +2095,7 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 		find_region(g, e, MIN_CONTIG_BARCODE, MAX_EDGE_COUNT, uni_cov, set_v, set_e);
 		if (kh_size(set_e) < MAX_EDGE_COUNT) {
 			kh_merge_set(visited, set_e);
-			detect_leg(g, MIN_LONG_CONTIG, MAX_MOLECULE_LEN,
+			detect_leg(g, MIN_LONG_CONTIG, 6000,
 					set_v, set_e, set_leg, set_self);
 			n_leg = kh_size(set_leg);
 			n_self = kh_size(set_self);
