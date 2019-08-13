@@ -9,6 +9,7 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
+#include "build_bridge.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -126,6 +127,14 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
 }
 
+void print_seq(FILE *f, uint32_t *seq, uint32_t leng, int u, int v)
+{
+	fprintf(f, ">%d_to_%d\n", u, v);
+	for (int i = 0; i < (int) leng; ++i)
+		fprintf(f, "%c", int_to_base(__binseq_get(seq, i)));
+	fprintf(f, "\n");
+}
+
 void graph_query_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g0;
@@ -139,6 +148,8 @@ void graph_query_process(struct opt_proc_t *opt)
 	gint_t u, v, v2;
 	FILE *fp;
 	fp = xfopen(opt->in_fasta, "r");
+	fclose(fopen(opt->lc, "w"));
+	int bridge_types_count[2] = {};
 	while (1) {
 		char c;
 		int ret = fscanf(fp, "%c %ld", &c, &u);
@@ -149,7 +160,24 @@ void graph_query_process(struct opt_proc_t *opt)
 			print_test_barcode_edge(g0, u, v);
 		} else if (c == 'P') {
 			fscanf(fp, "%ld\n", &v);
-			test_local_assembly(opt, g0, u, v);
+			struct asm_graph_t lg = test_local_assembly(opt, g0,
+							g0->edges[u].rc_id, v);
+			__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+			__VERBOSE_LOG("PATH", "Building bridge from %ld to %ld\n", u, v);
+			u = g0->edges[u].rc_id;
+			uint32_t *seq;
+			uint32_t leng;
+			int res = get_bridge(g0, &lg, u, v, &seq, &leng);
+
+			if (res != -1){
+				__VERBOSE("Path found!\n");
+				FILE *f = fopen(opt->lc, "a");
+				print_seq(f, seq, leng, u, v);
+				fclose(f);
+				bridge_types_count[res]++;
+			} else {
+				__VERBOSE("Path not found!\n");
+			}
 		} else if (c == 'S') {
 			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
@@ -163,6 +191,9 @@ void graph_query_process(struct opt_proc_t *opt)
 		// fprintf(stdout, "ret = %d\n", qret);
 	}
 	fclose(fp);
+	for (int i = 0; i < 2; ++i)
+		__VERBOSE_LOG("", "Bridge type %d count: %d\n", i,
+				bridge_types_count[i]);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
