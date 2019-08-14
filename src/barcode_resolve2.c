@@ -1476,6 +1476,20 @@ RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
 KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
+struct opt_local_t {
+	char *out_dir;
+	struct read_path_t *read_path;
+	khash_t(bcpos) *dict;
+	int ksize;
+	int n_threads;
+	int mmem;
+};
+
+struct result_local_t {
+	uint32_t *seq;
+	int len;
+};
+
 void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
 {
 	FILE *fp = xfopen(rpath->idx_path, "rb");
@@ -1908,8 +1922,100 @@ void check_edge_path(uint32_t *e1, uint32_t e1_len, uint32_t *e2,
 	}
 }
 
+struct seq_path_t {
+	int len;
+	gint_t *seq;
+	uint32_t pos_beg;
+	uint32_t pos_end;
+};
+
+struct ref_pos_t {
+	gint_t id;
+	uint32_t pos;
+};
+
+struct alg_seed_t {
+	gint_t ref;
+	uint32_t ref_pos;
+	uint32_t seq_pos;
+};
+
+KHASH_MAP_INIT_INT64(graph_index, struct ref_pos_t);
+
+void build_local_graph_index(struct asm_graph_t *g, khash_t(graph_index) *dict, int ksize)
+{
+	gint_t e, e_rc;
+	uint32_t k, c;
+	uint64_t kmer, krev, kmask;
+	kmask = ((uint64_t)1 << (ksize << 1)) - 1;
+	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		kmer = krev = 0;
+		for (k = 0; k < g->edges[e].seq_len; ++k) {
+			c = __binseq_get(g->edges[e].seq, k);
+			kmer = ((kmer << 2) & kmask) | c;
+			krev = (krev >> 2) | ((c ^ 3) << ((ksize - 1) << 1));
+			if (k + 1 >= ksize) {
+				if (kmer <= krev) {
+					it = khash_put(graph_index, dict, kmer, &hash_ret);
+				} else {
+					it = khash_put(graph_index, dict, krev, &hash_ret);
+				}
+				if (hash_ret == 0)
+					kh_value(dict, it) = (struct ref_pos_t){(gint_t)-1, 0};
+				else
+					kh_value(dict, it) = (struct ref_pos_t){e, k};
+			}
+		}
+	}
+}
+
+void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
+		int ksize, uint32_t *seq, int len, struct seq_path_t *ret)
+{
+	struct alg_seed_t *aseed = malloc(len * sizeof(struct alg_seed_t));
+	int n_seed = 0;
+	kmask = ((uint64_t)1 << (ksize << 1)) - 1;
+	for (k = 0; k < len; ++k) {
+		c = __binseq_get(seq, c);
+		kmer = ((kmer << 2) & kmask) | c;
+		krev = (krev >> 2) | ((c ^ 3) << ((ksize - 1) << 1));
+		if (k + 1 >= ksize) {
+			if (kmer <= krev) {
+				it = khash_get(graph_index, dict, kmer);
+			} else {
+				it = khash_get(graph_index, dict, krev);
+			}
+			if (it == kh_end(dict))
+				continue;
+			if (kh_value(dict, it).id != -1) {
+				aseed[n_seed++] = (struct alg_seed_t){kh_value(dict, it).id, kh_value(dict, it).pos, k};
+			}
+		}
+	}
+	ref_pos = aseed[0].
+	if (aseed[0].seq_pos > 0 ) {
+
+	}
+}
+
+int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, struct result_local_t *sret)
+{
+	__VERBOSE_LOG("", "Find path local assembly %ld(%ld) <-> %ld(%ld)\n",
+		g0->edges[e1].rc_id, e1, e2, g0->edges[e2].rc_id);
+	int ksize = 
+	khash_t(graph_index) *kdict = khash_init(graph_index);
+	struct seq_path_t ep1, ep2;
+	find_path_on_graph(g, kdict, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1);
+	find_path_on_graph(g, kdict, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2);
+
+}
+
 int find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
-		gint_t e1, gint_t e2, uint32_t **ret_seq, uint32_t *ret_len)
+		gint_t e1, gint_t e2, struct result_local_t *sret)
 {
 	__VERBOSE_LOG("", "Find path local assembly %ld(%ld) <-> %ld(%ld)\n",
 		g0->edges[e1].rc_id, e1, e2, g0->edges[e2].rc_id);
@@ -1983,6 +2089,27 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		free(ret_seq);
 	}
 	// resolve_local(opt, &local_read_path, &lg1, work_dir);
+}
+
+int local_assembly(struct opt_local_t *opt, struct asm_graph_t *g0, gint_t e1,
+		gint_t e2, struct result_local_t *sret)
+{
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	struct read_path_t local_read;
+	get_local_reads(opt->read_path, &local_read, dict, g, e1, e2, work_dir);
+	struct asm_graph_t lg, lg1;
+	build_local_assembly_graph(opt->ksize, opt->n_threads, opt->mmem, 1,
+		&(local_read.R1_path), &(local_read.R2_path), work_dir, &lg, g, e1, e2);
+	// save_graph_info(work_dir, &lg, "local_lvl_0");
+	build_0_1(&lg, &lg1);
+	int ret = find_path_local(g, &lg1, e1, e2, sret);
+	if (!ret) {
+		save_graph_info(work_dir, &lg1, "local_lvl_1");
+	}
+	asm_graph_destroy(&lg1);
+	return ret;
 }
 
 int local_assembly(struct opt_proc_t *opt, struct read_path_t *read_path,
