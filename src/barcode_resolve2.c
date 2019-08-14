@@ -1841,7 +1841,6 @@ int reconstruct_edge_path(struct asm_graph_t *g, gint_t *ep1, int eplen1, uint32
 		free(*ret_seq);
 		return 0;
 	}
-	fprintf(stderr, "s = %u; pos 2 = %u\n", s, pos2);
 	if (s < pos2) {
 		n_char = pos2 - s;
 		old_m_len = m_len;
@@ -2052,10 +2051,12 @@ void get_rc_seq(uint32_t **seq, uint32_t *ref, uint32_t len)
 	}
 }
 
+KHASH_INIT(used_pair, struct pair_contig_t, char, 0, __mix_2_64, __cmp_2_64);
+
 int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		khash_t(gint) *set_leg, khash_t(gint) *set_self,
 		struct opt_proc_t *opt, struct read_path_t *read_path,
-		khash_t(bcpos) *dict, char *work_dir)
+		khash_t(bcpos) *dict, char *work_dir, khash_t(used_pair) *assemblied_pair)
 {
 	int resolve;
 	khint_t k;
@@ -2080,6 +2081,18 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 				stat = 1;
 			}
 		}
+		struct pair_contig_t used_key1, used_key2;
+		used_key1 = (struct pair_contig_t){e1, e2};
+		used_key2 = (struct pair_contig_t){e2, e1};
+		khint_t k1, k2;
+		k1 = kh_get(used_pair, assemblied_pair, used_key1);
+		if (k1 != kh_end(assemblied_pair))
+			continue;
+		k2 = kh_get(used_pair, assemblied_pair, used_key2);
+		if (k2 != kh_end(assemblied_pair))
+			continue;
+		int hash_ret;
+		kh_put(used_pair, assemblied_pair, used_key1, &hash_ret);
 		uint32_t *ret_seq, ret_len;
 		ret_seq = NULL;
 		int ret = local_assembly(opt, read_path, dict, work_dir, g, e1, e2, &ret_seq, &ret_len);
@@ -2108,8 +2121,8 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 				kh_del(gint, set_self, kh_get(gint, set_self, e2_rc));
 				kh_put(gint, set_leg, e2_rc, &stat);
 			}
+			++resolve;
 		}
-		++resolve;
 	}
 	return resolve;
 }
@@ -2138,30 +2151,41 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 	set_v = kh_init(gint);
 	set_leg = kh_init(gint);
 	set_self = kh_init(gint);
-	gint_t e, ret = 0;
+	gint_t e, ret, resolve_local;
 	uint32_t n_leg, n_self;
-	for (e = 0; e < g->n_e; ++e) {
-		if (g->edges[e].source == -1)
-			continue;
-		uint32_t len = get_edge_len(g->edges + e);
-		if (kh_get(gint, visited, e) != kh_end(visited) || len < MIN_CONTIG_BARCODE)
-			continue;
-		find_region(g, e, MIN_CONTIG_BARCODE, MAX_EDGE_COUNT, uni_cov, set_v, set_e);
-		if (kh_size(set_e) < MAX_EDGE_COUNT) {
-			kh_merge_set(visited, set_e);
-			detect_leg(g, MIN_LONG_CONTIG, 6000,
-					set_v, set_e, set_leg, set_self);
-			n_leg = kh_size(set_leg);
-			n_self = kh_size(set_self);
-			if (n_self + n_leg >= 2)
-				ret += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
-					opt, &read_sorted_path, dict, work_dir);
+	khash_t(used_pair) *assemblied_pair = kh_init(used_pair);
+	ret = 0;
+	do {
+		resolve_local = 0;
+		for (e = 0; e < g->n_e; ++e) {
+			if (g->edges[e].source == -1)
+				continue;
+			uint32_t len = get_edge_len(g->edges + e);
+			if (kh_get(gint, visited, e) != kh_end(visited) || len < MIN_CONTIG_BARCODE)
+				continue;
+			find_region(g, e, MIN_CONTIG_BARCODE, MAX_EDGE_COUNT, uni_cov, set_v, set_e);
+			if (kh_size(set_e) < MAX_EDGE_COUNT) {
+				kh_merge_set(visited, set_e);
+				detect_leg(g, MIN_LONG_CONTIG, 6000,
+						set_v, set_e, set_leg, set_self);
+				n_leg = kh_size(set_leg);
+				n_self = kh_size(set_self);
+				if (n_self + n_leg >= 2)
+					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
+						opt, &read_sorted_path, dict, work_dir, assemblied_pair);
+			}
+			kh_clear(gint, set_leg);
+			kh_clear(gint, set_e);
+			kh_clear(gint, set_v);
+			kh_clear(gint, set_self);
 		}
-		kh_clear(gint, set_leg);
-		kh_clear(gint, set_e);
-		kh_clear(gint, set_v);
-		kh_clear(gint, set_self);
-	}
+		ret += resolve_local;
+	} while (resolve_local);
+	kh_destroy(used_pair, assemblied_pair);
+	kh_destroy(gint, set_leg);
+	kh_destroy(gint, set_e);
+	kh_destroy(gint, set_v);
+	kh_destroy(gint, set_self);
 	__VERBOSE("Number of joined pair(s) through jungle: %ld\n", ret);
 }
 
