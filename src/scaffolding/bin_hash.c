@@ -16,7 +16,7 @@ float get_avg_barcode(struct asm_graph_t *g)
 	uint64_t sum = 0;
 	for (int i = 0; i < g->n_e; ++i) {
 		if (get_edge_len(&g->edges[i]) > global_count_bc_size) {
-			int tmp = count_barcode(g, &g->edges[i].barcodes);
+			int tmp = count_barcode(g, &g->edges[i].barcodes_scaf);
 			VERBOSE_FLAG(0, "len and bc %d %d\n", get_edge_len(&g->edges[i]), tmp);
 			sum += tmp;
 			count++;

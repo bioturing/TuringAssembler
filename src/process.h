@@ -14,6 +14,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt);
 void build_scaffolding_test_process(struct opt_proc_t *opt);
 void build_barcode_process(struct opt_proc_t *opt);
 void build_barcode_info(struct opt_proc_t *opt);
+void build_barcode_scaffold(struct opt_proc_t *opt);
 void build_barcode_process_fasta(struct opt_proc_t *opt);
 void build_barcode_process_fastg(struct opt_proc_t *opt);
 void graph_query_process(struct opt_proc_t *opt);

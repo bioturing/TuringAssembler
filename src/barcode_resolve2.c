@@ -1673,7 +1673,7 @@ void resolve_local(struct opt_proc_t *opt, struct read_path_t *read_path,
 		list_2_2_bridge(g, e, fp);
 	}
 	fclose(fp);
-	construct_aux_info(opt, g, read_path, path, ASM_BUILD_CANDIDATE);
+	construct_aux_info(opt, g, read_path, path, ASM_BUILD_CANDIDATE, NOT_FOR_SCAFF);
 	int resolved = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)

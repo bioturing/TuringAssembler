@@ -145,7 +145,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	if (get_edge_len(e) < global_thres_short_len)
 		return;
 
-	struct barcode_hash_t *buck = &rev_e->barcodes;
+	struct barcode_hash_t *buck = &rev_e->barcodes_scaf;
 	for (int j = 0; j < buck->size; j++){
 		if (buck->keys[j] != (uint64_t)(-1)) {
 			uint64_t barcode = buck->keys[j];
@@ -171,8 +171,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		if (too_different(e1_cov, e2_cov))
 			value = 0;
 		if (value != 0) {
-			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes->n_item ;
-			int cnt1 = g->edges[i_contig].barcodes->n_item;
+			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf.n_item ;
+			int cnt1 = g->edges[i_contig].barcodes_scaf.n_item;
 			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash); 
 			(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 			++*n_local_edges;
@@ -229,7 +229,7 @@ void *process_build_big_table(void *data)
 		struct asm_edge_t *e = &g->edges[i_contig];
         if (!is_long_contig(e))
             continue;
-		struct barcode_hash_t *buck = &e->barcodes;
+		struct barcode_hash_t *buck = &e->barcodes_scaf;
 		for (int l = 0; l < buck->size; l++){
 			if (buck->keys[l] != (uint64_t)(-1)){
 				uint64_t barcode = buck->keys[l];
@@ -756,7 +756,7 @@ void insert_short_contig()
 
 int count_bc(struct asm_edge_t *e)
 {
-	struct barcode_hash_t *buck = &e->barcodes;
+	struct barcode_hash_t *buck = &e->barcodes_scaf;
 	int count = 0;
 	for (int j = 0; j < buck->size; j++){
 		if (buck->keys[j] != (uint64_t)(-1)) {
@@ -781,7 +781,7 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 		struct asm_edge_t *edge = &g->edges[i_e];
 		float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
 		VERBOSE_FLAG(0, "edge %d len:%d cov: %f count_bc %d\n", 
-				i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes->n_item);
+				i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
 	}
 
 	struct edges_score_type *edges_score = calloc(1, sizeof(struct edges_score_type));

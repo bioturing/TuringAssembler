@@ -10,11 +10,15 @@
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
 #define ASM_HAVE_CANDIDATE		0x8
+#define ASM_HAVE_BARCODE_SCAF		0x10
 
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
 #define ASM_BUILD_COVERAGE		0x4
 #define ASM_BUILD_CANDIDATE		0x8
+
+#define NOT_FOR_SCAFF 0x1
+#define FOR_SCAFFOLD 0x2
 
 struct pair_contig_t {
 	gint_t e1;
@@ -54,6 +58,7 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
+    struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -122,7 +127,7 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
-	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build);
+    struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,

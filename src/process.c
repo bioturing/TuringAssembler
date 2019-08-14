@@ -241,9 +241,32 @@ void build_barcode_info(struct opt_proc_t *opt)
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
-	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
+}
+
+void build_barcode_scaffold(struct opt_proc_t *opt)
+{
+    struct asm_graph_t g;
+    struct read_path_t read_sorted_path;
+
+    load_asm_graph(&g, opt->in_file);
+    char fasta_path[MAX_PATH];
+    if (opt->lib_type == LIB_TYPE_SORTED) {
+        read_sorted_path.R1_path = opt->files_1[0];
+        read_sorted_path.R2_path = opt->files_2[0];
+        read_sorted_path.idx_path = opt->files_I[0];
+    } else {
+        sort_read(opt, &read_sorted_path);
+    }
+    sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+    mkdir(fasta_path, 0755);
+    sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+    write_fasta_seq(&g, fasta_path);
+    construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+    save_graph_info(opt->out_dir, &g, "added_barcode");
+    asm_graph_destroy(&g);
 }
 
 void assembly_process(struct opt_proc_t *opt)
