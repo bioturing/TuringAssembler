@@ -15,10 +15,6 @@
 
 KSEQ_INIT(gzFile, gzread);
 
-#define __mix_2_64(x) (((x).e1 << 11) ^ ((x).e1 >> 33) ^ (x).e1 ^ (x).e2 ^ ((x).e2 << 11) ^ ((x).e2 >> 33))
-
-#define __cmp_2_64(x, y) ((x).e1 == (y).e1 && (x).e2 == (y).e2)
-
 __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
 							__mix_2_64, __cmp_2_64);
 
@@ -559,6 +555,8 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 	gint_t *q = malloc(g->n_e * sizeof(gint_t));
 
 	for (k = 0; k < g->n_e; ++k) {
+		if (g->edges[k].source == -1)
+			continue;
 		if (id_edge[k] != -1)
 			continue;
 		id_edge[k] = id_edge[g->edges[k].rc_id] = n_cc;
@@ -639,6 +637,8 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 	char *buf = alloca(81);
 	gint_t e, e_rc;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
@@ -677,6 +677,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 	uint32_t seq_len = 0;
 	gint_t e, e_rc;
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
 			continue;
@@ -690,6 +692,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			(long long)e_rc, seq, (long long unsigned)fake_count);
 	}
 	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < 250)
 			continue;
@@ -986,6 +990,8 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	for (e = 0; e < g->n_e; ++e) {
 		xfwrite(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfwrite(&g->edges[e].target, sizeof(gint_t), 1, fp);
+		if (g->edges[e].source == -1)
+			continue;
 		xfwrite(&g->edges[e].rc_id, sizeof(gint_t), 1, fp);
 		xfwrite(&g->edges[e].count, sizeof(uint64_t), 1, fp);
 		xfwrite(&g->edges[e].seq_len, sizeof(gint_t), 1, fp);
@@ -1000,6 +1006,8 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	/* save the barcode information */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
+			if (g->edges[e].source == -1)
+				continue;
 			struct barcode_hash_t *h = g->edges[e].barcodes;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
@@ -1049,6 +1057,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	for (e = 0; e < g->n_e; ++e) {
 		xfread(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfread(&g->edges[e].target, sizeof(gint_t), 1, fp);
+		if (g->edges[e].source == -1)
+			continue;
 		xfread(&g->edges[e].rc_id, sizeof(gint_t), 1, fp);
 		xfread(&g->edges[e].count, sizeof(uint64_t), 1, fp);
 		xfread(&g->edges[e].seq_len, sizeof(gint_t), 1, fp);
@@ -1069,6 +1079,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	/* load the barcode information */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
+			if (g->edges[e].source == -1)
+				continue;
 			g->edges[e].barcodes = calloc(3, sizeof(struct barcode_hash_t));
 			struct barcode_hash_t *h = g->edges[e].barcodes;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);

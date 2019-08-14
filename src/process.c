@@ -278,10 +278,13 @@ void build_1_2_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
-	build_1_2(&g1, &g2);
-	save_graph_info(opt->out_dir, &g2, "level_2");
-	asm_graph_destroy(&g1);
-	asm_graph_destroy(&g2);
+	do_some_resolve_bridge(&g1);
+	do_something_local(opt, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_pro");
+	// build_1_2(&g1, &g2);
+	// save_graph_info(opt->out_dir, &g2, "level_2");
+	// asm_graph_destroy(&g1);
+	// asm_graph_destroy(&g2);
 }
 
 void build_2_3_process(struct opt_proc_t *opt)

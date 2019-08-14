@@ -26,6 +26,9 @@ struct contig_count_t {
 	int n_pair;
 };
 
+#define __mix_2_64(x) (((x).e1 << 11) ^ ((x).e1 >> 33) ^ (x).e1 ^ (x).e2 ^ ((x).e2 << 11) ^ ((x).e2 >> 33))
+#define __cmp_2_64(x, y) ((x).e1 == (y).e1 && (x).e2 == (y).e2)
+
 KHASH_DECLARE(pair_contig_count, struct pair_contig_t, struct contig_count_t);
 
 struct asm_node_t {
