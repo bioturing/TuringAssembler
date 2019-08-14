@@ -117,6 +117,11 @@
 	memcpy(&(x), temp, sizeof(x));					       \
 } while (0)
 
+#define MIN(a, b) ((a)<(b) ?(a):(b))
+
+#define MAX(a, b) ((a)<(b) ?(b):(a))
+
+#define COPY_ARR(src, des, n) for(int i = 0; i < (n); i++) (des)[i] = (src)[i]
 /*
  * Built-in function
  */
@@ -138,6 +143,12 @@ int64_t seq2num(const char *seq, int len);
 
 /* convert from number to [ACGTN]+ to number */
 char *num2seq(int64_t num, int len);
+
+/* binary search */
+int *binary_search(int *list, int n, int value);
+
+/* unique list */
+void unique(int *listV, int *n_v);
 /*
  * Global variable
  */

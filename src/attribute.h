@@ -11,6 +11,8 @@
 #define SIZE_4MB		4194304
 #define SIZE_16MB		16777216
 #define SIZE_128MB		134217728
+#define BARCODE_LEN_10X 16
+#define UMI_LEN_10X 7
 
 #define KMCP			"KMCP"
 #define KMCS			"KMCS"
@@ -51,9 +53,12 @@ struct opt_proc_t {
 	int lib_type;
 	int n_files;
 	char **files_1, **files_2, **files_I;
+	int metagenomics;
 	char *out_dir;
 	char *in_file;
 	char *in_fasta;
+	char *in_fastg;
+	char *in_contig_file;
 	int mmem;
 };
 

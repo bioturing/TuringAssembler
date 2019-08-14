@@ -93,6 +93,7 @@ struct opt_proc_t *init_opt_proc()
 	opt->files_1 = opt->files_2 = NULL;
 	opt->in_file = NULL;
 	opt->in_fasta = NULL;
+    opt->in_fastg = NULL;
 	opt->out_dir = ".";
 	opt->lib_type = 0;
 	opt->mmem = 32;
@@ -140,6 +141,15 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
+        } else if (!strcmp(argv[pos], "-fg")) {
+            opt->in_fastg = argv[pos + 1];
+            pos += 2;
+		} else if (!strcmp(argv[pos], "-cf")) {
+			opt->in_contig_file = argv[pos + 1];
+			pos += 2;
+		} else if (!strcmp(argv[pos], "-metagenomics")){
+			opt->metagenomics = 1;
+			pos += 1;
 		} else if (!strcmp(argv[pos], "-l")) {
 			opt->lib_type = get_library_index(argv[pos + 1]);
 			if (opt->lib_type == -1)
@@ -283,6 +293,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_barcode_info);
 	else if (!strcmp(argv[1], "build_barcode_fasta"))
 		build_opt_process(argc, argv, &build_barcode_process_fasta);
+	else if (!strcmp(argv[1], "build_barcode_fastg"))
+		build_opt_process(argc, argv, &build_barcode_process_fastg);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build_opt_process(argc, argv, &build_0_1_process);
 	else if (!strcmp(argv[1], "build_1_2"))
@@ -295,12 +307,14 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_3_4_no_bc_rebuild_process);
 	else if (!strcmp(argv[1], "build_4_5"))
 		build_opt_process(argc, argv, &build_4_5_process);
-	else if (!strcmp(argv[1], "build_h_0_1"))
-		build_opt_process(argc, argv, &build_h_0_1_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_scaffolding_1_2"))
+		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
+	else if (!strcmp(argv[1], "build_scaffolding_test"))
+		build_opt_process(argc, argv, &build_scaffolding_test_process); 
 	else
 		print_usage(argv[0]);
 	return 0;

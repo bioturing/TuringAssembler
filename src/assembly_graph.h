@@ -94,7 +94,7 @@ struct asm_graph_t {
 #define MAX_READ_FRAG_LEN		700
 
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE		3000
+#define MIN_CONTIG_BARCODE		5000
 /* Only add and use barcode for contig with length minimum */
 #define MIN_LONG_CONTIG			1000
 #define MIN_CONTIG_READPAIR		500
@@ -181,6 +181,7 @@ static inline struct cov_range_t convert_cov_range(double fcov)
 }
 /* Estimate coverage of 1 walk on genome */
 double get_genome_coverage(struct asm_graph_t *g);
+double get_genome_coverage_h(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src);
 gint_t asm_create_node(struct asm_graph_t *g);
@@ -234,5 +235,6 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_pair_end(struct asm_graph_t *g, gint_t e);
 void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
+gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */

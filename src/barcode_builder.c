@@ -12,6 +12,8 @@
 #include "verbose.h"
 #include "../include/bwa.h"
 #include "../include/bwamem.h"
+#include "basic_resolve.h"
+#include "scaffolding/global_params.h"
 
 struct bccount_bundle_t {
 	struct asm_graph_t *g;
@@ -577,6 +579,128 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	free(r1_seq);
 	free(r2_seq);
 }
+
+//void barcode_read_mapper_h(struct read_t *r1, struct read_t *r2, uint64_t bc,
+//						struct bccount_bundle_t *bundle)
+//{
+//	int i, k, n1, n2, best_score1, best_score2;
+//	struct asm_graph_t *g = bundle->g;
+//	bwaidx_t *idx = bundle->bwa_idx;
+//	mem_opt_t *opt = bundle->bwa_opt;
+//	mem_alnreg_v ar1, ar2;
+//	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
+//	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
+//	struct ref_contig_t *p1, *p2;
+//	p1 = alloca(ar1.n * sizeof(struct ref_contig_t));
+//	p2 = alloca(ar2.n * sizeof(struct ref_contig_t));
+//	n1 = n2 = 0;
+//	best_score1 = best_score2 = -1000 * 1000 * 1000;
+//	for (i = 0; i < (int)ar1.n; ++i) {
+//		mem_aln_t a;
+//		a = mem_reg2aln(opt, idx->bns, idx->pac, r1->len, r1->seq, &ar1.a[i]);
+//		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+//		if (check_clip_both_end(a.n_cigar, a.cigar) ||
+//			aligned + 20 < r1->len) {
+//			free(a.cigar);
+//			continue;
+//		}
+//		free(a.cigar);
+//		gint_t e = atol(idx->bns->anns[a.rid].name);
+//		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+//			atomic_add_and_fetch64(&g->edges[e].count, MAX(aligned - g->ksize, 1));
+//		}
+//		if (ar1.a[i].score > best_score1 && ar1.a[i].score + 5 >= aligned) {
+//			best_score1 = ar1.a[i].score;
+//			p1[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
+//			n1 = 1;
+//		} else if (ar1.a[i].score == best_score1) {
+//			for (k = 0; k < n1; ++k) {
+//				if (p1[k].e == e) {
+//					p1[k].pos = __min(p1[k].pos, (int)a.pos);
+//					break;
+//				}
+//			}
+//			if (k == n1)
+//				p1[n1++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
+//		}
+//	}
+//	for (i = 0; i < (int)ar2.n; ++i) {
+//		mem_aln_t a;
+//		a = mem_reg2aln(opt, idx->bns, idx->pac, r2->len, r2->seq, &ar2.a[i]);
+//		int aligned = count_M_cigar(a.n_cigar, a.cigar);
+//		if (check_clip_both_end(a.n_cigar, a.cigar) ||
+//			aligned + 20 < r2->len) {
+//			free(a.cigar);
+//			continue;
+//		}
+//		free(a.cigar);
+//		gint_t e = atol(idx->bns->anns[a.rid].name);
+//		if (bundle->aux_build & ASM_BUILD_COVERAGE) {
+//			atomic_add_and_fetch64(&g->edges[e].count, MAX(aligned - g->ksize, 1));
+//		}
+//		if (ar2.a[i].score > best_score2 && ar2.a[i].score + 5 >= aligned) {
+//			best_score2 = ar2.a[i].score;
+//			p2[0] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
+//			n2 = 1;
+//		} else if (ar2.a[i].score == best_score2) {
+//			for (k = 0; k < n2; ++k) {
+//				if (p2[k].e == e) {
+//					p2[k].pos = __min(p2[k].pos, (int)a.pos);
+//					break;
+//				}
+//			}
+//			if (k == n2)
+//				p2[n2++] = (struct ref_contig_t){e, (int)a.pos, (int)a.is_rev};
+//		}
+//	}
+//
+//	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t)-1) {
+//		if (n1 <= 2)
+//		for (i = 0; i < n1; ++i) {
+//			int t = i;
+//			if (p1[t].pos <= MIN_CONTIG_BARCODE) {
+//				for (int j = 0 ; j < n2; j++)  if (p2[j].e == p1[t].e){
+//					add_barcode_edge(g, p1[t].e, bc);
+//					break;
+//				}
+//			}
+//		}
+//		if (n2 <= 2)
+//		for (i = 0; i < n2; ++i) {
+//			int t = i;
+//			if (p2[i].pos <= MIN_CONTIG_BARCODE) {
+//				for (int j = 0 ; j < n1; j++)  if (p1[j].e == p2[t].e){
+//					add_barcode_edge(g, p2[t].e, bc);
+//					break;
+//				}
+//			}
+//		}
+//		// for (i = 0; i < n1; ++i) {
+//		// 	if (p1[i].pos > MIN_CONTIG_BARCODE)
+//		// 		continue;
+//		// 	for (k = 0; k < n2; ++k) {
+//		// 		if (p2[k].pos <= MIN_CONTIG_BARCODE &&
+//		// 			p1[i].e == p2[k].e) {
+//		// 			add_barcode_edge(g, p1[i].e, bc);
+//		// 			break;
+//		// 		}
+//		// 	}
+//		// }
+//	}
+//	if ((bundle->aux_build & ASM_BUILD_READPAIR) && bc != (uint64_t)-1) {
+//		for (i = 0; i < n1; ++i) {
+//			for (k = 0; k < n2; ++k) {
+//				if (p1[i].e != p2[k].e && p1[i].strand == p2[k].strand
+//					&& p1[i].pos + p2[k].pos < MAX_PAIR_LEN) {
+//					add_read_pair_edge(g, p1[i].e, p2[k].e, bc);
+//					add_read_pair_edge(g, p2[k].e, p1[i].e, bc);
+//				}
+//			}
+//		}
+//	}
+//	free(ar1.a);
+//	free(ar2.a);
+//}
 
 void *barcode_buffer_iterator(void *data)
 {

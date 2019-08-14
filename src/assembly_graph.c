@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
+#include "scaffolding/global_params.h"
 #include "../include/kmc_skipping.h"
 
 KSEQ_INIT(gzFile, gzread);
@@ -104,6 +105,8 @@ double get_genome_coverage(struct asm_graph_t *g)
 	gint_t e;
 	double ret_cov = 0.0;
 	uint32_t max_len = 0;
+	uint32_t sum_len = 0;
+	double sum_cov = 0;
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
 			continue;
@@ -115,7 +118,30 @@ double get_genome_coverage(struct asm_graph_t *g)
 	return ret_cov;
 }
 
-static gint_t dump_edge_seq(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
+double get_genome_coverage_h(struct asm_graph_t *g)
+{
+	/* Using the coverage of the longest contigs */
+	gint_t e;
+	double ret_cov = 0.0;
+	uint32_t max_len = 0;
+	uint32_t sum_len = 0;
+	double sum_cov = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		int len = get_edge_len(&g->edges[e]);
+		float cov = __get_edge_cov(g->edges +e, g->ksize);
+		if (len < 1000)
+			continue;
+		sum_len += g->edges[e].seq_len;
+		sum_cov += g->edges[e].seq_len * cov;
+		VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
+	}
+	VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
+	return sum_cov/sum_len;
+}
+
+gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 {
 	uint32_t i, j, k, len = e->seq_len;
 	for (i = 0; i < e->n_holes; ++i)
@@ -646,7 +672,7 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
 			g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
-		gint_t len = dump_edge_seq(&seq, &seq_len, g->edges + e);
+		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
 			__get_edge_cov(g->edges + e, g->ksize));
@@ -685,7 +711,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < 250)
 			continue;
-		dump_edge_seq(&seq, &seq_len, g->edges + e);
+		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
@@ -751,9 +777,9 @@ void test2_asm_graph(struct asm_graph_t *g)
 				assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
 				char *seq = NULL;
 				uint32_t lseq = 0;
-				dump_edge_seq(&seq, &lseq, g->edges + e);
+				dump_edge_seq_h(&seq, &lseq, g->edges + e);
 				fprintf(stderr, "seq    = %s\n", seq);
-				dump_edge_seq(&seq, &lseq, g->edges + e_rc);
+				dump_edge_seq_h(&seq, &lseq, g->edges + e_rc);
 				fprintf(stderr, "seq_rc = %s\n", seq);
 				assert(0 && "Smart error");
 			}
@@ -768,7 +794,7 @@ static void debug_dump_adj(struct asm_graph_t *g, gint_t u)
 	uint32_t lseq = 0;
 	for (k = 0; k < g->nodes[u].deg; ++k) {
 		e = g->nodes[u].adj[k];
-		dump_edge_seq(&seq, &lseq, g->edges + e);
+		dump_edge_seq_h(&seq, &lseq, g->edges + e);
 		__VERBOSE("e = %ld: %s\n", e, seq);
 	}
 	free(seq);
@@ -778,7 +804,7 @@ void deb_dump_seq(struct asm_graph_t *g, gint_t e)
 {
 	uint32_t len = 0;
 	char *seq = NULL;
-	dump_edge_seq(&seq, &len, g->edges + e);
+	dump_edge_seq_h(&seq, &len, g->edges + e);
 	printf("%s\n", seq);
 }
 
@@ -923,13 +949,13 @@ void test_asm_graph(struct asm_graph_t *g)
 			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			dump_edge_seq(&seq, &lseq, g->edges + e);
+			dump_edge_seq_h(&seq, &lseq, g->edges + e);
 			// __VERBOSE("%s\n", seq);
 			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
 			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
-			dump_edge_seq(&seq, &lseq, g->edges + e_rc);
+			dump_edge_seq_h(&seq, &lseq, g->edges + e_rc);
 			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
 			// __VERBOSE("%s\n", seq);
 			assert(0 && "Edge and rc sequence is not reverse complemented");

@@ -20,6 +20,8 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
+#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
+
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
 #else
@@ -52,6 +54,8 @@
 	fprintf(stderr, fmt, ##args);					       \
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
+
+#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
 
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
