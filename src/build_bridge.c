@@ -14,14 +14,24 @@ int match_head(struct asm_edge_t P, struct asm_edge_t T)
 {
 	int Tleng = T.seq_len;
 	int Pleng = P.seq_len;
-	for (int i = Tleng - 1; i >= 0; --i){
+	for (int i = Tleng - 1; i >= MIN_MATCH_LENG; --i){
 		int p = 0;
 		int unmatch = 0;
 		int overlap_leng = min(i + 1, Pleng);
 		int flag = 1;
 		while (p < overlap_leng){
-			if(__binseq_get(T.seq, i - p) !=
-				__binseq_get(P.seq, Pleng - p - 1))
+			int found = 0;
+			for (int j = -MIN_RADIUS; j <= MIN_RADIUS; ++j){
+				int new_p = i - p + j;
+				if (new_p < 0 || new_p >= T.seq_len)
+					continue;
+				if(__binseq_get(T.seq, new_p) ==
+					__binseq_get(P.seq, Pleng - p - 1)){
+					found = 1;
+					break;
+				}
+			}
+			if (!found)
 				++unmatch;
 			if ((float) unmatch / overlap_leng > MIN_UNMATCHED_RATIO){
 				flag = 0;
@@ -39,14 +49,24 @@ int match_tail(struct asm_edge_t P, struct asm_edge_t T)
 {
 	int Tleng = T.seq_len;
 	int Pleng = P.seq_len;
-	for (int i = 0; i < Tleng; ++i){
+	for (int i = 0; i < Tleng - MIN_MATCH_LENG; ++i){
 		int p = 0;
 		int unmatch = 0;
 		int overlap_leng = min(Tleng - i, Pleng);
 		int flag = 1;
 		while (p < overlap_leng){
-			if (__binseq_get(T.seq, i + p) !=
-				__binseq_get(P.seq, p))
+			int found = 0;
+			for (int j = -MIN_RADIUS; j <= MIN_RADIUS; ++j){
+				int new_p = i + p + j;
+				if (new_p < 0 || new_p >= T.seq_len)
+					continue;
+				if (__binseq_get(T.seq, new_p) ==
+					__binseq_get(P.seq, p)){
+					found = 1;
+					break;
+				}
+			}
+			if (!found)
 				++unmatch;
 			if ((float) unmatch / overlap_leng > MIN_UNMATCHED_RATIO){
 				flag = 0;
@@ -65,16 +85,23 @@ void get_local_edge_id_head(struct asm_graph_t lg, struct asm_edge_t e,
 {
 	*pos = -1;
 	*edge_id = -1;
+	int max_match = 0;
 	for (int i = 0; i < lg.n_e; ++i){
 		/*if (lg.edges[i].seq_len < MIN_EDGE_LENGTH)
 			continue;*/
-		if ((float) lg.edges[i].seq_len / e.seq_len < MIN_EDGE_LENGTH_RATIO)
-			continue;
+		/*if ((float) lg.edges[i].seq_len / e.seq_len < MIN_EDGE_LENGTH_RATIO)
+			continue;*/
 		int tmp_pos = match_head(e, lg.edges[i]);
 		int match_leng = min((int) e.seq_len, tmp_pos + 1);
-		if ((float) match_leng / e.seq_len < MIN_EDGE_LENGTH_RATIO)
-			continue;
+		/*if ((float) match_leng / e.seq_len < MIN_EDGE_LENGTH_RATIO)
+			continue;*/
+		//if (max_match < match_leng){
+		if (i == 24){
+			__VERBOSE("bla %d\n", lg.edges[i].seq_len);
+			__VERBOSE("%d\n", tmp_pos);
+		}
 		if (*pos < tmp_pos){
+			max_match = match_leng;
 			*pos = tmp_pos;
 			*edge_id = i;
 		}
@@ -86,16 +113,19 @@ void get_local_edge_id_tail(struct asm_graph_t lg, struct asm_edge_t e,
 {
 	*pos = -1;
 	*edge_id = -1;
+	int max_match = 0;
 	for (int i = 0; i < lg.n_e; ++i){
 		/*if (lg.edges[i].seq_len < MIN_EDGE_LENGTH)
 			continue;*/
-		if ((float) lg.edges[i].seq_len / e.seq_len < MIN_EDGE_LENGTH_RATIO)
-			continue;
+		/*if ((float) lg.edges[i].seq_len / e.seq_len < MIN_EDGE_LENGTH_RATIO)
+			continue;*/
 		int tmp_pos = match_tail(e, lg.edges[i]);
 		int match_leng = min((int) e.seq_len, (int) lg.edges[i].seq_len - tmp_pos);
-		if ((float) match_leng / e.seq_len < MIN_EDGE_LENGTH_RATIO)
-			continue;
+		/*if ((float) match_leng / e.seq_len < MIN_EDGE_LENGTH_RATIO)
+			continue;*/
+		//if (max_match < match_leng){
 		if (tmp_pos != -1 && (*pos == -1 || *pos > tmp_pos)){
+			max_match = match_leng;
 			*pos = tmp_pos;
 			*edge_id = i;
 		}
@@ -162,6 +192,54 @@ int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
 path_found:
 	(*path)[depth] = u;
 	return 1;
+}
+
+void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge,
+		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		int *path, FILE *record, int *count_paths)
+{
+	path[depth] = u;
+	if (u == end_edge){
+		/*uint32_t *seq;
+		uint32_t leng;
+		combine_edges(g, &seq, &leng, g.edges[start_edge].seq_len,
+				g.edges[start_edge].seq_len - 1,
+				g.edges[end_edge].seq_len, 0, path, depth + 1);
+		fprintf(record, ">%d_%d_path_%d\n", start_edge, end_edge,
+				*count_paths);
+		__VERBOSE("%d %d\n", start_edge, end_edge);
+		__VERBOSE("%d %d %d\n", g.edges[start_edge].seq_len,
+				g.edges[end_edge].seq_len, leng);
+		for (int i = 0; i < leng; ++i)
+			fprintf(record, "%c", int_to_base(__binseq_get(seq, i)));
+		fprintf(record, "\n");*/
+		++(*count_paths);
+		return;
+	}
+	int tg = g.edges[u].target;
+	for (int i = 0; i < g.nodes[tg].deg; ++i){
+		gint_t v = g.nodes[tg].adj[i];
+		if (v == start_edge)
+			continue;
+		if (is_disable[v])
+			continue;
+		if (g.edges[v].rc_id == end_edge)
+			continue;
+		gint_t edge_code = get_edge_code(u, v);
+		khiter_t it = kh_get(gint_t_int, visited, edge_code);
+		if (it == kh_end(visited)){
+			int ret;
+			it = kh_put(gint_t_int, visited, edge_code, &ret);
+			kh_val(visited, it) = 0;
+		}
+		if (kh_val(visited, it) == 1)
+			continue;
+		++kh_val(visited, it);
+		find_all_paths(g, v, start_edge, end_edge, visited, is_disable,
+			depth + 1, path, record, count_paths);
+		it = kh_get(gint_t_int, visited, edge_code);
+		--kh_val(visited, it);
+	}
 }
 
 /*int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
@@ -375,7 +453,7 @@ void filter_edges(struct asm_graph_t g, int start_edge, int end_edge,
 		int **is_disable)
 {
 	*is_disable = (int *) calloc(g.n_e, sizeof(int));
-	cov_filter(g, start_edge, end_edge, *is_disable);
+	//cov_filter(g, start_edge, end_edge, *is_disable);
 	connection_filter(g, start_edge, end_edge, *is_disable);
 }
 
@@ -590,10 +668,37 @@ void combine_edges(struct asm_graph_t lg, uint32_t **seq, uint32_t *leng,
 	}
 }*/
 
+void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
+		int *is_disable, int *midair_edge)
+{
+	int *bad = (int *) calloc(lg.n_e, sizeof(int));
+	for (int i = 0; i < lg.n_e; ++i)
+		bad[i] = is_disable[i];
+	bad[start_edge] = bad[end_edge] = bad[lg.edges[start_edge].rc_id]
+		= bad[lg.edges[end_edge].rc_id] = 1;
+	for (int i = 0; i < lg.n_e; ++i){
+		if (is_disable[i] || is_disable[lg.edges[i].rc_id])
+			continue;
+		is_disable[lg.edges[i].rc_id] = 1;
+		if (reachable(lg, start_edge, i, is_disable) &&
+			reachable(lg, i, end_edge, is_disable))
+			bad[lg.edges[i].rc_id] = 1;
+		is_disable[lg.edges[i].rc_id] = 0;
+	}
+	int res = -1;
+	for (int i = 0; i < lg.n_e; ++i){
+		if (bad[i])
+			continue;
+		if (res == -1 || lg.edges[res].seq_len < lg.edges[i].seq_len)
+			res = i;
+	}
+	free(bad);
+	*midair_edge = res;
+}
+
 int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		uint32_t **ret_seq, uint32_t *seq_len)
 {
-	e1 = g->edges[e1].rc_id;
 	int lc_e1, pos1;
 	get_local_edge_id_head(*lg, g->edges[e1], &lc_e1, &pos1);
 
@@ -640,7 +745,6 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		char file_path[10000];
 		sprintf(file_path, "local_assembly_filtered_%d_%d.gfa", e1, e2);
 		print_graph(*lg, is_disable, file_path);
-		free(is_disable);
 		int *path;
 		int path_leng;
 		get_path(*lg, lc_e1, lc_e2, &path, &path_leng);
@@ -658,12 +762,20 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 			} else {
 				bridge_type = 0;
 				__VERBOSE("Complex path\n");
-				/**ret_seq = NULL;
-				*seq_len = 0;*/
-				combine_edges(*lg, ret_seq, seq_len,
+				int midair_edge;
+				get_midair_bridge(*lg, lc_e1, lc_e2, is_disable,
+						&midair_edge);
+				if (midair_edge != -1){
+					*ret_seq = lg->edges[midair_edge].seq;
+					*seq_len = lg->edges[midair_edge].seq_len;
+				} else {
+					*ret_seq = NULL;
+					*seq_len = 0;
+				}
+				/*combine_edges(*lg, ret_seq, seq_len,
 						g->edges[e1].seq_len, pos1,
 						g->edges[e2].seq_len, pos2,
-						path, path_leng);
+						path, path_leng);*/
 			}
 			goto path_found;
 		}

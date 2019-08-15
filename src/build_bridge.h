@@ -1,17 +1,22 @@
 #ifndef __BUILD_BRIDGE__
 #define __BUILD_BRIDGE__
-#define MIN_UNMATCHED_RATIO 0.0
+#define MIN_MATCH_LENG 500
+#define MIN_UNMATCHED_RATIO 0.005
+#define MIN_RADIUS 2
 #define MIN_EDGE_LENGTH 10000
 #define MIN_EDGE_LENGTH_RATIO 0.8
 #define MIN_RELATIVE_DEPTH_RATIO 0.2
 #define MIN_DEPTH_RATIO 0.05
 #define MIN_PATH_LENGTH 20
+#define READ_GAP 500
+#define BRIDGE_GAP 1000
+#define MIN_READ_MAP_RATIO 0.95
 #include <stdlib.h>
 #include "assembly_graph.h"
 #include "verbose.h"
 #include "khash.h"
 KHASH_MAP_INIT_INT64(gint_t_int, int);
-
+KHASH_MAP_INIT_STR(str_int, int);
 int match_head(struct asm_edge_t P, struct asm_edge_t T);
 int match_tail(struct asm_edge_t P, struct asm_edge_t T);
 void get_local_edge_id_head(struct asm_graph_t g, struct asm_edge_t e,
@@ -27,6 +32,9 @@ int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge);
 int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
 		khash_t(gint_t_int) *visited, int *is_disable, int depth,
 		int **path, int *path_leng);
+void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge,
+		khash_t(gint_t_int) *vistied, int *is_disable, int depth,
+		int *path, FILE *record, int *count_paths);
 void get_path(struct asm_graph_t lg, int start_edge, int end_edge,
 		int **path, int *path_leng);
 /*void print_path(struct asm_graph_t lg, int start_edge, int end_node,
@@ -55,4 +63,11 @@ void filter_edges(struct asm_graph_t g, int start_edge, int end_edge,
 		int **is_disable);
 void print_graph(struct asm_graph_t g, int *is_disable, char *path);
 char int_to_base(int x);
+
+int is_read_on_edge(struct read_t r, struct asm_edge_t e, int left, int right,
+		int ksize);
+void copy_seq_to_str(char *str, uint32_t *seq, int leng);
+
+void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
+		int *is_disable, int *midair_edge);
 #endif

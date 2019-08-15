@@ -10,7 +10,7 @@
 #include "utils.h"
 #include "verbose.h"
 #include "build_bridge.h"
-
+#include "read_list.h"
 void graph_convert_process(struct opt_proc_t *opt)
 {
 	char path[1024];
