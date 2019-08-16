@@ -1488,6 +1488,8 @@ struct opt_local_t {
 struct result_local_t {
 	uint32_t *seq;
 	int len;
+	int trim_e1;
+	int trim_e2;
 };
 
 void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
@@ -1925,8 +1927,10 @@ void check_edge_path(uint32_t *e1, uint32_t e1_len, uint32_t *e2,
 struct seq_path_t {
 	int len;
 	gint_t *seq;
-	uint32_t pos_beg;
-	uint32_t pos_end;
+	int e0_beg;
+	int en_end;
+	int seq_beg;
+	int seq_end;
 };
 
 struct ref_pos_t {
@@ -1991,13 +1995,49 @@ void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
 			if (it == kh_end(dict))
 				continue;
 			if (kh_value(dict, it).id != -1) {
-				aseed[n_seed++] = (struct alg_seed_t){kh_value(dict, it).id, kh_value(dict, it).pos, k};
+				aseed[n_seed++] = (struct alg_seed_t){kh_value(dict, it).id,
+						kh_value(dict, it).pos, k};
 			}
 		}
 	}
-	ref_pos = aseed[0].
-	if (aseed[0].seq_pos > 0 ) {
+	if (n_seed == 0) { /* find no seed hit */
+		ret->len = 0;
+		ret->seq = NULL;
+		goto find_path_clean;
+	}
+	ref_pos = aseed[0].ref_pos;
+	ret->e0_beg = aseed[0].ref_pos + 1 - ksize;
+	ret->en_end = aseed[n_seed - 1].ref_pos;
+	ret->seq_beg = aseed[0].seq_pos + 1 - ksize;
+	ret->seq_end = aseed[n_seed - 1].ref_pos;
+	ret->seq = NULL;
+	ret->len = 0;
+	prev_e = -1;
+	for (i = 0; i < n_seed; ++i) {
+		if (aseed[i].ref != prev_e) {
+			ret->seq = realloc(ret->seq, (ret->len + 1) * sizeof(gint_t));
+			ret->seq[ret->len++] = aseed[i].ref;
+		}
+	}
 
+find_path_clean:
+	free(aseed);
+}
+
+void get_sub_edge(uint32_t *ref, int l, int r, uint32_t **seq, int *len)
+{
+	if (l >= r) {
+		*seq = NULL;
+		*len = r - l;
+		return;
+	}
+	*len = r - l;
+	*seq = calloc((*len + 15) >> 4, sizeof(uint32_t));
+	int i, k;
+	uint32_t c;
+	for (k = l, i = 0; k < r; ++k, ++i) {
+		c = __binseq_get(ref, k);
+		__binseq_set(*seq, i, c);
 	}
 }
 
@@ -2006,12 +2046,36 @@ int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
 {
 	__VERBOSE_LOG("", "Find path local assembly %ld(%ld) <-> %ld(%ld)\n",
 		g0->edges[e1].rc_id, e1, e2, g0->edges[e2].rc_id);
-	int ksize = 
 	khash_t(graph_index) *kdict = khash_init(graph_index);
+	int ksize = __min(g->ksize, 31);
+	build_local_graph_index(g, kdict, ksize);
 	struct seq_path_t ep1, ep2;
-	find_path_on_graph(g, kdict, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1);
-	find_path_on_graph(g, kdict, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2);
-
+	__VERBOSE("Find path for e1\n");
+	find_path_on_graph(g, kdict, ksize, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1);
+	if (ep1.len == 0) {
+		__VERBOSE_LOG("", "e1: null path\n");
+	}
+	__VERBOSE("Find path for e2\n");
+	find_path_on_graph(g, kdict, ksize, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2);
+	if (ep2.len == 0) {
+		__VERBOSE_LOG("", "e2: null path\n");
+	}
+	if (ep1.len == 0 || ep2.len == 0) {
+		ret = 0;
+		goto fill_path_clean;
+	}
+	if (ep1.seq[ep1.len - 1] == ep2.seq[0]) {
+		len = ep2.e0_beg - ep1.en_end - 1;
+		sret->trim_e1 = g0->edges[e1].seq_len - ep1.seq_end - 1;
+		sret->trim_e2 = ep2.seq_beg;
+		get_sub_edge(ep2.seq[0], ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
+		ret = 1;
+	}
+fill_path_clean:
+	free(ep1.seq);
+	free(ep2.seq);
+	kh_destroy(graph_index, kdict);
+	return ret;
 }
 
 int find_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
