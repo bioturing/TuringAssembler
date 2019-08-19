@@ -349,6 +349,76 @@ void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src)
 	}
 }
 
+void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
+			uint32_t *seq, int len, int trim_dst, int trim_src)
+{
+	uint32_t seq_len, new_m, m, c;
+	int i, k;
+	seq_len = dst->seq_len - trim_dst + len + src->seq_len - trim_src;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len - trim_dst + 15) >> 4;
+	dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+	if (dst->seq == NULL)
+		__ERROR("Unable to realloc");
+	if (new_m > m)
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	dst->seq[m - 1] &= ((uint32_t)1 << (((dst->seq_len - trim_dst) & 15) << 1)) - 1;
+
+	if (len >= 0) {
+		for (i = 0, k = dst->seq_len - trim_dst; i < len; ++i, ++k) {
+			c = __binseq_get(seq, i);
+			__binseq_set(dst->seq, k, c);
+		}
+
+		for (i = trim_src, k = dst->seq_len - trim_dst + len; i < src->seq_len; ++i, ++k) {
+			c = __binseq_get(src->seq, i);
+			__binseq_set(dst->seq, k, c);
+		}
+	} else {
+		for (i = trim_src - len, k = dst->seq_len - trim_dst; i < src->seq_len; ++i, ++k) {
+			c = __binseq_get(src->seq, i);
+			__binseq_set(dst->seq, k, c);
+		}
+	}
+	dst->seq_len = seq_len;
+	/* there is no gap at this stage */
+}
+
+void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t *src,
+			uint32_t *seq, int len, int trim_dst, int trim_src)
+{
+	uint32_t c, seq_len, new_m, m;
+	int i, k;
+	seq_len = dst->seq_len - trim_dst + len + src->seq_len - trim_src;
+	new_m = (seq_len + 15) >> 4;
+	m = (dst->seq_len - trim_dst + 15) >> 4;
+	dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
+	if (dst->seq == NULL)
+		__ERROR("Unable to realloc");
+	if (new_m > m)
+		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
+	dst->seq[m - 1] &= ((uint32_t)1 << (((dst->seq_len - trim_dst) & 15) << 1)) - 1;
+
+	if (len >= 0) {
+		for (i = len - 1, k = dst->seq_len - trim_dst; i != 0; --i, ++k) {
+			c = __binseq_get(seq, i);
+			__binseq_set(dst->seq, k, c ^ 3);
+		}
+
+		for (i = trim_src, k = dst->seq_len - trim_dst + len; i < src->seq_len; ++i, ++k) {
+			c = __binseq_get(src->seq, i);
+			__binseq_set(dst->seq, k, c);
+		}
+	} else {
+		for (i = trim_src - len, k = dst->seq_len - trim_dst; i < src->seq_len; ++i, ++k) {
+			c = __binseq_get(src->seq, i);
+			__binseq_set(dst->seq, k, c);
+		}
+	}
+	dst->seq_len = seq_len;
+	/* there is no gap at this stage */
+}
+
 void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap)
 {
 	uint32_t i, k;
@@ -395,6 +465,26 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	g->edges[e1].count += g->edges[e2].count;
 
 	asm_append_seq_with_gap(g->edges + e_rc2, g->edges + e_rc1, gap_size);
+	g->edges[e_rc2].target = g->edges[e_rc1].target;
+	g->edges[e_rc2].count += g->edges[e_rc1].count;
+
+	g->edges[e1].rc_id = e_rc2;
+	g->edges[e_rc2].rc_id = e1;
+
+	asm_remove_edge(g, e2);
+	asm_remove_edge(g, e_rc1);
+}
+
+void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1, gint_t e2, gint_t e_rc2,
+	uint32_t *aseq, int alen, int trim_e1, int trim_e2)
+{
+	asm_append_barcode_readpair(g, e1, e2);
+	asm_append_seq_with_fill(g->edges + e1, g->edges + e2, aseq, alen, trim_e1, trim_e2);
+	g->edges[e1].target = g->edges[e2].target;
+	g->edges[e1].count += g->edges[e2].count;
+
+	asm_append_barcode_readpair(g, e_rc2, e_rc1);
+	asm_append_seq_with_fill_reverse(g->edges + e_rc2, g->edges + e_rc1, aseq, alen, trim_e2, trim_e1);
 	g->edges[e_rc2].target = g->edges[e_rc1].target;
 	g->edges[e_rc2].count += g->edges[e_rc1].count;
 

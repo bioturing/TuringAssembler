@@ -2095,7 +2095,7 @@ int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
 	if (ep1.seq[ep1.len - 1] == ep2.seq[0]) {
 		sret->trim_e1 = g0->edges[e1].seq_len - ep1.seq_end - 1;
 		sret->trim_e2 = ep2.seq_beg;
-		// get_sub_edge(g->edges[ep2.seq[0]].seq, ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
+		get_sub_edge(g->edges[ep2.seq[0]].seq, ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
 		ret = 1;
 	}
 fill_path_clean:
@@ -2216,7 +2216,7 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 {
 	int resolve;
 	khint_t k;
-	gint_t e1, e2_rc, e2, e2a, et, et_rc;
+	gint_t e1, e2, e2_rc, e1_rc, e2a, et, et_rc;
 	resolve = 0;
 	for (k = kh_begin(set_leg); k < kh_end(set_leg); ++k) {
 		if (!kh_exist(set_leg, k))
@@ -2251,35 +2251,21 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		kh_put(used_pair, assemblied_pair, used_key1, &hash_ret);
 		struct result_local_t sret;
 		int ret = local_assembly(opt, g, e1, e2, &sret);
-		// uint32_t *ret_seq, ret_len;
-		// ret_seq = NULL;
-		// int ret = local_assembly(opt, read_path, dict, work_dir, g, e1, e2, &ret_seq, &ret_len);
 		if (ret) {
-			// double cov1, cov2, cov;
-			// cov1 = __get_edge_cov(g->edges + e1, g->ksize);
-			// cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-			// cov = (cov1 + cov2) / 2;
-			// et = g->edges[e1].rc_id;
-			// et_rc = g->edges[e2].rc_id;
-			// e2_rc = g->edges[e2].rc_id;
-			// uint64_t count = (uint64_t)(cov * ret_len);
-			// asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
-			// g->edges[et].count = g->edges[et_rc].count = count;
-			// free(g->edges[et].seq);
-			// free(g->edges[et_rc].seq);
-			// g->edges[et].seq = ret_seq;
-			// g->edges[et].seq_len = ret_len;
-			// get_rc_seq(&(g->edges[et_rc].seq), ret_seq, ret_len);
-			// g->edges[et_rc].seq_len = ret_len;
-			// kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
-			// if (stat) {
-			// 	kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
-			// } else {
-			// 	kh_del(gint, set_self, kh_get(gint, set_self, e2));
-			// 	kh_del(gint, set_self, kh_get(gint, set_self, e2_rc));
-			// 	kh_put(gint, set_leg, e2_rc, &stat);
-			// }
-			// ++resolve;
+			e1_rc = g->edges[e1].rc_id;
+			e2_rc = g->edges[e2].rc_id;
+			asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
+				sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
+			free(sret.seq);
+			kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
+			if (stat) {
+				kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
+			} else {
+				kh_del(gint, set_self, kh_get(gint, set_self, e2));
+				kh_del(gint, set_self, kh_get(gint, set_self, e2_rc));
+				kh_put(gint, set_leg, e2_rc, &stat);
+			}
+			++resolve;
 		}
 	}
 	return resolve;

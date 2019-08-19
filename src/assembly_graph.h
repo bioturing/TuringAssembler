@@ -216,6 +216,8 @@ void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov);
 void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov);
 void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 				gint_t e_rc2, gint_t e_rc1);
+void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+	gint_t e2, gint_t e_rc2, uint32_t *aseq, int alen, int trim_e1, int trim_e2);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/
