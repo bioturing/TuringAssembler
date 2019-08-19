@@ -2050,7 +2050,7 @@ void get_sub_edge(uint32_t *ref, int l, int r, uint32_t **seq, int *len)
 int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, struct result_local_t *sret)
 {
-	int ksize, ret;
+	int ksize, ret, i;
 	ret = 0;
 	__VERBOSE_LOG("", "Find path local assembly %ld(%ld) <-> %ld(%ld)\n",
 		g0->edges[e1].rc_id, e1, e2, g0->edges[e2].rc_id);
@@ -2063,11 +2063,27 @@ int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
 	find_path_on_graph(g, kdict, ksize, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1);
 	if (ep1.len == 0) {
 		__VERBOSE_LOG("", "e1: null path\n");
+	} else {
+		__VERBOSE("ep1.len = %d\n", ep1.len);
+		__VERBOSE("e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d\n",
+			ep1.e0_beg, ep1.en_end, ep1.seq_beg, ep1.seq_end);
+		for (i = 0; i < ep1.len; ++i) {
+			fprintf(stderr, "%ld, ", ep1.seq[i]);
+		}
+		fprintf(stderr, "\n");
 	}
 	__VERBOSE("Find path for e2\n");
 	find_path_on_graph(g, kdict, ksize, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2);
 	if (ep2.len == 0) {
 		__VERBOSE_LOG("", "e2: null path\n");
+	} else {
+		__VERBOSE("ep2.len = %d\n", ep2.len);
+		__VERBOSE("e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d\n",
+			ep2.e0_beg, ep2.en_end, ep2.seq_beg, ep2.seq_end);
+		for (i = 0; i < ep2.len; ++i) {
+			fprintf(stderr, "%ld, ", ep2.seq[i]);
+		}
+		fprintf(stderr, "\n");
 	}
 	if (ep1.len == 0 || ep2.len == 0) {
 		ret = 0;
@@ -2076,7 +2092,7 @@ int fill_path_local(struct asm_graph_t *g0, struct asm_graph_t *g,
 	if (ep1.seq[ep1.len - 1] == ep2.seq[0]) {
 		sret->trim_e1 = g0->edges[e1].seq_len - ep1.seq_end - 1;
 		sret->trim_e2 = ep2.seq_beg;
-		get_sub_edge(g->edges[ep2.seq[0]].seq, ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
+		// get_sub_edge(g->edges[ep2.seq[0]].seq, ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
 		ret = 1;
 	}
 fill_path_clean:
@@ -2111,7 +2127,9 @@ void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	save_graph_info(work_dir, &lg, "local_lvl_0");
 	build_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	uint32_t *ret_seq, ret_len;
+	struct result_local_t sret;
+	int ret = fill_path_local(g, &lg1, e1, e2, &sret);
+	// uint32_t *ret_seq, ret_len;
 	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
 	// if (ret) {
 	// 	free(ret_seq);
