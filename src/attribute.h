@@ -56,6 +56,7 @@ struct opt_proc_t {
 	char *in_fasta;
 	int mmem;
 	char *lc;
+	int lk;
 };
 
 struct read_path_t {

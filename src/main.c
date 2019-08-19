@@ -183,6 +183,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-lc")){
 			opt->lc = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-lk")){
+			opt->lk = atoi(argv[pos + 1]);
+			pos += 2;
 		} else {
 			__ERROR("Unknown option %s", argv[pos]);
 		}
@@ -253,6 +256,21 @@ void graph_query_opt_process(int argc, char *argv[])
 	graph_query_process(opt);
 }
 
+void build_bridge_opt_process(int argc, char *argv[])
+{
+	struct opt_proc_t *opt;
+	opt = parse_proc_option(argc - 2, argv + 2);
+	if (opt == NULL){
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build_bridge.log");
+	init_log(tmp_dir);
+	init_clock();
+	build_bridge_process(opt);
+}
+
 void graph_convert_opt_process(int argc, char *argv[])
 {
 	struct opt_proc_t *opt;
@@ -302,6 +320,8 @@ int main(int argc, char *argv[])
 		graph_convert_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "query"))
 		graph_query_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "build_bridge"))
+		build_bridge_opt_process(argc, argv);
 	else
 		print_usage(argv[0]);
 	return 0;

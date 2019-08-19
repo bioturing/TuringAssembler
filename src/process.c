@@ -148,8 +148,6 @@ void graph_query_process(struct opt_proc_t *opt)
 	gint_t u, v, v2;
 	FILE *fp;
 	fp = xfopen(opt->in_fasta, "r");
-	fclose(fopen(opt->lc, "w"));
-	int bridge_types_count[2] = {};
 	while (1) {
 		char c;
 		int ret = fscanf(fp, "%c %ld", &c, &u);
@@ -159,41 +157,61 @@ void graph_query_process(struct opt_proc_t *opt)
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
 		} else if (c == 'P') {
+			__VERBOSE("Building local graph\n");
 			fscanf(fp, "%ld\n", &v);
 			struct asm_graph_t lg = test_local_assembly(opt, g0,
 							g0->edges[u].rc_id, v);
-			__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-			__VERBOSE_LOG("PATH", "Building bridge from %ld to %ld\n", u, v);
-			u = g0->edges[u].rc_id;
-			uint32_t *seq;
-			uint32_t leng;
-			int res = get_bridge(g0, &lg, u, v, &seq, &leng);
-
-			if (res != -1){
-				__VERBOSE("Path found!\n");
-				FILE *f = fopen(opt->lc, "a");
-				print_seq(f, seq, leng, u, v);
-				fclose(f);
-				bridge_types_count[res]++;
-			} else {
-				__VERBOSE("Path not found!\n");
-			}
+			asm_graph_destroy(&lg);
 		} else if (c == 'S') {
 			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
-			// if (check_medium_pair_superior(g0, u, v, v2)) {
-			// 	printf("success\n");
-			// } else {
-			// 	printf("failed\n");
-			// }
 		}
-		// int qret = test_edge_barcode(g0, u, v);
-		// fprintf(stdout, "ret = %d\n", qret);
 	}
+}
+
+void build_bridge_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_file);
+	fprintf(stderr, "bin size = %d\n", g0->bin_size);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building bridges on scaffold:\n");
+	FILE *f = xfopen(opt->lc, "w");
+	FILE *fp = xfopen(opt->in_fasta, "r");
+	int n_paths;
+	fscanf(fp, "%d\n", &n_paths);
+	int *mark = (int *) calloc(g0->n_e, sizeof(int));
+	for (int i = 0; i < n_paths; ++i){
+		int path_len;
+		fscanf(fp, "%d\n", &path_len);
+		int *path = (int *) calloc(path_len, sizeof(int));
+		for (int i = 0; i < path_len; ++i){
+			fscanf(fp, "%d", path + i);
+			mark[path[i]] = 1;
+			mark[g0->edges[path[i]].rc_id] = 1;
+		}
+		char *contig;
+		get_contig_from_scaffold_path(opt, g0, path, path_len, &contig);
+		fprintf(f, ">contig_path_%d\n", i);
+		fprintf(f, "%s\n", contig);
+		free(contig);
+	}
+	for (int i = 0; i < g0->n_e; ++i){
+		if (mark[i] == 0){
+			int rc = g0->edges[i].rc_id;
+			char *tmp;
+			decode_seq(&tmp, g0->edges[i].seq, g0->edges[i].seq_len);
+			fprintf(f, ">%d_%d\n", i, rc);
+			fprintf(f, "%s\n", tmp);
+			free(tmp);
+			mark[rc] = 1;
+		}
+	}
+	fclose(f);
 	fclose(fp);
-	for (int i = 0; i < 2; ++i)
-		__VERBOSE_LOG("", "Bridge type %d count: %d\n", i,
-				bridge_types_count[i]);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)

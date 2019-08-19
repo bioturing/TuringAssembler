@@ -1799,7 +1799,7 @@ struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_
 	mkdir(work_dir, 0755);
 	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
 	struct asm_graph_t lg, lg1;
-	build_local_assembly_graph(45, opt->n_threads, opt->mmem, 1,
+	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
 		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
 		&lg, g, e1, e2);
 	build_0_1(&lg, &lg1);

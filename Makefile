@@ -47,6 +47,8 @@ SRC = src/assembly_graph.c 				\
       src/verbose.c 					\
       src/build_bridge.c 				\
       src/read_list.c 					\
+      src/map_contig.c 					\
+      src/helper.c 					\
       src/main.c
 
 OBJ = $(SRC:.c=.o)
