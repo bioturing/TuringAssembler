@@ -400,7 +400,7 @@ void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t 
 	dst->seq[m - 1] &= ((uint32_t)1 << (((dst->seq_len - trim_dst) & 15) << 1)) - 1;
 
 	if (len >= 0) {
-		for (i = len - 1, k = dst->seq_len - trim_dst; i != 0; --i, ++k) {
+		for (i = len - 1, k = dst->seq_len - trim_dst; i >= 0; --i, ++k) {
 			c = __binseq_get(seq, i);
 			__binseq_set(dst->seq, k, c ^ 3);
 		}
