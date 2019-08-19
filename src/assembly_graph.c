@@ -19,6 +19,8 @@ KSEQ_INIT(gzFile, gzread);
 __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
 							__mix_2_64, __cmp_2_64);
 
+__KHASH_IMPL(contig_count, , gint_t, int, 1, kh_int64_hash_func, kh_int64_hash_equal);
+
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
 	if (e1->n_holes != e2->n_holes)

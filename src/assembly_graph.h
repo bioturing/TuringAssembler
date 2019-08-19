@@ -35,6 +35,8 @@ struct contig_count_t {
 
 KHASH_DECLARE(pair_contig_count, struct pair_contig_t, struct contig_count_t);
 
+KHASH_DECLARE(contig_count, gint_t, int);
+
 struct asm_node_t {
 	gint_t rc_id;		/* reverse complement link */
 	gint_t deg;		/* out degree */
@@ -128,6 +130,8 @@ double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
+void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,

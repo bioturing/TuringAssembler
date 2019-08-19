@@ -25,6 +25,13 @@ struct bccount_bundle_t {
 	int mapper_algo;
 };
 
+struct pathcount_bundle_t {
+	struct dqueue_t *q;
+	bwaidx_t *bwa_idx;
+	mem_opt_t *bwa_opt;
+	khash_t(contig_count) *count_cand;
+};
+
 mem_opt_t *asm_memopt_init()
 {
 	mem_opt_t *o;
@@ -64,6 +71,7 @@ mem_opt_t *asm_memopt_init()
 }
 
 void *barcode_buffer_iterator(void *data);
+void *pathcount_buffer_iterator(void *data);
 
 uint64_t get_barcode(struct read_t *r)
 {
@@ -172,6 +180,59 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
 		barcode_hash_init(g->edges[e].barcodes + 2, 4);
 	}
+}
+
+void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand)
+{
+	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
+	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
+	mem_opt_t *bwa_opt = asm_memopt_init();
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	int i;
+	struct producer_bundle_t *producer_bundles;
+	producer_bundles = init_fastq_pair(opt->n_threads, 1,
+					&(rpath->R1_path), &(rpath->R2_path));
+
+	struct pathcount_bundle_t *worker_bundles;
+	worker_bundles = malloc(opt->n_threads * sizeof(struct pathcount_bundle_t));
+
+	for (i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].bwa_idx = bwa_idx;
+		worker_bundles[i].bwa_opt = bwa_opt;
+		worker_bundles[i].count_cand = count_cand;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_producer,
+				producer_bundles + i);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, pathcount_buffer_iterator,
+				worker_bundles + i);
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, 1);
+	free(worker_bundles);
+
+	free(producer_threads);
+	free(worker_threads);
+
+	bwa_idx_destroy(bwa_idx);
+	free(bwa_opt);
 }
 
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -487,8 +548,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			p2[n2++] = a;
 		}
 	}
-	if (bundle->aux_build & ASM_BUILD_CANDIDATE) {
-		/* read information */
+	if (bundle->aux_build & ASM_BUILD_CANDIDATE) { /* read information */
 		for (i = 0; i < n1; ++i) {
 			struct fasta_ref_t ref;
 			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
@@ -758,6 +818,128 @@ void *barcode_buffer_iterator(void *data)
                 read_mapper_scaffold(&read1, &read2, barcode, bundle);
 			else
 			    read_mapper(&read1, &read2, barcode, bundle);
+
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+
+	free_pair_buffer(own_buf);
+	pthread_exit(NULL);
+}
+
+void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t *bundle)
+{
+	khash_t(contig_count) *count_cand = bundle->count_cand;
+	bwaidx_t *idx = bundle->bwa_idx;
+	mem_opt_t *opt = bundle->bwa_opt;
+	mem_alnreg_v ar1, ar2;
+	uint8_t *r1_seq, *r2_seq;
+	int i, k, n1, n2, count, best_score_1, best_score_2;
+	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
+	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
+	// fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
+	r1_seq = malloc(r1->len);
+	r2_seq = malloc(r2->len);
+	for (i = 0; i < r1->len; ++i)
+		r1_seq[i] = nst_nt4_table[(int)r1->seq[i]];
+	for (i = 0; i < r2->len; ++i)
+		r2_seq[i] = nst_nt4_table[(int)r2->seq[i]];
+	struct asm_align_t *p1, *p2;
+	p1 = alloca(ar1.n * sizeof(struct asm_align_t));
+	p2 = alloca(ar2.n * sizeof(struct asm_align_t));
+	n1 = n2 = 0;
+	best_score_1 = best_score_2 = - (1 << 30);
+	for (i = 0; i < (int)ar1.n; ++i) {
+		struct asm_align_t a;
+		a = asm_reg2aln(opt, idx->bns, idx->pac, r1->len, r1_seq, ar1.a + i);
+		if (a.rid == -1)
+			continue;
+		if (a.score > best_score_1) {
+			best_score_1 = a.score;
+			p1[0] = a;
+			n1 = 1;
+		} else if (a.score == best_score_1) {
+			p1[n1++] = a;
+		}
+	}
+	for (i = 0; i < (int)ar2.n; ++i) {
+		struct asm_align_t a;
+		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
+		if (a.rid == -1)
+			continue;
+		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
+		if (a.score > best_score_2) {
+			best_score_2 = a.score;
+			p2[0] = a;
+			n2 = 1;
+		} else if (a.score == best_score_2) {
+			p2[n2++] = a;
+		}
+	}
+	for (i = 0; i < n1; ++i) {
+		if (p1[i].aligned < r1->len)
+			continue;
+		int c1, c2;
+		c1 = atoi(idx->bns->anns[p1[i].rid].name);
+		for (k = 0; k < n2; ++k) {
+			if (p2[k].aligned < r2->len)
+				continue;
+			c2 = atoi(idx->bns->anns[p2[k].rid].name);
+			if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN) {
+				khiter_t it = kh_get(contig_count, count_cand, c1);
+				if (it != kh_end(count_cand))
+					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);
+			}
+		}
+	}
+	free(ar1.a);
+	free(ar2.a);
+	free(r1_seq);
+	free(r2_seq);
+}
+
+void *pathcount_buffer_iterator(void *data)
+{
+	struct pathcount_bundle_t *bundle = (struct pathcount_bundle_t *)data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_pair_buffer();
+
+	char *buf1, *buf2;
+	int pos1, pos2, rc1, rc2, input_format, mapper_algo;
+
+	int64_t n_reads;
+	int64_t *gcnt_reads;
+	uint64_t barcode;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf) {
+			break;
+		}
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read1, buf1, &pos1) :
+				get_read_from_fa(&read1, buf1, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read2, buf2, &pos2) :
+				get_read_from_fa(&read2, buf2, &pos2);
+
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				__ERROR("\nWrong format file\n");
+
+			path_mapper(&read1, &read2, bundle);
 
 			if (rc1 == READ_END)
 				break;

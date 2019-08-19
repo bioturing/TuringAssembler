@@ -2284,10 +2284,10 @@ void list_all_path(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 
 int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 			khash_t(gint) *set_leg, struct opt_local_t *opt,
-					khash_t(used_pair) *assemblied_pair)
+			struct opt_proc_t *optp, khash_t(used_pair) *assemblied_pair)
 {
 	gint_t *legs = alloca(2 * sizeof(gint_t));
-	int n_leg, hash_ret, max_list_e;
+	int n_leg, hash_ret, max_list_e, i;
 	khiter_t k, it;
 	gint_t e1, e2, e1_rc, e;
 	n_leg = 0;
@@ -2333,6 +2333,19 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	dfs_opt.uni_cov = uni_cov;
 	list_all_path(g, g->edges[e1_rc].target, g->edges[e2].source, 0, set_e,
 		cap, &dfs_opt);
+	khash_t(contig_count) *ctg_cnt = kh_init(contig_count);
+	for (i = 0; i < dfs_opt.cnt; ++i) {
+		k = kh_put(contig_count, ctg_cnt, i, &hash_ret);
+		kh_value(ctg_cnt, k) = 0;
+	}
+	count_readpair_path(optp, &local_read, fasta_path, ctg_cnt);
+	__VERBOSE_LOG("", "Testing local path %ld <-> %ld\n", e1, e2);
+	for (k = kh_begin(ctg_cnt); k != kh_end(ctg_cnt); ++k) {
+		if (!kh_exist(ctg_cnt, k))
+			continue;
+		__VERBOSE_LOG("", "Candidate %ld with %d counts!\n", kh_key(ctg_cnt, k),
+			kh_value(ctg_cnt, k));
+	}
 	return 0;
 }
 
@@ -2493,7 +2506,7 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 				n_self = kh_size(set_self);
 				if (n_self == 0 && n_leg == 2)
 					ret += join_1_1_jungle_la(g, set_e, set_leg,
-						&opt_local, assemblied_pair);
+						&opt_local, opt, assemblied_pair);
 				// else if (n_self + n_leg >= 2)
 				// 	resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
 				// 		&opt_local, assemblied_pair);
