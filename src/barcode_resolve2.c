@@ -1961,7 +1961,7 @@ void build_local_graph_index(struct asm_graph_t *g, khash_t(graph_index) *dict, 
 		for (k = 0; k < g->edges[e].seq_len; ++k) {
 			c = __binseq_get(g->edges[e].seq, k);
 			kmer = ((kmer << 2) & kmask) | c;
-			krev = (krev >> 2) | ((c ^ 3) << ((ksize - 1) << 1));
+			krev = (krev >> 2) | ((uint64_t)(c ^ 3) << ((ksize - 1) << 1));
 			khiter_t it;
 			if (k + 1 >= ksize) {
 				if (kmer <= krev) {
@@ -1992,7 +1992,7 @@ void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
 	for (k = 0; k < len; ++k) {
 		c = __binseq_get(seq, k);
 		kmer = ((kmer << 2) & kmask) | c;
-		krev = (krev >> 2) | ((c ^ 3) << ((ksize - 1) << 1));
+		krev = (krev >> 2) | ((uint64_t)(c ^ 3) << ((ksize - 1) << 1));
 		if (k + 1 >= ksize) {
 			if (kmer <= krev) {
 				it = kh_get(graph_index, dict, kmer);
@@ -2004,6 +2004,8 @@ void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
 			if (kh_value(dict, it).id != -1) {
 				aseed[n_seed++] = (struct alg_seed_t){kh_value(dict, it).id,
 						kh_value(dict, it).pos, k};
+			} else {
+				fprintf(stderr, "dupe\n");
 			}
 		}
 	}
@@ -2015,7 +2017,7 @@ void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
 	ret->e0_beg = aseed[0].ref_pos + 1 - ksize;
 	ret->en_end = aseed[n_seed - 1].ref_pos;
 	ret->seq_beg = aseed[0].seq_pos + 1 - ksize;
-	ret->seq_end = aseed[n_seed - 1].ref_pos;
+	ret->seq_end = aseed[n_seed - 1].seq_pos;
 	ret->seq = NULL;
 	ret->len = 0;
 	gint_t prev_e = -1;
@@ -2024,6 +2026,7 @@ void find_path_on_graph(struct asm_graph_t *g, khash_t(graph_index) *dict,
 			ret->seq = realloc(ret->seq, (ret->len + 1) * sizeof(gint_t));
 			ret->seq[ret->len++] = aseed[i].ref;
 		}
+		prev_e = aseed[i].ref;
 	}
 
 find_path_clean:
