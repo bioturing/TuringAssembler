@@ -65,6 +65,8 @@ int find_match_from_pos(struct map_contig_t *mct)
 	int match_id = -1;
 	int *points = (int *) calloc(mct->n_candidates, sizeof(int));
 	for (int i = 0; i < mct->n_candidates; ++i){
+		if (mct->local_graph.edges[i].seq_len < WINDOW_SIZE)
+			continue;
 		points[i] = count_match_kmer(kmers, mct->kmers[i]);
 		max_point = max(max_point, points[i]);
 

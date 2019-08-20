@@ -424,6 +424,31 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 			gpos2.end);
 	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
 			lpos2.end);
+
+	int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1, lc_e2,
+			gpos1, lpos1, gpos2, lpos2);
+	/*if (res == PATH_NOT_FOUND){
+		__VERBOSE_LOG("", "Checkiing if edge is reversed\n");
+		get_local_edge_head(*g, *lg, g->edges[e2], &lc_e2, &gpos2,
+				&lpos2);
+		__VERBOSE_LOG("", "Local edge 2 reversed: %d\n", lc_e2);
+		__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n", gpos2.start,
+			gpos2.end);
+		__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
+			lpos2.end);
+		int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1, lc_e2,
+				gpos1, lpos1, gpos2, lpos2);
+		if (res == TRIVIAL_CASE)
+			res = MIS_SCAFFOLD;
+	}*/
+	return res;
+}
+
+int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
+		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2)
+{
 	int bridge_type;
 	char *bridge_seq;
 	if (lc_e1 == -1 || lc_e2 == -1){
@@ -463,7 +488,7 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 path_not_found:
 	*ret_seq = NULL;
 	*seq_len = 0;
-	bridge_type = -1;
+	bridge_type = PATH_NOT_FOUND;
 	goto end_function;
 path_found:
 	*seq_len = strlen(bridge_seq);
@@ -494,15 +519,19 @@ void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 	decode_seq(&local_seq, lg.edges[local_edge].seq,
 			lg.edges[local_edge].seq_len);
 
-	int len = gpos1.end + max(0, lpos2.start - lpos1.end)
-			+ e2.seq_len - gpos2.start;
+	if (lpos2.start < lpos1.end){
+		int diff = lpos2.start - lpos1.end;
+		lpos2.start = lpos1.end;
+		gpos2.start += diff;
+	}
+	int len = gpos1.end + lpos2.start - lpos1.end + e2.seq_len
+			- gpos2.start;
 	*res_seq = (char *) calloc(len + 1, sizeof(char));
 	len = 0;
 	strncpy(*res_seq + len, edge_seq1, gpos1.end);
 	len += gpos1.end;
-	strncpy(*res_seq + len, local_seq + lpos1.end,
-			max(0, lpos2.start - lpos1.end));
-	len += max(0, lpos2.start - lpos1.end);
+	strncpy(*res_seq + len, local_seq + lpos1.end, lpos2.start - lpos1.end);
+	len += lpos2.start - lpos1.end;
 	strncpy(*res_seq + len, edge_seq2, e2.seq_len - gpos2.start);
 	len += e2.seq_len - gpos2.start;
 	free(edge_seq1);
@@ -553,6 +582,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		struct asm_graph_t lg = test_local_assembly(opt, g,
 				g->edges[u].rc_id, v);
 		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+		__VERBOSE_LOG("INFO", "Processing %d on %d bridges\n", i, path_len - 1);
 		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
 		uint32_t *seq;
 		uint32_t leng;
@@ -584,3 +614,5 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		}
 	}
 }
+
+

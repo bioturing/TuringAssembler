@@ -17,6 +17,8 @@
 #define MIS_SCAFFOLD 2
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
+#define COMPLEX_PATH 0
+#define PATH_NOT_FOUND -1
 #include <stdlib.h>
 #include "assembly_graph.h"
 #include "verbose.h"
@@ -82,4 +84,8 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 		char **res_seq);
 void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int *path, int path_len, char **contig);
+int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
+		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2);
 #endif
