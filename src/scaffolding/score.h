@@ -3,7 +3,7 @@
 
 struct pair_contigs_score {
 	float bc_score;
-	int m_score, m2_score;
+	float m_score, m2_score;
 };
 
 #endif /* __SCAFFOLDING_SCORE_H__ */

@@ -735,7 +735,6 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 
     //-----------------build barcode scaffold -----------------------
     // todo verify if n1<2 is best
-    __VERBOSE("%d %d\n", n1, n2);
     if (n1 <= 2) {
         for (int i = 0; i < n1; i ++) {
             struct fasta_ref_t ref;

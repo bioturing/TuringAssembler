@@ -68,10 +68,10 @@ float get_share_mate(struct asm_graph_t *g, int i0, int i1)
         if (b0->keys[i] != (uint64_t)(-1)) {
             uint32_t  tmp = barcode_hash_get(b1, b0->keys[i]);
             if (tmp != BARCODE_HASH_END(b1) && b1->keys[tmp] != (uint64_t)(-1)) {
-                res++;
+                res+=1;
             }
         }
     }
-    return res;
+    return (float) res;
 }
 
