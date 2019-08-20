@@ -180,6 +180,9 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 		barcode_hash_init(g->edges[e].barcodes, 4);
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
 		barcode_hash_init(g->edges[e].barcodes + 2, 4);
+		if (mapper_algo == FOR_SCAFFOLD) {
+			barcode_hash_init(&g->edges[e].barcodes_scaf, 4);
+		}
 	}
 }
 
@@ -718,13 +721,14 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
         if (ref.type != FASTA_REF_SEQ)
             continue;
         if (p2[i].pos <= CONTIG_LEVEL_2) {
-            add_barcode_edge(g, ref.e2, 2, bc);
+            add_barcode_edge(g, ref.e1, 2, bc);
         }
     }
 
     //-----------------build barcode scaffold -----------------------
     // todo verify if n1<2 is best
-    if (n1 < 2) {
+    __VERBOSE("%d %d\n", n1, n2);
+    if (n1 <= 2) {
         for (int i = 0; i < n1; i ++) {
             struct fasta_ref_t ref;
             ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
@@ -735,13 +739,13 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
             }
         }
     }
-    if (n2 < 2) {
-        for (int i = 0; i < n1; i ++) {
+    if (n2 <= 2) {
+        for (int i = 0; i < n2; i ++) {
             struct fasta_ref_t ref;
-            ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+            ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
             if (ref.type != FASTA_REF_SEQ)
                 continue;
-            if (p1[i].pos < MIN_CONTIG_BARCODE) {
+            if (p2[i].pos < MIN_CONTIG_BARCODE) {
                 add_barcode_scaffold(g, ref.e1, bc);
             }
         }
