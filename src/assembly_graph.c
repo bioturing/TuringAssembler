@@ -1150,6 +1150,10 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
             xfwrite(&h->size, sizeof(uint32_t), 1, fp);
             xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
             xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+            h = &g->edges[e].barcodes_scaf2;
+            xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+            xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+            xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
         }
 	}
 	fclose(fp);
@@ -1237,8 +1241,14 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
         for (e = 0; e < g->n_e; ++e) {
             if (g->edges[e].source == -1)
                 continue;
-            g->edges[e].barcodes = calloc(3, sizeof(struct barcode_hash_t));
             struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
+            xfread(&h->size, sizeof(uint32_t), 1, fp);
+            xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+            h->keys = malloc(h->size * sizeof(uint64_t));
+            xfread(h->keys, sizeof(uint64_t), h->size, fp);
+            h->cnts = NULL;
+
+            h = &g->edges[e].barcodes_scaf2;
             xfread(&h->size, sizeof(uint32_t), 1, fp);
             xfread(&h->n_item, sizeof(uint32_t), 1, fp);
             h->keys = malloc(h->size * sizeof(uint64_t));

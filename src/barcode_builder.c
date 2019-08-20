@@ -182,6 +182,7 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 		barcode_hash_init(g->edges[e].barcodes + 2, 4);
 		if (mapper_algo == FOR_SCAFFOLD) {
 			barcode_hash_init(&g->edges[e].barcodes_scaf, 4);
+            barcode_hash_init(&g->edges[e].barcodes_scaf2, 4);
 		}
 	}
 }
@@ -480,6 +481,13 @@ static inline void add_barcode_scaffold(struct asm_graph_t *g, gint_t e, uint64_
     pthread_mutex_unlock(&g->edges[e].lock);
 }
 
+static inline void add_barcode_scaffold2(struct asm_graph_t *g, gint_t e, uint64_t bc)
+{
+    pthread_mutex_lock(&g->edges[e].lock);
+    barcode_hash_add(&g->edges[e].barcodes_scaf2, bc);
+    pthread_mutex_unlock(&g->edges[e].lock);
+}
+
 static inline void add_read_count_candidate(struct asm_graph_t *g, gint_t e1, gint_t e2)
 {
 	struct pair_contig_t key = (struct pair_contig_t){e1, e2};
@@ -737,6 +745,9 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
             if (p1[i].pos < MIN_CONTIG_BARCODE) {
                 add_barcode_scaffold(g, ref.e1, bc);
             }
+            if (p1[i].pos < MIN_CONTIG_BARCODE2) {
+                add_barcode_scaffold2(g, ref.e1, bc);
+            }
         }
     }
     if (n2 <= 2) {
@@ -747,6 +758,9 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
                 continue;
             if (p2[i].pos < MIN_CONTIG_BARCODE) {
                 add_barcode_scaffold(g, ref.e1, bc);
+            }
+            if (p2[i].pos < MIN_CONTIG_BARCODE2) {
+                add_barcode_scaffold2(g, ref.e1, bc);
             }
         }
     }

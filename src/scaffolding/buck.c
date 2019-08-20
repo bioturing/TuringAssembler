@@ -62,7 +62,16 @@ float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buc
 
 float get_share_mate(struct asm_graph_t *g, int i0, int i1)
 {
-    //todo huu
-	return 0;
+    int res = 0;
+    struct barcode_hash_t *b0 = &g->edges[i0].barcodes_scaf2, *b1 = &g->edges[i1].barcodes_scaf2;
+    for (uint32_t i = 0; i < b0->size; i++) {
+        if (b0->keys[i] != (uint64_t)(-1)) {
+            uint32_t  tmp = barcode_hash_get(b1, b0->keys[i]);
+            if (tmp != BARCODE_HASH_END(b1) && b1->keys[tmp] != (uint64_t)(-1)) {
+                res++;
+            }
+        }
+    }
+    return res;
 }
 

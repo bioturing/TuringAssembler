@@ -205,11 +205,6 @@ struct params_build_big_table {
 
 void *process_build_big_table(void *data)
 {
-	void next_index(struct params_build_big_table *params, struct asm_graph_t *g)
-	{
-		params->i++;
-	}
-	
 	// ________________________________________BEGIN___________________________________
 	struct params_build_big_table *params = (struct params_build_big_table *) data;
 	struct asm_graph_t *g = params->g;
@@ -223,7 +218,7 @@ void *process_build_big_table(void *data)
 		}
 		int i_contig = params->i;
 		int new_i_contig = i_contig;
-		next_index(params, g);
+		params->i++;
 		pthread_mutex_unlock(&lock_id);
 
 		struct asm_edge_t *e = &g->edges[i_contig];
@@ -435,8 +430,9 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			if (too_different(e1_cov, e2_cov))
 				score.bc_score = -1;
 			score.m_score = get_share_mate(g, src, des);
-			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f\n", i_candidate_edge,
-					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score);
+			score.bc_score += 2*score.m_score;
+			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f %f\n", i_candidate_edge,
+					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score, score.m_score);
 			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, des, &score);
 			n_edges++;
 			if (n_edges > size_list_edge) {

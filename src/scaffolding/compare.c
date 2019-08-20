@@ -17,9 +17,10 @@ int decending_uint32(const void *e0,const void *e1)
 
 int decending_edge_score(const void *d0, const void *d1)
 {
-	float a =  ((struct scaffold_edge *) d0)->score.bc_score;
-	float b =  ((struct scaffold_edge *) d1)->score.bc_score;
-	struct scaffold_edge *e1 =  (struct scaffold_edge *) d1;
+	struct scaffold_edge *e1 =  ((struct scaffold_edge *) d0);
+    struct scaffold_edge *e2 =  ((struct scaffold_edge *) d1);
+	float a = e1->score.bc_score ;//+ e1->score.m_score*2;
+    float b = e2->score.bc_score ;//+ e1->score.m_score*2;
 	return (a < b) - (a > b);
 }
 

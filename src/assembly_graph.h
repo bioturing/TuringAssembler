@@ -61,6 +61,7 @@ struct asm_edge_t {
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
     struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+    struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -102,6 +103,7 @@ struct asm_graph_t {
 
 /* Add barcode upto prefix length */
 #define MIN_CONTIG_BARCODE		5000
+#define MIN_CONTIG_BARCODE2		500
 /* Only add and use barcode for contig with length minimum */
 #define MIN_LONG_CONTIG			1000
 #define MIN_CONTIG_READPAIR		500
