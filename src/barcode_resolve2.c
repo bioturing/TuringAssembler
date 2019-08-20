@@ -2226,6 +2226,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 			}
 		}
 	}
+	__VERBOSE_LOG("", "Candidate %u, len: %u\n", id, sum_len + g->ksize);
 	e2_len = __min(g->edges[e2].seq_len, 200);
 	for (k = g->ksize; k < e2_len; ++k) {
 		buf[buf_len++] = nt4_char[__binseq_get(g->edges[e2].seq, k)];
@@ -2341,7 +2342,8 @@ void reconstruct_path(struct asm_graph_t *g, gint_t *list_e, uint32_t n_e,
 			++len;
 		}
 	}
-	sret->trim_e1 = sret->trim_e2 = 0;
+	sret->trim_e1 = g->ksize;
+	sret->trim_e2 = g->ksize;
 }
 
 int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
@@ -2412,7 +2414,8 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 
 	__VERBOSE_LOG("", "Testing local path %ld <-> %ld\n", e1, e2);
 	int best_cnt, best_len, best_cand;
-	best_cnt = best_len = 0;
+	best_cnt = 0;
+	best_len = 0;
 	best_cand = -1;
 	for (k = kh_begin(ctg_cnt); k != kh_end(ctg_cnt); ++k) {
 		if (!kh_exist(ctg_cnt, k))
@@ -2421,7 +2424,8 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 			best_cnt = kh_value(ctg_cnt, k);
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
-		} else if (kh_value(ctg_cnt, k) == best_cnt && dfs_opt.cand_len[kh_key(ctg_cnt, k)] > best_len) {
+		} else if (kh_value(ctg_cnt, k) == best_cnt &&
+			dfs_opt.cand_len[kh_key(ctg_cnt, k)] > best_len) {
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		}
@@ -2435,8 +2439,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		cap, &dfs_opt);
 	struct result_local_t sret;
 	reconstruct_path(g, dfs_opt.list_e, dfs_opt.n_e, &sret);
-	e1_rc = g->edges[e1].rc_id;
-	e2_rc = g->edges[e2].rc_id;
+	__VERBOSE_LOG("", "Middle part len: %d\n", sret.len);
 	asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
 		sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
 	free(sret.seq);
@@ -2606,17 +2609,18 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 				n_leg = kh_size(set_leg);
 				n_self = kh_size(set_self);
 				if (n_self == 0 && n_leg == 2)
-					ret += join_1_1_jungle_la(g, set_e, set_leg,
+					resolve_local += join_1_1_jungle_la(g, set_e, set_leg,
 						&opt_local, opt, assemblied_pair);
-				// else if (n_self + n_leg >= 2)
-				// 	resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
-				// 		&opt_local, assemblied_pair);
+				else if (n_self + n_leg >= 2)
+					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
+						&opt_local, assemblied_pair);
 			}
 			kh_clear(gint, set_leg);
 			kh_clear(gint, set_e);
 			kh_clear(gint, set_v);
 			kh_clear(gint, set_self);
 		}
+		kh_clear(gint, visited);
 		ret += resolve_local;
 	} while (resolve_local);
 	kh_destroy(used_pair, assemblied_pair);
