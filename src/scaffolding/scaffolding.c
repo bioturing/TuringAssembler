@@ -427,6 +427,8 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			float e1_cov = __get_edge_cov(&g->edges[src], g->ksize);
 			float e2_cov = __get_edge_cov(&g->edges[des], g->ksize);
 			struct pair_contigs_score score = para->list_candidate_edges[i_candidate_edge].score;
+			//Todo @Huu the following line cause can not scaffold on low cov species in mock20
+			// put it when build candidate
 			if (too_different(e1_cov, e2_cov))
 				score.bc_score = -1;
 			score.m_score = get_share_mate(g, src, des);
