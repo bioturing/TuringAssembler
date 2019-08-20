@@ -2205,7 +2205,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 	buf[80] = '\0';
 	int buf_len = 0, i, k, e1_len, e2_len;
 	gint_t e, j;
-	e1_len = __min(g->edges[e1].seq_len, 500);
+	e1_len = __min(g->edges[e1].seq_len, 200);
 	for (i = e1_len; i > 0; --i) {
 		k = g->edges[e1].seq_len - i;
 		buf[buf_len++] = nt4_char[__binseq_get(g->edges[e1].seq, k)];
@@ -2224,8 +2224,8 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 			}
 		}
 	}
-	e2_len = __min(g->edges[e2].seq_len, 500);
-	for (k = g->ksize; k < g->edges[e2].seq_len; ++k) {
+	e2_len = __min(g->edges[e2].seq_len, 200);
+	for (k = g->ksize; k < e2_len; ++k) {
 		buf[buf_len++] = nt4_char[__binseq_get(g->edges[e2].seq, k)];
 		if (buf_len == 80) {
 			fprintf(fp, "%s\n", buf);
@@ -2333,6 +2333,9 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	dfs_opt.uni_cov = uni_cov;
 	list_all_path(g, g->edges[e1_rc].target, g->edges[e2].source, 0, set_e,
 		cap, &dfs_opt);
+	fclose(dfs_opt.fp);
+	if (dfs_opt.cnt == 0)
+		return 0;
 	khash_t(contig_count) *ctg_cnt = kh_init(contig_count);
 	for (i = 0; i < dfs_opt.cnt; ++i) {
 		k = kh_put(contig_count, ctg_cnt, i, &hash_ret);

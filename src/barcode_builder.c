@@ -175,6 +175,7 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 	    g->aux_flag |= ASM_HAVE_BARCODE_SCAF;
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
+		pthread_mutex_init(&(g->edges[e].lock), NULL);
 		g->edges[e].barcodes = calloc(3, sizeof(struct barcode_hash_t));
 		barcode_hash_init(g->edges[e].barcodes, 4);
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
@@ -366,7 +367,7 @@ struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 	clip5 = is_rev ? l_query - qe : qb;
 	clip3 = is_rev ? qb : l_query - qe;
 	dist5 = pos - bns->anns[a.rid].offset;
-	dist3 = bns->anns[a.rid + 1].offset - pos - l_ref;
+	dist3 = bns->anns[a.rid].offset + bns->anns[a.rid].len - pos - l_ref;
 	ext5 = __min(clip5, dist5);
 	ext3 = __min(clip3, dist3);
 	// fprintf(stderr, "lquery = %d; ext5 = %d, ext3 = %d\n", l_query, ext5, ext3);
@@ -868,7 +869,6 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
 		if (a.rid == -1)
 			continue;
-		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
 		if (a.score > best_score_2) {
 			best_score_2 = a.score;
 			p2[0] = a;
@@ -886,7 +886,8 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			if (p2[k].aligned < r2->len)
 				continue;
 			c2 = atoi(idx->bns->anns[p2[k].rid].name);
-			if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN) {
+			//if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN) {
+			if (c1 == c2) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
 				if (it != kh_end(count_cand))
 					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);
