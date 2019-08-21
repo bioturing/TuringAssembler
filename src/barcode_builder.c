@@ -183,7 +183,7 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 	}
 }
 
-void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
+void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand)
 {
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
@@ -195,13 +195,13 @@ void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int i;
 	struct producer_bundle_t *producer_bundles;
-	producer_bundles = init_fastq_pair(opt->n_threads, 1,
+	producer_bundles = init_fastq_pair(n_threads, 1,
 					&(rpath->R1_path), &(rpath->R2_path));
 
 	struct pathcount_bundle_t *worker_bundles;
-	worker_bundles = malloc(opt->n_threads * sizeof(struct pathcount_bundle_t));
+	worker_bundles = malloc(n_threads * sizeof(struct pathcount_bundle_t));
 
-	for (i = 0; i < opt->n_threads; ++i) {
+	for (i = 0; i < n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
@@ -209,21 +209,18 @@ void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
 	}
 
 	pthread_t *producer_threads, *worker_threads;
-	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+	producer_threads = calloc(1, sizeof(pthread_t));
+	worker_threads = calloc(n_threads, sizeof(pthread_t));
 
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_create(producer_threads + i, &attr, fastq_producer,
-				producer_bundles + i);
+	pthread_create(producer_threads, &attr, fastq_producer, producer_bundles);
 
-	for (i = 0; i < opt->n_threads; ++i)
+	for (i = 0; i < n_threads; ++i)
 		pthread_create(worker_threads + i, &attr, pathcount_buffer_iterator,
 				worker_bundles + i);
 
-	for (i = 0; i < opt->n_files; ++i)
-		pthread_join(producer_threads[i], NULL);
+	pthread_join(producer_threads[0], NULL);
 
-	for (i = 0; i < opt->n_threads; ++i)
+	for (i = 0; i < n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 
 	free_fastq_pair(producer_bundles, 1);
@@ -269,6 +266,7 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 
 	pthread_t *producer_threads, *worker_threads;
+	/* FIXME: not actually opt->n_files, noob */
 	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
 	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
 
