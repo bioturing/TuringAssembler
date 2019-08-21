@@ -389,10 +389,10 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	decode_seq(&local_seq, local.seq, local.seq_len);
 
 	if (sync_type == SYNC_KEEP_GLOBAL){
-		int len = global_pos.end + local.seq_len - local_pos.end;
+		int len = global_pos.start + local.seq_len - local_pos.start;
 		*res_seq = (char *) calloc(len + 1, sizeof(char));
-		strncpy(*res_seq, global_seq, global_pos.end);
-		strcpy(*res_seq + global_pos.end, local_seq + local_pos.end);
+		strncpy(*res_seq, global_seq, global_pos.start);
+		strcpy(*res_seq + global_pos.start, local_seq + local_pos.start);
 	} else {
 		int len = local_pos.end + global.seq_len - global_pos.end;
 		*res_seq = (char *) calloc(len + 1, sizeof(char));

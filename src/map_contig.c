@@ -123,10 +123,6 @@ void advance_pos(struct map_contig_t *mct)
 
 void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 {
-	pos->start = -1;
-	pos->end = -1;
-	if (mct->pos == (int) mct->global_edge.seq_len)
-		return;
 	pos->start = mct->pos;
 	int cur_best_match = mct->best_match;
 	while (check_stop(mct) == 0){
@@ -221,7 +217,7 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 			add_kmer(pre_hash, global_start);
 			add_kmer(pre_hash, global_end);
 		}
-		if (i + WINDOW_SIZE < (int) best_match.seq_len){
+		if (i + WINDOW_SIZE <= (int) best_match.seq_len){
 			khint32_t next_hash = get_one_seq_kmer_hash(local_seq
 					+ i + WINDOW_SIZE - KSIZE + 1);
 			khiter_t it;
