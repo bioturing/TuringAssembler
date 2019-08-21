@@ -46,4 +46,5 @@ khint32_t get_one_seq_kmer_hash(char *seq);
 int check_good_match(int point, float thresh);
 void add_kmer(khint32_t hash, khash_t(int32_int) *kmers);
 void remove_kmer(khint32_t hash, khash_t(int32_int) *kmers);
+int check_stop(struct map_contig_t *mct);
 #endif

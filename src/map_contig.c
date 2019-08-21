@@ -129,7 +129,7 @@ void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 		return;
 	pos->start = mct->pos;
 	int cur_best_match = mct->best_match;
-	while (mct->pos < (int) mct->global_edge.seq_len){
+	while (check_stop(mct) == 0){
 		int tmp = find_match_from_pos(mct);
 		if (tmp != cur_best_match)
 			break;
@@ -204,8 +204,6 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 	for (int i = 0; i + WINDOW_SIZE <= (int) best_match.seq_len; ++i){
 		start_point[i] = cur_start_point;
 		end_point[i] = cur_end_point;
-		/*start_point[i] = count_match_kmer(global_start, local_kmers);
-		end_point[i] = count_match_kmer(global_end, local_kmers);*/
 		if (i > 0){
 			khint32_t pre_hash = get_one_seq_kmer_hash(local_seq
 					+ i - 1);
@@ -222,7 +220,6 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 
 			add_kmer(pre_hash, global_start);
 			add_kmer(pre_hash, global_end);
-			//remove_kmer(pre_hash, local_kmers);
 		}
 		if (i + WINDOW_SIZE < (int) best_match.seq_len){
 			khint32_t next_hash = get_one_seq_kmer_hash(local_seq
@@ -239,24 +236,17 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 				++cur_end_point;
 			remove_kmer(next_hash, global_start);
 			remove_kmer(next_hash, global_end);
-			//add_kmer(next_hash, local_kmers);
 		}
 	}
 
 	float max_ratio = 0;
-	local->start = -1;
-	local->end = -1;
-	for (int i = 0; i + global->end - global->start + WINDOW_SIZE <=
-			(int) best_match.seq_len; ++i){
-		int j = i + global->end - global->start;
-		float start_ratio = (float) start_point[i] / WINDOW_SIZE;
-		float end_ratio = (float) end_point[j] / WINDOW_SIZE;
-		float ratio = start_ratio * end_ratio;
-		if (max_ratio < ratio){
-			max_ratio = ratio;
+	local->start = 0;
+	local->end = 0;
+	for (int i = 0; i < (int) best_match.seq_len; ++i){
+		if (start_point[i] > start_point[local->start])
 			local->start = i;
-			local->end = j;
-		}
+		if (end_point[i] > end_point[local->end])
+			local->end = i;
 	}
 	free(local_seq);
 	kh_destroy(int32_int, global_start);
@@ -311,4 +301,12 @@ void remove_kmer(khint32_t hash, khash_t(int32_int) *kmers)
 		kh_val(kmers, it) = 0;
 	}
 	--kh_val(kmers, it);
+}
+
+int check_stop(struct map_contig_t *mct)
+{
+	int len = min(WINDOW_SIZE, mct->global_edge.seq_len - mct->pos);
+	if (len < WINDOW_SIZE)
+		return 1;
+	return 0;
 }

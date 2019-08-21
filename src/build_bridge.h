@@ -36,6 +36,10 @@ int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge);
 int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
 		khash_t(gint_t_int) *visited, int *is_disable, int depth,
 		int **path, int *path_leng);
+void find_path_max_cov(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
+		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		int *tmp_path, int cov_sum, int *max_cov, int **path,
+		int *path_leng);
 void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge,
 		khash_t(gint_t_int) *vistied, int *is_disable, int depth,
 		int *path, FILE *record, int *count_paths);
@@ -67,7 +71,7 @@ int is_read_on_edge(struct read_t r, struct asm_edge_t e, int left, int right,
 void copy_seq_to_str(char *str, uint32_t *seq, int leng);
 
 void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
-		int *is_disable, int *midair_edge);
+		int *midair_edge);
 void join_seq(char **dest, char *source);
 void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 		struct subseq_pos_t global_pos, struct subseq_pos_t local_pos,
@@ -88,4 +92,6 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
 		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
 		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2);
+void get_path_max_cov(struct asm_graph_t lg, int start_edge, int end_edge,
+		int **path, int *path_len);
 #endif

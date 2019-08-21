@@ -123,9 +123,7 @@ int reachable(struct asm_graph_t g, int start_edge, int end_edge,
 		int *is_disable)
 {
 	int *visited = (int *) calloc(g.n_e, sizeof(int));
-	//__VERBOSE_LOG("", "PATH\n");
 	int res = dfs(g, start_edge, start_edge, end_edge, visited, is_disable);
-	//__VERBOSE_LOG("", "END PATH\n");
 	free(visited);
 	return res;
 }
@@ -227,7 +225,7 @@ void filter_edges(struct asm_graph_t g, int start_edge, int end_edge,
 		int **is_disable)
 {
 	*is_disable = (int *) calloc(g.n_e, sizeof(int));
-	//cov_filter(g, start_edge, end_edge, *is_disable);
+	cov_filter(g, start_edge, end_edge, *is_disable);
 	connection_filter(g, start_edge, end_edge, *is_disable);
 }
 
@@ -316,8 +314,10 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 }
 
 void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
-		int *is_disable, int *midair_edge)
+		int *midair_edge)
 {
+	int *is_disable;
+	filter_edges(lg, start_edge, end_edge, &is_disable);
 	int *bad = (int *) calloc(lg.n_e, sizeof(int));
 	for (int i = 0; i < lg.n_e; ++i)
 		bad[i] = is_disable[i];
@@ -340,6 +340,7 @@ void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
 			res = i;
 	}
 	free(bad);
+	free(is_disable);
 	*midair_edge = res;
 }
 
@@ -354,12 +355,12 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);
 	*edge_id = lg.edges[*edge_id].rc_id;
-	gpos->start = e.seq_len - gpos->start - 1;
-	gpos->end = e.seq_len - gpos->end - 1;
+	gpos->start = e.seq_len - gpos->start - WINDOW_SIZE;
+	gpos->end = e.seq_len - gpos->end - WINDOW_SIZE;
 	swap(&gpos->start, &gpos->end, sizeof(khint32_t));
 
-	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - 1;
-	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - 1;
+	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - WINDOW_SIZE;
+	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - WINDOW_SIZE;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
 no_local_edge_found:
 	map_contig_destroy(&mct);
@@ -432,12 +433,12 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		get_local_edge_head(*g, *lg, g->edges[e2], &lc_e2, &gpos2,
 				&lpos2);
 		__VERBOSE_LOG("", "Local edge 2 reversed: %d\n", lc_e2);
-		__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n", gpos2.start,
-			gpos2.end);
-		__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
-			lpos2.end);
-		int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1, lc_e2,
-				gpos1, lpos1, gpos2, lpos2);
+		__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+				gpos2.start, gpos2.end);
+		__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+				lpos2.start, lpos2.end);
+		int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1,
+				lc_e2, gpos1, lpos1, gpos2, lpos2);
 		if (res == TRIVIAL_CASE)
 			res = MIS_SCAFFOLD;
 	}*/
@@ -469,19 +470,29 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		int *path;
 		int path_len;
 		get_path(*lg, lc_e1, lc_e2, &path, &path_len);
-		if (path == NULL){
+		/*if (path != NULL){
+			get_path_max_cov(*lg, lc_e1, lc_e2, &path, &path_len);
+		} else {
 			goto path_not_found;
-		}
-		__VERBOSE("Path exists, checking for simple path\n");
-		if (check_simple_path(*lg, lc_e1, lc_e2)){
-			bridge_type = 1;
+		}*/
+		if (path != NULL && check_simple_path(*lg, lc_e1, lc_e2)){
+			bridge_type = TRIVIAL_CASE;
 			join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
 					path, path_len, gpos1, lpos1, gpos2,
 					lpos2, &bridge_seq);
 			goto path_found;
 		} else {
-			bridge_type = 0;
-			__VERBOSE("Complex path\n");
+			bridge_type = COMPLEX_PATH;
+			__VERBOSE_LOG("", "Complex path, searching for middle edge\n");
+			goto path_not_found;
+			int mid_edge;
+			get_midair_bridge(*lg, lc_e1, lc_e2, &mid_edge);
+			__VERBOSE_LOG("", "Middle edge found: %d\n", mid_edge);
+			if (mid_edge != -1){
+				decode_seq(&bridge_seq, lg->edges[mid_edge].seq,
+						lg->edges[mid_edge].seq_len);
+				goto path_found;
+			}
 			goto path_not_found;
 		}
 	}
@@ -601,18 +612,96 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			join_seq(contig, tmp + g->edges[path[i - 1]].seq_len);
 			free(tmp);
 			path[i] = g->edges[path[i]].rc_id;
-		} else {
+		} else if (res == COMPLEX_PATH){
+			char *dump_N;
+			get_dump_N(&dump_N);
+			join_seq(contig, dump_N);
+
 			char *tmp;
-			get_dump_N(&tmp);
+			decode_seq(&tmp, seq, leng);
 			join_seq(contig, tmp);
 			free(tmp);
+
+			join_seq(contig, dump_N);
 
 			decode_seq(&tmp, g->edges[path[i]].seq,
 					g->edges[path[i]].seq_len);
 			join_seq(contig, tmp);
+
 			free(tmp);
+			free(dump_N);
+		} else {
+			char *dump_N;
+			get_dump_N(&dump_N);
+			join_seq(contig, dump_N);
+
+			char *tmp;
+			decode_seq(&tmp, g->edges[path[i]].seq,
+					g->edges[path[i]].seq_len);
+			join_seq(contig, tmp);
+
+			free(tmp);
+			free(dump_N);
 		}
 	}
 }
 
+void find_path_max_cov(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
+		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		int *tmp_path, int cov_sum, int *max_cov, int **path,
+		int *path_leng)
+{
+	tmp_path[depth] = u;
+	cov_sum += get_cov(lg, u);
+	if (u == end_edge){
+		if (*max_cov < cov_sum){
+			*path_leng = depth + 1;
+			*path = (int *) realloc(*path, sizeof(int) * *path_leng);
+			for (int i = 0; i < *path_leng; ++i)
+				(*path)[i] = tmp_path[i];
+			*max_cov = cov_sum;
+		}
+		return;
+	}
+	int tg = lg.edges[u].target;
+	for (int i = 0; i < lg.nodes[tg].deg; ++i){
+		gint_t v = lg.nodes[tg].adj[i];
+		if (v == start_edge)
+			continue;
+		if (is_disable[v])
+			continue;
+		if (lg.edges[v].rc_id == end_edge)
+			continue;
+		gint_t edge_code = get_edge_code(u, v);
+		khiter_t it = kh_get(gint_t_int, visited, edge_code);
+		if (it == kh_end(visited)){
+			int ret;
+			khiter_t it = kh_put(gint_t_int, visited, edge_code,
+					&ret);
+			kh_val(visited, it) = 0;
+		}
+		if (kh_val(visited, it) == 1)
+			continue;
+		++kh_val(visited, it);
+		find_path_max_cov(lg, v, start_edge, end_edge, visited,
+				is_disable, depth + 1, tmp_path, cov_sum,
+				max_cov, path, path_leng);
+		it = kh_get(gint_t_int, visited, edge_code);
+		--kh_val(visited, it);
+	}
+}
 
+void get_path_max_cov(struct asm_graph_t lg, int start_edge, int end_edge,
+		int **path, int *path_len)
+{
+	int *tmp_path = (int *) calloc(lg.n_e, sizeof(int));
+	khash_t(gint_t_int) *visited = kh_init(gint_t_int);
+	int *is_disable;
+	int max_cov = 0;
+	filter_edges(lg, start_edge, end_edge, &is_disable);
+	find_path_max_cov(lg, start_edge, start_edge, end_edge, visited,
+			is_disable, 0, tmp_path, 0, &max_cov, path, path_len);
+	free(is_disable);
+	free(tmp_path);
+	kh_destroy(gint_t_int, visited);
+}
