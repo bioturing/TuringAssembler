@@ -432,10 +432,12 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 			if (too_different(e1_cov, e2_cov))
 				score.bc_score = -1;
 			score.m_score = get_share_mate(g, src, des);
-			score.bc_score += get_bc_score(2*score.m_score,
-			        g->edges[src].barcodes_scaf.n_item, g->edges[des].barcodes_scaf.n_item, para->avg_bin_hash);
-			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f %f\n", i_candidate_edge,
-					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score, score.m_score);
+			float t = get_bc_score(2*score.m_score, 
+					g->edges[src].barcodes_scaf.n_item, g->edges[des].barcodes_scaf.n_item, para->avg_bin_hash);
+
+//			score.bc_score += t;
+			VERBOSE_FLAG(0, "i candidate %d src %d des %d score %f %f to float %f\n", i_candidate_edge,
+					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score, score.m_score, t);
 			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, des, &score);
 			n_edges++;
 			if (n_edges > size_list_edge) {
@@ -651,11 +653,13 @@ void refine_path(struct asm_graph_t *g, struct edges_score_type *edges_score, st
 		int right = get_last_n(path, 1, j+1);
 		struct pair_contigs_score *normal_score = get_score_tripple(edges_score, left, mid, right);
 		struct pair_contigs_score *reverse_score = get_score_tripple(edges_score, left, get_rc_id(g, mid), right);
+		VERBOSE_FLAG(0, "get score tripple %d %d %d normal %f reverse %f", left, mid, right, normal_score->bc_score, reverse_score->bc_score);
 		if (better_edge(reverse_score, normal_score)) {
 			reverse_n_th(g, path, 1, j);
 		}
 		free(normal_score);
 		free(reverse_score);
+		j++;
 	}
 }
 
