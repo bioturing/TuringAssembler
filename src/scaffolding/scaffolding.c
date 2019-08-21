@@ -546,7 +546,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
-	VERBOSE_FLAG(0, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
+	VERBOSE_FLAG(0, "\ndonescascore %f %f %f\n", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
@@ -555,10 +555,10 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 int better_edge(struct pair_contigs_score *sc0, struct pair_contigs_score *sc1)
 {
 	//todo wtd
-	if (sc0->bc_score > 1.1 * sc1->bc_score) return 1;
-	if (sc0->bc_score * 1.1 < sc1->bc_score) return 0;
-	if (sc0->m_score + sc0->m2_score != sc1->m_score + sc1->m2_score)
-		return (sc0->m_score + sc0->m2_score > sc1->m_score +sc1->m2_score);
+//	if (sc0->bc_score > 1.1 * sc1->bc_score) return 1;
+//	if (sc0->bc_score * 1.1 < sc1->bc_score) return 0;
+//	if (sc0->m_score + sc0->m2_score != sc1->m_score + sc1->m2_score)
+//		return (sc0->m_score + sc0->m2_score > sc1->m_score +sc1->m2_score);
 	return (sc0->bc_score > sc1->bc_score);
 }
 
