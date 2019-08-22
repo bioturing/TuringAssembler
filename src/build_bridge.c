@@ -58,6 +58,7 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	struct map_contig_t mct;
 	init_map_contig(&mct, g.edges[e.rc_id], lg);
 	*edge_id = find_match(&mct);
+	__VERBOSE("%d\n", *edge_id);
 	if (*edge_id == -1)
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);

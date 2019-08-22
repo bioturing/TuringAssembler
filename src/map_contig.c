@@ -99,6 +99,7 @@ int count_match_kmer(khash_t(int32_int) *first, khash_t(int32_int) *second)
 int find_match(struct map_contig_t *mct)
 {
 	while (mct->pos < (int) mct->global_edge.seq_len){
+		__VERBOSE("%d\n", mct->pos);
 		int res = find_match_from_pos(mct);
 		if (res != -1){
 			mct->best_match = res;

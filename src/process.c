@@ -11,6 +11,11 @@
 #include "verbose.h"
 #include "build_bridge.h"
 #include "read_list.h"
+#include "scaffolding/scaffolding.h"
+#include "barcode_resolve2.h"
+#include "basic_resolve.h"
+#include "fastg.h"
+
 void graph_convert_process(struct opt_proc_t *opt)
 {
 	char path[1024];
@@ -74,6 +79,42 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	__VERBOSE_LOG("TIMER", "Build graph level 2 time: %.3f\n", sec_from_prev_time());
 }
 
+struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_file);
+	test_asm_graph(g0);
+	return g0;
+}
+
+void build_scaffolding_1_2_process(struct opt_proc_t *opt)
+{
+	init_clock();
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+
+	char *out_name = str_concate(opt->out_dir, "/scaffolds.fasta");
+	FILE *out_file = fopen(out_name, "w");
+	
+	scaffolding(out_file, g0, opt);
+
+	free(out_name);
+	fclose(out_file);
+	asm_graph_destroy(g0);
+	free(g0);
+}
+
+void build_scaffolding_test_process(struct opt_proc_t *opt)
+{
+	init_clock();
+	FILE *fp;
+	struct asm_graph_t *g0 = create_and_load_graph(opt);
+
+	scaffolding_test(g0, opt);
+
+	asm_graph_destroy(g0);
+}
+
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -125,14 +166,6 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	set_time_now();
 	// construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR | ASM_BUILD_COVERAGE);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
-}
-
-void print_seq(FILE *f, uint32_t *seq, uint32_t leng, int u, int v)
-{
-	fprintf(f, ">%d_to_%d\n", u, v);
-	for (int i = 0; i < (int) leng; ++i)
-		fprintf(f, "%c", int_to_base(__binseq_get(seq, i)));
-	fprintf(f, "\n");
 }
 
 void graph_query_process(struct opt_proc_t *opt)
@@ -250,9 +283,32 @@ void build_barcode_info(struct opt_proc_t *opt)
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
-	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
+}
+
+void build_barcode_scaffold(struct opt_proc_t *opt)
+{
+    struct asm_graph_t g;
+    struct read_path_t read_sorted_path;
+
+    load_asm_graph(&g, opt->in_file);
+    char fasta_path[MAX_PATH];
+    if (opt->lib_type == LIB_TYPE_SORTED) {
+        read_sorted_path.R1_path = opt->files_1[0];
+        read_sorted_path.R2_path = opt->files_2[0];
+        read_sorted_path.idx_path = opt->files_I[0];
+    } else {
+        sort_read(opt, &read_sorted_path);
+    }
+    sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+    mkdir(fasta_path, 0755);
+    sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+    write_fasta_seq(&g, fasta_path);
+    construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+    save_graph_info(opt->out_dir, &g, "added_barcode");
+    asm_graph_destroy(&g);
 }
 
 void assembly_process(struct opt_proc_t *opt)
@@ -276,7 +332,7 @@ void assembly3_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	build_0_KMC(opt, opt->k0, &g1);
-	// save_graph_info(opt->out_dir, &g1, "level_0");
+	save_graph_info(opt->out_dir, &g1, "level_0");
 
 	build_0_1(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");
@@ -317,10 +373,13 @@ void build_1_2_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
-	build_1_2(&g1, &g2);
-	save_graph_info(opt->out_dir, &g2, "level_2");
-	asm_graph_destroy(&g1);
-	asm_graph_destroy(&g2);
+	do_some_resolve_bridge(&g1);
+	do_something_local(opt, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_pro");
+	// build_1_2(&g1, &g2);
+	// save_graph_info(opt->out_dir, &g2, "level_2");
+	// asm_graph_destroy(&g1);
+	// asm_graph_destroy(&g2);
 }
 
 void build_2_3_process(struct opt_proc_t *opt)
@@ -381,4 +440,16 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 	build_barcode_read(opt, &g);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
+}
+
+void build_barcode_process_fastg(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g, g1;
+	load_asm_graph_fastg(&g, opt->in_fastg, opt->k0);
+	test_asm_graph(&g);
+	build_barcode_read(opt, &g);
+	build_3_4(&g, &g1);
+	save_graph_info(opt->out_dir, &g1, "level_4");
+	asm_graph_destroy(&g);
+	asm_graph_destroy(&g1);
 }
