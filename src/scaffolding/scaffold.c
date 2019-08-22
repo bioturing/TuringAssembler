@@ -61,18 +61,27 @@ void destroy_path(struct scaffold_path *path)
 
 void print_scaffold_contig(struct scaffold_type *scaffold) 
 {
+	int n_paths = 0;
+	for (int i = 0; i < scaffold->n_path; ++i)
+		n_paths += scaffold->path[i].n_left_half
+			+ scaffold->path[i].n_right_half > 1;
+	FILE *f = fopen("local_assembly_scaffold_path.txt", "w");
+	fprintf(f, "%d\n", n_paths);
 	for (int i = 0 ; i < scaffold->n_path; i++) {
-
-		VERBOSE_FLAG(1, "path\n");
 		struct scaffold_path *path = &scaffold->path[i];
-		for (int j = path->n_left_half-1; j >= 0; j--) {
-			VERBOSE_FLAG(1, "contig %d ", path->left_half[j]);
-		}
-		VERBOSE_FLAG(1, "\n righthalf");
-		for(int j = 0; j < path->n_right_half; j++){
-			VERBOSE_FLAG(1, "contig %d ", path->right_half[j]);
-		}
-		VERBOSE_FLAG(1, "\n");
+		int sum_n = path->n_left_half + path->n_right_half;
+		if (sum_n <= 1)
+			continue;
+		int *list_contig = calloc(sum_n, sizeof(int));
+		for(int i = 0; i < path->n_left_half; i++)
+			list_contig[path->n_left_half - 1 - i] = path->left_half[i];
+		COPY_ARR(path->right_half, list_contig + path->n_left_half,
+				path->n_right_half);
+		fprintf(f, "%d\n", sum_n);
+		for (int j = 0; j < sum_n; ++j)
+			fprintf(f, "%d ", list_contig[j]);
+		fprintf(f, "\n");
+		free(list_contig);
 	}
 }
 
