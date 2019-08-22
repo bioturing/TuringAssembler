@@ -11,6 +11,10 @@
 /src/execute/**
 !/src/execute/*.c
 
+!/src/scaffolding
+/src/scaffolding/**
+!/src/scaffolding/*.c
+!/src/scaffolding/*.h
 !/include
 /include/**
 !/include/*.h
