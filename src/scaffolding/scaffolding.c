@@ -749,7 +749,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	}
 	free(mark);
 	free(thres_score);
-	print_scaffold_contig(scaffold);
+	print_scaffold_contig(opt, scaffold);
 }
 
 void insert_short_contig()
@@ -796,7 +796,7 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	find_scaffolds(g, opt, edges_score, scaffold);
 	insert_short_contig();
 	refine_scaffold(g, edges_score, scaffold);
-	print_scaffold_contig(scaffold);
+	print_scaffold_contig(opt, scaffold);
 	print_scaffold(g, out_file, scaffold);
 }
 
