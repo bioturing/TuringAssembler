@@ -2,7 +2,7 @@
 #include "helper.h"
 
 int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		khash_t(gint_int) *visited, int *is_disable, int depth,
 		int **path, int *path_leng)
 {
 	if (u == end_edge){
@@ -20,10 +20,10 @@ int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
 		if (lg.edges[v].rc_id == end_edge)
 			continue;
 		gint_t edge_code = get_edge_code(u, v);
-		if (kh_get(gint_t_int, visited, edge_code) != kh_end(visited))
+		if (kh_get(gint_int, visited, edge_code) != kh_end(visited))
 			continue;
 		int ret;
-		kh_put(gint_t_int, visited, edge_code, &ret);
+		kh_put(gint_int, visited, edge_code, &ret);
 		if (find_path(lg, v, start_edge, end_edge, visited,
 				is_disable, depth + 1, path, path_leng))
 			goto path_found;
@@ -35,7 +35,7 @@ path_found:
 }
 
 void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		khash_t(gint_int) *visited, int *is_disable, int depth,
 		int *path, FILE *record, int *count_paths)
 {
 	path[depth] = u;
@@ -66,10 +66,10 @@ void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge
 		if (g.edges[v].rc_id == end_edge)
 			continue;
 		gint_t edge_code = get_edge_code(u, v);
-		khiter_t it = kh_get(gint_t_int, visited, edge_code);
+		khiter_t it = kh_get(gint_int, visited, edge_code);
 		if (it == kh_end(visited)){
 			int ret;
-			it = kh_put(gint_t_int, visited, edge_code, &ret);
+			it = kh_put(gint_int, visited, edge_code, &ret);
 			kh_val(visited, it) = 0;
 		}
 		if (kh_val(visited, it) == 1)
@@ -77,7 +77,7 @@ void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge
 		++kh_val(visited, it);
 		find_all_paths(g, v, start_edge, end_edge, visited, is_disable,
 			depth + 1, path, record, count_paths);
-		it = kh_get(gint_t_int, visited, edge_code);
+		it = kh_get(gint_int, visited, edge_code);
 		--kh_val(visited, it);
 	}
 }
@@ -234,12 +234,12 @@ void get_path(struct asm_graph_t lg, int start_edge, int end_edge,
 {
 	int *is_disable;
 	filter_edges(lg, start_edge, end_edge, &is_disable);
-	khash_t(gint_t_int) *visited = kh_init(gint_t_int);
+	khash_t(gint_int) *visited = kh_init(gint_int);
 	*path_leng = 0;
 	*path = NULL;
 	int found = find_path(lg, start_edge, start_edge, end_edge, visited,
 			is_disable, 0, path, path_leng);
-	kh_destroy(gint_t_int, visited);
+	kh_destroy(gint_int, visited);
 	free(is_disable);
 }
 
@@ -257,7 +257,7 @@ gint_t get_edge_code(gint_t e1, gint_t e2)
 
 int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge)
 {
-	khash_t(gint_t_int) *visited = kh_init(gint_t_int);
+	khash_t(gint_int) *visited = kh_init(gint_int);
 	int *path = NULL;
 	int path_leng;
 	int *new_path = NULL;
@@ -274,13 +274,13 @@ int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge)
 	int ban_edge2 = -1;
 	filter_edges(lg, start_edge, end_edge, &is_disable);
 	for (int i = 1; i < path_leng; ++i){
-		kh_destroy(gint_t_int, visited);
-		visited = kh_init(gint_t_int);
+		kh_destroy(gint_int, visited);
+		visited = kh_init(gint_int);
 		ban_edge1 = path[i - 1];
 		ban_edge2 = path[i];
 		gint_t edge_code = get_edge_code(ban_edge1, ban_edge2);
 		int ret;
-		kh_put(gint_t_int, visited, edge_code, &ret);
+		kh_put(gint_int, visited, edge_code, &ret);
 		int tmp = find_path(lg, start_edge, start_edge, end_edge,
 				visited, is_disable, 0, &new_path,
 				&new_path_leng);
@@ -293,7 +293,7 @@ int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge)
 		}
 	}
 end_check_simple_path:
-	kh_destroy(gint_t_int, visited);
+	kh_destroy(gint_int, visited);
 	if (path != NULL)
 		free(path);
 	if (new_path != NULL)
@@ -483,8 +483,8 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 			goto path_found;
 		} else {
 			bridge_type = COMPLEX_PATH;
-			__VERBOSE_LOG("", "Complex path, searching for middle edge\n");
 			goto path_not_found;
+			/*__VERBOSE_LOG("", "Complex path, searching for middle edge\n");
 			int mid_edge;
 			get_midair_bridge(*lg, lc_e1, lc_e2, &mid_edge);
 			__VERBOSE_LOG("", "Middle edge found: %d\n", mid_edge);
@@ -493,7 +493,7 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 						lg->edges[mid_edge].seq_len);
 				goto path_found;
 			}
-			goto path_not_found;
+			goto path_not_found;*/
 		}
 	}
 path_not_found:
@@ -559,12 +559,11 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 	char *head_seq, *tail_seq;
 	int lc_e1 = path[0];
 	int lc_e2 = path[path_len - 1];
-	__VERBOSE("Joinging form %d to %d\n", lc_e1, lc_e2);
+	__VERBOSE("Joining from %d to %d\n", lc_e1, lc_e2);
 	sync_global_local_edge(e1, lg.edges[lc_e1], gpos1, lpos1,
 			SYNC_KEEP_GLOBAL, &head_seq);
 	sync_global_local_edge(e2, lg.edges[lc_e2], gpos2, lpos2,
 			SYNC_KEEP_LOCAL, &tail_seq);
-
 	*res_seq = (char *) calloc(1, sizeof(char));
 	join_seq(res_seq, head_seq);
 	for (int i = 1; i < path_len - 1; ++i){
@@ -645,63 +644,13 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		}
 	}
 }
-
-void find_path_max_cov(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *visited, int *is_disable, int depth,
-		int *tmp_path, int cov_sum, int *max_cov, int **path,
-		int *path_leng)
+/*
+int get_mid_edge(struct asm_graph_t *lg, int start_edge, int end_edge)
 {
-	tmp_path[depth] = u;
-	cov_sum += get_cov(lg, u);
-	if (u == end_edge){
-		if (*max_cov < cov_sum){
-			*path_leng = depth + 1;
-			*path = (int *) realloc(*path, sizeof(int) * *path_leng);
-			for (int i = 0; i < *path_leng; ++i)
-				(*path)[i] = tmp_path[i];
-			*max_cov = cov_sum;
-		}
-		return;
-	}
-	int tg = lg.edges[u].target;
-	for (int i = 0; i < lg.nodes[tg].deg; ++i){
-		gint_t v = lg.nodes[tg].adj[i];
-		if (v == start_edge)
-			continue;
-		if (is_disable[v])
-			continue;
-		if (lg.edges[v].rc_id == end_edge)
-			continue;
-		gint_t edge_code = get_edge_code(u, v);
-		khiter_t it = kh_get(gint_t_int, visited, edge_code);
-		if (it == kh_end(visited)){
-			int ret;
-			khiter_t it = kh_put(gint_t_int, visited, edge_code,
-					&ret);
-			kh_val(visited, it) = 0;
-		}
-		if (kh_val(visited, it) == 1)
-			continue;
-		++kh_val(visited, it);
-		find_path_max_cov(lg, v, start_edge, end_edge, visited,
-				is_disable, depth + 1, tmp_path, cov_sum,
-				max_cov, path, path_leng);
-		it = kh_get(gint_t_int, visited, edge_code);
-		--kh_val(visited, it);
-	}
-}
-
-void get_path_max_cov(struct asm_graph_t lg, int start_edge, int end_edge,
-		int **path, int *path_len)
-{
-	int *tmp_path = (int *) calloc(lg.n_e, sizeof(int));
-	khash_t(gint_t_int) *visited = kh_init(gint_t_int);
-	int *is_disable;
-	int max_cov = 0;
-	filter_edges(lg, start_edge, end_edge, &is_disable);
-	find_path_max_cov(lg, start_edge, start_edge, end_edge, visited,
-			is_disable, 0, tmp_path, 0, &max_cov, path, path_len);
-	free(is_disable);
-	free(tmp_path);
-	kh_destroy(gint_t_int, visited);
-}
+	int max_path_len = 0;
+	for (int i = 0; i < lg->n_v; ++i)
+		max_path_len += lg->nodes[i].deg;
+	int *path = (int *) calloc(max_path_len, sizeof(int));
+	khash_t(gint_int) *visited = kh_init(gint_int);
+	find_mid_edge(lg, start_edge, end_edge, 
+}*/

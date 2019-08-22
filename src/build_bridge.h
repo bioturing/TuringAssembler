@@ -24,8 +24,9 @@
 #include "verbose.h"
 #include "khash.h"
 #include "map_contig.h"
-KHASH_MAP_INIT_INT64(gint_t_int, int);
+KHASH_MAP_INIT_INT64(gint_int, int);
 KHASH_MAP_INIT_STR(str_int, int);
+
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		struct asm_edge_t e, int *edge_id, struct subseq_pos_t *gpos,
 		struct subseq_pos_t *lpos);
@@ -34,15 +35,9 @@ void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		struct subseq_pos_t *lpos);
 int check_simple_path(struct asm_graph_t lg, int start_edge, int end_edge);
 int find_path(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *visited, int *is_disable, int depth,
+		khash_t(gint_int) *visited, int *is_disable, int depth,
 		int **path, int *path_leng);
-void find_path_max_cov(struct asm_graph_t lg, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *visited, int *is_disable, int depth,
-		int *tmp_path, int cov_sum, int *max_cov, int **path,
-		int *path_leng);
-void find_all_paths(struct asm_graph_t g, gint_t u, int start_edge, int end_edge,
-		khash_t(gint_t_int) *vistied, int *is_disable, int depth,
-		int *path, FILE *record, int *count_paths);
+
 void get_path(struct asm_graph_t lg, int start_edge, int end_edge,
 		int **path, int *path_leng);
 void print_path(int *path, int path_leng);
@@ -66,10 +61,6 @@ void filter_edges(struct asm_graph_t g, int start_edge, int end_edge,
 		int **is_disable);
 void print_graph(struct asm_graph_t g, int *is_disable, char *path);
 
-int is_read_on_edge(struct read_t r, struct asm_edge_t e, int left, int right,
-		int ksize);
-void copy_seq_to_str(char *str, uint32_t *seq, int leng);
-
 void get_midair_bridge(struct asm_graph_t lg, int start_edge, int end_edge,
 		int *midair_edge);
 void join_seq(char **dest, char *source);
@@ -92,6 +83,5 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
 		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
 		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2);
-void get_path_max_cov(struct asm_graph_t lg, int start_edge, int end_edge,
-		int **path, int *path_len);
+//int get_mid_edge(struct asm_graph_t *lg, int start_edge, int end_edge);
 #endif
