@@ -48,6 +48,7 @@ SRC = src/assembly_graph.c 				\
       src/build_bridge.c 				\
       src/read_list.c 					\
       src/map_contig.c 					\
+      src/graph_search.c 				\
       src/helper.c 					\
       src/main.c
 
