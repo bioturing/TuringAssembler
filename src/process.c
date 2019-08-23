@@ -233,6 +233,8 @@ void build_bridge_process(struct opt_proc_t *opt)
 		free(contig);
 	}
 	for (int i = 0; i < g0->n_e; ++i){
+		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
+			continue;
 		if (mark[i] == 0){
 			int rc = g0->edges[i].rc_id;
 			char *tmp;
