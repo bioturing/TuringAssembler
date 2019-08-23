@@ -48,7 +48,7 @@ void link_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo);
 void connection_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo);
 void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int start_edge,
 		int **bfs_len);
-int find_path(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
+int find_path_hao(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 		int depth, int **path, int *path_len);
 int check_simple_path(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int *old_path, int old_path_len, int **new_path,

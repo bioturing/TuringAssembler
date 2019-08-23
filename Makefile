@@ -17,6 +17,7 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
+         -I ./src \
          -g
 
 EXEC = skipping
@@ -50,6 +51,19 @@ SRC = src/assembly_graph.c 				\
       src/map_contig.c 					\
       src/graph_search.c 				\
       src/helper.c 					\
+      src/fastg.c 					\
+      src/scaffolding/bin_hash.c 						\
+      src/scaffolding/algorithm.c 						\
+      src/scaffolding/compare.c 						\
+      src/scaffolding/buck.c 						\
+      src/scaffolding/contig.c 						\
+      src/scaffolding/edge.c 						\
+      src/scaffolding/global_params.c 						\
+      src/scaffolding/output.c 						\
+      src/scaffolding/score.c 						\
+      src/scaffolding/scaffolding.c 						\
+      src/scaffolding/scaffold.c 						\
+      src/scaffolding/contig_graph.c 						\
       src/main.c
 
 OBJ = $(SRC:.c=.o)

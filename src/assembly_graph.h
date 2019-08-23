@@ -10,11 +10,15 @@
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
 #define ASM_HAVE_CANDIDATE		0x8
+#define ASM_HAVE_BARCODE_SCAF		0x10
 
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
 #define ASM_BUILD_COVERAGE		0x4
 #define ASM_BUILD_CANDIDATE		0x8
+
+#define NOT_FOR_SCAFF 0x1
+#define FOR_SCAFFOLD 0x2
 
 struct pair_contig_t {
 	gint_t e1;
@@ -26,7 +30,12 @@ struct contig_count_t {
 	int n_pair;
 };
 
+#define __mix_2_64(x) (((x).e1 << 11) ^ ((x).e1 >> 33) ^ (x).e1 ^ (x).e2 ^ ((x).e2 << 11) ^ ((x).e2 >> 33))
+#define __cmp_2_64(x, y) ((x).e1 == (y).e1 && (x).e2 == (y).e2)
+
 KHASH_DECLARE(pair_contig_count, struct pair_contig_t, struct contig_count_t);
+
+KHASH_DECLARE(contig_count, gint_t, int);
 
 struct asm_node_t {
 	gint_t rc_id;		/* reverse complement link */
@@ -51,6 +60,8 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
+    struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+    struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -71,7 +82,7 @@ struct asm_graph_t {
 	khash_t(pair_contig_count) *candidates;
 };
 
-#define MIN_NOTICE_LEN			250
+#define MIN_NOTICE_LEN			100
 #define MIN_CONNECT_SIZE		500
 
 #define TIPS_RATIO_THRES		0.1
@@ -91,7 +102,8 @@ struct asm_graph_t {
 #define MAX_READ_FRAG_LEN		700
 
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE		3000
+#define MIN_CONTIG_BARCODE		5000
+#define MIN_CONTIG_BARCODE2		500
 /* Only add and use barcode for contig with length minimum */
 #define MIN_LONG_CONTIG			1000
 #define MIN_CONTIG_READPAIR		500
@@ -119,12 +131,16 @@ double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
 double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
-	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build);
+    struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
+void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2);
 struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2);
+struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
@@ -178,6 +194,7 @@ static inline struct cov_range_t convert_cov_range(double fcov)
 }
 /* Estimate coverage of 1 walk on genome */
 double get_genome_coverage(struct asm_graph_t *g);
+double get_genome_coverage_h(struct asm_graph_t *g);
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src);
 gint_t asm_create_node(struct asm_graph_t *g);
@@ -207,6 +224,8 @@ void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov);
 void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov);
 void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 				gint_t e_rc2, gint_t e_rc1);
+void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+	gint_t e2, gint_t e_rc2, uint32_t *aseq, int alen, int trim_e1, int trim_e2);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/
@@ -231,5 +250,6 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_pair_end(struct asm_graph_t *g, gint_t e);
 void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
+gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */

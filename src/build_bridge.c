@@ -282,7 +282,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 	for (int i = 1; i < path_len; ++i){
 		int u = path[i - 1];
 		int v = path[i];
-		struct asm_graph_t lg = test_local_assembly(opt, g,
+		struct asm_graph_t lg = get_local_assembly(opt, g,
 				g->edges[u].rc_id, v);
 		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 		__VERBOSE_LOG("INFO", "Processing %d on %d bridges\n", i, path_len - 1);

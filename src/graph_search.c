@@ -137,7 +137,7 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	filter_edges(lg, &ginfo);
 	*path_len = 0;
 	*path = NULL;
-	int found = find_path(lg, &ginfo, start_edge, 0, path, path_len);
+	int found = find_path_hao(lg, &ginfo, start_edge, 0, path, path_len);
 
 	if (found == 0){
 		__VERBOSE_LOG("PATH", "Path not found, exit\n");
@@ -266,7 +266,7 @@ void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int start_edge,
 	free(queue);
 }
 
-int find_path(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
+int find_path_hao(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 		int depth, int **path, int *path_len)
 {
 	*path = NULL;
@@ -288,7 +288,7 @@ int find_path(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 		if (check_link_visited(ginfo, u, v))
 			continue;
 		mark_link_visited(ginfo, u, v);
-		if (find_path(lg, ginfo, v, depth + 1, path, path_len))
+		if (find_path_hao(lg, ginfo, v, depth + 1, path, path_len))
 			goto path_found;
 	}
 	return 0;
@@ -305,7 +305,7 @@ int check_simple_path(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		kh_destroy(gint_int, ginfo->is_link_vst);
 		ginfo->is_link_vst = kh_init(gint_int);
 		mark_link_visited(ginfo, path[i - 1], path[i]);
-		int tmp = find_path(lg, ginfo, ginfo->start_edge, 0, new_path,
+		int tmp = find_path_hao(lg, ginfo, ginfo->start_edge, 0, new_path,
 				new_path_len);
 		if (tmp){
 			res = 0;

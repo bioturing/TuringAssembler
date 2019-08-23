@@ -286,7 +286,7 @@ void *biot_buffer_iterator(void *data)
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			} else {
-				record_len = strlen(read1.name) + strlen(read2.name) + 2 +
+				record_len = strlen(read1.name) + strlen(read2.name) + 2 + 2 +
 					(read1.len + 1) * 2 + (read2.len + 1) * 2 + 2 * 2 +
 					8 + 4 * 2;
 			}
