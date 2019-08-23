@@ -188,7 +188,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		{
 			for (int j = 0; j < *n_local_edges; j++) {
 				struct candidate_edge e_j = (*list_local_edges)[j];
-				VERBOSE_FLAG(0, "ffff %d\n", e_j.score.bc_score);
+				VERBOSE_FLAG(0, "ffff %f\n", e_j.score.bc_score);
 			}
 			*n_local_edges = i;
 			break;
