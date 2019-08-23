@@ -188,7 +188,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		{
 			for (int j = 0; j < *n_local_edges; j++) {
 				struct candidate_edge e_j = (*list_local_edges)[j];
-				VERBOSE_FLAG(0, "ffff %d\n", e_j.score.bc_score);
+				VERBOSE_FLAG(0, "ffff %f\n", e_j.score.bc_score);
 			}
 			*n_local_edges = i;
 			break;
@@ -546,7 +546,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
-	VERBOSE_FLAG(0, "\ndonescascore %f %d %d\n", score->bc_score, score->m_score, score->m2_score);
+	VERBOSE_FLAG(0, "\ndonescascore %f %f %f\n", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
