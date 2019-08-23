@@ -21,7 +21,7 @@ void add_edge(struct scaffold_type *scaffold, struct scaffold_edge *edge);
 void add_i_contig(struct scaffold_path *path, int i_contig);
 void add_path(struct scaffold_type *scaffold, struct scaffold_path *path);
 void destroy_path(struct scaffold_path *path);
-void print_scaffold_contig(struct scaffold_type *scaffold);
+void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffold);
 int get_last_n(struct scaffold_path *path, int is_left, int pos);
 void reverse_n_th(struct asm_graph_t *g, struct scaffold_path *path, int is_left, int pos);
 #endif /* __SCAFFOLDING_SCAFFOLD_H__*/

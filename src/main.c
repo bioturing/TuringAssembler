@@ -77,6 +77,10 @@ void print_usage(const char *prog)
 	__VERBOSE("          build_barcode [options] -1 read_1.fq -2 read_2.fq\n");
 	__VERBOSE("          build0 [options] -1 read_1.fq -2 read_2.fq\n");
 	__VERBOSE("          query -i <input_graph> -f <list edge>\n");
+	__VERBOSE("Skipping scaffolding\n");
+	__VERBOSE("Usage: %s\n", prog);
+	__VERBOSE("          build_barcode_scaffold [options] -1 read_1.fq -2 read_2.fq\n");
+	__VERBOSE("          build_scaffolding [option] [-metagenomics] -i addedbarcode.bin\n");
 }
 
 struct opt_proc_t *init_opt_proc()
