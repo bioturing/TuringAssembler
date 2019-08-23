@@ -132,7 +132,7 @@ double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
-void count_readpair_path(struct opt_proc_t *opt, struct read_path_t *rpath,
+void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
