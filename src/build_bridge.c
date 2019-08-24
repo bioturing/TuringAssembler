@@ -153,6 +153,55 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 	return res;
 }
 
+void join_complex_path(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
+		char **res_seq)
+{
+	char *first, *second;
+	sync_global_local_edge(e1, lc_e1, gpos1, lpos1, SYNC_KEEP_GLOBAL,
+			&first);
+	sync_global_local_edge(e2, lc_e2, gpos2, lpos2, SYNC_KEEP_LOCAL,
+			&second);
+	char *tmp;
+	get_dump_N(&tmp);
+	*res_seq = (char *) calloc(1, sizeof(char));
+	join_seq(res_seq, first);
+	join_seq(res_seq, tmp);
+	join_seq(res_seq, second);
+	free(first);
+	free(second);
+	free(tmp);
+}
+
+void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
+		struct asm_edge_t middle, char **res_seq)
+{
+	char *first, *second, *mid;
+	sync_global_local_edge(e1, lc_e1, gpos1, lpos1, SYNC_KEEP_GLOBAL,
+			&first);
+	sync_global_local_edge(e2, lc_e2, gpos2, lpos2, SYNC_KEEP_LOCAL,
+			&second);
+	decode_seq(&mid, middle.seq, middle.seq_len);
+	char *dump_N;
+	get_dump_N(&dump_N);
+	*res_seq = (char *) calloc(1, sizeof(char));
+	join_seq(res_seq, first);
+	join_seq(res_seq, dump_N);
+	join_seq(res_seq, mid);
+	join_seq(res_seq, dump_N);
+	join_seq(res_seq, second);
+	free(first);
+	free(second);
+	free(dump_N);
+	free(mid);
+
+}
+
 int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
 		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
@@ -180,14 +229,21 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 					lpos2, &bridge_seq);
 			goto path_found;
 		} else {
-			bridge_type = NON_TRIVIAL_CASE;
-			goto path_not_found;
-			/*if (mid_edge != -1){
-				decode_seq(&bridge_seq, lg->edges[mid_edge].seq,
-						lg->edges[mid_edge].seq_len);
+			//if (mid_edge == -1){
+				bridge_type = NON_TRIVIAL_CASE;
+				join_complex_path(g->edges[e1], g->edges[e2],
+					lg->edges[lc_e1], lg->edges[lc_e2],
+					gpos1, lpos1, gpos2, lpos2,
+					&bridge_seq);
 				goto path_found;
-			}
-			goto path_not_found;*/
+			/*} else {
+				bridge_type = NON_TRIVIAL_CASE;
+				join_middle_edge(g->edges[e1], g->edges[e2],
+					lg->edges[lc_e1], lg->edges[lc_e2],
+					gpos1, lpos1, gpos2, lpos2,
+					lg->edges[mid_edge], &bridge_seq);
+				goto path_found;
+			}*/
 		}
 	}
 path_not_found:
@@ -298,20 +354,12 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			decode_seq(&tmp, seq, leng);
 			join_seq(contig, tmp + g->edges[path[i - 1]].seq_len);
 			free(tmp);
-		} else if (res == NON_TRIVIAL_CASE && seq != NULL){
-			__VERBOSE_LOG("", "Middle edge found\n");
-			char *dump_N;
-			get_dump_N(&dump_N);
-			join_seq(contig, dump_N);
-
+		} else if (res == NON_TRIVIAL_CASE){
+			__VERBOSE_LOG("", "Complex path\n");
 			char *tmp;
 			decode_seq(&tmp, seq, leng);
-			join_seq(contig, tmp);
+			join_seq(contig, tmp + g->edges[path[i - 1]].seq_len);
 			free(tmp);
-
-			join_seq(contig, dump_N);
-
-			free(dump_N);
 		} else {
 			char *dump_N;
 			get_dump_N(&dump_N);

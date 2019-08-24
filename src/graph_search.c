@@ -353,6 +353,9 @@ void find_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		int v = lg->nodes[tg].adj[i];
+		if (v == lg->edges[ginfo->start_edge].rc_id ||
+			v == lg->edges[ginfo->end_edge].rc_id)
+			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
 		if (check_link_trash(ginfo, u, v))

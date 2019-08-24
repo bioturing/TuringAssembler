@@ -55,4 +55,14 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
 		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
 		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2);
+void join_complex_path(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
+		char **res_seq);
+void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
+		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
+		struct asm_edge_t middle, char **res_seq);
 #endif
