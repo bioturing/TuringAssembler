@@ -364,7 +364,9 @@ void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
 		__ERROR("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	dst->seq[m - 1] &= ((uint32_t)1 << (((dst->seq_len - trim_dst) & 15) << 1)) - 1;
+	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
+		(((uint32_t)1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
+	dst->seq[m - 1] &= mask;
 
 	if (len >= 0) {
 		for (i = 0, k = dst->seq_len - trim_dst; i < len; ++i, ++k) {
@@ -399,12 +401,14 @@ void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t 
 		__ERROR("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	dst->seq[m - 1] &= ((uint32_t)1 << (((dst->seq_len - trim_dst) & 15) << 1)) - 1;
+	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
+		(((uint32_t)1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
+	dst->seq[m - 1] &= mask;
 
 	if (len >= 0) {
 		for (i = len - 1, k = dst->seq_len - trim_dst; i >= 0; --i, ++k) {
-			c = __binseq_get(seq, i);
-			__binseq_set(dst->seq, k, c ^ 3);
+			c = __binseq_get(seq, i) ^ 3;
+			__binseq_set(dst->seq, k, c);
 		}
 
 		for (i = trim_src, k = dst->seq_len - trim_dst + len; i < src->seq_len; ++i, ++k) {
