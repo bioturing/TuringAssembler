@@ -1848,15 +1848,14 @@ void list_all_path(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 		if (kh_get(gint, set_e, e) == kh_end(set_e))
 			continue;
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_all_path(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize, set_e,
 				cap, opt);
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1875,15 +1874,14 @@ void list_all_path_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_all_path_local(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize,
 				cap, opt);
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1902,9 +1900,8 @@ void list_path_slim_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cu
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_path_slim_local(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize,
@@ -1912,7 +1909,7 @@ void list_path_slim_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cu
 			if (opt->cnt > opt->max_cnt)
 				return;
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1933,9 +1930,8 @@ void list_path_slim(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 		if (kh_get(gint, set_e, e) == kh_end(set_e))
 			continue;
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_path_slim(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize, set_e,
@@ -1943,7 +1939,7 @@ void list_path_slim(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 			if (opt->cnt > opt->max_cnt)
 				return;
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1978,6 +1974,7 @@ void reconstruct_path_global(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	uint32_t e1_len, uint32_t e2_len, gint_t *list_e, uint32_t n_e,
 	struct result_local_t *sret)
 {
+	__VERBOSE_LOG("DEBUG", "n_e = %u\n", n_e);
 	uint32_t len, i, k, c;
 	gint_t e;
 	len = e1_len;
@@ -2001,7 +1998,7 @@ void reconstruct_path_global(struct asm_graph_t *g, gint_t e1, gint_t e2,
 			++len;
 		}
 	}
-	for (k = g->ksize; k < g->edges[e2].seq_len; ++k) {
+	for (k = g->ksize; k < e2_len; ++k) {
 		c = __binseq_get(g->edges[e2].seq, k);
 		__binseq_set(sret->seq, len, c);
 		++len;
@@ -2031,17 +2028,18 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 	khash_t(cap_set) *cap = kh_init(cap_set);
 	for (e = 0; e < g->n_e; ++e) {
 		it = kh_put(cap_set, cap, e, &hash_ret);
-		kh_value(cap, it) = 0;
+		kh_value(cap, it) = 4;
 	}
 	max_list_e = g->n_e * 4;
 
 	sprintf(fasta_path, "%s/candidates.fasta", opt->out_dir);
+	__VERBOSE_LOG("DEBUG", "fasta path: %s\n", fasta_path);
 
 	struct dfs_listpath_t dfs_opt;
 	dfs_opt.e1 = e1;
 	dfs_opt.e2 = e2;
 	dfs_opt.max_len = 3000;
-	dfs_opt.max_cnt = 100;
+	dfs_opt.max_cnt = 500;
 	dfs_opt.fp = xfopen(fasta_path, "wb");
 	dfs_opt.cnt = 0;
 	dfs_opt.cand_len = malloc((dfs_opt.max_cnt + 1) * sizeof(uint32_t));
@@ -2091,6 +2089,8 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 
 	list_path_slim_local(g, g->edges[e1].target, g->edges[e2].source, 0, cap,
 								&dfs_opt);
+	sret->seq = NULL;
+	sret->len = sret->trim_e1 = sret->trim_e2 = 0;
 	reconstruct_path_global(g, e1, e2, e1_len, e2_len, dfs_opt.list_e, dfs_opt.n_e, sret);
 	kh_destroy(contig_count, ctg_cnt);
 	ret = 1;
@@ -2245,7 +2245,11 @@ int local_assembly(struct opt_local_t *opt, struct asm_graph_t *g0, gint_t e1,
 		&(local_read.R1_path), &(local_read.R2_path), work_dir, &lg, g0, e1, e2);
 	// save_graph_info(work_dir, &lg, "local_lvl_0");
 	build_0_1(&lg, &lg1);
-	int ret = fill_path_local(opt, g0, &lg1, e1, e2, sret);
+	struct opt_local_t optl;
+	optl = *opt;
+	optl.out_dir = work_dir;
+	optl.read_path = &local_read;
+	int ret = fill_path_local(&optl, g0, &lg1, e1, e2, sret);
 	if (!ret) {
 		save_graph_info(work_dir, &lg1, "local_lvl_1");
 	}
@@ -2293,7 +2297,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		struct cov_range_t rcov = get_edge_cov_range(g, e, uni_cov);
 		max_list_e += rcov.hi;
 		it = kh_put(cap_set, cap, e, &hash_ret);
-		kh_value(cap, it) = 0;
+		kh_value(cap, it) = rcov.hi;
 	}
 
 	sprintf(fasta_path, "%s/candidates.fasta", work_dir);
@@ -2302,7 +2306,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	dfs_opt.e1 = e1_rc;
 	dfs_opt.e2 = e2;
 	dfs_opt.max_len = 3000;
-	dfs_opt.max_cnt = 100;
+	dfs_opt.max_cnt = 500;
 	dfs_opt.fp = xfopen(fasta_path, "wb");
 	dfs_opt.cnt = 0;
 	dfs_opt.cand_len = malloc((dfs_opt.max_cnt + 1) * sizeof(uint32_t));
@@ -2450,7 +2454,7 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		kh_put(used_pair, assemblied_pair, used_key1, &hash_ret);
 		struct result_local_t sret;
 		int ret = local_assembly(opt, g, e1, e2, &sret);
-		if (ret) {
+		if (ret == 1) {
 			e1_rc = g->edges[e1].rc_id;
 			e2_rc = g->edges[e2].rc_id;
 			asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
@@ -2523,7 +2527,8 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 				if (n_self == 0 && n_leg == 2)
 					resolve_local += join_1_1_jungle_la(g, set_e, set_leg,
 						&opt_local, assemblied_pair);
-				else if (n_self + n_leg >= 2)
+				else
+				if (n_self + n_leg >= 2)
 					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
 						&opt_local, assemblied_pair);
 			}

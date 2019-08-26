@@ -137,6 +137,7 @@ struct producer_bundle_t *init_fastq_single(int n_threads, int n_files,
 
 	int64_t total_size = 0;
 	int64_t *processed_size = malloc(sizeof(int64_t));
+	*processed_size = 0;
 
 	for (i = 0; i < n_files; ++i) {
 		struct gb_single_data *data = calloc(1, sizeof(struct gb_single_data));
@@ -181,6 +182,7 @@ struct producer_bundle_t *init_fastq_pair(int n_threads, int n_files,
 
 	int64_t total_size = 0;
 	int64_t *processed_size = malloc(sizeof(int64_t));
+	*processed_size = 0;
 
 	for (i = 0; i < n_files; ++i) {
 		struct gb_pair_data *data = calloc(1, sizeof(struct gb_pair_data));
@@ -225,6 +227,7 @@ struct producer_bundle_t *init_fastq_triple(int n_threads, int n_files,
 
 	int64_t total_size = 0;
 	int64_t *processed_size = malloc(sizeof(int64_t));
+	*processed_size = 0;
 
 	for (i = 0; i < n_files; ++i) {
 		struct gb_trip_data *data = calloc(1, sizeof(struct gb_trip_data));

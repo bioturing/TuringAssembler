@@ -32,6 +32,13 @@ struct pathcount_bundle_t {
 	khash_t(contig_count) *count_cand;
 };
 
+struct asm_align_t {
+	int rid;
+	int pos;
+	int score:30, strand:2;
+	int aligned;
+};
+
 mem_opt_t *asm_memopt_init()
 {
 	mem_opt_t *o;
@@ -195,6 +202,7 @@ void count_readpair_path(int n_threads, struct read_path_t *rpath,
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int i;
 	struct producer_bundle_t *producer_bundles;
+	__VERBOSE_LOG("DEBUG", "NTHREAD = %d\n", n_threads);
 	producer_bundles = init_fastq_pair(n_threads, 1,
 					&(rpath->R1_path), &(rpath->R2_path));
 
@@ -293,13 +301,6 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 	bwa_idx_destroy(bwa_idx);
 	free(bwa_opt);
 }
-
-struct asm_align_t {
-	int rid;
-	int pos;
-	int score;
-	int aligned;
-};
 
 static inline int infer_bw(int l1, int l2, int score, int a, int q, int r)
 {
@@ -408,6 +409,7 @@ struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 	} else {
 		a.rid = -1;
 	}
+	a.strand = is_rev;
 	return a;
 }
 
@@ -884,8 +886,8 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			if (p2[k].aligned < r2->len)
 				continue;
 			c2 = atoi(idx->bns->anns[p2[k].rid].name);
-			//if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN) {
-			if (c1 == c2) {
+			if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN
+				&& p1[i].strand != p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
 				if (it != kh_end(count_cand))
 					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);
