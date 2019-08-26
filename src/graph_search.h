@@ -54,6 +54,6 @@ int check_simple_path(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int *old_path, int old_path_len, int **new_path,
 		int *new_path_len);
 void print_path(int *path, int path_len);
-void find_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo,
-		int u, int *path, int depth, int *best_edge);
+void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int u, int *path, int depth, int *mark);
 #endif

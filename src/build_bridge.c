@@ -58,7 +58,6 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	struct map_contig_t mct;
 	init_map_contig(&mct, g.edges[e.rc_id], lg);
 	*edge_id = find_match(&mct);
-	__VERBOSE("%d\n", *edge_id);
 	if (*edge_id == -1)
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);
@@ -112,7 +111,7 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 }
 
 int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
-		uint32_t **ret_seq, uint32_t *seq_len)
+		char **ret_seq, int *seq_len)
 {
 	__VERBOSE("Matching edges...\n");
 	int lc_e1;
@@ -203,7 +202,7 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 }
 
 int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
-		uint32_t **ret_seq, uint32_t *seq_len, int lc_e1, int lc_e2,
+		char **ret_seq, int *seq_len, int lc_e1, int lc_e2,
 		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
 		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2)
 {
@@ -229,21 +228,23 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 					lpos2, &bridge_seq);
 			goto path_found;
 		} else {
-			//if (mid_edge == -1){
+			if (mid_edge == -1){
 				bridge_type = NON_TRIVIAL_CASE;
 				join_complex_path(g->edges[e1], g->edges[e2],
 					lg->edges[lc_e1], lg->edges[lc_e2],
 					gpos1, lpos1, gpos2, lpos2,
 					&bridge_seq);
 				goto path_found;
-			/*} else {
+			} else {
+				__VERBOSE_LOG("", "Middle edge: %d\n", mid_edge);
 				bridge_type = NON_TRIVIAL_CASE;
 				join_middle_edge(g->edges[e1], g->edges[e2],
 					lg->edges[lc_e1], lg->edges[lc_e2],
 					gpos1, lpos1, gpos2, lpos2,
 					lg->edges[mid_edge], &bridge_seq);
+				__VERBOSE("HIHIHI\n");
 				goto path_found;
-			}*/
+			}
 		}
 	}
 path_not_found:
@@ -253,7 +254,9 @@ path_not_found:
 	goto end_function;
 path_found:
 	*seq_len = strlen(bridge_seq);
-	encode_seq(ret_seq, bridge_seq);
+	//encode_seq(ret_seq, bridge_seq);
+	*ret_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
+	strcpy(*ret_seq, bridge_seq);
 	free(bridge_seq);
 end_function:
 	return bridge_type;
@@ -332,10 +335,12 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int *path, int path_len, char **contig)
 {
 	*contig = (char *) calloc(1, sizeof(char));
-	char *tmp;
-	decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
-	join_seq(contig, tmp);
-	free(tmp);
+	{
+		char *tmp;
+		decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
+		join_seq(contig, tmp);
+		free(tmp);
+	}
 	for (int i = 1; i < path_len; ++i){
 		int u = path[i - 1];
 		int v = path[i];
@@ -344,22 +349,22 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 		__VERBOSE_LOG("INFO", "Processing %d on %d bridges\n", i, path_len - 1);
 		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
-		uint32_t *seq;
-		uint32_t leng;
+		char *seq;
+		int leng;
 		int res = get_bridge(g, &lg, u, v, &seq, &leng);
 
 		if (res == TRIVIAL_CASE){
 			__VERBOSE_LOG("", "Trivial path found\n");
-			char *tmp;
-			decode_seq(&tmp, seq, leng);
-			join_seq(contig, tmp + g->edges[path[i - 1]].seq_len);
-			free(tmp);
+			//char *tmp;
+			//decode_seq(&tmp, seq, leng);
+			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
+			//free(tmp);
 		} else if (res == NON_TRIVIAL_CASE){
 			__VERBOSE_LOG("", "Complex path\n");
-			char *tmp;
-			decode_seq(&tmp, seq, leng);
-			join_seq(contig, tmp + g->edges[path[i - 1]].seq_len);
-			free(tmp);
+			//char *tmp;
+			//decode_seq(&tmp, seq, leng);
+			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
+			//free(tmp);
 		} else {
 			char *dump_N;
 			get_dump_N(&dump_N);

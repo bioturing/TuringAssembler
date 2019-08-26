@@ -2149,7 +2149,8 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
 		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
 		&lg, g, e1, e2);
-	build_0_1(&lg, &lg1);
+	save_graph_info(work_dir, &lg, "local_lvl_0");
+	build_local_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local_lvl_1");
 	return lg1;
 	// uint32_t *ret_seq, ret_len;

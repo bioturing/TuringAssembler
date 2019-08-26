@@ -170,6 +170,7 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	graph_info_destroy(&new_ginfo);
 path_not_found:
 	graph_info_destroy(&ginfo);
+	*middle_edge = -1;
 	return res;
 }
 
@@ -332,29 +333,36 @@ int get_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	for (int i = 0; i < lg->n_v; ++i)
 		deg_sum += lg->nodes[i].deg;
 	int *path = (int *) calloc(deg_sum, sizeof(int));
-	find_best_middle_edge(lg, &new_ginfo, new_ginfo.start_edge, path, 0,
-			&res);
+	int *mark = (int *) calloc(ginfo->n_edges, sizeof(int));
+	find_middle_edge_candidates(lg, &new_ginfo, new_ginfo.start_edge, path,
+			0, mark);
+	for (int i = 0; i < ginfo->n_edges; ++i){
+		if (!mark[i] || mark[lg->edges[i].rc_id])
+			continue;
+		if (res == -1 || lg->edges[res].seq_len < lg->edges[i].seq_len)
+			res = i;
+	}
 	free(path);
+	free(mark);
 	graph_info_destroy(&new_ginfo);
 	return res;
 }
 
-void find_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo,
-		int u, int *path, int depth, int *best_edge)
+void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int u, int *path, int depth, int *mark)
 {
-	path[depth + 1] = u;
+	path[depth] = u;
 	if (u == ginfo->end_edge){
 		for (int i = 1; i < depth; ++i)
-			if (*best_edge == -1 || lg->edges[*best_edge].seq_len
-				< lg->edges[path[i]].seq_len)
-				*best_edge = path[i];
+			mark[path[i]] = 1;
 		return;
 	}
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		int v = lg->nodes[tg].adj[i];
 		if (v == lg->edges[ginfo->start_edge].rc_id ||
-			v == lg->edges[ginfo->end_edge].rc_id)
+			v == lg->edges[ginfo->end_edge].rc_id ||
+			v == ginfo->start_edge)
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
@@ -363,7 +371,7 @@ void find_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		if (check_link_visited(ginfo, u, v))
 			continue;
 		mark_link_visited(ginfo, u, v);
-		find_best_middle_edge(lg, ginfo, v, path, depth + 1, best_edge);
+		find_middle_edge_candidates(lg, ginfo, v, path, depth + 1, mark);
 		unmark_link_visited(ginfo, u, v);
 	}
 }
