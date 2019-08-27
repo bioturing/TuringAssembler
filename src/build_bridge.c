@@ -2,44 +2,6 @@
 #include "helper.h"
 #include "graph_search.h"
 
-void print_graph(struct asm_graph_t g, int *is_disable, char *path)
-{
-	FILE *f = fopen(path, "w");
-	int *mark = (int *) calloc(g.n_e, sizeof(int));
-	for (int u = 0; u < (int) g.n_e; ++u){
-		if (is_disable[u])
-			continue;
-		if (mark[u] || mark[g.edges[u].rc_id])
-			continue;
-		mark[u] = mark[g.edges[u].rc_id] = 1;
-		fprintf(f, "S\t%d_%ld_%.3f\t", u, g.edges[u].rc_id,
-				get_cov(g, u));
-		for (int i = 0; i < (int)g.edges[u].seq_len; ++i)
-			fprintf(f, "%c", int_to_base(__binseq_get(g.edges[u].seq, i)));
-		fprintf(f, "\tKC:i:%ld\n", g.edges[u].count);
-	}
-	for (int u = 0; u < (int) g.n_e; ++u)
-		mark[u] = 0;
-	for (int u = 0; u < (int) g.n_e; ++u){
-		if (is_disable[u])
-			continue;
-		if (mark[u] || mark[g.edges[u].rc_id])
-			continue;
-		mark[u] = mark[g.edges[u].rc_id] = 1;
-		int tg = g.edges[u].target;
-		for (int i = 0; i < (int) g.nodes[tg].deg; ++i){
-			int v = g.nodes[tg].adj[i];
-			if (is_disable[v])
-				continue;
-			fprintf(f, "L\t%d_%ld_%.3f\t+\t%d_%ld_%.3f\t+\t%dM\n", u,
-					g.edges[u].rc_id, get_cov(g, u),
-					v, g.edges[v].rc_id, get_cov(g, v),
-					g.ksize);
-		}
-	}
-	fclose(f);
-}
-
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
 	*seq = calloc(1, sizeof(char));
@@ -135,20 +97,6 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 
 	int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1, lc_e2,
 			gpos1, lpos1, gpos2, lpos2);
-	/*if (res == PATH_NOT_FOUND){
-		__VERBOSE_LOG("", "Checkiing if edge is reversed\n");
-		get_local_edge_head(*g, *lg, g->edges[e2], &lc_e2, &gpos2,
-				&lpos2);
-		__VERBOSE_LOG("", "Local edge 2 reversed: %d\n", lc_e2);
-		__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
-				gpos2.start, gpos2.end);
-		__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
-				lpos2.start, lpos2.end);
-		int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1,
-				lc_e2, gpos1, lpos1, gpos2, lpos2);
-		if (res == TRIVIAL_CASE)
-			res = MIS_SCAFFOLD;
-	}*/
 	return res;
 }
 
@@ -211,7 +159,7 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 	if (lc_e1 == -1 || lc_e2 == -1){
 		goto path_not_found;
 	} else if (lc_e1 == lc_e2){
-		bridge_type = TRIVIAL_CASE;
+		bridge_type = TRIVIAL_BRIDGE;
 		join_trivial_bridge(g->edges[e1], g->edges[e2], *lg, lc_e1,
 				gpos1, lpos1, gpos2, lpos2, &bridge_seq);
 		goto path_found;
@@ -222,35 +170,34 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		int path_type = get_path(lg, lc_e1, lc_e2, &mid_edge,
 				&path, &path_len);
 		if (path_type == SIMPLE_PATH){
-			bridge_type = TRIVIAL_CASE;
+			bridge_type = SINGLE_PATH;
 			join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
 					path, path_len, gpos1, lpos1, gpos2,
 					lpos2, &bridge_seq);
 			goto path_found;
-		} else {
+		} else if (path_type == COMPLEX_PATH){
+			bridge_type = MULTIPLE_PATH;
 			if (mid_edge == -1){
-				bridge_type = NON_TRIVIAL_CASE;
 				join_complex_path(g->edges[e1], g->edges[e2],
 					lg->edges[lc_e1], lg->edges[lc_e2],
 					gpos1, lpos1, gpos2, lpos2,
 					&bridge_seq);
-				goto path_found;
 			} else {
 				__VERBOSE_LOG("", "Middle edge: %d\n", mid_edge);
-				bridge_type = NON_TRIVIAL_CASE;
 				join_middle_edge(g->edges[e1], g->edges[e2],
 					lg->edges[lc_e1], lg->edges[lc_e2],
 					gpos1, lpos1, gpos2, lpos2,
 					lg->edges[mid_edge], &bridge_seq);
-				__VERBOSE("HIHIHI\n");
-				goto path_found;
 			}
+			goto path_found;
+		} else {
+			goto path_not_found;
 		}
 	}
 path_not_found:
 	*ret_seq = NULL;
 	*seq_len = 0;
-	bridge_type = PATH_NOT_FOUND;
+	bridge_type = NO_PATH_FOUND;
 	goto end_function;
 path_found:
 	*seq_len = strlen(bridge_seq);
@@ -341,6 +288,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		join_seq(contig, tmp);
 		free(tmp);
 	}
+	int bridge_types[N_BRIDGE_TYPE] = {};
 	for (int i = 1; i < path_len; ++i){
 		int u = path[i - 1];
 		int v = path[i];
@@ -353,19 +301,17 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int leng;
 		int res = get_bridge(g, &lg, u, v, &seq, &leng);
 
-		if (res == TRIVIAL_CASE){
-			__VERBOSE_LOG("", "Trivial path found\n");
-			//char *tmp;
-			//decode_seq(&tmp, seq, leng);
+		if (res == TRIVIAL_BRIDGE){
+			__VERBOSE_LOG("", "Trivial bridge found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-			//free(tmp);
-		} else if (res == NON_TRIVIAL_CASE){
-			__VERBOSE_LOG("", "Complex path\n");
-			//char *tmp;
-			//decode_seq(&tmp, seq, leng);
+		} else if (res == SINGLE_PATH){
+			__VERBOSE_LOG("", "Single path found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-			//free(tmp);
+		} else if (res == MULTIPLE_PATH){
+			__VERBOSE_LOG("", "Multiple paths found\n");
+			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 		} else {
+			__VERBOSE_LOG("", "No path found\n");
 			char *dump_N;
 			get_dump_N(&dump_N);
 			join_seq(contig, dump_N);
@@ -378,6 +324,16 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			free(tmp);
 			free(dump_N);
 		}
+		++bridge_types[res];
 	}
+	__VERBOSE_LOG("INFO", "Path sumary:\n");
+	__VERBOSE_LOG("", "Number of trivial bridges: %d\n",
+			bridge_types[TRIVIAL_BRIDGE]);
+	__VERBOSE_LOG("", "Number of single paths: %d\n",
+			bridge_types[SINGLE_PATH]);
+	__VERBOSE_LOG("", "Number of multiple paths: %d\n",
+			bridge_types[MULTIPLE_PATH]);
+	__VERBOSE_LOG("", "Number of disconnected region: %d\n",
+			bridge_types[NO_PATH_FOUND]);
 }
 

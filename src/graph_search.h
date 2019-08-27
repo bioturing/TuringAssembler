@@ -56,4 +56,5 @@ int check_simple_path(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 void print_path(int *path, int path_len);
 void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int *path, int depth, int *mark);
+void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo);
 #endif

@@ -126,6 +126,48 @@ int check_key_exist(khash_t(gint_int) *h, gint_t key)
 	return it != kh_end(h);
 }
 
+void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
+{
+	char path[1024];
+	sprintf(path, "%d_%d_local.gfa", ginfo->start_edge, ginfo->end_edge);
+	FILE *f = fopen(path, "w");
+	int *mark = (int *) calloc(ginfo->n_edges, sizeof(int));
+	for (int u = 0; u < ginfo->n_edges; ++u){
+		if (check_edge_trash(ginfo, u))
+			continue;
+		if (mark[u] || mark[lg->edges[u].rc_id])
+			continue;
+		mark[u] = mark[lg->edges[u].rc_id] = 1;
+		fprintf(f, "S\t%d_%ld_%.3f\t", u, lg->edges[u].rc_id,
+				get_cov(*lg, u));
+		for (int i = 0; i < (int) lg->edges[u].seq_len; ++i)
+			fprintf(f, "%c", int_to_base(__binseq_get(lg->edges[u].seq, i)));
+		fprintf(f, "\tKC:i:%ld\n", lg->edges[u].count);
+	}
+	for (int u = 0; u < ginfo->n_edges; ++u)
+		mark[u] = 0;
+	for (int u = 0; u < ginfo->n_edges; ++u){
+		if (check_edge_trash(ginfo, u))
+			continue;
+		if (mark[u] || mark[lg->edges[u].rc_id])
+			continue;
+		mark[u] = mark[lg->edges[u].rc_id] = 1;
+		int tg = lg->edges[u].target;
+		for (int i = 0; i < (int) lg->nodes[tg].deg; ++i){
+			int v = lg->nodes[tg].adj[i];
+			if (check_edge_trash(ginfo, v))
+				continue;
+			if (check_link_trash(ginfo, u, v))
+				continue;
+			fprintf(f, "L\t%d_%ld_%.3f\t+\t%d_%ld_%.3f\t+\t%dM\n", u,
+					lg->edges[u].rc_id, get_cov(*lg, u),
+					v, lg->edges[v].rc_id, get_cov(*lg, v),
+					lg->ksize);
+		}
+	}
+	fclose(f);
+}
+
 int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 		int *middle_edge, int **path, int *path_len)
 {
@@ -135,6 +177,7 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	struct graph_info_t ginfo;
 	graph_info_init(&ginfo, lg->n_e, start_edge, end_edge);
 	filter_edges(lg, &ginfo);
+	print_graph(lg, &ginfo);
 	*path_len = 0;
 	*path = NULL;
 	int found = find_path_hao(lg, &ginfo, start_edge, 0, path, path_len);
@@ -168,9 +211,12 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 		*middle_edge = get_best_middle_edge(lg, &ginfo);
 	}
 	graph_info_destroy(&new_ginfo);
+	goto end_function;
 path_not_found:
-	graph_info_destroy(&ginfo);
 	*middle_edge = -1;
+	goto end_function;
+end_function:
+	graph_info_destroy(&ginfo);
 	return res;
 }
 
@@ -235,7 +281,7 @@ void connection_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 			++disabled;
 		}
 	}
-	__VERBOSE_LOG("", "Before filter: %d edges\n",
+	__VERBOSE_LOG("", "After filter: %d edges\n",
 			ginfo->n_edges - disabled);
 }
 

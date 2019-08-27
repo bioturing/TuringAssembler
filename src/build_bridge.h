@@ -11,8 +11,11 @@
 #define BRIDGE_GAP 1000
 #define MIN_READ_MAP_RATIO 0.95
 #define POS_IGNORED 1e9
-#define TRIVIAL_CASE 1
-#define NON_TRIVIAL_CASE 0
+#define NO_PATH_FOUND 0
+#define TRIVIAL_BRIDGE 1
+#define SINGLE_PATH 2
+#define MULTIPLE_PATH 3
+#define N_BRIDGE_TYPE 4
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
 #include <stdlib.h>
@@ -33,7 +36,6 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq);
 gint_t get_edge_code(gint_t u, gint_t v);
-void print_graph(struct asm_graph_t g, int *is_disable, char *path);
 
 void join_seq(char **dest, char *source);
 void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
