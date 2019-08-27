@@ -291,7 +291,7 @@ struct params_build_candidate_edges* new_params_build_candidate_edges(
 	params_candidate->g = g;
 	params_candidate->i = 0;
 	params_candidate->big_table = big_table;
-	params_candidate->list_candidate_edges = NULL;
+	params_candidate->list_candidate_edges = calloc(1, sizeof(struct edges_score_type));
 	params_candidate->avg_bin_hash = get_avg_barcode(g);
 	return params_candidate;
 }
