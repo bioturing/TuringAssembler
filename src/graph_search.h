@@ -17,10 +17,11 @@ struct graph_info_t{
 	int *is_edge_vst;
 	khash_t(gint_int) *is_link_trash;
 	khash_t(gint_int) *is_link_vst;
+	khash_t(gint_int) *link_max_vst;
 };
 
-void graph_info_init(struct graph_info_t *ginfo, int n_edges, int start_edge,
-		int end_edge);
+void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int n_edges, int start_edge, int end_edge);
 int check_edge_trash(struct graph_info_t *ginfo, int e);
 int check_link_trash(struct graph_info_t *ginfo, int e1, int e2);
 int check_edge_visted(struct graph_info_t *ginfo, int e);

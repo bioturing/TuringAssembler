@@ -2,8 +2,8 @@
 #include "verbose.h"
 #include "helper.h"
 
-void graph_info_init(struct graph_info_t *ginfo, int n_edges, int start_edge,
-		int end_edge)
+void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int n_edges, int start_edge, int end_edge)
 {
 	ginfo->n_edges = n_edges;
 	ginfo->start_edge = start_edge;
@@ -12,6 +12,19 @@ void graph_info_init(struct graph_info_t *ginfo, int n_edges, int start_edge,
 	ginfo->is_edge_vst = (int *) calloc(n_edges, sizeof(int));
 	ginfo->is_link_trash = kh_init(gint_int);
 	ginfo->is_link_vst = kh_init(gint_int);
+	ginfo->link_max_vst = kh_init(gint_int);
+	float avg_vst = (float) (get_cov(*lg, ginfo->start_edge) +
+			get_cov(*lg, ginfo->end_edge)) / 2;
+	for (int u = 0; u < ginfo->n_edges; ++u){
+		int tg = lg->edges[u].target;
+		for (int i = 0; i < (int) lg->nodes[tg].deg; ++i){
+			int v = lg->nodes[tg].adj[i];
+			gint_t edge_code = get_edge_code(u, v);
+			int ret;
+			khiter_t it = kh_put(gint_int, ginfo->link_max_vst,
+					edge_code, &ret);
+		}
+	}
 }
 
 void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
@@ -32,6 +45,7 @@ void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
 		insert_key(dest->is_link_trash, key);
 	}
 	dest->is_link_vst = kh_init(gint_int);
+	dest->link_max_vst = kh_init(gint_int);
 }
 
 int check_edge_trash(struct graph_info_t *ginfo, int e)
@@ -66,7 +80,12 @@ int check_edge_visited(struct graph_info_t *ginfo, int e)
 int check_link_visited(struct graph_info_t *ginfo, int e1, int e2)
 {
 	gint_t edge_code = get_edge_code(e1, e2);
-	return check_key_exist(ginfo->is_link_vst, edge_code);
+	khiter_t it = kh_get(gint_int, ginfo->is_link_vst, edge_code);
+	int n_vst = kh_val(ginfo->is_link_vst, it);
+	it = kh_get(gint_int, ginfo->is_link_vst, edge_code);
+	int max_vst = kh_val(ginfo->link_max_vst, it);
+	return n_vst == max_vst;
+	//return check_key_exist(ginfo->is_link_vst, edge_code);
 }
 
 void mark_edge_visited(struct graph_info_t *ginfo, int e)
@@ -191,7 +210,7 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	__VERBOSE_LOG("PATH", "Finding path from %d to %d\n", start_edge,
 			end_edge);
 	struct graph_info_t ginfo;
-	graph_info_init(&ginfo, lg->n_e, start_edge, end_edge);
+	graph_info_init(lg, &ginfo, lg->n_e, start_edge, end_edge);
 	filter_edges(lg, &ginfo);
 	int t = 0;
 	for (int i = 0; i < ginfo.n_edges; ++i)

@@ -314,8 +314,8 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 				- g->edges[path[i]].seq_len);
 		} else if (res == MULTIPLE_PATH){
 			__VERBOSE_LOG("", "Multiple paths found\n");
-			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len - 200);
+			/*closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len - 200);*/
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 		} else {
 			__VERBOSE_LOG("", "No path found\n");
@@ -327,8 +327,8 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			decode_seq(&tmp, g->edges[path[i]].seq,
 					g->edges[path[i]].seq_len);
 			join_seq(contig, tmp);
-			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len - 100);
+			/*closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len - 100);*/
 
 			free(tmp);
 			free(dump_N);
