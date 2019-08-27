@@ -137,7 +137,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		if (value != 0) {
 			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf.n_item ;
 			int cnt1 = g->edges[i_contig].barcodes_scaf.n_item;
-			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash); 
+			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash);
+			new_candidate_edge->score.m2_score = value;
 			(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 			++*n_local_edges;
 		}
@@ -253,7 +254,6 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 
 void *process_build_candidate_edges(void *data)
 {
-	VERBOSE_FLAG(1, "build candidate edgeee \n");
 	struct params_build_candidate_edges *params_candidate;
 	params_candidate = (struct params_build_candidate_edges*) data;
 	struct asm_graph_t *g = params_candidate->g;
@@ -280,7 +280,6 @@ void *process_build_candidate_edges(void *data)
             append_edge_score(params_candidate->list_candidate_edges, &list_local_edges[i]);
         }
 		pthread_mutex_unlock(&lock_append_edges);
-		VERBOSE_FLAG(0, "nlocaledge from %d %d \n", i_contig, n_local_edges);
 		free(list_local_edges);
 	} while(1);
 	pthread_exit(NULL);
