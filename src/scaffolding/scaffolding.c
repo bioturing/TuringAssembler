@@ -125,6 +125,9 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		*list_local_edges = realloc(*list_local_edges, (*n_local_edges+1) *
 				sizeof(struct scaffold_edge));
 		struct scaffold_edge *new_candidate_edge = calloc(1, sizeof(struct scaffold_edge));
+		if ((i_contig == i_edge && g->edges[i_contig].seq_len < 50000)  || i_contig == get_rc_id(g, i_edge) ) {
+		    continue;
+		}
 		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = i_contig;
 		float e1_cov = __get_edge_cov(&g->edges[i_edge], g->ksize);
