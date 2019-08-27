@@ -135,23 +135,20 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	for (int u = 0; u < ginfo->n_edges; ++u){
 		if (check_edge_trash(ginfo, u))
 			continue;
-		if (mark[u] || mark[lg->edges[u].rc_id])
+		if (mark[u])
 			continue;
-		mark[u] = mark[lg->edges[u].rc_id] = 1;
+		mark[u] = 1;
+		mark[lg->edges[u].rc_id] = 2;
 		fprintf(f, "S\t%d_%ld_%.3f\t", u, lg->edges[u].rc_id,
 				get_cov(*lg, u));
 		for (int i = 0; i < (int) lg->edges[u].seq_len; ++i)
 			fprintf(f, "%c", int_to_base(__binseq_get(lg->edges[u].seq, i)));
 		fprintf(f, "\tKC:i:%ld\n", lg->edges[u].count);
 	}
-	for (int u = 0; u < ginfo->n_edges; ++u)
-		mark[u] = 0;
-	for (int u = 0; u < ginfo->n_edges; ++u){
-		if (check_edge_trash(ginfo, u))
+	for (int it = 0; it < ginfo->n_edges; ++it){
+		int u = it;
+		if (!mark[u])
 			continue;
-		if (mark[u] || mark[lg->edges[u].rc_id])
-			continue;
-		mark[u] = mark[lg->edges[u].rc_id] = 1;
 		int tg = lg->edges[u].target;
 		for (int i = 0; i < (int) lg->nodes[tg].deg; ++i){
 			int v = lg->nodes[tg].adj[i];
@@ -159,12 +156,31 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 				continue;
 			if (check_link_trash(ginfo, u, v))
 				continue;
-			fprintf(f, "L\t%d_%ld_%.3f\t+\t%d_%ld_%.3f\t+\t%dM\n", u,
-					lg->edges[u].rc_id, get_cov(*lg, u),
+			char dir1;
+			if (mark[u] == 1){
+				dir1 = '+';
+			} else {
+				dir1 = '-';
+				u = lg->edges[u].rc_id;
+			}
+			char dir2;
+			if (mark[v] == 1){
+				dir2 = '+';
+			} else {
+				dir2 = '-';
+				v = lg->edges[v].rc_id;
+			}
+			fprintf(f, "L\t%d_%ld_%.3f\t%c\t%d_%ld_%.3f\t%c\t%dM\n",
+				u, lg->edges[u].rc_id, get_cov(*lg, u), dir1,
+				v, lg->edges[v].rc_id, get_cov(*lg, v), dir2,
+				lg->ksize);
+			/*fprintf(f, "L\t%d_%ld_%.3f\t-\t%d_%ld_%.3f\t-\t%dM\n",
 					v, lg->edges[v].rc_id, get_cov(*lg, v),
-					lg->ksize);
+					u, lg->edges[u].rc_id, get_cov(*lg, u),
+					lg->ksize);*/
 		}
 	}
+	__VERBOSE("haha\n");
 	fclose(f);
 }
 
@@ -177,7 +193,19 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	struct graph_info_t ginfo;
 	graph_info_init(&ginfo, lg->n_e, start_edge, end_edge);
 	filter_edges(lg, &ginfo);
+	int t = 0;
+	for (int i = 0; i < ginfo.n_edges; ++i)
+		t += check_edge_trash(&ginfo, i);
+	__VERBOSE("%d %d\n", ginfo.n_edges, t);
 	print_graph(lg, &ginfo);
+	t = 0;
+	for (int i = 0; i < ginfo.n_edges; ++i)
+		t += check_edge_trash(&ginfo, i);
+	__VERBOSE("%d %d\n", ginfo.n_edges, t);
+	for (int i = 0; i < ginfo.n_edges; ++i)
+		if (check_edge_trash(&ginfo, i) + check_edge_trash(&ginfo, i)
+				== 1)
+			__VERBOSE("%d\n", i);
 	*path_len = 0;
 	*path = NULL;
 	int found = find_path_hao(lg, &ginfo, start_edge, 0, path, path_len);
@@ -231,7 +259,7 @@ void cov_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
 	__VERBOSE_LOG("COV FILTER", "+----------------------------------+\n");
 	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e);
-	int thresh = (int) (MIN_DEPTH_RATIO * 
+	int thresh = (int) (MIN_DEPTH_RATIO *
 			max(get_cov(*lg, ginfo->start_edge),
 				get_cov(*lg, ginfo->end_edge)));
 	int disabled = 0;

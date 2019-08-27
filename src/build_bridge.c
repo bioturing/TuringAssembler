@@ -73,7 +73,7 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 }
 
 int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
-		char **ret_seq, int *seq_len)
+		char **res_seq, int *seq_len)
 {
 	__VERBOSE("Matching edges...\n");
 	int lc_e1;
@@ -95,8 +95,8 @@ int get_bridge(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
 			lpos2.end);
 
-	int res = try_bridging(g, lg, e1, e2, ret_seq, seq_len, lc_e1, lc_e2,
-			gpos1, lpos1, gpos2, lpos2);
+	int res = try_bridging(g, lg, e1, e2, lc_e1, lc_e2, gpos1, lpos1,
+			gpos2, lpos2, res_seq, seq_len);
 	return res;
 }
 
@@ -150,9 +150,9 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 }
 
 int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
-		char **ret_seq, int *seq_len, int lc_e1, int lc_e2,
-		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
-		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2)
+		int lc_e1, int lc_e2, struct subseq_pos_t gpos1,
+		struct subseq_pos_t lpos1, struct subseq_pos_t gpos2,
+		struct subseq_pos_t lpos2, char **res_seq, int *seq_len)
 {
 	int bridge_type;
 	char *bridge_seq;
@@ -195,15 +195,14 @@ int try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg, int e1, int e2,
 		}
 	}
 path_not_found:
-	*ret_seq = NULL;
+	*res_seq = NULL;
 	*seq_len = 0;
 	bridge_type = NO_PATH_FOUND;
 	goto end_function;
 path_found:
 	*seq_len = strlen(bridge_seq);
-	//encode_seq(ret_seq, bridge_seq);
-	*ret_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
-	strcpy(*ret_seq, bridge_seq);
+	*res_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
+	strcpy(*res_seq, bridge_seq);
 	free(bridge_seq);
 end_function:
 	return bridge_type;
@@ -289,6 +288,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		free(tmp);
 	}
 	int bridge_types[N_BRIDGE_TYPE] = {};
+	FILE *f = fopen("gap.txt", "w");
 	for (int i = 1; i < path_len; ++i){
 		int u = path[i - 1];
 		int v = path[i];
@@ -300,15 +300,22 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		char *seq;
 		int leng;
 		int res = get_bridge(g, &lg, u, v, &seq, &leng);
+		int closed_gap = 0;
 
 		if (res == TRIVIAL_BRIDGE){
 			__VERBOSE_LOG("", "Trivial bridge found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
+			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len);
 		} else if (res == SINGLE_PATH){
 			__VERBOSE_LOG("", "Single path found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
+			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len);
 		} else if (res == MULTIPLE_PATH){
 			__VERBOSE_LOG("", "Multiple paths found\n");
+			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len - 200);
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 		} else {
 			__VERBOSE_LOG("", "No path found\n");
@@ -320,12 +327,20 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			decode_seq(&tmp, g->edges[path[i]].seq,
 					g->edges[path[i]].seq_len);
 			join_seq(contig, tmp);
+			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len - 100);
 
 			free(tmp);
 			free(dump_N);
 		}
 		++bridge_types[res];
+		__VERBOSE_LOG("GAP", "Closed gap: %d\n", closed_gap);
+		fprintf(f, "Gap from %d to %d: %d\n", path[i],
+				path[i - 1], closed_gap);
+		fprintf(f, "%d %d %d\n", g->edges[path[i - 1]].seq_len,
+				g->edges[path[i]].seq_len, leng);
 	}
+	fclose(f);
 	__VERBOSE_LOG("INFO", "Path sumary:\n");
 	__VERBOSE_LOG("", "Number of trivial bridges: %d\n",
 			bridge_types[TRIVIAL_BRIDGE]);
