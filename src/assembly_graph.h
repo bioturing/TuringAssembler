@@ -102,7 +102,7 @@ struct asm_graph_t {
 #define MAX_READ_FRAG_LEN		700
 
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE		5000
+#define MIN_CONTIG_BARCODE		12000
 #define MIN_CONTIG_BARCODE2		500
 /* Only add and use barcode for contig with length minimum */
 #define MIN_LONG_CONTIG			1000
