@@ -17,12 +17,6 @@ void print_edge_score(struct edges_score_type *edges_score);
 
 struct scaffold_edge{
 	int src, des;
-	int rv_src, rv_des;
-	struct pair_contigs_score score;
-};
-
-struct candidate_edge {
-	int src, des;
 	struct pair_contigs_score score;
 };
 
