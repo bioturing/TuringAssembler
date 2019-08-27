@@ -575,10 +575,10 @@ void refine_path(struct asm_graph_t *g, struct edges_score_type *edges_score, st
 		VERBOSE_FLAG(0, "get score tripple %d %d %d normal %f reverse %f", left, mid, right, normal_score->bc_score, reverse_score->bc_score);
 		if (better_edge(reverse_score, normal_score)) {
 			reverse_n_th(g, path, 1, j);
+			j++;
 		}
 		free(normal_score);
 		free(reverse_score);
-		j++;
 	}
 }
 
