@@ -84,13 +84,16 @@ void destroy_params_build_candidate(struct params_build_candidate_edges *para)
 	free(para);
 }
 
-void count_pos(int *count, struct list_position *pos)
+int count_pos(int *count, struct list_position *pos)
 {
 	assert(pos != NULL && count != NULL);
 	VERBOSE_FLAG(3, "n pos %d\n", pos->n_pos);
+	int res = 0;
 	for (int i = 0; i < pos->n_pos; i++){
-		count[pos->i_contig[i]]++ ;
+	    res++;
+		count[pos->i_contig[i]]++;
 	}
+    return res;
 }
 
 void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *params, int *n_local_edges, 
@@ -107,6 +110,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		return;
 
 	struct barcode_hash_t *buck = &rev_e->barcodes_scaf;
+	int total_count = 0;
 	for (int j = 0; j < buck->size; j++){
 		if (buck->keys[j] != (uint64_t)(-1)) {
 			uint64_t barcode = buck->keys[j];
@@ -114,9 +118,10 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 			if (k == kh_end(big_table))
 				continue;
 			struct list_position *pos = kh_value(big_table, k);
-			count_pos(count, pos);
+			total_count = count_pos(count, pos);
 		}
-	} 
+	}
+	VERBOSE_FLAG(0, "i_edge %d n_items %d sum_count_pos",  i_edge, buck->n_item, total_count);
 
 	for (int i_contig = 0; i_contig < g->n_e; i_contig++) {
 		if (is_very_short_contig(&g->edges[i_contig]))
