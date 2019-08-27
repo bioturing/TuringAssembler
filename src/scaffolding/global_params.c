@@ -29,7 +29,6 @@ void init_global_params(struct asm_graph_t *g)
 	global_genome_coverage = get_genome_coverage_h(g);
 	VERBOSE_FLAG(1, "global genome coverrage %f\n", global_genome_coverage);
 	global_filter_constant = 30;
-	global_number_degree = 10;
 	global_n_candidate = 11;
 	global_count_bc_size = 3000;
 	global_distance = 60000;
