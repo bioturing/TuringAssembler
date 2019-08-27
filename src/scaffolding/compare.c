@@ -35,23 +35,23 @@ int ascending_edge(const void *e0, const void *e1)
 	return t1;
 }
 
-int decending_candidate_edge(const void *d0, const void *d1)
+int decending_scaffold_edge(const void *d0, const void *d1)
 {
-	float a =  ((struct candidate_edge *) d0)->score.bc_score;
-	float b =  ((struct candidate_edge *) d1)->score.bc_score;
+	float a =  ((struct scaffold_edge *) d0)->score.bc_score;
+	float b =  ((struct scaffold_edge *) d1)->score.bc_score;
 	return (a < b) - (a > b);
 }
 
-int ascending_index_edge(const void *e0, const void *e1)
-{
-	struct candidate_edge *a = (struct candidate_edge *) e0;
-	struct candidate_edge *b = (struct candidate_edge *) e1;
-	int t0 = (a->src > b->src) - (a->src < b->src);
-	int t1 = (a->des > b->des) - (a->des < b->des);
-	if (t0 != 0)
-		return t0;
-	return t1;
-}
+//int ascending_index_edge(const void *e0, const void *e1)
+//{
+//	struct scaff *a = (struct candidate_edge *) e0;
+//	struct candidate_edge *b = (struct candidate_edge *) e1;
+//	int t0 = (a->src > b->src) - (a->src < b->src);
+//	int t1 = (a->des > b->des) - (a->des < b->des);
+//	if (t0 != 0)
+//		return t0;
+//	return t1;
+//}
 
 int ascending_scaffold_edge_index(const void *e0, const void *e1)
 {
