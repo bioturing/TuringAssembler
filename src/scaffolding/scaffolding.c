@@ -73,7 +73,6 @@ KHASH_MAP_INIT_INT64(big_table, struct list_position*)
 struct params_build_candidate_edges{
 	struct asm_graph_t *g;
 	int i;
-	int n_candidate_edges;
 	struct edges_score_type *list_candidate_edges;
 	float avg_bin_hash;
 	khash_t(big_table) *big_table;
@@ -273,11 +272,6 @@ void *process_build_candidate_edges(void *data)
 				&n_local_edges,
 				&list_local_edges);
 		pthread_mutex_lock(&lock_append_edges);
-        int n = params_candidate->n_candidate_edges;
-        params_candidate->list_candidate_edges =
-            realloc(params_candidate->list_candidate_edges, (n + n_local_edges) *
-                    sizeof(struct scaffold_edge));
-        params_candidate->n_candidate_edges += n_local_edges;
 
         for (int i = 0; i < n_local_edges; i++) {
             append_edge_score(params_candidate->list_candidate_edges, &list_local_edges[i]);
@@ -297,7 +291,6 @@ struct params_build_candidate_edges* new_params_build_candidate_edges(
 	params_candidate->g = g;
 	params_candidate->i = 0;
 	params_candidate->big_table = big_table;
-	params_candidate->n_candidate_edges = 0;
 	params_candidate->list_candidate_edges = NULL;
 	params_candidate->avg_bin_hash = get_avg_barcode(g);
 	return params_candidate;
@@ -314,19 +307,6 @@ void run_parallel_build_candidate_edges(struct params_build_candidate_edges *par
 		pthread_join(thr[i], NULL);
 	free(thr);
 	pthread_attr_destroy(&attr);
-}
-
-struct params_check_edge *new_params_check_edge(struct asm_graph_t *g, struct opt_proc_t *opt,
-	struct params_build_candidate_edges *params_candidate) 
-{
-	struct params_check_edge *params = calloc(1, sizeof(struct params_check_edge));
-	params->g = g;
-	params->i = 0;
-	params->avg_bin_hash = get_avg_barcode(g);
-	params->n_candidate_edges = params_candidate->n_candidate_edges;
-	params->list_candidate_edges = params_candidate->list_candidate_edges;
-	params->opt = opt;
-	return params;
 }
 
 void remove_lov_high_cov(struct asm_graph_t *g)
@@ -354,7 +334,6 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 		new_params_build_candidate_edges(g, opt, big_table);
 	run_parallel_build_candidate_edges(params_candidate, opt->n_threads);
 	// sorted candidate edge
-	VERBOSE_FLAG(1, "n candidate edges %d", params_candidate->n_candidate_edges);
 	VERBOSE_FLAG(1, "done build candidate edge");
 
 	*edges_score = params_candidate->list_candidate_edges;
