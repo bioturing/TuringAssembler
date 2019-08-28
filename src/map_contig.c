@@ -9,6 +9,7 @@ void init_map_contig(struct map_contig_t *mct, struct asm_edge_t global_edge,
 	mct->pos = 0;
 	mct->n_candidates = local_graph.n_e;
 	mct->best_match = -1;
+	mct->is_match = (int *) calloc(mct->local_graph.n_e, sizeof(int));
 	init_local_kmers(mct);
 }
 
@@ -98,21 +99,27 @@ int count_match_kmer(khash_t(int32_int) *first, khash_t(int32_int) *second)
 
 int find_match(struct map_contig_t *mct)
 {
+	int cur_pos = 0;
 	while (mct->pos < (int) mct->global_edge.seq_len){
 		int res = find_match_from_pos(mct);
 		if (res != -1){
-			mct->best_match = res;
-			return res;
+			if (mct->best_match == -1){
+				mct->best_match = res;
+				cur_pos = mct->pos;
+			}
+			mct->is_match[res] = 1;
 		}
 		advance_pos(mct);
 	}
-	return -1;
+	mct->pos = cur_pos;
+	return mct->best_match;
 }
 
 void map_contig_destroy(struct map_contig_t *mct)
 {
 	for (int i = 0; i < mct->n_candidates; ++i)
 		kh_destroy(int32_int, mct->kmers[i]);
+	free(mct->is_match);
 }
 
 void advance_pos(struct map_contig_t *mct)

@@ -5,7 +5,7 @@
 #define MIN_RELATIVE_COV_RATIO 0.2
 #define SIMPLE_PATH 0
 #define COMPLEX_PATH 1
-#define MAX_PATH_COUNT 500
+#define MAX_PATH_COUNT 100
 #include "khash.h"
 #include "assembly_graph.h"
 #include <stdio.h>
@@ -68,7 +68,7 @@ void print_path(int *path, int path_len);
 void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int *path, int depth, int *mark);
 void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo);
-void get_all_paths(struct asm_graph_t *lg, int start_edge, int end_edge,
+void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo);
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo);

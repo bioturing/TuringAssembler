@@ -21,7 +21,7 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 	ginfo->link_max_vst = kh_init(gint_int);
 	float avg_cov = 0;
 	int n_e = 0;
-	int *mark = (int *) calloc(ginfo->g->n_e, sizeof(int));
+	/*int *mark = (int *) calloc(ginfo->g->n_e, sizeof(int));
 	for (int i = 0; i < ginfo->g->n_e; ++i){
 		if (check_edge_trash(ginfo, i))
 			continue;
@@ -31,7 +31,7 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 		++n_e;
 		avg_cov += get_cov(*(ginfo->g), i);
 	}
-	avg_cov /= n_e;
+	avg_cov /= n_e;*/
 	float init_cov = (float) (get_cov(*ginfo->g, ginfo->start_edge) +
 			get_cov(*ginfo->g, ginfo->end_edge)) / 2;
 	for (int u = 0; u < ginfo->g->n_e; ++u){
@@ -43,8 +43,8 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 			khiter_t it = kh_put(gint_int, ginfo->link_max_vst,
 					edge_code, &ret);
 			float tmp = ceil(1.0 * get_cov(*ginfo->g, v) / init_cov);
-			if (tmp > avg_cov)
-				tmp = avg_cov;
+			/*if (tmp > avg_cov)
+				tmp = avg_cov;*/
 			kh_val(ginfo->link_max_vst, it) = (int) tmp;
 		}
 	}
@@ -230,20 +230,17 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	fclose(f);
 }
 
-void get_all_paths(struct asm_graph_t *lg, int start_edge, int end_edge,
+void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo)
 {
-	struct graph_info_t ginfo;
-	graph_info_init(lg, &ginfo, start_edge, end_edge);
-	filter_edges(lg, &ginfo);
-	print_graph(lg, &ginfo);
+	filter_edges(lg, ginfo);
+	print_graph(lg, ginfo);
 	int deg_sum = 0;
-	for (int i = 0; i < ginfo.g->n_v; ++i)
-		deg_sum += ginfo.g->nodes[i].deg;
+	for (int i = 0; i < ginfo->g->n_v; ++i)
+		deg_sum += ginfo->g->nodes[i].deg;
 	int *path = (int *) calloc(deg_sum, sizeof(int));
-	find_all_paths(lg, &ginfo, ginfo.start_edge, 0, path, pinfo);
+	find_all_paths(lg, ginfo, ginfo->start_edge, 0, path, pinfo);
 	free(path);
-	graph_info_destroy(&ginfo);
 }
 
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
@@ -326,16 +323,19 @@ end_function:
 
 void filter_edges(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
-	cov_filter(lg, ginfo);
+	//cov_filter(lg, ginfo);
 	//link_filter(lg, ginfo);
-	connection_filter(lg, ginfo);
+	//connection_filter(lg, ginfo);
 	graph_info_init_max_vst(ginfo);
 }
 
 void cov_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
 	__VERBOSE_LOG("COV FILTER", "+----------------------------------+\n");
-	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e);
+	int is_disabled = 0;
+	for (int i = 0; i < lg->n_e; ++i)
+		is_disabled += check_edge_trash(ginfo, i);
+	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e - is_disabled);
 	int thresh = (int) (MIN_DEPTH_RATIO *
 			max(get_cov(*lg, ginfo->start_edge),
 				get_cov(*lg, ginfo->end_edge)));

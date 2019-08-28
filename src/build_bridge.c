@@ -71,6 +71,34 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
+void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_graph_t *lg, struct graph_info_t *ginfo)
+{
+	__VERBOSE_LOG("UNRELATED FILTER", "Before filter: %d edges\n", lg->n_e);
+	struct map_contig_t mct_1;
+	init_map_contig(&mct_1, e1, *lg);
+	// Must reverse e1 outside
+	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
+
+	struct map_contig_t mct_2;
+	init_map_contig(&mct_2, e2, *lg);
+	int lc_e2 = find_match(&mct_2);
+
+	int is_disabled = 0;
+	for (int i = 0; i < lg->n_e; ++i){
+		if (i == lc_e1 || i == lc_e2)
+			continue;
+		int rc_id = lg->edges[i].rc_id;
+		if (mct_2.is_match[i] || mct_2.is_match[rc_id] ||
+			mct_1.is_match[i] || mct_1.is_match[rc_id]){
+			mark_edge_trash(ginfo, i);
+			++is_disabled;
+		}
+	}
+	__VERBOSE_LOG("UNRELATED FILTER", "After filter: %d edges\n", lg->n_e - is_disabled);
+
+}
+
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, char **res_seq,
 		int *seq_len)
@@ -165,11 +193,18 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 				gpos1, lpos1, gpos2, lpos2, &bridge_seq);
 		goto path_found;
 	} else {
+		struct graph_info_t ginfo;
+		graph_info_init(lg, &ginfo, lc_e1, lc_e2);
+		unrelated_filter(g->edges[g->edges[e1].rc_id], g->edges[e2],
+				lg, &ginfo);
 		struct path_info_t pinfo;
 		path_info_init(&pinfo);
-		get_all_paths(lg, lc_e1, lc_e2, &pinfo);
-		if (pinfo.n_paths == 0)
+		get_all_paths(lg, &ginfo, &pinfo);
+		if (pinfo.n_paths == 0){
+			path_info_destroy(&pinfo);
+			graph_info_destroy(&ginfo);
 			goto path_not_found;
+		}
 		/*for (int i = 0; i < pinfo.n_paths; ++i){
 			__VERBOSE("len: %d\n", pinfo.path_lens[i]);
 			for (int j = 0; j < pinfo.path_lens[i]; ++j)
@@ -201,6 +236,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 				pinfo.path_lens[best_path], gpos1, lpos1,
 				gpos2, lpos2, &bridge_seq);
 		path_info_destroy(&pinfo);
+		graph_info_destroy(&ginfo);
 		goto path_found;
 	}
 	/*} else {

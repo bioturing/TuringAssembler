@@ -18,6 +18,7 @@ struct map_contig_t{
 	int n_candidates;
 	int pos;
 	int best_match;
+	int *is_match;
 };
 
 struct subseq_pos_t{
