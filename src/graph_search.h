@@ -1,16 +1,17 @@
 #ifndef __GRAPH_SEARCH__
 #define __GRAPH_SEARCH__
-#define MIN_DEPTH_RATIO 0.05
+#define MIN_DEPTH_RATIO 0.2
 #define MIN_PATH_LENGTH 20
 #define MIN_RELATIVE_COV_RATIO 0.2
 #define SIMPLE_PATH 0
 #define COMPLEX_PATH 1
 #include "khash.h"
 #include "assembly_graph.h"
+#include <stdio.h>
 #define PATH_NOT_FOUND -1
 KHASH_MAP_INIT_INT64(gint_int, int);
 struct graph_info_t{
-	int n_edges;
+	struct asm_graph_t *g;
 	int start_edge;
 	int end_edge;
 	int *is_edge_trash;
@@ -20,8 +21,16 @@ struct graph_info_t{
 	khash_t(gint_int) *link_max_vst;
 };
 
+struct path_info_t{
+	int n_paths;
+	int m_paths;
+	int *path_lens;
+	int **paths;
+};
+
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
-		int n_edges, int start_edge, int end_edge);
+			int start_edge, int end_edge);
+void graph_info_init_max_vst(struct graph_info_t *ginfo);
 int check_edge_trash(struct graph_info_t *ginfo, int e);
 int check_link_trash(struct graph_info_t *ginfo, int e1, int e2);
 int check_edge_visted(struct graph_info_t *ginfo, int e);
@@ -58,4 +67,11 @@ void print_path(int *path, int path_len);
 void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int *path, int depth, int *mark);
 void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo);
+void get_all_paths(struct asm_graph_t *lg, int start_edge, int end_edge,
+		struct path_info_t *pinfo);
+void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int u, int depth, int *cur_path, struct path_info_t *pinfo);
+void path_info_init(struct path_info_t *path);
+void path_info_push(struct path_info_t *pinfo, int *path, int len);
+void path_info_destroy(struct path_info_t *pinfo);
 #endif

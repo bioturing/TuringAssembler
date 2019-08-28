@@ -739,10 +739,10 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
-		/*cnt_tips_complex = remove_tips_topo(g0);
+		cnt_tips_complex = remove_tips_topo(g0);
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
-		*g0 = *g;*/
+		*g0 = *g;
 
 		 cnt_chimeric = remove_chimeric(g0);
 		asm_condense(g0, g);

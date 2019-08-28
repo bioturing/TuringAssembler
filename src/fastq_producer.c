@@ -96,7 +96,7 @@ void *fastq_producer(void *data)
 	}
 	buffer_free(own_buf);
 	__VERBOSE("\rLoad 100%%");
-
+	__VERBOSE("\n");
 	int cur;
 	pthread_barrier_wait(bundle->barrier);
 	while (1) {

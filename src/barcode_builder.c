@@ -197,7 +197,7 @@ void init_barcode_graph(struct asm_graph_t *g, int mapper_algo)
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand)
 {
-	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
+	bwa_idx_build(fasta_path, fasta_path , BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
 	mem_opt_t *bwa_opt = asm_memopt_init();
 	pthread_attr_t attr;
