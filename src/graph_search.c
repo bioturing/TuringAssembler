@@ -234,7 +234,7 @@ void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo)
 {
 	filter_edges(lg, ginfo);
-	print_graph(lg, ginfo);
+	//print_graph(lg, ginfo); //DEBUG only
 	int deg_sum = 0;
 	for (int i = 0; i < ginfo->g->n_v; ++i)
 		deg_sum += ginfo->g->nodes[i].deg;
@@ -279,7 +279,7 @@ int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, start_edge, end_edge);
 	filter_edges(lg, &ginfo);
-	print_graph(lg, &ginfo);
+	//print_graph(lg, &ginfo); //DEBUG only
 	*path_len = 0;
 	*path = NULL;
 	int found = find_path_hao(lg, &ginfo, start_edge, 0, path, path_len);

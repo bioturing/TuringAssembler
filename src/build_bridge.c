@@ -288,9 +288,9 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
 		int e1, int e2, int **scores)
 {
-	char cand_dir[1024];
-	sprintf(cand_dir, "%d_%d_all.fasta", e1, e2);
-	FILE *f = fopen(cand_dir, "w");
+	char cand_path[1024];
+	sprintf(cand_path, "%s/%d_%d_all.fasta", opt->out_dir, e1, e2);
+	FILE *f = fopen(cand_path, "w");
 	for (int i = 0; i < pinfo->n_paths; ++i){
 		fprintf(f, ">%d\n", i);
 		char *seq;
@@ -314,7 +314,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	read_path.R2_path = (char *) calloc(1024, sizeof(char));
 	sprintf(read_path.R2_path, "%s/local_assembly_%d_%d/R2.sub.fq",opt->out_dir,
 			g->edges[e1].rc_id, e2);
-	count_readpair_path(opt->n_threads, &read_path, cand_dir, ctg_cnt);
+	count_readpair_path(opt->n_threads, &read_path, cand_path, ctg_cnt);
 	*scores = (int *) calloc(pinfo->n_paths, sizeof(int));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
 		if (!kh_exist(ctg_cnt, it))
@@ -405,7 +405,9 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		free(tmp);
 	}
 	int bridge_types[N_BRIDGE_TYPE] = {};
-	FILE *f = fopen("gap.txt", "w");
+	char gap_path[1024];
+	sprintf(gap_path, "%s/gap.txt", opt->out_dir);
+	FILE *f = fopen(gap_path, "w");
 	for (int i = 1; i < path_len; ++i){
 		int u = path[i - 1];
 		int v = path[i];
