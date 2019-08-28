@@ -249,6 +249,8 @@ void get_all_paths(struct asm_graph_t *lg, int start_edge, int end_edge,
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo)
 {
+	if (pinfo->n_paths == MAX_PATH_COUNT)
+		return;
 	cur_path[depth] = u;
 	if (u == ginfo->end_edge){
 		path_info_push(pinfo, cur_path, depth + 1);

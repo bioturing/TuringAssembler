@@ -5,6 +5,7 @@
 #define MIN_RELATIVE_COV_RATIO 0.2
 #define SIMPLE_PATH 0
 #define COMPLEX_PATH 1
+#define MAX_PATH_COUNT 500
 #include "khash.h"
 #include "assembly_graph.h"
 #include <stdio.h>

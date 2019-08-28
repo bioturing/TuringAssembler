@@ -13,13 +13,11 @@
 #define POS_IGNORED 1e9
 #define NO_PATH_FOUND 0
 #define TRIVIAL_BRIDGE 1
-#define PATH_FOUND 2
-#define LOCAL_NOT_FOUND 3
+#define SINGLE_PATH 2
+#define MULTIPLE_PATH 3
 #define N_BRIDGE_TYPE 4
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
-#define MIN_PATH_SCORE 0.95
-#define TOO_COMPLEX_THRESH 500
 #include <stdlib.h>
 #include "assembly_graph.h"
 #include "verbose.h"

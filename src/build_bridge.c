@@ -158,25 +158,25 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int bridge_type;
 	char *bridge_seq;
 	if (lc_e1 == -1 || lc_e2 == -1){
-		goto local_not_found;
+		goto path_not_found;
 	} else if (lc_e1 == lc_e2){
+		bridge_type = TRIVIAL_BRIDGE;
 		join_trivial_bridge(g->edges[e1], g->edges[e2], *lg, lc_e1,
 				gpos1, lpos1, gpos2, lpos2, &bridge_seq);
-		goto trivial_bridge_found;
+		goto path_found;
 	} else {
 		struct path_info_t pinfo;
 		path_info_init(&pinfo);
 		get_all_paths(lg, lc_e1, lc_e2, &pinfo);
-		if (pinfo.n_paths == 0 || pinfo.n_paths > TOO_COMPLEX_THRESH){
-			path_info_destroy(&pinfo);
-			goto no_path_found;
-		}
+		if (pinfo.n_paths == 0)
+			goto path_not_found;
 		/*for (int i = 0; i < pinfo.n_paths; ++i){
 			__VERBOSE("len: %d\n", pinfo.path_lens[i]);
 			for (int j = 0; j < pinfo.path_lens[i]; ++j)
 				__VERBOSE("%d ", pinfo.paths[j]);
 			__VERBOSE("\n");
 		}*/
+		bridge_type = MULTIPLE_PATH;
 		__VERBOSE("Found %d paths, finding the best one\n",
 				pinfo.n_paths);
 		int *scores;
@@ -201,7 +201,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 				pinfo.path_lens[best_path], gpos1, lpos1,
 				gpos2, lpos2, &bridge_seq);
 		path_info_destroy(&pinfo);
-		goto multiple_path_found;
+		goto path_found;
 	}
 	/*} else {
 		int *path;
@@ -234,7 +234,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 			goto path_not_found;
 		}
 	}*/
-/*path_not_found:
+path_not_found:
 	*res_seq = NULL;
 	*seq_len = 0;
 	bridge_type = NO_PATH_FOUND;
@@ -244,31 +244,6 @@ path_found:
 	*res_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
 	strcpy(*res_seq, bridge_seq);
 	free(bridge_seq);
-end_function:
-	return bridge_type;*/
-local_not_found:
-	bridge_type = LOCAL_NOT_FOUND;
-	*res_seq = NULL;
-	*seq_len = 0;
-	goto end_function;
-trivial_bridge_found:
-	bridge_type = TRIVIAL_BRIDGE;
-	*seq_len = strlen(bridge_seq);
-	*res_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
-	strcpy(*res_seq, bridge_seq);
-	free(bridge_seq);
-	goto end_function;
-multiple_path_found:
-	bridge_type = PATH_FOUND;
-	*seq_len = strlen(bridge_seq);
-	*res_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
-	strcpy(*res_seq, bridge_seq);
-	free(bridge_seq);
-	goto end_function;
-no_path_found:
-	bridge_type = NO_PATH_FOUND;
-	*res_seq = NULL;
-	*seq_len = 0;
 end_function:
 	return bridge_type;
 }
@@ -408,19 +383,18 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int res = get_bridge(opt, g, &lg, u, v, &seq, &leng);
 		int closed_gap = 0;
 
-		if (res == NO_PATH_FOUND){
-		} else if (res == TRIVIAL_BRIDGE){
+		if (res == TRIVIAL_BRIDGE){
 			__VERBOSE_LOG("", "Trivial bridge found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
 				- g->edges[path[i]].seq_len);
-		/*} else if (res == SINGLE_PATH){
+		} else if (res == SINGLE_PATH){
 			__VERBOSE_LOG("", "Single path found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len);*/
-		} else if (res == PATH_FOUND){
-			__VERBOSE_LOG("", "Path found\n");
+				- g->edges[path[i]].seq_len);
+		} else if (res == MULTIPLE_PATH){
+			__VERBOSE_LOG("", "Multiple paths found\n");
 			/*closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
 				- g->edges[path[i]].seq_len - 200);*/
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
