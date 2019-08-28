@@ -309,10 +309,10 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	struct read_path_t read_path;
 	read_path.R1_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R1_path, "local_assembly_%d_%d/R1.sub.fq",
+	sprintf(read_path.R1_path, "%s/local_assembly_%d_%d/R1.sub.fq",opt->out_dir,
 			g->edges[e1].rc_id, e2);
 	read_path.R2_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R2_path, "local_assembly_%d_%d/R2.sub.fq",
+	sprintf(read_path.R2_path, "%s/local_assembly_%d_%d/R2.sub.fq",opt->out_dir,
 			g->edges[e1].rc_id, e2);
 	count_readpair_path(opt->n_threads, &read_path, cand_dir, ctg_cnt);
 	*scores = (int *) calloc(pinfo->n_paths, sizeof(int));
