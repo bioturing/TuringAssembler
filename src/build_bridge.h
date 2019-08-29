@@ -33,8 +33,8 @@ void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		struct asm_edge_t e, int *edge_id, struct subseq_pos_t *gpos,
 		struct subseq_pos_t *lpos);
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2, char **res_seq,
-		int *seq_len);
+		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
+		char **res_seq, int *seq_len);
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq);
 gint_t get_edge_code(gint_t u, gint_t v);
@@ -56,7 +56,7 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int *path, int path_len, char **contig);
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2,
+		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
 		int lc_e1, int lc_e2, struct subseq_pos_t gpos1,
 		struct subseq_pos_t lpos1, struct subseq_pos_t gpos2,
 		struct subseq_pos_t lpos2, char **res_seq, int *seq_len);
@@ -76,5 +76,6 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
 void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo);
 #endif
