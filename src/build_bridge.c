@@ -72,38 +72,60 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 }
 
 void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
 	__VERBOSE_LOG("UNRELATED FILTER", "+++++++++++++++++++++++++++\n");
 	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
+	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	struct map_contig_t mct_1;
 	init_map_contig(&mct_1, e1, *lg);
-	// Must reverse e1 outside
-	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
+	int lc_e1 = find_match(&mct_1);
 
 	struct map_contig_t mct_2;
 	init_map_contig(&mct_2, e2, *lg);
 	int lc_e2 = find_match(&mct_2);
 
-	int is_disabled = 0;
 	for (int i = 0; i < lg->n_e; ++i){
 		int rc_id = lg->edges[i].rc_id;
-		if (i == lc_e1 || i == lc_e2 || rc_id == lc_e1
-			|| rc_id == lc_e2)
-			continue;
-		if (mct_2.is_match[i] || mct_2.is_match[rc_id] ||
-			mct_1.is_match[i] || mct_1.is_match[rc_id]){
+		bad[i] |= mct_1.is_match[i] || mct_1.is_match[rc_id]
+			|| mct_2.is_match[i] || mct_2.is_match[rc_id];
+	}
+	if (pre_e1.source != -1){
+		struct map_contig_t mct_3;
+		init_map_contig(&mct_3, pre_e1, *lg);
+		find_match(&mct_3);
+
+		struct map_contig_t mct_4;
+		init_map_contig(&mct_4, next_e2, *lg);
+		find_match(&mct_4);
+
+		for (int i = 0; i < lg->n_e; ++i){
+			int rc_id = lg->edges[i].rc_id;
+			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id]
+				|| mct_4.is_match[i] || mct_4.is_match[rc_id];
+		}
+		map_contig_destroy(&mct_3);
+		map_contig_destroy(&mct_4);
+	}
+	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
+		= bad[lg->edges[lc_e2].rc_id] = 0;
+	int is_disabled = 0;
+	for (int i = 0; i < lg->n_e; ++i){
+		if (bad[i]){
 			mark_edge_trash(ginfo, i);
 			++is_disabled;
 		}
 	}
 	__VERBOSE_LOG("", "After filter: %d edges\n", lg->n_e - is_disabled);
-
+	free(bad);
+	map_contig_destroy(&mct_1);
+	map_contig_destroy(&mct_2);
 }
 
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2, char **res_seq,
-		int *seq_len)
+		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
+		char **res_seq, int *seq_len)
 {
 	__VERBOSE("Matching edges...\n");
 	int lc_e1;
@@ -125,8 +147,8 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
 			lpos2.end);
 
-	int res = try_bridging(opt, g, lg, e1, e2, lc_e1, lc_e2, gpos1, lpos1,
-			gpos2, lpos2, res_seq, seq_len);
+	int res = try_bridging(opt, g, lg, e1, e2, pre_e1, next_e2, lc_e1,
+			lc_e2, gpos1, lpos1, gpos2, lpos2, res_seq, seq_len);
 	return res;
 }
 
@@ -180,7 +202,7 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 }
 
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2,
+		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
 		int lc_e1, int lc_e2, struct subseq_pos_t gpos1,
 		struct subseq_pos_t lpos1, struct subseq_pos_t gpos2,
 		struct subseq_pos_t lpos2, char **res_seq, int *seq_len)
@@ -197,8 +219,17 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 	} else {
 		struct graph_info_t ginfo;
 		graph_info_init(lg, &ginfo, lc_e1, lc_e2);
-		unrelated_filter(g->edges[g->edges[e1].rc_id], g->edges[e2],
-				lg, &ginfo);
+		struct asm_edge_t edge_pre_e1;
+		struct asm_edge_t edge_next_e2;
+		if (pre_e1 == -1 || next_e2 == -1){
+			edge_pre_e1.source = -1;
+			edge_next_e2.source = -1;
+		} else {
+			edge_pre_e1 = g->edges[pre_e1];
+			edge_next_e2 = g->edges[next_e2];
+		}
+		unrelated_filter(g->edges[e1], g->edges[e2], edge_pre_e1,
+				edge_next_e2, lg, &ginfo);
 		struct path_info_t pinfo;
 		path_info_init(&pinfo);
 		get_all_paths(lg, &ginfo, &pinfo);
@@ -228,6 +259,9 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 		}*/
 		__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
 				best_path, best_score);
+		for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
+			__VERBOSE("%d ", pinfo.paths[best_path][i]);
+		__VERBOSE("\n");
 		__VERBOSE_LOG("", "-----------------------------------------\n");
 		free(scores);
 		join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
@@ -379,8 +413,10 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 	sprintf(gap_path, "%s/gap.txt", opt->out_dir);
 	FILE *f = fopen(gap_path, "w");
 	for (int i = 1; i < path_len; ++i){
+		int pre_u = i == 1 ? -1 : path[i - 2];
 		int u = path[i - 1];
 		int v = path[i];
+		int next_v = i + 1 == path_len ? -1 : path[i + 1];
 		struct asm_graph_t lg = get_local_assembly(opt, g,
 				g->edges[u].rc_id, v);
 		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
@@ -388,7 +424,8 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
 		char *seq;
 		int leng;
-		int res = get_bridge(opt, g, &lg, u, v, &seq, &leng);
+		int res = get_bridge(opt, g, &lg, u, v, pre_u, next_v, &seq,
+				&leng);
 		int closed_gap = 0;
 
 		if (res == TRIVIAL_BRIDGE){

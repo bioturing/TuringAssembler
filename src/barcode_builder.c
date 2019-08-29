@@ -894,6 +894,17 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			p2[n2++] = a;
 		}
 	}
+	/*FILE *f1 = fopen("mappos_1.txt", "a");
+	FILE *f2 = fopen("mappos_2.txt", "a");
+	for (int i = 0; i < n1; ++i){
+		if (p1[i].aligned < r1->len)
+			continue;
+		int c = atoi(idx->bns->anns[p1[i].rid].name);
+		FILE *f = c == 0? f1 : f2;
+		fprintf(f, "%d %d\n", p1[i].pos, p1[i].aligned);
+	}
+	fclose(f1);
+	fclose(f2);*/
 	for (i = 0; i < n1; ++i) {
 		if (p1[i].aligned < r1->len)
 			continue;
