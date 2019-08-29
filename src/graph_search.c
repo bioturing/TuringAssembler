@@ -339,15 +339,15 @@ void cov_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	int thresh = (int) (MIN_DEPTH_RATIO *
 			max(get_cov(*lg, ginfo->start_edge),
 				get_cov(*lg, ginfo->end_edge)));
-	int disabled = 0;
 	for (int i = 0; i < ginfo->g->n_e; ++i){
-		if (get_cov(*lg, i) < thresh){
+		if (get_cov(*lg, i) < thresh)
 			mark_edge_trash(ginfo, i);
-			++disabled;
-		}
 	}
+	is_disabled = 0;
+	for (int i = 0; i < lg->n_e; ++i)
+		is_disabled += check_edge_trash(ginfo, i);
 	__VERBOSE_LOG("", "After filter: %d edges\n",
-			ginfo->g->n_e - disabled);
+			ginfo->g->n_e - is_disabled);
 }
 
 void link_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)

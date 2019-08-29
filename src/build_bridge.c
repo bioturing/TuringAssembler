@@ -214,18 +214,21 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 			__VERBOSE("\n");
 		}*/
 		bridge_type = MULTIPLE_PATH;
-		__VERBOSE("Found %d paths, finding the best one\n",
+		__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
 				pinfo.n_paths);
-		int *scores;
+		float *scores;
 		get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores);
-		int best_score = 0;
+		float best_score = 0;
 		int best_path = 0;
-		for (int i = 1; i < pinfo.n_paths; ++i){
+		for (int i = 0; i < pinfo.n_paths; ++i){
 			if (scores[i] > best_score){
 				best_path = i;
 				best_score = scores[i];
 			}
 		}
+		__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
+				best_path, best_score);
+		__VERBOSE_LOG("", "-----------------------------------------\n");
 		/*for (int i = 0; i < pinfo.n_paths; ++i){
 			if (MIN_PATH_SCORE * best_score > scores[i])
 				continue;
@@ -288,8 +291,9 @@ end_function:
 
 void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
-		int e1, int e2, int **scores)
+		int e1, int e2, float **scores)
 {
+	int *seq_lens = (int *) calloc(pinfo->n_paths, sizeof(int));
 	char cand_path[1024];
 	sprintf(cand_path, "%s/%d_%d_all.fasta", opt->out_dir, e1, e2);
 	FILE *f = fopen(cand_path, "w");
@@ -299,6 +303,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		join_bridge_center_by_path(lg, pinfo->paths[i],
 				pinfo->path_lens[i], &seq);
 		fprintf(f, "%s\n", seq);
+		seq_lens[i] = strlen(seq);
 		free(seq);
 	}
 	fclose(f);
@@ -317,13 +322,13 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	sprintf(read_path.R2_path, "%s/local_assembly_%d_%d/R2.sub.fq",opt->out_dir,
 			g->edges[e1].rc_id, e2);
 	count_readpair_path(opt->n_threads, &read_path, cand_path, ctg_cnt);
-	*scores = (int *) calloc(pinfo->n_paths, sizeof(int));
+	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
 		if (!kh_exist(ctg_cnt, it))
 			continue;
 		int key = kh_key(ctg_cnt, it);
 		int val = kh_val(ctg_cnt, it);
-		(*scores)[key] = val;
+		(*scores)[key] = 1.0f * val / seq_lens[key];
 	}
 }
 
