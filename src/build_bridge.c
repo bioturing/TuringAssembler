@@ -220,6 +220,12 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 				best_score = scores[i];
 			}
 		}
+		/*for (int i = 0; i < pinfo.n_paths; ++i){
+			__VERBOSE("%d %.3f\n", i, scores[i]);
+			for (int j = 0; j < pinfo.path_lens[i]; ++j)
+				__VERBOSE("%d ", pinfo.paths[i][j]);
+			__VERBOSE("\n");
+		}*/
 		__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
 				best_path, best_score);
 		__VERBOSE_LOG("", "-----------------------------------------\n");

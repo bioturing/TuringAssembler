@@ -207,24 +207,30 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 				continue;
 			if (check_link_trash(ginfo, u, v))
 				continue;
+			int new_u;
 			char dir1;
 			if (mark[u] == 1){
 				dir1 = '+';
+				new_u = u;
 			} else {
 				dir1 = '-';
-				u = lg->edges[u].rc_id;
+				new_u = lg->edges[u].rc_id;
 			}
+			int new_v;
 			char dir2;
 			if (mark[v] == 1){
 				dir2 = '+';
+				new_v = v;
 			} else {
 				dir2 = '-';
-				v = lg->edges[v].rc_id;
+				new_v = lg->edges[v].rc_id;
 			}
 			fprintf(f, "L\t%d_%ld_%.3f\t%c\t%d_%ld_%.3f\t%c\t%dM\n",
-				u, lg->edges[u].rc_id, get_cov(*lg, u), dir1,
-				v, lg->edges[v].rc_id, get_cov(*lg, v), dir2,
-				lg->ksize);
+					new_u, lg->edges[new_u].rc_id,
+					get_cov(*lg, new_u), dir1,
+					new_v, lg->edges[new_v].rc_id,
+					get_cov(*lg, new_v), dir2,
+					lg->ksize);
 		}
 	}
 	fclose(f);
@@ -234,7 +240,7 @@ void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo)
 {
 	filter_edges(lg, ginfo);
-	//print_graph(lg, ginfo); //DEBUG only
+	print_graph(lg, ginfo); //DEBUG only
 	int deg_sum = 0;
 	for (int i = 0; i < ginfo->g->n_v; ++i)
 		deg_sum += ginfo->g->nodes[i].deg;
@@ -323,7 +329,7 @@ end_function:
 
 void filter_edges(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
-	cov_filter(lg, ginfo);
+	//cov_filter(lg, ginfo);
 	//link_filter(lg, ginfo);
 	connection_filter(lg, ginfo);
 	graph_info_init_max_vst(ginfo);
