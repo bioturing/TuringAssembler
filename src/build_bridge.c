@@ -74,7 +74,8 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
-	__VERBOSE_LOG("UNRELATED FILTER", "Before filter: %d edges\n", lg->n_e);
+	__VERBOSE_LOG("UNRELATED FILTER", "+++++++++++++++++++++++++++\n");
+	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
 	struct map_contig_t mct_1;
 	init_map_contig(&mct_1, e1, *lg);
 	// Must reverse e1 outside
@@ -86,16 +87,17 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 
 	int is_disabled = 0;
 	for (int i = 0; i < lg->n_e; ++i){
-		if (i == lc_e1 || i == lc_e2)
-			continue;
 		int rc_id = lg->edges[i].rc_id;
+		if (i == lc_e1 || i == lc_e2 || rc_id == lc_e1
+			|| rc_id == lc_e2)
+			continue;
 		if (mct_2.is_match[i] || mct_2.is_match[rc_id] ||
 			mct_1.is_match[i] || mct_1.is_match[rc_id]){
 			mark_edge_trash(ginfo, i);
 			++is_disabled;
 		}
 	}
-	__VERBOSE_LOG("UNRELATED FILTER", "After filter: %d edges\n", lg->n_e - is_disabled);
+	__VERBOSE_LOG("", "After filter: %d edges\n", lg->n_e - is_disabled);
 
 }
 
