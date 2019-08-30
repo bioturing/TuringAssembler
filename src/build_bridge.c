@@ -13,9 +13,13 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 }
 
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
-		struct asm_edge_t e, int *edge_id, struct subseq_pos_t *gpos,
-		struct subseq_pos_t *lpos)
+		int e_id, struct edge_map_info_t *emap)
 {
+	emap->gl_e = e_id;
+	int *edge_id = &(emap->lc_e);
+	struct subseq_pos_t *gpos = &(emap->gpos);
+	struct subseq_pos_t *lpos = &(emap->lpos);
+	struct asm_edge_t e = g.edges[e_id];
 	struct map_contig_t mct;
 	init_map_contig(&mct, g.edges[e.rc_id], lg);
 	*edge_id = find_match(&mct);
@@ -35,9 +39,13 @@ no_local_edge_found:
 }
 
 void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
-		struct asm_edge_t e, int *edge_id, struct subseq_pos_t *gpos,
-		struct subseq_pos_t *lpos)
+		int e_id, struct edge_map_info_t *emap)
 {
+	emap->gl_e = e_id;
+	int *edge_id = &(emap->lc_e);
+	struct subseq_pos_t *gpos = &(emap->gpos);
+	struct subseq_pos_t *lpos = &(emap->lpos);
+	struct asm_edge_t e = g.edges[e_id];
 	struct map_contig_t mct;
 	init_map_contig(&mct, e, lg);
 	*edge_id = find_match(&mct);
@@ -95,17 +103,22 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct map_contig_t mct_3;
 		init_map_contig(&mct_3, pre_e1, *lg);
 		find_match(&mct_3);
-
+		
+		for (int i = 0; i < lg->n_e; ++i){
+			int rc_id = lg->edges[i].rc_id;
+			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id];
+		}
+		map_contig_destroy(&mct_3);
+	}
+	if (next_e2.source != -1){
 		struct map_contig_t mct_4;
 		init_map_contig(&mct_4, next_e2, *lg);
 		find_match(&mct_4);
-
+		
 		for (int i = 0; i < lg->n_e; ++i){
 			int rc_id = lg->edges[i].rc_id;
-			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id]
-				|| mct_4.is_match[i] || mct_4.is_match[rc_id];
+			bad[i] |= mct_4.is_match[i] || mct_4.is_match[rc_id];
 		}
-		map_contig_destroy(&mct_3);
 		map_contig_destroy(&mct_4);
 	}
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
@@ -128,27 +141,25 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		char **res_seq, int *seq_len)
 {
 	__VERBOSE("Matching edges...\n");
-	int lc_e1;
-	struct subseq_pos_t gpos1, lpos1;
-	get_local_edge_head(*g, *lg, g->edges[e1], &lc_e1, &gpos1, &lpos1);
+	struct edge_map_info_t emap1;
+	get_local_edge_head(*g, *lg, e1, &emap1);
 
-	__VERBOSE_LOG("", "Local edge 1: %d\n", lc_e1);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n", gpos1.start,
-			gpos1.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos1.start,
-			lpos1.end);
+	__VERBOSE_LOG("", "Local edge 1: %d\n", emap1.lc_e);
+	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+			emap1.gpos.start, emap1.gpos.end);
+	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+			emap1.lpos.start, emap1.lpos.end);
 
-	int lc_e2;
-	struct subseq_pos_t gpos2, lpos2;
-	get_local_edge_tail(*g, *lg, g->edges[e2], &lc_e2, &gpos2, &lpos2);
-	__VERBOSE_LOG("", "Local edge 2: %d\n", lc_e2);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n", gpos2.start,
-			gpos2.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n", lpos2.start,
-			lpos2.end);
+	struct edge_map_info_t emap2;
+	get_local_edge_tail(*g, *lg, e2, &emap2);
+	__VERBOSE_LOG("", "Local edge 2: %d\n", emap2.lc_e);
+	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+			emap2.gpos.start, emap2.gpos.end);
+	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+			emap2.lpos.start, emap2.lpos.end);
 
-	int res = try_bridging(opt, g, lg, e1, e2, pre_e1, next_e2, lc_e1,
-			lc_e2, gpos1, lpos1, gpos2, lpos2, res_seq, seq_len);
+	int res = try_bridging(opt, g, lg, pre_e1, next_e2, &emap1, &emap2,
+			res_seq, seq_len);
 	return res;
 }
 
@@ -202,88 +213,110 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 }
 
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
-		int lc_e1, int lc_e2, struct subseq_pos_t gpos1,
-		struct subseq_pos_t lpos1, struct subseq_pos_t gpos2,
-		struct subseq_pos_t lpos2, char **res_seq, int *seq_len)
+		struct asm_graph_t *lg, int pre_e1, int next_e2,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
+		char **res_seq, int *seq_len)
 {
 	int bridge_type;
 	char *bridge_seq;
+	int e1 = emap1->gl_e;
+	int e2 = emap2->gl_e;
+	int lc_e1 = emap1->lc_e;
+	int lc_e2 = emap2->lc_e;
+	struct subseq_pos_t gpos1 = emap1->gpos;
+	struct subseq_pos_t gpos2 = emap2->gpos;
+	struct subseq_pos_t lpos1 = emap1->lpos;
+	struct subseq_pos_t lpos2 = emap2->lpos;
 	if (lc_e1 == -1 || lc_e2 == -1){
-		goto path_not_found;
+		bridge_type = BRIDGE_LOCAL_NOT_FOUND;
+		join_bridge_dump(g->edges[e1], g->edges[e2], &bridge_seq);
+		goto end_function;
 	} else if (lc_e1 == lc_e2){
-		bridge_type = TRIVIAL_BRIDGE;
-		join_trivial_bridge(g->edges[e1], g->edges[e2], *lg, lc_e1,
-				gpos1, lpos1, gpos2, lpos2, &bridge_seq);
-		goto path_found;
+		bridge_type = BRIDGE_TRIVIAL_BRIDGE;
+		join_trivial_bridge(g->edges[e1], g->edges[e2], *lg, emap1,
+				emap2, &bridge_seq);
+		goto end_function;
 	} else {
-		struct graph_info_t ginfo;
-		graph_info_init(lg, &ginfo, lc_e1, lc_e2);
-		struct asm_edge_t edge_pre_e1;
-		struct asm_edge_t edge_next_e2;
-		if (pre_e1 == -1 || next_e2 == -1){
-			edge_pre_e1.source = -1;
-			edge_next_e2.source = -1;
+		int *path;
+		int path_len;
+		get_best_path(opt, g, lg, emap1, emap2, pre_e1, next_e2,
+				&path, &path_len);
+		if (path_len == 0){
+			bridge_type = BRIDGE_PATH_NOT_FOUND;
+			join_bridge_no_path(g->edges[e1], g->edges[e2],
+					g->edges[lc_e1], g->edges[lc_e2],
+					emap1, emap2, &bridge_seq);
+			goto end_function;
 		} else {
-			edge_pre_e1 = g->edges[pre_e1];
-			edge_next_e2 = g->edges[next_e2];
+			bridge_type = BRIDGE_MULTIPLE_PATH;
+			join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
+					path, path_len, emap1, emap2,
+					&bridge_seq);
+			free(path);
+			goto end_function;
 		}
-		unrelated_filter(g->edges[e1], g->edges[e2], edge_pre_e1,
-				edge_next_e2, lg, &ginfo);
-		struct path_info_t pinfo;
-		path_info_init(&pinfo);
-		get_all_paths(lg, &ginfo, &pinfo);
-		if (pinfo.n_paths == 0){
-			path_info_destroy(&pinfo);
-			graph_info_destroy(&ginfo);
-			goto path_not_found;
-		}
-		bridge_type = MULTIPLE_PATH;
-		__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
-				pinfo.n_paths);
-		float *scores;
-		get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores);
-		float best_score = 0;
-		int best_path = 0;
-		for (int i = 0; i < pinfo.n_paths; ++i){
-			if (scores[i] > best_score){
-				best_path = i;
-				best_score = scores[i];
-			}
-		}
-		/*for (int i = 0; i < pinfo.n_paths; ++i){
-			__VERBOSE("%d %.3f\n", i, scores[i]);
-			for (int j = 0; j < pinfo.path_lens[i]; ++j)
-				__VERBOSE("%d ", pinfo.paths[i][j]);
-			__VERBOSE("\n");
-		}*/
-		__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
-				best_path, best_score);
-		for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-			__VERBOSE("%d ", pinfo.paths[best_path][i]);
-		__VERBOSE("\n");
-		__VERBOSE_LOG("", "-----------------------------------------\n");
-		free(scores);
-		join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
-				pinfo.paths[best_path],
-				pinfo.path_lens[best_path], gpos1, lpos1,
-				gpos2, lpos2, &bridge_seq);
-		path_info_destroy(&pinfo);
-		graph_info_destroy(&ginfo);
-		goto path_found;
 	}
-path_not_found:
-	*res_seq = NULL;
-	*seq_len = 0;
-	bridge_type = NO_PATH_FOUND;
-	goto end_function;
-path_found:
-	*seq_len = strlen(bridge_seq);
-	*res_seq = (char *) calloc((*seq_len) + 1, sizeof(char));
-	strcpy(*res_seq, bridge_seq);
-	free(bridge_seq);
 end_function:
+	*seq_len = strlen(bridge_seq);
+	*res_seq = bridge_seq;
 	return bridge_type;
+}
+
+void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, int pre_e1, int next_e2,
+		int **path, int *path_len)
+{
+	*path = NULL;
+	*path_len = 0;
+	int e1 = emap1->gl_e;
+	int e2 = emap2->gl_e;
+	int lc_e1 = emap1->lc_e;
+	int lc_e2 = emap2->lc_e;
+	struct graph_info_t ginfo;
+	graph_info_init(lg, &ginfo, lc_e1, lc_e2);
+	struct asm_edge_t edge_pre_e1;
+	struct asm_edge_t edge_next_e2;
+	if (pre_e1 == -1)
+		edge_pre_e1.source = -1;
+	else
+		edge_pre_e1 = g->edges[pre_e1];
+	if (next_e2 == -1)
+		edge_next_e2.source = -1;
+	else
+		edge_next_e2 = g->edges[next_e2];
+	unrelated_filter(g->edges[e1], g->edges[e2], edge_pre_e1,
+			edge_next_e2, lg, &ginfo);
+	struct path_info_t pinfo;
+	path_info_init(&pinfo);
+	get_all_paths(lg, &ginfo, &pinfo);
+	if (pinfo.n_paths == 0)
+		goto end_function;
+	__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
+			pinfo.n_paths);
+	float *scores;
+	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores);
+	float best_score = 0;
+	int best_path = 0;
+	for (int i = 0; i < pinfo.n_paths; ++i){
+		if (scores[i] > best_score){
+			best_path = i;
+			best_score = scores[i];
+		}
+	}
+	__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
+			best_path, best_score);
+	for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
+		__VERBOSE("%d ", pinfo.paths[best_path][i]);
+	__VERBOSE("\n");
+	__VERBOSE_LOG("", "-----------------------------------------\n");
+	*path_len = pinfo.path_lens[best_path];
+	*path = (int *) calloc(*path_len, sizeof(int));
+	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
+	free(scores);
+end_function:
+	graph_info_destroy(&ginfo);
+	path_info_destroy(&pinfo);
 }
 
 void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -339,11 +372,14 @@ void join_seq(char **dest, char *source)
 }
 
 void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
-		struct asm_graph_t lg, int local_edge,
-		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
-		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
-		char **res_seq)
+		struct asm_graph_t lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, char **res_seq)
 {
+	int local_edge = emap1->lc_e;
+	struct subseq_pos_t gpos1 = emap1->gpos;
+	struct subseq_pos_t gpos2 = emap2->gpos;
+	struct subseq_pos_t lpos1 = emap1->lpos;
+	struct subseq_pos_t lpos2 = emap2->lpos;
 	char *edge_seq1, *edge_seq2, *local_seq;
 	decode_seq(&edge_seq1, e1.seq, e1.seq_len);
 	decode_seq(&edge_seq2, e2.seq, e2.seq_len);
@@ -372,10 +408,13 @@ void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 
 void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_graph_t lg, int *path, int path_len,
-		struct subseq_pos_t gpos1, struct subseq_pos_t lpos1,
-		struct subseq_pos_t gpos2, struct subseq_pos_t lpos2,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq)
 {
+	struct subseq_pos_t gpos1 = emap1->gpos;
+	struct subseq_pos_t gpos2 = emap2->gpos;
+	struct subseq_pos_t lpos1 = emap1->lpos;
+	struct subseq_pos_t lpos2 = emap2->lpos;
 	char *head_seq, *tail_seq;
 	int lc_e1 = path[0];
 	int lc_e2 = path[path_len - 1];
@@ -424,24 +463,29 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
 		char *seq;
 		int leng;
-		int res = get_bridge(opt, g, &lg, u, v, pre_u, next_v, &seq,
-				&leng);
-		int closed_gap = 0;
+		int res = get_bridge(opt, g, &lg, u, v, pre_u, next_v,
+				&seq, &leng);
+		join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
+		int closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+			- g->edges[path[i]].seq_len);
 
-		if (res == TRIVIAL_BRIDGE){
+		/*if (res == LOCAL_NOT_FOUND){
+			char *dump_N;
+			get_dump_N(&dump_N);
+			join_seq(contig, dump_N);
+			free(dump_N);
+			char *tmp;
+			decode_seq(&tmp, 
+			join_seq(contig, 
+		} else if (res == TRIVIAL_BRIDGE){
 			__VERBOSE_LOG("", "Trivial bridge found\n");
-			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len);
-		} else if (res == SINGLE_PATH){
-			__VERBOSE_LOG("", "Single path found\n");
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
 				- g->edges[path[i]].seq_len);
 		} else if (res == MULTIPLE_PATH){
 			__VERBOSE_LOG("", "Multiple paths found\n");
-			/*closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len - 200);*/
+			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
+				- g->edges[path[i]].seq_len);
 			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 		} else {
 			__VERBOSE_LOG("", "No path found\n");
@@ -453,29 +497,28 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			decode_seq(&tmp, g->edges[path[i]].seq,
 					g->edges[path[i]].seq_len);
 			join_seq(contig, tmp);
-			/*closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len - 100);*/
 
 			free(tmp);
 			free(dump_N);
-		}
+		}*/
 		++bridge_types[res];
 		__VERBOSE_LOG("GAP", "Closed gap: %d\n", closed_gap);
 		fprintf(f, "Gap from %d to %d: %d\n", path[i],
 				path[i - 1], closed_gap);
 		fprintf(f, "%d %d %d\n", g->edges[path[i - 1]].seq_len,
 				g->edges[path[i]].seq_len, leng);
+		free(seq);
 	}
 	fclose(f);
 	__VERBOSE_LOG("INFO", "Path summary:\n");
 	__VERBOSE_LOG("", "Number of trivial bridges: %d\n",
-			bridge_types[TRIVIAL_BRIDGE]);
-	__VERBOSE_LOG("", "Number of single paths: %d\n",
-			bridge_types[SINGLE_PATH]);
+			bridge_types[BRIDGE_TRIVIAL_BRIDGE]);
+	__VERBOSE_LOG("", "Number of cases where local edges not found: %d\n",
+			bridge_types[BRIDGE_LOCAL_NOT_FOUND]);
 	__VERBOSE_LOG("", "Number of multiple paths: %d\n",
-			bridge_types[MULTIPLE_PATH]);
+			bridge_types[BRIDGE_MULTIPLE_PATH]);
 	__VERBOSE_LOG("", "Number of disconnected region: %d\n",
-			bridge_types[NO_PATH_FOUND]);
+			bridge_types[BRIDGE_PATH_NOT_FOUND]);
 }
 
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
@@ -493,4 +536,39 @@ void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		strcat(*seq, tmp + pos);
 		free(tmp);
 	}
+}
+
+void join_bridge_no_path(struct asm_edge_t e1, struct asm_edge_t e2,
+		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
+		char **res_seq)
+{
+	*res_seq = (char *) calloc(1, sizeof(char));
+	char *first, *second;
+	sync_global_local_edge(e1, lc_e1, emap1->gpos, emap1->lpos,
+			SYNC_KEEP_GLOBAL, &first);
+	sync_global_local_edge(e2, lc_e2, emap2->gpos, emap1->lpos,
+			SYNC_KEEP_LOCAL, &second);
+	char *dump_N;
+	get_dump_N(&dump_N);
+	join_seq(res_seq, first);
+	join_seq(res_seq, dump_N);
+	join_seq(res_seq, second);
+	free(first);
+	free(second);
+	free(dump_N);
+}
+
+void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
+		char **res_seq)
+{
+	char *first, *second;
+	decode_seq(&first, e1.seq, e1.seq_len);
+	decode_seq(&second, e2.seq, e2.seq_len);
+	char *dump_N;
+	get_dump_N(&dump_N);
+	*res_seq = (char *) calloc(1, sizeof(char));
+	join_seq(res_seq, first);
+	join_seq(res_seq, dump_N);
+	join_seq(res_seq, second);
 }
