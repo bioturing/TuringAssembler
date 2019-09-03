@@ -903,8 +903,8 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			if (p2[k].aligned < r2->len)
 				continue;
 			c2 = atoi(idx->bns->anns[p2[k].rid].name);
-			if (c1 == c2 && p2[k].pos - p1[i].pos < MAX_READ_FRAG_LEN
-				&& p2[k].pos > p1[i].pos && p1[i].strand != p2[k].strand) {
+			if (c1 == c2 && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
+				&& p1[i].strand != p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
 				if (it != kh_end(count_cand))
 					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);

@@ -127,12 +127,10 @@ void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
 	int is_disabled = 0;
 	for (int i = 0; i < lg->n_e; ++i){
 		if (bad[i]){
-			__VERBOSE("%d ", i);
 			mark_edge_trash(ginfo, i);
 			++is_disabled;
 		}
 	}
-	__VERBOSE("\n");
 	__VERBOSE_LOG("", "After filter: %d edges\n", lg->n_e - is_disabled);
 	free(bad);
 	map_contig_destroy(&mct_1);
