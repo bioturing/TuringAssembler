@@ -1,7 +1,7 @@
 #ifndef __GRAPH_SEARCH__
 #define __GRAPH_SEARCH__
 #define MIN_DEPTH_RATIO 0.2
-#define MIN_PATH_LENGTH 20
+#define MIN_PATH_LENGTH 10000
 #define MIN_RELATIVE_COV_RATIO 0.2
 #define SIMPLE_PATH 0
 #define COMPLEX_PATH 1

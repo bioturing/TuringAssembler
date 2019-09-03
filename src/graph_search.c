@@ -329,7 +329,7 @@ end_function:
 
 void filter_edges(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
-	//cov_filter(lg, ginfo);
+	cov_filter(lg, ginfo);
 	//link_filter(lg, ginfo);
 	connection_filter(lg, ginfo);
 	graph_info_init_max_vst(ginfo);

@@ -1,5 +1,8 @@
 #include "build_bridge.h"
 #include "helper.h"
+#include "sort_read.h"
+#include "barcode_resolve2.h"
+#include <sys/stat.h>
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -78,7 +81,7 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
-void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
 		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
@@ -86,11 +89,11 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	struct map_contig_t mct_1;
-	init_map_contig(&mct_1, e1, *lg);
-	int lc_e1 = find_match(&mct_1);
+	init_map_contig(&mct_1, g->edges[g->edges[e1].rc_id], *lg);
+	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
 
 	struct map_contig_t mct_2;
-	init_map_contig(&mct_2, e2, *lg);
+	init_map_contig(&mct_2, g->edges[e2], *lg);
 	int lc_e2 = find_match(&mct_2);
 
 	for (int i = 0; i < lg->n_e; ++i){
@@ -102,7 +105,6 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct map_contig_t mct_3;
 		init_map_contig(&mct_3, pre_e1, *lg);
 		find_match(&mct_3);
-		
 		for (int i = 0; i < lg->n_e; ++i){
 			int rc_id = lg->edges[i].rc_id;
 			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id];
@@ -125,10 +127,12 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 	int is_disabled = 0;
 	for (int i = 0; i < lg->n_e; ++i){
 		if (bad[i]){
+			__VERBOSE("%d ", i);
 			mark_edge_trash(ginfo, i);
 			++is_disabled;
 		}
 	}
+	__VERBOSE("\n");
 	__VERBOSE_LOG("", "After filter: %d edges\n", lg->n_e - is_disabled);
 	free(bad);
 	map_contig_destroy(&mct_1);
@@ -284,7 +288,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
-	unrelated_filter(g->edges[e1], g->edges[e2], edge_pre_e1,
+	unrelated_filter(g, e1, e2, edge_pre_e1,
 			edge_next_e2, lg, &ginfo);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
@@ -343,14 +347,24 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		kh_val(ctg_cnt, it) = 0;
 	}
 
-	struct read_path_t read_path;
-	read_path.R1_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R1_path, "%s/local_assembly_%d_%d/R1.sub.fq",opt->out_dir,
-			g->edges[e1].rc_id, e2);
-	read_path.R2_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R2_path, "%s/local_assembly_%d_%d/R2.sub.fq",opt->out_dir,
-			g->edges[e1].rc_id, e2);
-	count_readpair_path(opt->n_threads, &read_path, cand_path, ctg_cnt);
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		__ERROR("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	struct read_path_t local_read_path;
+	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir);
+
+	count_readpair_path(opt->n_threads, &local_read_path, cand_path, ctg_cnt);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
 		if (!kh_exist(ctg_cnt, it))
