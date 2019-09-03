@@ -1,5 +1,8 @@
 #include "build_bridge.h"
 #include "helper.h"
+#include "sort_read.h"
+#include "barcode_resolve2.h"
+#include <sys/stat.h>
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -63,7 +66,6 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	char *global_seq, *local_seq;
 	decode_seq(&global_seq, global.seq, global.seq_len);
 	decode_seq(&local_seq, local.seq, local.seq_len);
-
 	if (sync_type == SYNC_KEEP_GLOBAL){
 		int len = global_pos.start + local.seq_len - local_pos.start;
 		*res_seq = (char *) calloc(len + 1, sizeof(char));
@@ -79,7 +81,7 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
-void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
 		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
@@ -87,11 +89,11 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	struct map_contig_t mct_1;
-	init_map_contig(&mct_1, e1, *lg);
-	int lc_e1 = find_match(&mct_1);
+	init_map_contig(&mct_1, g->edges[g->edges[e1].rc_id], *lg);
+	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
 
 	struct map_contig_t mct_2;
-	init_map_contig(&mct_2, e2, *lg);
+	init_map_contig(&mct_2, g->edges[e2], *lg);
 	int lc_e2 = find_match(&mct_2);
 
 	for (int i = 0; i < lg->n_e; ++i){
@@ -103,7 +105,6 @@ void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct map_contig_t mct_3;
 		init_map_contig(&mct_3, pre_e1, *lg);
 		find_match(&mct_3);
-		
 		for (int i = 0; i < lg->n_e; ++i){
 			int rc_id = lg->edges[i].rc_id;
 			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id];
@@ -244,7 +245,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 		if (path_len == 0){
 			bridge_type = BRIDGE_PATH_NOT_FOUND;
 			join_bridge_no_path(g->edges[e1], g->edges[e2],
-					g->edges[lc_e1], g->edges[lc_e2],
+					lg->edges[lc_e1], lg->edges[lc_e2],
 					emap1, emap2, &bridge_seq);
 			goto end_function;
 		} else {
@@ -285,7 +286,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
-	unrelated_filter(g->edges[e1], g->edges[e2], edge_pre_e1,
+	unrelated_filter(g, e1, e2, edge_pre_e1,
 			edge_next_e2, lg, &ginfo);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
@@ -344,14 +345,24 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		kh_val(ctg_cnt, it) = 0;
 	}
 
-	struct read_path_t read_path;
-	read_path.R1_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R1_path, "%s/local_assembly_%d_%d/R1.sub.fq",opt->out_dir,
-			g->edges[e1].rc_id, e2);
-	read_path.R2_path = (char *) calloc(1024, sizeof(char));
-	sprintf(read_path.R2_path, "%s/local_assembly_%d_%d/R2.sub.fq",opt->out_dir,
-			g->edges[e1].rc_id, e2);
-	count_readpair_path(opt->n_threads, &read_path, cand_path, ctg_cnt);
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		__ERROR("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	struct read_path_t local_read_path;
+	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir);
+
+	count_readpair_path(opt->n_threads, &local_read_path, cand_path, ctg_cnt);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
 		if (!kh_exist(ctg_cnt, it))
@@ -366,7 +377,6 @@ void join_seq(char **dest, char *source)
 {
 	int old_len = strlen(*dest);
 	int new_len = old_len + strlen(source);
-	char *old_dest = *dest;
 	*dest = (char *) realloc(*dest, (new_len + 1) * sizeof(char));
 	strcpy(*dest + old_len, source);
 }
@@ -469,38 +479,6 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
 			- g->edges[path[i]].seq_len);
 
-		/*if (res == LOCAL_NOT_FOUND){
-			char *dump_N;
-			get_dump_N(&dump_N);
-			join_seq(contig, dump_N);
-			free(dump_N);
-			char *tmp;
-			decode_seq(&tmp, 
-			join_seq(contig, 
-		} else if (res == TRIVIAL_BRIDGE){
-			__VERBOSE_LOG("", "Trivial bridge found\n");
-			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len);
-		} else if (res == MULTIPLE_PATH){
-			__VERBOSE_LOG("", "Multiple paths found\n");
-			closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-				- g->edges[path[i]].seq_len);
-			join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-		} else {
-			__VERBOSE_LOG("", "No path found\n");
-			char *dump_N;
-			get_dump_N(&dump_N);
-			join_seq(contig, dump_N);
-
-			char *tmp;
-			decode_seq(&tmp, g->edges[path[i]].seq,
-					g->edges[path[i]].seq_len);
-			join_seq(contig, tmp);
-
-			free(tmp);
-			free(dump_N);
-		}*/
 		++bridge_types[res];
 		__VERBOSE_LOG("GAP", "Closed gap: %d\n", closed_gap);
 		fprintf(f, "Gap from %d to %d: %d\n", path[i],
@@ -547,7 +525,7 @@ void join_bridge_no_path(struct asm_edge_t e1, struct asm_edge_t e2,
 	char *first, *second;
 	sync_global_local_edge(e1, lc_e1, emap1->gpos, emap1->lpos,
 			SYNC_KEEP_GLOBAL, &first);
-	sync_global_local_edge(e2, lc_e2, emap2->gpos, emap1->lpos,
+	sync_global_local_edge(e2, lc_e2, emap2->gpos, emap2->lpos,
 			SYNC_KEEP_LOCAL, &second);
 	char *dump_N;
 	get_dump_N(&dump_N);

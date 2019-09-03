@@ -240,7 +240,7 @@ void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo)
 {
 	filter_edges(lg, ginfo);
-	//print_graph(lg, ginfo); //DEBUG only
+	print_graph(lg, ginfo); //DEBUG only
 	int deg_sum = 0;
 	for (int i = 0; i < ginfo->g->n_v; ++i)
 		deg_sum += ginfo->g->nodes[i].deg;
@@ -329,7 +329,7 @@ end_function:
 
 void filter_edges(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 {
-	//cov_filter(lg, ginfo);
+	cov_filter(lg, ginfo);
 	//link_filter(lg, ginfo);
 	connection_filter(lg, ginfo);
 	graph_info_init_max_vst(ginfo);

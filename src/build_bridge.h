@@ -76,7 +76,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, float **scores);
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
-void unrelated_filter(struct asm_edge_t e1, struct asm_edge_t e2,
+void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
 		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
 		struct asm_graph_t *lg, struct graph_info_t *ginfo);
 void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,

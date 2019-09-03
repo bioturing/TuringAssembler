@@ -894,17 +894,6 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			p2[n2++] = a;
 		}
 	}
-	/*FILE *f1 = fopen("mappos_1.txt", "a");
-	FILE *f2 = fopen("mappos_2.txt", "a");
-	for (int i = 0; i < n1; ++i){
-		if (p1[i].aligned < r1->len)
-			continue;
-		int c = atoi(idx->bns->anns[p1[i].rid].name);
-		FILE *f = c == 0? f1 : f2;
-		fprintf(f, "%d %d\n", p1[i].pos, p1[i].aligned);
-	}
-	fclose(f1);
-	fclose(f2);*/
 	for (i = 0; i < n1; ++i) {
 		if (p1[i].aligned < r1->len)
 			continue;
@@ -914,7 +903,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			if (p2[k].aligned < r2->len)
 				continue;
 			c2 = atoi(idx->bns->anns[p2[k].rid].name);
-			if (c1 == c2 && __abs(p1[i].pos - p2[k].pos) < MAX_READ_FRAG_LEN
+			if (c1 == c2 && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
 				&& p1[i].strand != p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
 				if (it != kh_end(count_cand))

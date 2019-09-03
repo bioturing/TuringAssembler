@@ -15,8 +15,8 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "utils.h"
-#include "verbose.h"
-
+#include "verbose.h" 
+#include "barcode_resolve2.h"
 KHASH_SET_INIT_INT64(gint);
 
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
@@ -25,17 +25,9 @@ KHASH_SET_INIT_INT64(gint);
 
 #define __is_hang_edge(g, set_e, e) (kh_get(gint, set_e, (g)->edges[e].rc_id) == kh_end(set_e))
 
-struct read_index_t {
-	int64_t r1_offset;
-	int64_t r2_offset;
-	int64_t r1_len;
-	int64_t r2_len;
-};
-
 #define read_index_get_key(p) ((p).r1_offset)
 RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
-KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
 struct opt_local_t {
 	char *out_dir;
@@ -1556,6 +1548,52 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
+void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rpath,
+			khash_t(bcpos) *dict, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, const char *prefix)
+{
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath->R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath->R2_path = strdup(path);
+	struct barcode_hash_t *h1, *h2;
+	h1 = g->edges[e1].barcodes + 2;
+	h2 = g->edges[e2].barcodes + 2;
+	kmint_t i, k;
+	khash_t(gint) *h1_key = kh_init(gint);
+	khash_t(gint) *h2_key = kh_init(gint);
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] != (uint64_t)-1) {
+			int ret;
+			kh_put(gint, h1_key, h1->keys[i], &ret);
+		}
+	}
+	for (i = 0; i < h2->size; ++i) {
+		if (h2->keys[i] != (uint64_t)-1) {
+			int ret;
+			kh_put(gint, h2_key, h2->keys[i], &ret);
+		}
+	}
+	int n_shared = 0;
+	int m_shared = 1;
+	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
+	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
+		uint64_t key = kh_key(h1_key, it);
+		khiter_t it2 = kh_get(gint, h2_key, key);
+		if (it2 == kh_end(h2_key))
+			continue;
+		if (n_shared == m_shared){
+			m_shared <<= 1;
+			shared = (uint64_t *) realloc(shared, m_shared * sizeof(uint64_t));
+		}
+		shared[n_shared++] = key;
+	}
+
+	filter_read(reads, dict, rpath, shared, n_shared);
+	free(shared);
+}
+
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix)
@@ -2555,13 +2593,13 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 						set_v, set_e, set_leg, set_self);
 				n_leg = kh_size(set_leg);
 				n_self = kh_size(set_self);
-				if (n_self == 0 && n_leg == 2)
+				if (n_self == 0 && n_leg == 2){
 					resolve_local += join_1_1_jungle_la(g, set_e, set_leg,
 						&opt_local, assemblied_pair);
-				else
-				if (n_self + n_leg >= 2)
-					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
-						&opt_local, assemblied_pair);
+				} else if (n_self + n_leg >= 2){
+					/*resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
+						&opt_local, assemblied_pair);*/
+				}
 			}
 			kh_clear(gint, set_leg);
 			kh_clear(gint, set_e);
