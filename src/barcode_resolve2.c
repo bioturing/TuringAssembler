@@ -2555,13 +2555,13 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 						set_v, set_e, set_leg, set_self);
 				n_leg = kh_size(set_leg);
 				n_self = kh_size(set_self);
-				if (n_self == 0 && n_leg == 2)
+				if (n_self == 0 && n_leg == 2){
 					resolve_local += join_1_1_jungle_la(g, set_e, set_leg,
 						&opt_local, assemblied_pair);
-				else
-				if (n_self + n_leg >= 2)
-					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
-						&opt_local, assemblied_pair);
+				} else if (n_self + n_leg >= 2){
+					/*resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
+						&opt_local, assemblied_pair);*/
+				}
 			}
 			kh_clear(gint, set_leg);
 			kh_clear(gint, set_e);

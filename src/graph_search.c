@@ -240,7 +240,7 @@ void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		struct path_info_t *pinfo)
 {
 	filter_edges(lg, ginfo);
-	//print_graph(lg, ginfo); //DEBUG only
+	print_graph(lg, ginfo); //DEBUG only
 	int deg_sum = 0;
 	for (int i = 0; i < ginfo->g->n_v; ++i)
 		deg_sum += ginfo->g->nodes[i].deg;

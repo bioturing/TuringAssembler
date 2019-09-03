@@ -230,6 +230,7 @@ void build_bridge_process(struct opt_proc_t *opt)
 	fscanf(fp, "%d\n", &n_paths);
 	int *mark = (int *) calloc(g0->n_e, sizeof(int));
 	for (int i = 0; i < n_paths; ++i){
+		__VERBOSE_LOG("SCAFFOLD PATH", "Processing %d on %d paths\n", i + 1, n_paths);
 		int path_len;
 		fscanf(fp, "%d\n", &path_len);
 		int *path = (int *) calloc(path_len, sizeof(int));
