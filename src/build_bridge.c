@@ -3,6 +3,8 @@
 #include "sort_read.h"
 #include "barcode_resolve2.h"
 #include <sys/stat.h>
+#include "kmer_hash.h"
+#include "resolve.h"
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -81,12 +83,14 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
-void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
-		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
-		struct asm_graph_t *lg, struct graph_info_t *ginfo)
+void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct asm_edge_t pre_e1,
+		struct asm_edge_t next_e2, struct asm_graph_t *lg)
 {
 	__VERBOSE_LOG("UNRELATED FILTER", "+++++++++++++++++++++++++++\n");
 	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
+	int e1 = emap1->gl_e;
+	int e2 = emap2->gl_e;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	struct map_contig_t mct_1;
 	init_map_contig(&mct_1, g->edges[g->edges[e1].rc_id], *lg);
@@ -124,17 +128,22 @@ void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
 	}
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
 		= bad[lg->edges[lc_e2].rc_id] = 0;
-	int is_disabled = 0;
 	for (int i = 0; i < lg->n_e; ++i){
-		if (bad[i]){
-			mark_edge_trash(ginfo, i);
-			++is_disabled;
-		}
+		if (bad[i])
+			asm_remove_edge(lg, i);
 	}
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg->n_e - is_disabled);
+	struct asm_graph_t lg1;
+	asm_condense(lg, &lg1);
+	asm_graph_destroy(lg);
+	*lg = lg1;
+	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
 	free(bad);
 	map_contig_destroy(&mct_1);
 	map_contig_destroy(&mct_2);
+
+	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+	print_log_edge_map(emap1, emap2);
 }
 
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -145,23 +154,28 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct edge_map_info_t emap1;
 	get_local_edge_head(*g, *lg, e1, &emap1);
 
-	__VERBOSE_LOG("", "Local edge 1: %d\n", emap1.lc_e);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
-			emap1.gpos.start, emap1.gpos.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
-			emap1.lpos.start, emap1.lpos.end);
 
 	struct edge_map_info_t emap2;
 	get_local_edge_tail(*g, *lg, e2, &emap2);
-	__VERBOSE_LOG("", "Local edge 2: %d\n", emap2.lc_e);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
-			emap2.gpos.start, emap2.gpos.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
-			emap2.lpos.start, emap2.lpos.end);
 
+	print_log_edge_map(&emap1, &emap2);
 	int res = try_bridging(opt, g, lg, pre_e1, next_e2, &emap1, &emap2,
 			res_seq, seq_len);
 	return res;
+}
+
+void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
+{
+	__VERBOSE_LOG("", "Local edge 1: %d\n", emap1->lc_e);
+	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+			emap1->gpos.start, emap1->gpos.end);
+	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+			emap1->lpos.start, emap1->lpos.end);
+	__VERBOSE_LOG("", "Local edge 2: %d\n", emap2->lc_e);
+	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+			emap2->gpos.start, emap2->gpos.end);
+	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+			emap2->lpos.start, emap2->lpos.end);
 }
 
 void join_complex_path(struct asm_edge_t e1, struct asm_edge_t e2,
@@ -244,9 +258,9 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 				&path, &path_len);
 		if (path_len == 0){
 			bridge_type = BRIDGE_PATH_NOT_FOUND;
-			join_bridge_no_path(g->edges[e1], g->edges[e2],
-					lg->edges[lc_e1], lg->edges[lc_e2],
-					emap1, emap2, &bridge_seq);
+			// Graph is changed so the local edge id might not stay
+			// the same
+			join_bridge_no_path(g, lg, emap1, emap2, &bridge_seq);
 			goto end_function;
 		} else {
 			bridge_type = BRIDGE_MULTIPLE_PATH;
@@ -274,8 +288,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int e2 = emap2->gl_e;
 	int lc_e1 = emap1->lc_e;
 	int lc_e2 = emap2->lc_e;
-	struct graph_info_t ginfo;
-	graph_info_init(lg, &ginfo, lc_e1, lc_e2);
 	struct asm_edge_t edge_pre_e1;
 	struct asm_edge_t edge_next_e2;
 	if (pre_e1 == -1)
@@ -286,10 +298,29 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
-	unrelated_filter(g, e1, e2, edge_pre_e1, edge_next_e2, lg, &ginfo);
+	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
+			g->edges[next_e2], lg);
+	cov_filter(g, lg, emap1, emap2);
+	connection_filter(g, lg, emap1, emap2);
+	asm_resolve_local_loop(lg);
+	get_local_edge_head(*g, *lg, emap1->gl_e, emap1);
+	get_local_edge_tail(*g, *lg, emap2->gl_e, emap2);
+	print_log_edge_map(emap1, emap2);
+	link_filter(opt, g, lg, emap1, emap2);
+	print_graph(lg, emap1->gl_e, emap2->gl_e);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
-	get_all_paths(lg, &ginfo, &pinfo);
+	char r1_path[1024], r2_path[1024];
+	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
+			emap1->gl_e, emap2->gl_e);
+	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
+			emap1->gl_e, emap2->gl_e);
+	khash_t(kmer_int) *kmer_count = get_kmer_hash(r1_path, r2_path, KSIZE_CHECK);
+	//get_all_paths(g, lg, emap1, emap2, &pinfo);
+	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
+			kmer_count);
+	kh_destroy(kmer_int, kmer_count);
+
 	if (pinfo.n_paths == 0)
 		goto end_function;
 	__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
@@ -315,7 +346,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
 	free(scores);
 end_function:
-	graph_info_destroy(&ginfo);
 	path_info_destroy(&pinfo);
 }
 
@@ -368,7 +398,8 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 			continue;
 		int key = kh_key(ctg_cnt, it);
 		int val = kh_val(ctg_cnt, it);
-		(*scores)[key] = 1.0f * val / seq_lens[key];
+		//(*scores)[key] = 1.0f * val / seq_lens[key];
+		(*scores)[key] = val;
 	}
 }
 
@@ -514,17 +545,16 @@ void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 	}
 }
 
-void join_bridge_no_path(struct asm_edge_t e1, struct asm_edge_t e2,
-		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq)
 {
 	*res_seq = (char *) calloc(1, sizeof(char));
 	char *first, *second;
-	sync_global_local_edge(e1, lc_e1, emap1->gpos, emap1->lpos,
-			SYNC_KEEP_GLOBAL, &first);
-	sync_global_local_edge(e2, lc_e2, emap2->gpos, emap2->lpos,
-			SYNC_KEEP_LOCAL, &second);
+	sync_global_local_edge(g->edges[emap1->gl_e], lg->edges[emap1->lc_e],
+			emap1->gpos, emap1->lpos, SYNC_KEEP_GLOBAL, &first);
+	sync_global_local_edge(g->edges[emap2->gl_e], lg->edges[emap2->lc_e],
+			emap2->gpos, emap2->lpos, SYNC_KEEP_LOCAL, &second);
 	char *dump_N;
 	get_dump_N(&dump_N);
 	join_seq(res_seq, first);
@@ -547,4 +577,104 @@ void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 	join_seq(res_seq, first);
 	join_seq(res_seq, dump_N);
 	join_seq(res_seq, second);
+}
+
+void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
+{
+	__VERBOSE_LOG("COV FILTER", "+----------------------------------+\n");
+	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e);
+	int thresh = (int) (MIN_DEPTH_RATIO *
+			min(get_cov(*lg, emap1->lc_e),
+				get_cov(*lg, emap2->lc_e)));
+	for (int i = 0; i < lg->n_e; ++i){
+		if (get_cov(*lg, i) < thresh)
+			asm_remove_edge(lg, i);
+	}
+	struct asm_graph_t lg1;
+	asm_condense(lg, &lg1);
+	asm_graph_destroy(lg);
+	*lg = lg1;
+	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+	print_log_edge_map(emap1, emap2);
+}
+
+void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
+{
+	__VERBOSE_LOG("CONNECTION FILTER", "+----------------------------------+\n");
+	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
+	int *forward_len, *backward_len;
+	struct graph_info_t ginfo;
+	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
+	bfs(lg, &ginfo, emap1->lc_e, &forward_len);
+	bfs(lg, &ginfo, lg->edges[emap2->lc_e].rc_id, &backward_len);
+	graph_info_destroy(&ginfo);
+
+	int *bad = (int *) calloc(lg->n_e, sizeof(int));
+	for (int i = 0; i < lg->n_e; ++i){
+		int l1 = forward_len[i];
+		int l2 = backward_len[lg->edges[i].rc_id];
+		if (l1 == -1 || l2 == -1 || l1 + l2 > MIN_PATH_LENGTH)
+			bad[i] = 1;
+	}
+	for (int i = 0; i < lg->n_e; ++i)
+		if (!bad[lg->edges[i].rc_id])
+			bad[i] = 0;
+	for (int i = 0; i < lg->n_e; ++i){
+		if (bad[i])
+			asm_remove_edge(lg, i);
+	}
+	free(bad);
+	struct asm_graph_t lg1;
+	asm_condense(lg, &lg1);
+	asm_graph_destroy(lg);
+	*lg = lg1;
+	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+
+	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+	get_local_edge_head(*g, lg1, emap2->gl_e, emap2);
+	print_log_edge_map(emap1, emap2);
+}
+
+void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
+{
+	char r1_path[1024], r2_path[1024];
+	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
+			emap1->gl_e, emap2->gl_e);
+	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
+			emap1->gl_e, emap2->gl_e);
+	khash_t(kmer_int) *kmer_count = get_kmer_hash(r1_path, r2_path, KSIZE_CHECK);
+	int watch = 32;
+	for (int e1 = 0; e1 < lg->n_e; ++e1){
+		int tg = lg->edges[e1].target;
+		float max_score = 0;
+		__VERBOSE_LOG("", "edge %d\n", e1);
+		for (int i = 0; i < lg->nodes[tg].deg; ++i){
+			int e2 = lg->nodes[tg].adj[i];
+			char *first, *second;
+			decode_seq(&first, lg->edges[e1].seq, lg->edges[e1].seq_len);
+			decode_seq(&second, lg->edges[e2].seq, lg->edges[e2].seq_len);
+			int len1 = strlen(first);
+			int len2 = strlen(second);
+			int m = min(len1, KSIZE_CHECK);
+			int pos = len1 - m;
+			char *join = (char *) calloc(m + len2 - lg->ksize + 1, sizeof(char));
+			strcpy(join, first + pos);
+			strncpy(join + m, second + lg->ksize,
+					max(0, min(len2 - lg->ksize, m)));
+			float score = count_kmer_on_seq(kmer_count, join, KSIZE_CHECK);
+
+			max_score = max(max_score, score);
+			__VERBOSE_LOG("", "e2 %d m %d score %.3f\n", e2, m, score);
+			print_kmer_count_on_seq(kmer_count, join, KSIZE_CHECK);
+			free(first);
+			free(second);
+			free(join);
+		}
+	}
+	kh_destroy(kmer_int, kmer_count);
 }

@@ -252,4 +252,6 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
+void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
+void asm_resolve_local_loop(struct asm_graph_t *lg);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

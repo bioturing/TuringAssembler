@@ -26,6 +26,13 @@ struct subseq_pos_t{
 	int end;
 };
 
+struct edge_map_info_t{
+	int gl_e;
+	int lc_e;
+	struct subseq_pos_t gpos;
+	struct subseq_pos_t lpos;
+};
+
 void init_map_contig(struct map_contig_t *mct, struct asm_edge_t global_edge,
 		struct asm_graph_t local_graph);
 void init_local_kmers(struct map_contig_t *mct);
