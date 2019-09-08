@@ -97,6 +97,14 @@ static void kh_merge_set(khash_t(gint) *dst, khash_t(gint) *src)
 	}
 }
 
+void destroy_read_path(struct read_path_t *reads)
+{
+	free(reads->R1_path);
+	free(reads->R1_path);
+	if (reads->idx_path != NULL)
+		free(reads->idx_path);
+}
+
 void find_region(struct asm_graph_t *g, gint_t se, uint32_t min_contig_len,
 				uint32_t max_edge_count, double genome_cov,
 				khash_t(gint) *set_v, khash_t(gint) *set_e)
@@ -1925,6 +1933,9 @@ struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_
 	}
 	save_graph_info("./", g, "level_noob");
 	test_asm_graph(g);
+	destroy_read_path(&read_sorted_path);
+	destroy_read_path(&local_read_path);
+	
 	return lg1;
 	// uint32_t *ret_seq, ret_len;
 	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
@@ -1956,6 +1967,7 @@ int local_assembly(struct opt_local_t *opt, struct asm_graph_t *g0, gint_t e1,
 	// 	save_graph_info(work_dir, &lg1, "local_lvl_1");
 	// }
 	asm_graph_destroy(&lg1);
+	destroy_read_path(&local_read);
 	return ret;
 }
 
@@ -2396,7 +2408,8 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		kh_value(ctg_cnt, k) = 0;
 	}
 	count_readpair_path(opt->n_threads, &local_read, fasta_path, ctg_cnt);
-
+	destroy_read_path(&local_read);
+	
 	__VERBOSE_LOG("", "Testing local path %ld <-> %ld\n", e1, e2);
 	int best_cnt, best_len, best_cand;
 	best_cnt = 0;

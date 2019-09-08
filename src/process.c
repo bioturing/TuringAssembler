@@ -263,6 +263,7 @@ void build_bridge_process(struct opt_proc_t *opt)
 	fclose(fp);
 	free(mark);
 	asm_graph_destroy(g0);
+	free(g0);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)

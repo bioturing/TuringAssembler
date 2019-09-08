@@ -1,4 +1,5 @@
 #include "map_contig.h"
+#include <assert.h>
 
 void init_map_contig(struct map_contig_t *mct, struct asm_edge_t global_edge,
 		struct asm_graph_t local_graph)
@@ -30,16 +31,18 @@ void get_all_seq_kmers(char *seq, int len, khash_t(int32_int) **kmers)
 		power *= HASH_BASE;
 	*kmers = kh_init(int32_int);
 	khint32_t hash = 0;
-	for (int i = 0; i < KSIZE - 1; ++i){
-		char base = seq[i];
-		hash = hash * 4 + base_to_int(base);
-	}
-	for (int i = 0; i + KSIZE <= len; ++i){
-		char cur_base = seq[i + KSIZE - 1];
-		char pre_base = i > 0 ? seq[i - 1] : 0;
-		hash = (hash - base_to_int(pre_base) * power) * HASH_BASE +
-			base_to_int(cur_base);
-		add_kmer(hash, *kmers);
+	if (KSIZE < len) { 
+		for (int i = 0; i < KSIZE - 1; ++i){
+			char base = seq[i];
+			hash = hash * 4 + base_to_int(base);
+		}
+		for (int i = 0; i + KSIZE <= len; ++i){
+			char cur_base = seq[i + KSIZE - 1];
+			char pre_base = i > 0 ? seq[i - 1] : 0;
+			hash = (hash - base_to_int(pre_base) * power) * HASH_BASE +
+				base_to_int(cur_base);
+			add_kmer(hash, *kmers);
+		}
 	}
 }
 
