@@ -1879,6 +1879,7 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	save_graph_info(work_dir, &lg, "local_lvl_0");
 	build_local_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local_lvl_1");
+	kh_destroy(bcpos, dict);
 	return lg1;
 	// uint32_t *ret_seq, ret_len;
 	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);

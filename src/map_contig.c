@@ -119,6 +119,7 @@ void map_contig_destroy(struct map_contig_t *mct)
 {
 	for (int i = 0; i < mct->n_candidates; ++i)
 		kh_destroy(int32_int, mct->kmers[i]);
+	free(mct->kmers);
 	free(mct->is_match);
 }
 
