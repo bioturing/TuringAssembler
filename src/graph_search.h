@@ -17,10 +17,10 @@ struct graph_info_t{
 	int lc_e1;
 	int lc_e2;
 	int *is_edge_trash;
-	int *is_edge_vst;
+	int *edge_vst_count;
+	int *edge_max_vst;
 	khash_t(gint_int) *is_link_trash;
 	khash_t(gint_int) *is_link_vst;
-	khash_t(gint_int) *link_max_vst;
 };
 
 struct path_info_t{
@@ -36,7 +36,6 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo);
 int check_edge_trash(struct graph_info_t *ginfo, int e);
 int check_link_trash(struct graph_info_t *ginfo, int e1, int e2);
 int check_edge_visted(struct graph_info_t *ginfo, int e);
-int get_max_visited(struct graph_info_t *ginfo, int e);
 void graph_info_destroy(struct graph_info_t *ginfo);
 gint_t get_edge_code(gint_t u, gint_t v);
 void mark_edge_trash(struct graph_info_t *ginfo, int e);

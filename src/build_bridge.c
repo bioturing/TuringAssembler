@@ -298,6 +298,22 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		__ERROR("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	struct read_path_t local_read_path;
+	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir);
 	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
 			g->edges[next_e2], lg);
 	cov_filter(g, lg, emap1, emap2);
@@ -310,12 +326,10 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_graph(lg, emap1->gl_e, emap2->gl_e);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
-	char r1_path[1024], r2_path[1024];
-	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
-			emap1->gl_e, emap2->gl_e);
-	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
-			emap1->gl_e, emap2->gl_e);
-	khash_t(kmer_int) *kmer_count = get_kmer_hash(r1_path, r2_path, KSIZE_CHECK);
+
+
+	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
+			local_read_path.R2_path, KSIZE_CHECK);
 	//get_all_paths(g, lg, emap1, emap2, &pinfo);
 	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
@@ -382,15 +396,15 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	} else {
 		__ERROR("Reads must be sorted\n");
 	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
+	char r1_path[1024], r2_path[1024];
+	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
+			e1, e2);
+	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
+			e1, e2);
 	struct read_path_t local_read_path;
-	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
-			g->edges[e1].rc_id, e2, work_dir);
-	kh_destroy(bcpos, dict);
+	local_read_path.R1_path = r1_path;
+	local_read_path.R2_path = r2_path;
+
 	count_readpair_path(opt->n_threads, &local_read_path, cand_path, ctg_cnt);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
@@ -665,7 +679,7 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 			char *join = (char *) calloc(m + len2 - lg->ksize + 1, sizeof(char));
 			strcpy(join, first + pos);
 			strncpy(join + m, second + lg->ksize,
-					max(0, min(len2 - lg->ksize, m)));
+					min(len2, KSIZE_CHECK) - lg->ksize);
 			float score = count_kmer_on_seq(kmer_count, join, KSIZE_CHECK);
 
 			max_score = max(max_score, score);

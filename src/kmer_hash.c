@@ -171,7 +171,7 @@ int count_max_consecutive_zero_kmer(char *first, char *second, int overlap_ksize
 	int pos = len1 - m;
 	strcpy(join, first + pos);
 	strncpy(join + m, second + overlap_ksize,
-			max(0, min(len2 - overlap_ksize, m)));
+			min(len2, check_ksize) - overlap_ksize);
 	khash_t(kmer_int) *h = kh_init(kmer_int);
 	count_hash_from_read(join, check_ksize, h);
 	int max_consecutive = 0;

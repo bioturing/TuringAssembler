@@ -10,33 +10,19 @@ void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	ginfo->lc_e1 = lc_e1;
 	ginfo->lc_e2 = lc_e2;
 	ginfo->is_edge_trash = (int *) calloc(lg->n_e, sizeof(int));
-	ginfo->is_edge_vst = (int *) calloc(lg->n_e, sizeof(int));
+	ginfo->edge_vst_count = (int *) calloc(lg->n_e, sizeof(int));
 	ginfo->is_link_trash = kh_init(gint_int);
-	ginfo->is_link_vst = kh_init(gint_int);
-	ginfo->link_max_vst = NULL;
 	graph_info_init_max_vst(ginfo);
 }
 
 void graph_info_init_max_vst(struct graph_info_t *ginfo)
 {
-	if (ginfo->link_max_vst != NULL)
-		kh_destroy(gint_int, ginfo->link_max_vst);
-	ginfo->link_max_vst = kh_init(gint_int);
-	float avg_cov = 0;
-	int n_e = 0;
+	ginfo->edge_max_vst = (int *) calloc(ginfo->g->n_e, sizeof(int));
 	float init_cov = (float) (get_cov(*ginfo->g, ginfo->lc_e1) +
 			get_cov(*ginfo->g, ginfo->lc_e2)) / 2;
-	for (int u = 0; u < ginfo->g->n_e; ++u){
-		int tg = ginfo->g->edges[u].target;
-		for (int i = 0; i < (int) ginfo->g->nodes[tg].deg; ++i){
-			int v = ginfo->g->nodes[tg].adj[i];
-			gint_t edge_code = get_edge_code(u, v);
-			int ret;
-			khiter_t it = kh_put(gint_int, ginfo->link_max_vst,
-					edge_code, &ret);
-			float tmp = ceil(1.0 * get_cov(*ginfo->g, v) / init_cov);
-			kh_val(ginfo->link_max_vst, it) = (int) tmp;
-		}
+	for (int i = 0; i < ginfo->g->n_e; ++i){
+		int cov = get_cov(*(ginfo->g), i);
+		ginfo->edge_max_vst[i] = max(1, (int) round(1.0 * cov / init_cov));
 	}
 }
 
@@ -49,7 +35,7 @@ void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
 	dest->is_edge_trash = (int *) calloc(dest->g->n_e, sizeof(int));
 	memcpy(dest->is_edge_trash, source->is_edge_trash, sizeof(int) *
 			dest->g->n_e);
-	dest->is_edge_vst = (int *) calloc(dest->g->n_e, sizeof(int));
+	dest->edge_vst_count = (int *) calloc(dest->g->n_e, sizeof(int));
 
 	dest->is_link_trash = kh_init(gint_int);
 	for (khiter_t it = kh_begin(source->is_link_trash);
@@ -57,8 +43,6 @@ void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
 		gint_t key = kh_key(source->is_link_trash, it);
 		insert_key(dest->is_link_trash, key);
 	}
-	dest->is_link_vst = kh_init(gint_int);
-	dest->link_max_vst = kh_init(gint_int);
 	graph_info_init_max_vst(dest);
 }
 
@@ -76,10 +60,9 @@ int check_link_trash(struct graph_info_t *ginfo, int e1, int e2)
 void graph_info_destroy(struct graph_info_t *ginfo)
 {
 	free(ginfo->is_edge_trash);
-	free(ginfo->is_edge_vst);
+	free(ginfo->edge_vst_count);
+	free(ginfo->edge_max_vst);
 	kh_destroy(gint_int, ginfo->is_link_trash);
-	kh_destroy(gint_int, ginfo->is_link_vst);
-	kh_destroy(gint_int, ginfo->link_max_vst);
 }
 
 gint_t get_edge_code(gint_t u, gint_t v)
@@ -89,31 +72,12 @@ gint_t get_edge_code(gint_t u, gint_t v)
 
 int check_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	return ginfo->is_edge_vst[e];
-}
-
-int check_link_visited(struct graph_info_t *ginfo, int e1, int e2)
-{
-	gint_t edge_code = get_edge_code(e1, e2);
-	khiter_t it = kh_get(gint_int, ginfo->is_link_vst, edge_code);
-	int n_vst;
-	if (it == kh_end(ginfo->is_link_vst))
-		n_vst = 0;
-	else
-		n_vst = kh_val(ginfo->is_link_vst, it);
-	int max_vst;
-	it = kh_get(gint_int, ginfo->link_max_vst, edge_code);
-	if (it == kh_end(ginfo->link_max_vst))
-		max_vst = 0;
-	else
-		max_vst = kh_val(ginfo->link_max_vst, it);
-	return n_vst == max_vst;
-	//return check_key_exist(ginfo->is_link_vst, edge_code);
+	return ginfo->edge_vst_count[e] == ginfo->edge_max_vst[e];
 }
 
 void mark_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	ginfo->is_edge_vst[e] = 1;
+	++ginfo->edge_vst_count[e];
 }
 
 void mark_edge_trash(struct graph_info_t *ginfo, int e)
@@ -141,7 +105,7 @@ void unmark_link_visited(struct graph_info_t *ginfo, int e1, int e2)
 
 void unmark_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	ginfo->is_edge_vst[e] = 0;
+	--ginfo->edge_vst_count[e];
 }
 
 void remove_key(khash_t(gint_int) *h, gint_t key)
@@ -263,11 +227,9 @@ void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
-		if (check_link_visited(ginfo, u, v))
-			continue;
-		mark_link_visited(ginfo, u, v);
+		mark_edge_visited(ginfo, v);
 		find_all_paths(lg, ginfo, v, depth + 1, cur_path, pinfo);
-		unmark_link_visited(ginfo, u, v);
+		unmark_edge_visited(ginfo, v);
 	}
 }
 
@@ -293,7 +255,7 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
-		if (check_link_visited(ginfo, u, v))
+		if (check_edge_visited(ginfo, v))
 			continue;
 		char *second;
 		decode_seq(&second, lg->edges[v].seq, lg->edges[v].seq_len);
@@ -304,15 +266,17 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 		int max_con = count_max_consecutive_zero_kmer(first, second,
 				lg->ksize, ksize, h);
 		//__VERBOSE_LOG("", "%d %d %d\n", u, v, zero);
-		__VERBOSE_LOG("", "%d %d %d\n", u, v, max_con);
+		__VERBOSE_LOG("", "%d %d %d %d %d %d\n", depth, ginfo->edge_vst_count[v],
+				ginfo->edge_max_vst[v], u, v, max_con);
 		free(second);
-		if (max_con >= 4)
+		//if (lg->nodes[tg].deg > 1 && max_con >= 1)
+		if (max_con >= 1)
 		//if (kmer_res == 0)
 			continue;
-		mark_link_visited(ginfo, u, v);
+		mark_edge_visited(ginfo, v);
 		find_all_paths_kmer_check(lg, ginfo, v, depth + 1, cur_path,
 				pinfo, ksize, h);
-		unmark_link_visited(ginfo, u, v);
+		unmark_edge_visited(ginfo, v);
 	}
 	free(first);
 }
@@ -412,8 +376,6 @@ int find_path_hao(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
-		if (check_link_visited(ginfo, u, v))
-			continue;
 		mark_link_visited(ginfo, u, v);
 		if (find_path_hao(lg, ginfo, v, depth + 1, path, path_len))
 			goto path_found;
@@ -494,8 +456,6 @@ void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *gi
 			continue;
 		if (check_link_trash(ginfo, u, v))
 			continue;
-		if (check_link_visited(ginfo, u, v))
-			continue;
 		mark_link_visited(ginfo, u, v);
 		find_middle_edge_candidates(lg, ginfo, v, path, depth + 1, mark);
 		unmark_link_visited(ginfo, u, v);
@@ -532,11 +492,5 @@ void path_info_destroy(struct path_info_t *pinfo)
 	for (int i = 0; i < pinfo->n_paths; ++i)
 		free(pinfo->paths[i]);
 	free(pinfo->paths);
-}
-
-int get_max_visited(struct graph_info_t *ginfo, int e)
-{
-	khiter_t it = kh_get(gint_int, ginfo->link_max_vst, e);
-	return kh_val(ginfo->link_max_vst, it);
 }
 
