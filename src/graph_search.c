@@ -13,25 +13,17 @@ void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	ginfo->is_edge_vst = (int *) calloc(lg->n_e, sizeof(int));
 	ginfo->is_link_trash = kh_init(gint_int);
 	ginfo->is_link_vst = kh_init(gint_int);
+	ginfo->link_max_vst = NULL;
 	graph_info_init_max_vst(ginfo);
 }
 
 void graph_info_init_max_vst(struct graph_info_t *ginfo)
 {
+	if (ginfo->link_max_vst != NULL)
+		kh_destroy(gint_int, ginfo->link_max_vst);
 	ginfo->link_max_vst = kh_init(gint_int);
 	float avg_cov = 0;
 	int n_e = 0;
-	/*int *mark = (int *) calloc(ginfo->g->n_e, sizeof(int));
-	for (int i = 0; i < ginfo->g->n_e; ++i){
-		if (check_edge_trash(ginfo, i))
-			continue;
-		if (mark[i])
-			continue;
-		mark[i] = mark[ginfo->g->edges[i].rc_id] = 1;
-		++n_e;
-		avg_cov += get_cov(*(ginfo->g), i);
-	}
-	avg_cov /= n_e;*/
 	float init_cov = (float) (get_cov(*ginfo->g, ginfo->start_edge) +
 			get_cov(*ginfo->g, ginfo->end_edge)) / 2;
 	for (int u = 0; u < ginfo->g->n_e; ++u){
@@ -43,8 +35,6 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 			khiter_t it = kh_put(gint_int, ginfo->link_max_vst,
 					edge_code, &ret);
 			float tmp = ceil(1.0 * get_cov(*ginfo->g, v) / init_cov);
-			/*if (tmp > avg_cov)
-				tmp = avg_cov;*/
 			kh_val(ginfo->link_max_vst, it) = (int) tmp;
 		}
 	}
@@ -241,12 +231,8 @@ void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 {
 	filter_edges(lg, ginfo);
 	print_graph(lg, ginfo); //DEBUG only
-	int deg_sum = 0;
-	for (int i = 0; i < ginfo->g->n_v; ++i)
-		deg_sum += ginfo->g->nodes[i].deg;
-	int *path = (int *) calloc(deg_sum, sizeof(int));
+	int path[1024];
 	find_all_paths(lg, ginfo, ginfo->start_edge, 0, path, pinfo);
-	free(path);
 }
 
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
@@ -394,6 +380,8 @@ void connection_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	}
 	__VERBOSE_LOG("", "After filter: %d edges\n",
 			ginfo->g->n_e - disabled);
+	free(forward_len);
+	free(backward_len);
 }
 
 void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int start_edge,

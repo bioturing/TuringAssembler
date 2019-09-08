@@ -286,8 +286,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
-	unrelated_filter(g, e1, e2, edge_pre_e1,
-			edge_next_e2, lg, &ginfo);
+	unrelated_filter(g, e1, e2, edge_pre_e1, edge_next_e2, lg, &ginfo);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
 	get_all_paths(lg, &ginfo, &pinfo);
@@ -451,12 +450,10 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int *path, int path_len, char **contig)
 {
 	*contig = (char *) calloc(1, sizeof(char));
-	{
-		char *tmp;
-		decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
-		join_seq(contig, tmp);
-		free(tmp);
-	}
+	char *tmp;
+	decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
+	join_seq(contig, tmp);
+	free(tmp);
 	int bridge_types[N_BRIDGE_TYPE] = {};
 	char gap_path[1024];
 	sprintf(gap_path, "%s/gap.txt", opt->out_dir);
@@ -486,6 +483,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		fprintf(f, "%d %d %d\n", g->edges[path[i - 1]].seq_len,
 				g->edges[path[i]].seq_len, leng);
 		free(seq);
+		asm_graph_destroy(&lg);
 	}
 	fclose(f);
 	__VERBOSE_LOG("INFO", "Path summary:\n");

@@ -244,6 +244,7 @@ void build_bridge_process(struct opt_proc_t *opt)
 		fprintf(f, ">contig_path_%d\n", i);
 		fprintf(f, "%s\n", contig);
 		free(contig);
+		free(path);
 	}
 	for (int i = 0; i < g0->n_e; ++i){
 		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
@@ -260,6 +261,8 @@ void build_bridge_process(struct opt_proc_t *opt)
 	}
 	fclose(f);
 	fclose(fp);
+	free(mark);
+	asm_graph_destroy(g0);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
