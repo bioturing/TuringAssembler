@@ -88,11 +88,11 @@ void print_kmer_count_on_seq(khash_t(kmer_int) *h, char *seq, int ksize)
 		hash = hash * 4 + base_to_int(seq[i + ksize - 1]);
 		khiter_t it = kh_get(kmer_int, h, hash);
 		if (it != kh_end(h))
-			__VERBOSE_LOG("", "%d ", kh_val(h, it));
+			printf("%d ", kh_val(h, it));
 		else
-			__VERBOSE_LOG("", "0 ");
+			printf("0 ");
 	}
-	__VERBOSE_LOG("", "\n");
+	printf("\n");
 }
 
 int kmer_check(char *first, char *second, int overlap_ksize, int check_ksize,

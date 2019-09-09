@@ -666,7 +666,7 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 	for (int e1 = 0; e1 < lg->n_e; ++e1){
 		int tg = lg->edges[e1].target;
 		float max_score = 0;
-		__VERBOSE_LOG("", "edge %d\n", e1);
+		printf("edge %d\n", e1);
 		for (int i = 0; i < lg->nodes[tg].deg; ++i){
 			int e2 = lg->nodes[tg].adj[i];
 			char *first, *second;
@@ -683,7 +683,7 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 			float score = count_kmer_on_seq(kmer_count, join, KSIZE_CHECK);
 
 			max_score = max(max_score, score);
-			__VERBOSE_LOG("", "e2 %d m %d score %.3f\n", e2, m, score);
+			printf("e2 %d m %d score %.3f\n", e2, m, score);
 			print_kmer_count_on_seq(kmer_count, join, KSIZE_CHECK);
 			free(first);
 			free(second);
