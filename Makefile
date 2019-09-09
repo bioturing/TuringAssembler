@@ -1,13 +1,13 @@
-CC = gcc
+CC = gcc 
 
-CXX = g++
+CXX = g++ 
 
 CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
        -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
-       libs/libbwa.a -lm
+       libs/libbwa.a -lm 
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 
@@ -17,8 +17,8 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src \
-         -g
+		 -fPIC\
+         -I ./src 
 
 EXEC = skipping
 
@@ -77,9 +77,13 @@ $(EXEC_RELEASE): $(OBJ)
 	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
-debug: CFLAGS += -fsanitize=undefined,address
-debug: LIBS += -fsanitize=undefined,address
+debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
+debug: LIBS += -fsanitize=address -fno-omit-frame-pointer -lasan
+debug: CC = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
+debug: CXX = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
+debug: EXEC = src/skipping 
 debug: $(EXEC)
+
 
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
@@ -87,6 +91,10 @@ release: LIBS = -pthread -static -O3 -std=c++11 \
        -lpthread libs/libkmc_skipping.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm
+release: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
+release: LIBS +=  -static-libasan
+release: CC = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
+release: CXX = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
