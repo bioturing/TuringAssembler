@@ -1600,6 +1600,8 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 
 	filter_read(reads, dict, rpath, shared, n_shared);
 	free(shared);
+	kh_destroy(gint, h1_key);
+	kh_destroy(gint, h2_key);
 }
 
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,

@@ -1,13 +1,13 @@
-CC = docker run -it -v /mnt/hdd1/tan/SoftWare/skipping/include:/include -v /mnt/hdd1/tan/SoftWare/skipping/libs:/libs -v /mnt/hdd1/tan/SoftWare/skipping/src:/src gcc:5.4.0 gcc
+CC = gcc 
 
-CXX = docker run -it -v /mnt/hdd1/tan/SoftWare/skipping/include:/include -v /mnt/hdd1/tan/SoftWare/skipping/libs:/libs -v /mnt/hdd1/tan/SoftWare/skipping/src:/src gcc:5.4.0 g++
+CXX = g++ 
 
 CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
        -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
-       libs/libbwa.a -lm -fsanitize=address -fno-omit-frame-pointer -lasan
+       libs/libbwa.a -lm 
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
 
@@ -17,10 +17,9 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src \
-         -g -fsanitize=address -fno-omit-frame-pointer 
+         -I ./src 
 
-EXEC = ./src/skipping
+EXEC = skipping
 
 EXEC_RELEASE = skipping_static
 
@@ -82,9 +81,13 @@ $(EXEC_RELEASE): $(OBJ)
 	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
-debug: CFLAGS += -fsanitize=undefined,address
-debug: LIBS += -fsanitize=undefined,address
+debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
+debug: LIBS += -fsanitize=address -fno-omit-frame-pointer -lasan
+debug: CC = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:5.4.0 gcc
+debug: CXX = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:5.4.0 g++
+debug: EXEC = src/skipping 
 debug: $(EXEC)
+
 
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
