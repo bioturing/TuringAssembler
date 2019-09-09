@@ -2,9 +2,4 @@
 
 set -e
 
-tar -zxvf KMC-lib.tar.gz
-cd KMC
-make kmc_lib
-
-cd ..
-make
+docker run -it -v $PWD:/in skipping_build make -f /in/Makefile $@

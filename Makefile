@@ -17,7 +17,7 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src  -g 
+         -I ./src  -fPIC -g 
 
 EXEC = skipping
 
