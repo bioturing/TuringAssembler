@@ -223,6 +223,7 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 					lg->ksize);
 		}
 	}
+	free(mark);
 	fclose(f);
 }
 

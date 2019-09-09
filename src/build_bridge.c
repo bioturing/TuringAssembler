@@ -360,7 +360,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t local_read_path;
 	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
 			g->edges[e1].rc_id, e2, work_dir);
-
+	kh_destroy(bcpos, dict);
 	count_readpair_path(opt->n_threads, &local_read_path, cand_path, ctg_cnt);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){

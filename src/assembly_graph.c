@@ -644,6 +644,10 @@ void asm_clean_edge(struct asm_graph_t *g, gint_t e)
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		barcode_hash_clean(g->edges[e].barcodes);
 		barcode_hash_clean(g->edges[e].barcodes + 1);
+		barcode_hash_clean(g->edges[e].barcodes + 2);
+		free(g->edges[e].barcodes);
+		barcode_hash_clean(&(g->edges[e].barcodes_scaf));
+		barcode_hash_clean(&(g->edges[e].barcodes_scaf2));
 	}
 }
 
