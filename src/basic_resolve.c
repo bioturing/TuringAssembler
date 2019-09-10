@@ -117,7 +117,15 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 		gint_t deg_fw = g0->nodes[u].deg;
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
 		/* non-branching node */
-		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0 || is_dead_end(g0, u))
+		int is_single_loop = 0;
+		if (deg_fw == 1 && deg_rv == 1){
+			int fw_e = g0->nodes[u].adj[0];
+			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
+			if (fw_e == rv_e)
+				is_single_loop = 1;
+		}
+		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
+				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
 			continue;
 		node_id[u] = n_v++;
 	}

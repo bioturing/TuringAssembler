@@ -30,6 +30,8 @@ void get_all_seq_kmers(char *seq, int len, khash_t(int32_int) **kmers)
 	for (int i = 0; i < KSIZE - 1; ++i)
 		power *= HASH_BASE;
 	*kmers = kh_init(int32_int);
+	if (strlen(seq) < KSIZE)
+		return;
 	khint32_t hash = 0;
 	if (KSIZE < len) { 
 		for (int i = 0; i < KSIZE - 1; ++i){
