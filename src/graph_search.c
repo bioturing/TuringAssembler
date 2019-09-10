@@ -242,6 +242,7 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 	cur_path[depth] = u;
 	if (u == ginfo->lc_e2){
 		path_info_push(pinfo, cur_path, depth + 1);
+		__VERBOSE("%d paths found\n", pinfo->n_paths);
 		return;
 	}
 	int tg = lg->edges[u].target;

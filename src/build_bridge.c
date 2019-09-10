@@ -313,6 +313,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	cov_filter(g, lg, emap1, emap2);
 	if (emap1->lc_e == emap2->lc_e)
 		goto skip_filtering;
+	print_graph(lg, emap1->gl_e, emap2->gl_e);
 	connection_filter(g, lg, emap1, emap2);
 	if (emap1->lc_e == emap2->lc_e)
 		goto skip_filtering;
@@ -657,11 +658,15 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	for (int i = 0; i < lg->n_e; ++i)
 		if (!bad[lg->edges[i].rc_id])
 			bad[i] = 0;
-	bad[emap1->lc_e] = bad[g->edges[emap1->lc_e].rc_id]
-		= bad[emap2->lc_e] = bad[g->edges[emap2->lc_e].rc_id] = 0;
+	bad[emap1->lc_e] = bad[lg->edges[emap1->lc_e].rc_id]
+		= bad[emap2->lc_e] = bad[lg->edges[emap2->lc_e].rc_id] = 0;
 	for (int i = 0; i < lg->n_e; ++i){
-		if (bad[i])
+		if (bad[i]){
 			asm_remove_edge(lg, i);
+		} else {
+			__VERBOSE("%d %d %d\n", i, lg->edges[i].source,
+					lg->edges[i].target);
+		}
 	}
 	free(bad);
 	struct asm_graph_t lg1;
