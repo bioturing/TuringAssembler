@@ -6,7 +6,7 @@ CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-       -Llibs -l:libkmc_skipping.so -l:libbz2.so -l:libz.so \
+       -Llibs KMC/libkmc.a -l:libbz2.so -l:libz.so \
        libs/libbwa.a -lm 
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
@@ -66,7 +66,7 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(EXEC_RELEASE): $(OBJ)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
@@ -88,13 +88,13 @@ debug: $(EXEC)
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
-       -lpthread libs/libkmc_skipping.a \
+       -lpthread KMC/libkmc.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm
 release: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
 release: LIBS +=  -static-libasan
-release: CC = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
-release: CXX = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
+release: CC = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
+release: CXX = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
