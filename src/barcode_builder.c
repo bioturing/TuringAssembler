@@ -30,6 +30,7 @@ struct pathcount_bundle_t {
 	bwaidx_t *bwa_idx;
 	mem_opt_t *bwa_opt;
 	khash_t(contig_count) *count_cand;
+	khash_t(contig_count) *count_err;
 };
 
 struct asm_align_t {
@@ -218,6 +219,60 @@ void count_readpair_path(int n_threads, struct read_path_t *rpath,
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
 		worker_bundles[i].count_cand = count_cand;
+		worker_bundles[i].count_err = NULL;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	producer_threads = calloc(1, sizeof(pthread_t));
+	worker_threads = calloc(n_threads, sizeof(pthread_t));
+
+	pthread_create(producer_threads, &attr, fastq_producer, producer_bundles);
+
+	for (i = 0; i < n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, pathcount_buffer_iterator,
+				worker_bundles + i);
+
+	pthread_join(producer_threads[0], NULL);
+
+	for (i = 0; i < n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, 1);
+	free(worker_bundles);
+
+	free(producer_threads);
+	free(worker_threads);
+
+	bwa_idx_destroy(bwa_idx);
+	free(bwa_opt);
+}
+
+void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand,
+				khash_t(contig_count) *count_err)
+{
+	bwa_idx_build(fasta_path, fasta_path , BWTALGO_AUTO, 500000000);
+	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
+	mem_opt_t *bwa_opt = asm_memopt_init();
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	int i;
+	struct producer_bundle_t *producer_bundles;
+	__VERBOSE_LOG("DEBUG", "NTHREAD = %d\n", n_threads);
+	producer_bundles = init_fastq_pair(n_threads, 1,
+					&(rpath->R1_path), &(rpath->R2_path));
+
+	struct pathcount_bundle_t *worker_bundles;
+	worker_bundles = malloc(n_threads * sizeof(struct pathcount_bundle_t));
+
+	for (i = 0; i < n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].bwa_idx = bwa_idx;
+		worker_bundles[i].bwa_opt = bwa_opt;
+		worker_bundles[i].count_cand = count_cand;
+		worker_bundles[i].count_err = count_err;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -849,6 +904,7 @@ void *barcode_buffer_iterator(void *data)
 void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t *bundle)
 {
 	khash_t(contig_count) *count_cand = bundle->count_cand;
+	khash_t(contig_count) *count_err = bundle->count_err;
 	bwaidx_t *idx = bundle->bwa_idx;
 	mem_opt_t *opt = bundle->bwa_opt;
 	mem_alnreg_v ar1, ar2;
@@ -894,11 +950,13 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			p2[n2++] = a;
 		}
 	}
+	FILE *f = fopen("err.cnt", "a");
 	for (i = 0; i < n1; ++i) {
 		if (p1[i].aligned < r1->len)
 			continue;
 		int c1, c2;
 		c1 = atoi(idx->bns->anns[p1[i].rid].name);
+		int paired_map = 0;
 		for (k = 0; k < n2; ++k) {
 			if (p2[k].aligned < r2->len)
 				continue;
@@ -906,11 +964,92 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			if (c1 == c2 && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
 				&& p1[i].strand != p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
-				if (it != kh_end(count_cand))
+				if (it != kh_end(count_cand)){
 					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);
+					paired_map = 1;
+				}
+			}
+			if (count_err != NULL && c1 == c2
+				&& __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
+				&& p1[i].strand == p2[k].strand){
+				khiter_t it = kh_get(contig_count, count_err, c1);
+				if (it != kh_end(count_err)){
+					atomic_add_and_fetch32(&kh_value(count_err, it), 1);
+					fprintf(f, "%d 1 %d %d\n", c1, p1[i].pos, p1[i].aligned);
+				}
+			}
+		}
+		if (count_err != NULL && !paired_map){
+			khiter_t it = kh_get(contig_count, count_err, c1);
+			if (it != kh_end(count_err)){
+				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
+				fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
 			}
 		}
 	}
+	for (int i = 0; i < n2; ++i){
+		if (p2[i].aligned < r2->len)
+			continue;
+		int c1, c2;
+		c2 = atoi(idx->bns->anns[p2[i].rid].name);
+		int paired_map = 0;
+		for (int j = 0; j < n1; ++j){
+			if (p1[j].aligned < r1->len)
+				continue;
+			c1 = atoi(idx->bns->anns[p1[j].rid].name);
+			if (c1 == c2 && __abs(p2[i].pos - p1[j].pos) < MAX_READ_FRAG_LEN
+				&& p1[j].strand != p2[i].strand) {
+				paired_map = 1;
+				break;
+			}
+		}
+		if (count_err != NULL && !paired_map){
+			khiter_t it = kh_get(contig_count, count_err, c2);
+			if (it != kh_end(count_err)){
+				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
+				fprintf(f, "%d 2 %d %d\n", c2, p2[i].pos, p2[i].aligned);
+			}
+		}
+	}
+	fclose(f);
+	f = fopen("read_map.txt", "a");
+	/*for (int i = 0; i < n1; ++i){
+		if (p1[i].aligned < r1->len)
+			continue;
+		int c;
+		c = atoi(idx->bns->anns[p1[i].rid].name);
+		if (count_err != NULL){
+			fprintf(f, "%d 2 %d %d\n", c, p1[i].pos, p1[i].aligned);
+		}
+	}
+	for (int i = 0; i < n2; ++i){
+		if (p2[i].aligned < r2->len)
+			continue;
+		int c;
+		c = atoi(idx->bns->anns[p2[i].rid].name);
+		if (count_err != NULL){
+			fprintf(f, "%d 2 %d %d\n", c, p2[i].pos, p2[i].aligned);
+		}
+	}*/
+	for (i = 0; i < n1; ++i) {
+		if (p1[i].aligned < r1->len)
+			continue;
+		int c1, c2;
+		c1 = atoi(idx->bns->anns[p1[i].rid].name);
+		int paired_map = 0;
+		for (k = 0; k < n2; ++k) {
+			if (p2[k].aligned < r2->len)
+				continue;
+			c2 = atoi(idx->bns->anns[p2[k].rid].name);
+			if (count_err != NULL && c1 == c2
+				&& __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
+				&& p1[i].strand != p2[k].strand){
+				fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
+				fprintf(f, "%d 2 %d %d\n", c2, p2[k].pos, p2[k].aligned);
+			}
+		}
+	}
+	fclose(f);
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);

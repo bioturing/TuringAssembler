@@ -69,7 +69,7 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_edge_t middle, char **res_seq);
 void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
-		int e1, int e2, float **scores);
+		int e1, int e2, float **scores, float **error);
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
 void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,

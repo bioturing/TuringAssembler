@@ -330,7 +330,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 			local_read_path.R2_path, KSIZE_CHECK);
-	//get_all_paths(g, lg, emap1, emap2, &pinfo);
 	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
 	kh_destroy(kmer_int, kmer_count);
@@ -340,15 +339,21 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
 			pinfo.n_paths);
 	float *scores;
-	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores);
+	float *error;
+	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
 	float best_score = 0;
 	int best_path = 0;
+	FILE *f = fopen("loghao.txt", "w");
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		if (scores[i] > best_score){
+		fprintf(f, "%d %d %d\n", i, (int) scores[i], (int) error[i]);
+		__VERBOSE_LOG("", "Path %d: scores %.3f, err %.3f\n", i,
+				scores[i], error[i]);
+		if (scores[i] - error[i] > best_score){
 			best_path = i;
-			best_score = scores[i];
+			best_score = scores[i] - error[i];
 		}
 	}
+	fclose(f);
 	__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
 	for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
@@ -365,7 +370,7 @@ end_function:
 
 void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
-		int e1, int e2, float **scores)
+		int e1, int e2, float **scores, float **error)
 {
 	int *seq_lens = (int *) calloc(pinfo->n_paths, sizeof(int));
 	char cand_path[1024];
@@ -382,10 +387,14 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	fclose(f);
 	khash_t(contig_count) *ctg_cnt = kh_init(contig_count);
+	khash_t(contig_count) *count_err = kh_init(contig_count);
 	for (int i = 0; i < pinfo->n_paths; ++i){
 		int ret;
 		khiter_t it = kh_put(contig_count, ctg_cnt, i, &ret);
 		kh_val(ctg_cnt, it) = 0;
+
+		it = kh_put(contig_count, count_err, i, &ret);
+		kh_val(count_err, it) = 0;
 	}
 
 	struct read_path_t read_sorted_path;
@@ -405,15 +414,24 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 	local_read_path.R1_path = r1_path;
 	local_read_path.R2_path = r2_path;
 
-	count_readpair_path(opt->n_threads, &local_read_path, cand_path, ctg_cnt);
+	count_readpair_err_path(opt->n_threads, &local_read_path, cand_path,
+			ctg_cnt, count_err);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
 		if (!kh_exist(ctg_cnt, it))
 			continue;
 		int key = kh_key(ctg_cnt, it);
 		int val = kh_val(ctg_cnt, it);
-		//(*scores)[key] = 1.0f * val / seq_lens[key];
 		(*scores)[key] = val;
+	}
+
+	*error = (float *) calloc(pinfo->n_paths, sizeof(float));
+	for (khiter_t it = kh_begin(count_err); it != kh_end(count_err); ++it){
+		if (!kh_exist(count_err, it))
+			continue;
+		int key = kh_key(count_err, it);
+		int val = kh_val(count_err, it);
+		(*error)[key] = val;
 	}
 }
 

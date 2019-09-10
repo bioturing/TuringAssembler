@@ -134,6 +134,9 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand);
+void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand,
+				khash_t(contig_count) *count_err);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
