@@ -257,4 +257,5 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
 void asm_resolve_local_loop(struct asm_graph_t *lg);
+void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1);
 #endif  /* __ASSEMBLY_GRAPH_H__ */
