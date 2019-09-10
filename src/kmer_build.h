@@ -8,4 +8,4 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 						struct asm_graph_t *g);
 void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g);
 
-#endif /* __KMER_BUILD_H__ */b
+#endif /* __KMER_BUILD_H__ */

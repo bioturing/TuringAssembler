@@ -94,7 +94,7 @@ debug: $(EXEC)
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
-       -lpthread libs/libkmc_skipping.a \
+       -lpthread KMC/libkmc.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm 
 release: $(EXEC_RELEASE)
