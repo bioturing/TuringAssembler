@@ -932,9 +932,20 @@ void deb_dump_seq(struct asm_graph_t *g, gint_t e)
 void test_asm_graph(struct asm_graph_t *g)
 {
 	gint_t le_idx = get_longest_edge(g);
-	if (le_idx != -1)
+	if (le_idx != -1) {
 		__VERBOSE("Longest edge %ld_%ld, length %u\n",
 			le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
+	}
+	uint64_t sum_count = 0;
+	for (gint_t e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		gint_t e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum_count += g->edges[e].count;
+	}
+	__VERBOSE("sum_count = %lu\n", sum_count);
 
 	gint_t u, e, j, k;
 	for (u = 0; u < g->n_v; ++u) {

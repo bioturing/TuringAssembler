@@ -550,6 +550,7 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	__VERBOSE("|---- Retrieving kmer from KMC database\n");
 	struct kmhash_t kmer_table;
 	struct kmc_info_t kmc_inf;
+
 	char *kmc_pre = alloca(strlen(work_dir) + 50);
 	char *kmc_suf = alloca(strlen(work_dir) + 50);
 	sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", work_dir, ksize + 1);
