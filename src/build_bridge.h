@@ -1,6 +1,6 @@
 #ifndef __BUILD_BRIDGE__
 #define __BUILD_BRIDGE__
-#define KSIZE_CHECK 31
+#define KSIZE_CHECK (lg->ksize + 6)
 #define MIN_PATH_LENGTH 100
 #define MIN_DEPTH_RATIO 0.2
 #define MIN_OUTPUT_CONTIG_LEN 1000
@@ -93,6 +93,4 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, struct read_path_t *local_read_path);
-int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
-		int e1, int e2);
 #endif

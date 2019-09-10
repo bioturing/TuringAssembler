@@ -1401,6 +1401,8 @@ void asm_resolve_local_loop(struct asm_graph_t *lg)
 				lg->edges[lg->nodes[sr].adj[1]].rc_id;
 			int e2 = lg->nodes[tg].adj[0] != loop_e ?
 				lg->nodes[tg].adj[0] : lg->nodes[tg].adj[1];
+			if (e1 == e2 || e == loop_e)
+				continue;
 			__VERBOSE("Local loop detected, e1: %d, e: %d, loop e: %d, e2: %d, rc: %d\n",
 					e1, e, loop_e, e2, rc);
 
