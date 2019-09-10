@@ -134,16 +134,20 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	}
 	struct asm_graph_t lg1;
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Graph degenerated, abort filtering~\n");
+		asm_graph_destroy(&lg1);
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 	free(bad);
 	map_contig_destroy(&mct_1);
 	map_contig_destroy(&mct_2);
-
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
 }
 
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -262,11 +266,15 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 			// the same
 			join_bridge_no_path(g, lg, emap1, emap2, &bridge_seq);
 			goto end_function;
+		} else if (path_len == 1) {
+			bridge_type = BRIDGE_TRIVIAL_BRIDGE;
+			join_trivial_bridge(g->edges[emap1->gl_e], g->edges[emap2->gl_e],
+					*lg, emap1, emap2, &bridge_seq);
+			goto end_function;
 		} else {
 			bridge_type = BRIDGE_MULTIPLE_PATH;
-			join_bridge_by_path(g->edges[e1], g->edges[e2], *lg,
-					path, path_len, emap1, emap2,
-					&bridge_seq);
+			join_bridge_by_path(g->edges[emap1->gl_e], g->edges[emap2->gl_e],
+					*lg, path, path_len, emap1, emap2, &bridge_seq);
 			free(path);
 			goto end_function;
 		}
@@ -298,36 +306,28 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		edge_next_e2.source = -1;
 	else
 		edge_next_e2 = g->edges[next_e2];
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		__ERROR("Reads must be sorted\n");
-	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
+
 	struct read_path_t local_read_path;
-	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
-			g->edges[e1].rc_id, e2, work_dir);
+	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
+
+
 	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
 			g->edges[next_e2], lg);
 	cov_filter(g, lg, emap1, emap2);
 	connection_filter(g, lg, emap1, emap2);
+
+
+
 	asm_resolve_local_loop(lg);
+	__VERBOSE("%d\n", lg->n_e);
 	get_local_edge_head(*g, *lg, emap1->gl_e, emap1);
 	get_local_edge_tail(*g, *lg, emap2->gl_e, emap2);
 	print_log_edge_map(emap1, emap2);
-	link_filter(opt, g, lg, emap1, emap2);
-	print_graph(lg, emap1->gl_e, emap2->gl_e);
+	//link_filter(opt, g, lg, emap1, emap2);
+	//print_graph(lg, emap1->gl_e, emap2->gl_e);
+
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
-
-
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 			local_read_path.R2_path, KSIZE_CHECK);
 	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
@@ -343,17 +343,17 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
 	float best_score = 0;
 	int best_path = 0;
-	FILE *f = fopen("loghao.txt", "w");
+	//FILE *f = fopen("loghao.txt", "w");
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		fprintf(f, "%d %d %d\n", i, (int) scores[i], (int) error[i]);
-		__VERBOSE_LOG("", "Path %d: scores %.3f, err %.3f\n", i,
-				scores[i], error[i]);
+		//fprintf(f, "%d %d %d\n", i, (int) scores[i], (int) error[i]);
+		/*__VERBOSE_LOG("", "Path %d: scores %.3f, err %.3f\n", i,
+				scores[i], error[i]);*/
 		if (scores[i] - error[i] > best_score){
 			best_path = i;
 			best_score = scores[i] - error[i];
 		}
 	}
-	fclose(f);
+	//fclose(f);
 	__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
 	for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
@@ -625,12 +625,17 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	}
 	struct asm_graph_t lg1;
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Graph degenerated, abort filtering~\n");
+		asm_graph_destroy(&lg1);
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 }
 
 void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
@@ -655,6 +660,8 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	for (int i = 0; i < lg->n_e; ++i)
 		if (!bad[lg->edges[i].rc_id])
 			bad[i] = 0;
+	bad[emap1->lc_e] = bad[g->edges[emap1->lc_e].rc_id]
+		= bad[emap2->lc_e] = bad[g->edges[emap2->lc_e].rc_id] = 0;
 	for (int i = 0; i < lg->n_e; ++i){
 		if (bad[i])
 			asm_remove_edge(lg, i);
@@ -662,13 +669,21 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	free(bad);
 	struct asm_graph_t lg1;
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
-
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_head(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Graph degenerated, abort filtering!\n");
+		struct edge_map_info_t bla1, bla2;
+		get_local_edge_head(*g, *lg, emap1->gl_e, &bla1);
+		get_local_edge_tail(*g, *lg, emap2->gl_e, &bla2);
+		__VERBOSE("%d %%d\n", bla1.lc_e, bla2.lc_e);
+		asm_graph_destroy(&lg1);
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 }
 
 void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
@@ -709,4 +724,39 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		}
 	}
 	kh_destroy(kmer_int, kmer_count);
+}
+
+void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
+		int e1, int e2, struct read_path_t *local_read_path)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		__ERROR("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	get_local_reads_intersect(&read_sorted_path, local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir);
+}
+
+int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int e1, int e2)
+{
+	return 0;
+	struct edge_map_info_t emap1;
+	get_local_edge_head(*g, *lg, e1, &emap1);
+
+	struct edge_map_info_t emap2;
+	get_local_edge_head(*g, *lg, e2, &emap2);
+
+	if (emap1.lc_e == emap2.lc_e)
+		return 1;
+	return 0;
 }

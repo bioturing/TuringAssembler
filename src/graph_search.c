@@ -266,8 +266,8 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 		int max_con = count_max_consecutive_zero_kmer(first, second,
 				lg->ksize, ksize, h);
 		//__VERBOSE_LOG("", "%d %d %d\n", u, v, zero);
-		printf("%d %d %d %d %d %d\n", depth, ginfo->edge_vst_count[v],
-				ginfo->edge_max_vst[v], u, v, max_con);
+		/*printf("%d %d %d %d %d %d\n", depth, ginfo->edge_vst_count[v],
+				ginfo->edge_max_vst[v], u, v, max_con);*/
 		free(second);
 		//if (lg->nodes[tg].deg > 1 && max_con >= 1)
 		if (max_con >= 1)
