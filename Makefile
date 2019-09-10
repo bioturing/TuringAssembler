@@ -5,8 +5,7 @@ CXX = g++
 CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
-       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-       -Llibs KMC/libkmc.a -l:libbz2.so -l:libz.so \
+       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -lbz2 -Llibs KMC/libkmc.a  -l:libz.so \
        libs/libbwa.a -lm 
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
@@ -18,7 +17,7 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
 		 -fPIC\
-         -I ./src 
+         -I ./src -lbz2
 
 EXEC = skipping
 
@@ -89,10 +88,8 @@ debug: $(EXEC)
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread KMC/libkmc.a \
-       libs/libz.a libs/libbz2.a libs/libbwa.a \
-       -Wl,--no-whole-archive -lm
-release: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
-release: LIBS +=  -static-libasan
+       libs/libz.a libs/libbwa.a \
+       -Wl,--no-whole-archive -lm -lbz2
 release: CC = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
 release: CXX = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
 release: $(EXEC_RELEASE)
