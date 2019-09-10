@@ -133,13 +133,24 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 			asm_remove_edge(lg, i);
 	}
 	struct asm_graph_t lg1;
+	struct asm_graph_t g_bak;
+	__VERBOSE("before\n");
+	asm_clone_graph(lg, &g_bak);
+	__VERBOSE("after\n");
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&lg1);
+		*lg = g_bak;
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 	free(bad);
 	map_contig_destroy(&mct_1);
 	map_contig_destroy(&mct_2);
@@ -629,13 +640,22 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 			asm_remove_edge(lg, i);
 	}
 	struct asm_graph_t lg1;
+	struct asm_graph_t g_bak;
+	asm_clone_graph(lg, &g_bak);
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&lg1);
+		*lg = g_bak;
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 }
 
 void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
@@ -668,15 +688,22 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	}
 	free(bad);
 	struct asm_graph_t lg1;
+	struct asm_graph_t g_bak;
+	asm_clone_graph(lg, &g_bak);
 	asm_condense(lg, &lg1);
-	asm_graph_destroy(lg);
-	*lg = lg1;
-	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
-	free(forward_len);
-	free(backward_len);
-	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&lg1);
+		*lg = g_bak;
+	} else {
+		asm_graph_destroy(lg);
+		*lg = lg1;
+		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 }
 
 void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,

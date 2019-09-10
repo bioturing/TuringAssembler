@@ -93,4 +93,6 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, struct read_path_t *local_read_path);
+int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int e1, int e2);
 #endif
