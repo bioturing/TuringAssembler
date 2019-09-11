@@ -143,6 +143,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 		*lg = g_bak;
 	} else {
 		asm_graph_destroy(lg);
+		asm_graph_destroy(&g_bak);
 		*lg = lg1;
 		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
@@ -270,11 +271,6 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 			// the same
 			join_bridge_no_path(g, lg, emap1, emap2, &bridge_seq);
 			goto end_function;
-		} else if (path_len == 1) {
-			bridge_type = BRIDGE_TRIVIAL_BRIDGE;
-			join_trivial_bridge(g->edges[emap1->gl_e], g->edges[emap2->gl_e],
-					*lg, emap1, emap2, &bridge_seq);
-			goto end_function;
 		} else {
 			bridge_type = BRIDGE_MULTIPLE_PATH;
 			join_bridge_by_path(g->edges[emap1->gl_e], g->edges[emap2->gl_e],
@@ -317,14 +313,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
 			g->edges[next_e2], lg);
-	if (emap1->lc_e == emap2->lc_e)
-		goto skip_filtering;
 	cov_filter(g, lg, emap1, emap2);
-	if (emap1->lc_e == emap2->lc_e)
-		goto skip_filtering;
 	connection_filter(g, lg, emap1, emap2);
-	if (emap1->lc_e == emap2->lc_e)
-		goto skip_filtering;
 
 
 
@@ -338,7 +328,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//link_filter(opt, g, lg, emap1, emap2);
 	//print_graph(lg, emap1->gl_e, emap2->gl_e);
 
-skip_filtering:
 	__VERBOSE("Start finding paths\n");
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
@@ -358,13 +347,19 @@ skip_filtering:
 	float best_score = 0;
 	int best_path = 0;
 	//FILE *f = fopen("loghao.txt", "w");
+	int min_score = 1e9;
+	int max_err = 0;
+	for (int i = 0; i < pinfo.n_paths; ++i){
+		min_score = min(min_score, scores[i]);
+		max_err = max(max_err, error[i]);
+	}
 	for (int i = 0; i < pinfo.n_paths; ++i){
 		//fprintf(f, "%d %d %d\n", i, (int) scores[i], (int) error[i]);
 		/*__VERBOSE_LOG("", "Path %d: scores %.3f, err %.3f\n", i,
 				scores[i], error[i]);*/
-		if (scores[i] - error[i] > best_score){
+		if (scores[i] - min_score + max_err - error[i]  > best_score){
 			best_path = i;
-			best_score = scores[i] - error[i];
+			best_score = scores[i] - min_score + max_err - error[i];
 		}
 	}
 	//fclose(f);
@@ -650,6 +645,7 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		*lg = g_bak;
 	} else {
 		asm_graph_destroy(lg);
+		asm_graph_destroy(&g_bak);
 		*lg = lg1;
 		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
@@ -698,12 +694,15 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		*lg = g_bak;
 	} else {
 		asm_graph_destroy(lg);
+		asm_graph_destroy(&g_bak);
 		*lg = lg1;
 		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
 	}
+	free(forward_len);
+	free(backward_len);
 }
 
 void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
