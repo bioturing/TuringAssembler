@@ -64,6 +64,7 @@ void swap(void *a, void *b, int size)
 	memcpy(c, a, size);
 	memcpy(a, b, size);
 	memcpy(b, c, size);
+	free(c);
 }
 
 void get_dump_N(char **N)

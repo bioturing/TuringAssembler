@@ -12,11 +12,14 @@ void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	ginfo->is_edge_trash = (int *) calloc(lg->n_e, sizeof(int));
 	ginfo->edge_vst_count = (int *) calloc(lg->n_e, sizeof(int));
 	ginfo->is_link_trash = kh_init(gint_int);
+	ginfo->edge_max_vst = NULL;
 	graph_info_init_max_vst(ginfo);
 }
 
 void graph_info_init_max_vst(struct graph_info_t *ginfo)
 {
+	if (ginfo->edge_max_vst != NULL)
+		free(ginfo->edge_max_vst);
 	ginfo->edge_max_vst = (int *) calloc(ginfo->g->n_e, sizeof(int));
 	float init_cov = (float) (get_cov(*ginfo->g, ginfo->lc_e1) +
 			get_cov(*ginfo->g, ginfo->lc_e2)) / 2;
@@ -205,6 +208,7 @@ void get_all_paths_kmer_check(struct asm_graph_t *g, struct asm_graph_t *lg,
 	int *path = (int *) calloc(1024, sizeof(int));
 	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
 			ksize, h);
+	graph_info_destroy(&ginfo);
 	free(path);
 }
 

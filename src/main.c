@@ -283,6 +283,7 @@ void build_bridge_opt_process(int argc, char *argv[])
 	init_log(tmp_dir);
 	init_clock();
 	build_bridge_process(opt);
+	free(opt);
 }
 
 void graph_convert_opt_process(int argc, char *argv[])

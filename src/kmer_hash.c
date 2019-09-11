@@ -25,11 +25,15 @@ khash_t(kmer_int) *get_kmer_hash(char *r1_path, char *r2_path, int ksize)
 		count_hash_from_read(rv, ksize, res);
 		free(rv);
 	}
+	read_list_destroy(&rlist1);
+	read_list_destroy(&rlist2);
 	return res;
 }
 
 void count_hash_from_read(char *seq, int ksize, khash_t(kmer_int) *h)
 {
+	if (strlen(seq) < ksize)
+		return;
 	uint64_t power = 1;
 	for (int i = 0; i < ksize - 1; ++i)
 		power *= 4;

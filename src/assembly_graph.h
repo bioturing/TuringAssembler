@@ -60,8 +60,8 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
-    struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
-    struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -257,4 +257,5 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
 void asm_resolve_local_loop(struct asm_graph_t *lg);
+void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

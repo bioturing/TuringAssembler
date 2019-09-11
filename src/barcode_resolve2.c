@@ -100,7 +100,7 @@ static void kh_merge_set(khash_t(gint) *dst, khash_t(gint) *src)
 void destroy_read_path(struct read_path_t *reads)
 {
 	free(reads->R1_path);
-	free(reads->R1_path);
+	free(reads->R2_path);
 	if (reads->idx_path != NULL)
 		free(reads->idx_path);
 }
@@ -1565,6 +1565,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	rpath->R1_path = strdup(path);
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
 	struct barcode_hash_t *h1, *h2;
 	h1 = g->edges[e1].barcodes + 2;
 	h2 = g->edges[e2].barcodes + 2;
@@ -1613,6 +1614,7 @@ void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R1_path = strdup(path);
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
 	struct barcode_hash_t *h1, *h2;
 	h1 = g->edges[e1].barcodes + 2;
 	h2 = g->edges[e2].barcodes + 2;
@@ -1890,6 +1892,7 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	build_local_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local_lvl_1");
 	kh_destroy(bcpos, dict);
+	destroy_read_path(&local_read_path);
 	return lg1;
 	// uint32_t *ret_seq, ret_len;
 	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
