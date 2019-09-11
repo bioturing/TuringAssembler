@@ -4,52 +4,38 @@
 #include <math.h>
 
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
-			int start_edge, int end_edge)
+			int lc_e1, int lc_e2)
 {
 	ginfo->g = lg;
-	ginfo->start_edge = start_edge;
-	ginfo->end_edge = end_edge;
+	ginfo->lc_e1 = lc_e1;
+	ginfo->lc_e2 = lc_e2;
 	ginfo->is_edge_trash = (int *) calloc(lg->n_e, sizeof(int));
-	ginfo->is_edge_vst = (int *) calloc(lg->n_e, sizeof(int));
+	ginfo->edge_vst_count = (int *) calloc(lg->n_e, sizeof(int));
 	ginfo->is_link_trash = kh_init(gint_int);
-	ginfo->is_link_vst = kh_init(gint_int);
-	ginfo->link_max_vst = NULL;
 	graph_info_init_max_vst(ginfo);
 }
 
 void graph_info_init_max_vst(struct graph_info_t *ginfo)
 {
-	if (ginfo->link_max_vst != NULL)
-		kh_destroy(gint_int, ginfo->link_max_vst);
-	ginfo->link_max_vst = kh_init(gint_int);
-	float avg_cov = 0;
-	int n_e = 0;
-	float init_cov = (float) (get_cov(*ginfo->g, ginfo->start_edge) +
-			get_cov(*ginfo->g, ginfo->end_edge)) / 2;
-	for (int u = 0; u < ginfo->g->n_e; ++u){
-		int tg = ginfo->g->edges[u].target;
-		for (int i = 0; i < (int) ginfo->g->nodes[tg].deg; ++i){
-			int v = ginfo->g->nodes[tg].adj[i];
-			gint_t edge_code = get_edge_code(u, v);
-			int ret;
-			khiter_t it = kh_put(gint_int, ginfo->link_max_vst,
-					edge_code, &ret);
-			float tmp = ceil(1.0 * get_cov(*ginfo->g, v) / init_cov);
-			kh_val(ginfo->link_max_vst, it) = (int) tmp;
-		}
+	ginfo->edge_max_vst = (int *) calloc(ginfo->g->n_e, sizeof(int));
+	float init_cov = (float) (get_cov(*ginfo->g, ginfo->lc_e1) +
+			get_cov(*ginfo->g, ginfo->lc_e2)) / 2;
+	for (int i = 0; i < ginfo->g->n_e; ++i){
+		int cov = get_cov(*(ginfo->g), i);
+		ginfo->edge_max_vst[i] = (int) max(1, round(1.0 * cov / init_cov));
 	}
 }
 
 void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
 {
 	dest->g = source->g;
-	dest->start_edge = source->start_edge;
-	dest->end_edge = source->end_edge;
+	dest->lc_e1 = source->lc_e1;
+	dest->lc_e2 = source->lc_e2;
 
 	dest->is_edge_trash = (int *) calloc(dest->g->n_e, sizeof(int));
 	memcpy(dest->is_edge_trash, source->is_edge_trash, sizeof(int) *
 			dest->g->n_e);
-	dest->is_edge_vst = (int *) calloc(dest->g->n_e, sizeof(int));
+	dest->edge_vst_count = (int *) calloc(dest->g->n_e, sizeof(int));
 
 	dest->is_link_trash = kh_init(gint_int);
 	for (khiter_t it = kh_begin(source->is_link_trash);
@@ -57,8 +43,6 @@ void copy_static_info(struct graph_info_t *dest, struct graph_info_t *source)
 		gint_t key = kh_key(source->is_link_trash, it);
 		insert_key(dest->is_link_trash, key);
 	}
-	dest->is_link_vst = kh_init(gint_int);
-	dest->link_max_vst = kh_init(gint_int);
 	graph_info_init_max_vst(dest);
 }
 
@@ -76,10 +60,9 @@ int check_link_trash(struct graph_info_t *ginfo, int e1, int e2)
 void graph_info_destroy(struct graph_info_t *ginfo)
 {
 	free(ginfo->is_edge_trash);
-	free(ginfo->is_edge_vst);
+	free(ginfo->edge_vst_count);
+	free(ginfo->edge_max_vst);
 	kh_destroy(gint_int, ginfo->is_link_trash);
-	kh_destroy(gint_int, ginfo->is_link_vst);
-	kh_destroy(gint_int, ginfo->link_max_vst);
 }
 
 gint_t get_edge_code(gint_t u, gint_t v)
@@ -89,31 +72,12 @@ gint_t get_edge_code(gint_t u, gint_t v)
 
 int check_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	return ginfo->is_edge_vst[e];
-}
-
-int check_link_visited(struct graph_info_t *ginfo, int e1, int e2)
-{
-	gint_t edge_code = get_edge_code(e1, e2);
-	khiter_t it = kh_get(gint_int, ginfo->is_link_vst, edge_code);
-	int n_vst;
-	if (it == kh_end(ginfo->is_link_vst))
-		n_vst = 0;
-	else
-		n_vst = kh_val(ginfo->is_link_vst, it);
-	int max_vst;
-	it = kh_get(gint_int, ginfo->link_max_vst, edge_code);
-	if (it == kh_end(ginfo->link_max_vst))
-		max_vst = 0;
-	else
-		max_vst = kh_val(ginfo->link_max_vst, it);
-	return n_vst == max_vst;
-	//return check_key_exist(ginfo->is_link_vst, edge_code);
+	return ginfo->edge_vst_count[e] == ginfo->edge_max_vst[e];
 }
 
 void mark_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	ginfo->is_edge_vst[e] = 1;
+	++ginfo->edge_vst_count[e];
 }
 
 void mark_edge_trash(struct graph_info_t *ginfo, int e)
@@ -141,7 +105,7 @@ void unmark_link_visited(struct graph_info_t *ginfo, int e1, int e2)
 
 void unmark_edge_visited(struct graph_info_t *ginfo, int e)
 {
-	ginfo->is_edge_vst[e] = 0;
+	--ginfo->edge_vst_count[e];
 }
 
 void remove_key(khash_t(gint_int) *h, gint_t key)
@@ -167,15 +131,13 @@ int check_key_exist(khash_t(gint_int) *h, gint_t key)
 	return it != kh_end(h);
 }
 
-void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
+void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 {
 	char path[1024];
-	sprintf(path, "%d_%d_local.gfa", ginfo->start_edge, ginfo->end_edge);
+	sprintf(path, "%d_%d_local.gfa", lc_e1, lc_e2);
 	FILE *f = fopen(path, "w");
-	int *mark = (int *) calloc(ginfo->g->n_e, sizeof(int));
-	for (int u = 0; u < ginfo->g->n_e; ++u){
-		if (check_edge_trash(ginfo, u))
-			continue;
+	int *mark = (int *) calloc(lg->n_e, sizeof(int));
+	for (int u = 0; u < lg->n_e; ++u){
 		if (mark[u])
 			continue;
 		mark[u] = 1;
@@ -186,17 +148,13 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 			fprintf(f, "%c", int_to_base(__binseq_get(lg->edges[u].seq, i)));
 		fprintf(f, "\tKC:i:%ld\n", lg->edges[u].count);
 	}
-	for (int it = 0; it < ginfo->g->n_e; ++it){
+	for (int it = 0; it < lg->n_e; ++it){
 		int u = it;
 		if (!mark[u])
 			continue;
 		int tg = lg->edges[u].target;
 		for (int i = 0; i < (int) lg->nodes[tg].deg; ++i){
 			int v = lg->nodes[tg].adj[i];
-			if (check_edge_trash(ginfo, v))
-				continue;
-			if (check_link_trash(ginfo, u, v))
-				continue;
 			int new_u;
 			char dir1;
 			if (mark[u] == 1){
@@ -227,13 +185,27 @@ void print_graph(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 	fclose(f);
 }
 
-void get_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+void get_all_paths(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		struct path_info_t *pinfo)
 {
-	filter_edges(lg, ginfo);
-	print_graph(lg, ginfo); //DEBUG only
-	int path[1024];
-	find_all_paths(lg, ginfo, ginfo->start_edge, 0, path, pinfo);
+	struct graph_info_t ginfo;
+	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
+	int *path = (int *) calloc(1024, sizeof(int));
+	find_all_paths(lg, &ginfo, emap1->lc_e, 0, path, pinfo);
+	free(path);
+}
+
+void get_all_paths_kmer_check(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
+		struct path_info_t *pinfo, int ksize, khash_t(kmer_int) *h)
+{
+	struct graph_info_t ginfo;
+	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
+	int *path = (int *) calloc(1024, sizeof(int));
+	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
+			ksize, h);
+	free(path);
 }
 
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
@@ -242,40 +214,86 @@ void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	if (pinfo->n_paths == MAX_PATH_COUNT)
 		return;
 	cur_path[depth] = u;
-	if (u == ginfo->end_edge){
+	if (u == ginfo->lc_e2){
 		path_info_push(pinfo, cur_path, depth + 1);
 		return;
 	}
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		gint_t v = lg->nodes[tg].adj[i];
-		if (v == ginfo->start_edge)
+		if (v == ginfo->lc_e1)
 			continue;
-		if (lg->edges[v].rc_id == ginfo->end_edge)
+		if (lg->edges[v].rc_id == ginfo->lc_e2)
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
-		if (check_link_visited(ginfo, u, v))
-			continue;
-		mark_link_visited(ginfo, u, v);
+		mark_edge_visited(ginfo, v);
 		find_all_paths(lg, ginfo, v, depth + 1, cur_path, pinfo);
-		unmark_link_visited(ginfo, u, v);
+		unmark_edge_visited(ginfo, v);
 	}
 }
 
-int get_path(struct asm_graph_t *lg, int start_edge, int end_edge,
+void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginfo,
+		int u, int depth, int *cur_path, struct path_info_t *pinfo,
+		int ksize, khash_t(kmer_int) *h)
+{
+	if (pinfo->n_paths == MAX_PATH_COUNT)
+		return;
+	cur_path[depth] = u;
+	if (u == ginfo->lc_e2){
+		path_info_push(pinfo, cur_path, depth + 1);
+		__VERBOSE("%d paths found\n", pinfo->n_paths);
+		return;
+	}
+	int tg = lg->edges[u].target;
+	char *first;
+	decode_seq(&first, lg->edges[u].seq, lg->edges[u].seq_len);
+	for (int i = 0; i < lg->nodes[tg].deg; ++i){
+		gint_t v = lg->nodes[tg].adj[i];
+		if (v == ginfo->lc_e1)
+			continue;
+		if (lg->edges[v].rc_id == ginfo->lc_e2)
+			continue;
+		if (check_edge_trash(ginfo, v))
+			continue;
+		if (check_edge_visited(ginfo, v))
+			continue;
+		char *second;
+		decode_seq(&second, lg->edges[v].seq, lg->edges[v].seq_len);
+		int kmer_res = kmer_check(first, second, lg->ksize,
+				ksize, h);
+		/*int zero = count_zero_kmer_map(first, second, lg->ksize,
+				ksize, h);*/
+		int max_con = count_max_consecutive_zero_kmer(first, second,
+				lg->ksize, ksize, h);
+		//__VERBOSE_LOG("", "%d %d %d\n", u, v, zero);
+		/*printf("%d %d %d %d %d %d\n", depth, ginfo->edge_vst_count[v],
+				ginfo->edge_max_vst[v], u, v, max_con);*/
+		free(second);
+		//if (lg->nodes[tg].deg > 1 && max_con >= 1)
+		if (max_con >= 1)
+		//if (kmer_res == 0)
+			continue;
+		mark_edge_visited(ginfo, v);
+		find_all_paths_kmer_check(lg, ginfo, v, depth + 1, cur_path,
+				pinfo, ksize, h);
+		unmark_edge_visited(ginfo, v);
+	}
+	free(first);
+}
+
+int get_path(struct asm_graph_t *lg, int lc_e1, int lc_e2,
 		int *middle_edge, int **path, int *path_len)
 {
 	int res;
-	__VERBOSE_LOG("PATH", "Finding path from %d to %d\n", start_edge,
-			end_edge);
+	__VERBOSE_LOG("PATH", "Finding path from %d to %d\n", lc_e1,
+			lc_e2);
 	struct graph_info_t ginfo;
-	graph_info_init(lg, &ginfo, start_edge, end_edge);
-	filter_edges(lg, &ginfo);
+	graph_info_init(lg, &ginfo, lc_e1, lc_e2);
 	//print_graph(lg, &ginfo); //DEBUG only
 	*path_len = 0;
 	*path = NULL;
-	int found = find_path_hao(lg, &ginfo, start_edge, 0, path, path_len);
+	int found = find_path_hao(lg, &ginfo, lc_e1, 0, path, path_len);
 	if (found == 0){
 		__VERBOSE_LOG("PATH", "Path not found, exit\n");
 		res = PATH_NOT_FOUND;
@@ -314,87 +332,16 @@ end_function:
 	return res;
 }
 
-void filter_edges(struct asm_graph_t *lg, struct graph_info_t *ginfo)
-{
-	cov_filter(lg, ginfo);
-	//link_filter(lg, ginfo);
-	connection_filter(lg, ginfo);
-	graph_info_init_max_vst(ginfo);
-}
-
-void cov_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
-{
-	__VERBOSE_LOG("COV FILTER", "+----------------------------------+\n");
-	int is_disabled = 0;
-	for (int i = 0; i < lg->n_e; ++i)
-		is_disabled += check_edge_trash(ginfo, i);
-	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e - is_disabled);
-	int thresh = (int) (MIN_DEPTH_RATIO *
-			max(get_cov(*lg, ginfo->start_edge),
-				get_cov(*lg, ginfo->end_edge)));
-	for (int i = 0; i < ginfo->g->n_e; ++i){
-		if (get_cov(*lg, i) < thresh)
-			mark_edge_trash(ginfo, i);
-	}
-	is_disabled = 0;
-	for (int i = 0; i < lg->n_e; ++i)
-		is_disabled += check_edge_trash(ginfo, i);
-	__VERBOSE_LOG("", "After filter: %d edges\n",
-			ginfo->g->n_e - is_disabled);
-}
-
-void link_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
-{
-	for (int u = 0; u < ginfo->g->n_e; ++u){
-		int tg = lg->edges[u].target;
-		for (int i = 0; i < lg->nodes[tg].deg; ++i){
-			int v = lg->nodes[tg].adj[i];
-			float a = get_cov(*lg, u);
-			float b = get_cov(*lg, v);
-			if (a / b < MIN_RELATIVE_COV_RATIO ||
-				b / a < MIN_RELATIVE_COV_RATIO)
-				mark_link_trash(ginfo, u, v);
-		}
-	}
-}
-
-void connection_filter(struct asm_graph_t *lg, struct graph_info_t *ginfo)
-{
-	__VERBOSE_LOG("CONNECTION FILTER", "+----------------------------------+\n");
-	int disabled = 0;
-	for (int i = 0; i < ginfo->g->n_e; ++i)
-		disabled += check_edge_trash(ginfo, i);
-	__VERBOSE_LOG("", "Before filter: %d edges\n",
-			ginfo->g->n_e - disabled);
-	int *forward_len, *backward_len;
-	bfs(lg, ginfo, ginfo->start_edge, &forward_len);
-	bfs(lg, ginfo, lg->edges[ginfo->end_edge].rc_id, &backward_len);
-	for (int i = 0; i < ginfo->g->n_e; ++i){
-		if (check_edge_trash(ginfo, i))
-			continue;
-		int l1 = forward_len[i];
-		int l2 = backward_len[lg->edges[i].rc_id];
-		if (l1 == -1 || l2 == -1 || l1 + l2 > MIN_PATH_LENGTH){
-			mark_edge_trash(ginfo, i);
-			++disabled;
-		}
-	}
-	__VERBOSE_LOG("", "After filter: %d edges\n",
-			ginfo->g->n_e - disabled);
-	free(forward_len);
-	free(backward_len);
-}
-
-void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int start_edge,
+void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int lc_e1,
 		int **bfs_len)
 {
 	int *queue = (int *) calloc(ginfo->g->n_e, sizeof(int));
 	*bfs_len = (int *) calloc(ginfo->g->n_e, sizeof(int));
 	for (int i = 0; i < (int) ginfo->g->n_e; ++i)
 		(*bfs_len)[i] = -1;
-	(*bfs_len)[start_edge] = 0;
+	(*bfs_len)[lc_e1] = 0;
 	int front = 0, back = 1;
-	queue[0] = start_edge;
+	queue[0] = lc_e1;
 	while (front < back){
 		int u = queue[front++];
 		int tg = lg->edges[u].target;
@@ -416,7 +363,7 @@ void bfs(struct asm_graph_t *lg, struct graph_info_t *ginfo, int start_edge,
 int find_path_hao(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 		int depth, int **path, int *path_len)
 {
-	if (u == ginfo->end_edge){
+	if (u == ginfo->lc_e2){
 		*path_len = depth + 1;
 		*path = (int *) calloc(*path_len, sizeof(int));
 		goto path_found;
@@ -424,13 +371,11 @@ int find_path_hao(struct asm_graph_t *lg, struct graph_info_t *ginfo, int u,
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		gint_t v = lg->nodes[tg].adj[i];
-		if (v == ginfo->start_edge)
+		if (v == ginfo->lc_e1)
 			continue;
-		if (lg->edges[v].rc_id == ginfo->end_edge)
+		if (lg->edges[v].rc_id == ginfo->lc_e2)
 			continue;
 		if (check_edge_trash(ginfo, v))
-			continue;
-		if (check_link_visited(ginfo, u, v))
 			continue;
 		mark_link_visited(ginfo, u, v);
 		if (find_path_hao(lg, ginfo, v, depth + 1, path, path_len))
@@ -450,7 +395,7 @@ int check_simple_path(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		kh_destroy(gint_int, ginfo->is_link_vst);
 		ginfo->is_link_vst = kh_init(gint_int);
 		mark_link_visited(ginfo, path[i - 1], path[i]);
-		int tmp = find_path_hao(lg, ginfo, ginfo->start_edge, 0, new_path,
+		int tmp = find_path_hao(lg, ginfo, ginfo->lc_e1, 0, new_path,
 				new_path_len);
 		if (tmp){
 			res = 0;
@@ -478,7 +423,7 @@ int get_best_middle_edge(struct asm_graph_t *lg, struct graph_info_t *ginfo)
 		deg_sum += lg->nodes[i].deg;
 	int *path = (int *) calloc(deg_sum, sizeof(int));
 	int *mark = (int *) calloc(ginfo->g->n_e, sizeof(int));
-	find_middle_edge_candidates(lg, &new_ginfo, new_ginfo.start_edge, path,
+	find_middle_edge_candidates(lg, &new_ginfo, new_ginfo.lc_e1, path,
 			0, mark);
 	for (int i = 0; i < ginfo->g->n_e; ++i){
 		if (!mark[i] || mark[lg->edges[i].rc_id])
@@ -496,7 +441,7 @@ void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *gi
 		int u, int *path, int depth, int *mark)
 {
 	path[depth] = u;
-	if (u == ginfo->end_edge){
+	if (u == ginfo->lc_e2){
 		for (int i = 1; i < depth; ++i)
 			mark[path[i]] = 1;
 		return;
@@ -504,15 +449,13 @@ void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *gi
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		int v = lg->nodes[tg].adj[i];
-		if (v == lg->edges[ginfo->start_edge].rc_id ||
-			v == lg->edges[ginfo->end_edge].rc_id ||
-			v == ginfo->start_edge)
+		if (v == lg->edges[ginfo->lc_e1].rc_id ||
+			v == lg->edges[ginfo->lc_e2].rc_id ||
+			v == ginfo->lc_e1)
 			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
 		if (check_link_trash(ginfo, u, v))
-			continue;
-		if (check_link_visited(ginfo, u, v))
 			continue;
 		mark_link_visited(ginfo, u, v);
 		find_middle_edge_candidates(lg, ginfo, v, path, depth + 1, mark);
@@ -551,3 +494,4 @@ void path_info_destroy(struct path_info_t *pinfo)
 		free(pinfo->paths[i]);
 	free(pinfo->paths);
 }
+

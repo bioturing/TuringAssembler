@@ -11,7 +11,7 @@ int base_to_int(char ch)
 	for (int i = 0; i < 4; ++i)
 		if (ch == __base[i])
 			return i;
-	return -1;
+	return 0;
 }
 
 char flip(char ch)

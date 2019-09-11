@@ -1,5 +1,8 @@
 #ifndef __BUILD_BRIDGE__
 #define __BUILD_BRIDGE__
+#define KSIZE_CHECK (lg->ksize + 6)
+#define MIN_PATH_LENGTH 100
+#define MIN_DEPTH_RATIO 0.2
 #define MIN_OUTPUT_CONTIG_LEN 1000
 #define MIN_MATCH_LENG 4000
 #define MATCH_THRESH 8000
@@ -25,13 +28,6 @@
 #include "map_contig.h"
 #include "graph_search.h"
 KHASH_MAP_INIT_STR(str_int, int);
-
-struct edge_map_info_t{
-	int gl_e;
-	int lc_e;
-	struct subseq_pos_t gpos;
-	struct subseq_pos_t lpos;
-};
 
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e, struct edge_map_info_t *emap);
@@ -73,20 +69,28 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_edge_t middle, char **res_seq);
 void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
-		int e1, int e2, float **scores);
+		int e1, int e2, float **scores, float **error);
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
-void unrelated_filter(struct asm_graph_t *g, int e1, int e2,
-		struct asm_edge_t pre_e1, struct asm_edge_t next_e2,
-		struct asm_graph_t *lg, struct graph_info_t *ginfo);
+void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct asm_edge_t pre_e1,
+		struct asm_edge_t next_e2, struct asm_graph_t *lg);
 void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 		char **res_seq);
-void join_bridge_no_path(struct asm_edge_t e1, struct asm_edge_t e2,
-		struct asm_edge_t lc_e1, struct asm_edge_t lc_e2,
+void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq);
 void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2, int pre_e1, int next_e2,
 		int **path, int *path_len);
+void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
+void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
+void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
+void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
+void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
+		int e1, int e2, struct read_path_t *local_read_path);
 #endif

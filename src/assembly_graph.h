@@ -134,6 +134,9 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand);
+void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand,
+				khash_t(contig_count) *count_err);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
@@ -252,4 +255,6 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
+void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
+void asm_resolve_local_loop(struct asm_graph_t *lg);
 #endif  /* __ASSEMBLY_GRAPH_H__ */
