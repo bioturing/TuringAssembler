@@ -134,9 +134,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	}
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
-	__VERBOSE("before\n");
 	asm_clone_graph(lg, &g_bak);
-	__VERBOSE("after\n");
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
 		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
@@ -325,16 +323,18 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	if (emap1->lc_e == emap2->lc_e)
 		goto skip_filtering;
 	connection_filter(g, lg, emap1, emap2);
-	print_graph(lg, emap1->gl_e, emap2->gl_e);
 	if (emap1->lc_e == emap2->lc_e)
 		goto skip_filtering;
 
 
 
+	// BUGGY CODE
+	/*__VERBOSE("resolve local loop\n");
 	asm_resolve_local_loop(lg);
 	get_local_edge_head(*g, *lg, emap1->gl_e, emap1);
 	get_local_edge_tail(*g, *lg, emap2->gl_e, emap2);
 	print_log_edge_map(emap1, emap2);
+	__VERBOSE("DONE\n");*/
 	//link_filter(opt, g, lg, emap1, emap2);
 	//print_graph(lg, emap1->gl_e, emap2->gl_e);
 
@@ -770,7 +770,6 @@ void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e1, int e2)
 {
-	return 0;
 	struct edge_map_info_t emap1;
 	get_local_edge_head(*g, *lg, e1, &emap1);
 

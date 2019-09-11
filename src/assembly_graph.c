@@ -1433,12 +1433,14 @@ void asm_resolve_local_loop(struct asm_graph_t *lg)
 
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 {
+	save_asm_graph(g0, "tmp_graph.bin");
+	load_asm_graph(g1, "tmp_graph.bin");
+	return;
 	g1->ksize = g0->ksize;
 	g1->bin_size = g0->bin_size;
 	g1->aux_flag = g0->aux_flag;
 	g1->n_v = g0->n_v;
 	g1->n_e = g0->n_e;
-	__VERBOSE("HAHA\n");
 	if (g0->candidates != NULL){
 		g1->candidates = kh_init(pair_contig_count);
 		for (khiter_t it = kh_begin(g0->candidates); it != kh_end(g0->candidates);
@@ -1454,7 +1456,6 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 	} else {
 		g1->candidates = NULL;
 	}
-	__VERBOSE("HIHI\n");
 	g1->nodes = (struct asm_node_t *) calloc(g0->n_v, sizeof(struct asm_node_t));
 	for (int i = 0; i < g1->n_v; ++i){
 		g1->nodes[i].rc_id = g0->nodes[i].rc_id;
@@ -1463,7 +1464,6 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		memcpy(g1->nodes[i].adj, g0->nodes[i].adj, sizeof(gint_t) * g1->nodes[i].deg);
 	}
 
-	__VERBOSE("HOHO\n");
 	g1->edges = (struct asm_edge_t *) calloc(g0->n_e, sizeof(struct asm_edge_t));
 	for (int i = 0; i < g1->n_e; ++i){
 		g1->edges[i].count = g0->edges[i].count;
@@ -1473,24 +1473,27 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		g1->edges[i].target = g0->edges[i].target;
 		g1->edges[i].rc_id = g0->edges[i].rc_id;
 		pthread_mutex_init(&g1->edges[i].lock, NULL);
-		g1->edges[i].barcodes_scaf = g0->edges[i].barcodes_scaf;
-		g1->edges[i].barcodes_scaf2 = g0->edges[i].barcodes_scaf2;
+		__VERBOSE("seq len %d\n", g1->edges[i].seq_len);
+		__VERBOSE("%d\n", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
 				sizeof(uint32_t));
+		for (int j = 0; j < g0->edges[i].seq_len; ++j)
+			__VERBOSE("%d", __binseq_get(g0->edges[i].seq, j));
+		__VERBOSE("\n");
+		__VERBOSE("copy mem\n");
 		memcpy(g1->edges[i].seq, g0->edges[i].seq,
-				sizeof(uint32_t) * (g1->edges[i].seq_len + 3) / 4);
-		g1->edges[i].p_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
-				sizeof(uint32_t));
-		memcpy(g1->edges[i].p_holes, g0->edges[i].p_holes,
-				sizeof(uint32_t) * g1->edges[i].n_holes);
-		g1->edges[i].l_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
-				sizeof(uint32_t));
-		memcpy(g1->edges[i].l_holes, g0->edges[i].l_holes,
-				sizeof(uint32_t) * g1->edges[i].n_holes);
-		g1->edges[i].barcodes = (struct barcode_hash_t *) calloc(3,
-				sizeof(struct barcode_hash_t));
-		for (int j = 0; j < 3; ++j)
-			g1->edges[i].barcodes[j] = g0->edges[i].barcodes[j];
+				sizeof(uint32_t) * ((g1->edges[i].seq_len + 3) / 4));
+		__VERBOSE("done seq\n");
+		if (g1->edges[i].n_holes > 0){
+			g1->edges[i].p_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
+					sizeof(uint32_t));
+			memcpy(g1->edges[i].p_holes, g0->edges[i].p_holes,
+					sizeof(uint32_t) * g1->edges[i].n_holes);
+			g1->edges[i].l_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
+					sizeof(uint32_t));
+			memcpy(g1->edges[i].l_holes, g0->edges[i].l_holes,
+					sizeof(uint32_t) * g1->edges[i].n_holes);
+		}
 	}
-	__VERBOSE("HEHE\n");
+	__VERBOSE("DONE\n");
 }
