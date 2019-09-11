@@ -436,6 +436,8 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int val = kh_val(count_err, it);
 		(*error)[key] = val;
 	}
+	kh_destroy(contig_count, ctg_cnt);
+	kh_destroy(contig_count, count_err);
 }
 
 void join_seq(char **dest, char *source)
@@ -733,6 +735,7 @@ void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 	mkdir(work_dir, 0755);
 	get_local_reads_intersect(&read_sorted_path, local_read_path, dict, g,
 			g->edges[e1].rc_id, e2, work_dir);
+	kh_destroy(bcpos, dict);
 }
 
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
