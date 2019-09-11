@@ -26,13 +26,11 @@ void load_reads_from_fastq(char *r_path, struct read_list_t *rlist)
 		fscanf(f, "+%s\n", info);
 		info = (char *) realloc(info, (strlen(info) + 1) * sizeof(char));
 
-		struct read_t *r = (struct read_t *) calloc(1,
-				sizeof(struct read_t));
-		r->name = name;
-		r->seq = seq;
-		r->info = info;
-		r->len = strlen(seq);
-		push_read_to_list(*r, rlist);
+		struct read_t r = {.name = name,
+				.seq = seq,
+				.info = info,
+				.len = strlen(seq)};
+		push_read_to_list(r, rlist);
 	}
 	fclose(f);
 }
@@ -53,4 +51,14 @@ void load_read_pairs_from_fastq(char *r1_path, char *r2_path,
 {
 	load_reads_from_fastq(r1_path, list1);
 	load_reads_from_fastq(r2_path, list2);
+}
+
+void read_list_destroy(struct read_list_t *rlst)
+{
+	for (int i = 0; i < rlst->n; ++i){
+		free(rlst->reads[i].name);
+		free(rlst->reads[i].seq);
+		free(rlst->reads[i].info);
+	}
+	free(rlst->reads);
 }

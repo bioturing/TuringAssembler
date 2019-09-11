@@ -310,7 +310,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t local_read_path;
 	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
 
-
 	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
 			g->edges[next_e2], lg);
 	cov_filter(g, lg, emap1, emap2);
@@ -333,6 +332,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	path_info_init(&pinfo);
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 			local_read_path.R2_path, KSIZE_CHECK);
+	destroy_read_path(&local_read_path);
 	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
 	kh_destroy(kmer_int, kmer_count);
@@ -373,6 +373,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
 	free(scores);
+	free(error);
 end_function:
 	path_info_destroy(&pinfo);
 }
@@ -381,7 +382,6 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct path_info_t *pinfo,
 		int e1, int e2, float **scores, float **error)
 {
-	int *seq_lens = (int *) calloc(pinfo->n_paths, sizeof(int));
 	char cand_path[1024];
 	sprintf(cand_path, "%s/%d_%d_all.fasta", opt->out_dir, e1, e2);
 	FILE *f = fopen(cand_path, "w");
@@ -391,7 +391,6 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		join_bridge_center_by_path(lg, pinfo->paths[i],
 				pinfo->path_lens[i], &seq);
 		fprintf(f, "%s\n", seq);
-		seq_lens[i] = strlen(seq);
 		free(seq);
 	}
 	fclose(f);
