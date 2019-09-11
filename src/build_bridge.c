@@ -672,6 +672,8 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	asm_graph_destroy(lg);
 	*lg = lg1;
 	__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+	free(forward_len);
+	free(backward_len);
 	get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 	get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 	print_log_edge_map(emap1, emap2);
