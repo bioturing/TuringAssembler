@@ -11,14 +11,16 @@
 
 void destroy_kmc_info(struct kmc_info_t *inf)
 {
-	free(inf->prefix_offset);
-	free(inf->sig_map);
-	inf->prefix_offset = NULL;
-	inf->sig_map = NULL;
+	free(inf->prefix_file_buf);
+	free(inf->signature_map);
+	inf->prefix_file_buf = NULL;
+	inf->signature_map = NULL;
 }
 
+typedef unsigned long long uint64;
 void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 {
+    printf("Open file prefix %s\n", path);
 	FILE *fp = xfopen(path, "rb");
 	char sig[4];
 	/* read signature to check whether not truncated file */
@@ -31,33 +33,120 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 	if (strncmp(sig, KMCP, 4))
 		__ERROR("KMC prefix file is truncated");
 	fseek(fp, 0, SEEK_END);
-	uint64_t file_size = ftell(fp);
+	uint64_t size = ftell(fp)-4-4; // size of file without 2 marker and header_offset
 
 	/* read header position */
-	int header_position;
+	int header_offset;
 	fseek(fp, -8, SEEK_END);
-	xfread(&header_position, 4, 1, fp);
+	xfread(&header_offset, 4, 1, fp);
+	printf("header position %d \n", header_offset);
 
-	/* read header */
-	fseek(fp, -header_position - 8, SEEK_END);
-	xfread(&(data->header), sizeof(struct kmc_header_t), 1, fp);
-
-	/* calculate some auxiliary information */
-	data->sig_map_size = ((uint64_t)1 << (2 * data->header.signature_length)) + 1;
-	uint64_t sig_map_size_byte = data->sig_map_size * sizeof(uint32_t);
-	uint64_t prefix_offset_size_byte = file_size - sig_map_size_byte - header_position - 12;
-	data->prefix_offset_size = (prefix_offset_size_byte - 8) / sizeof(uint64_t);
-
-	/* read prefix offset */
-	data->prefix_offset = malloc(prefix_offset_size_byte);
+	int kmer_type;
+	fseek(fp, -12, SEEK_END);
+	xfread(&kmer_type, 4, 1, fp);
+	fseek(fp, ftell(fp), SEEK_SET);
 	fseek(fp, 4, SEEK_SET);
-	xfread(data->prefix_offset, 1, prefix_offset_size_byte, fp);
-	data->prefix_offset[data->prefix_offset_size] = data->header.total_kmers + 1;
 
-	/* read signature map */
-	data->sig_map = malloc(sig_map_size_byte);
-	xfread(data->sig_map, data->sig_map_size, sizeof(uint32_t), fp);
-	fclose(fp);
+	if (kmer_type == 0x200) {
+	    size -= 4;
+        /* read header */
+        fseek(fp, -header_offset - 8, SEEK_END);
+        xfread(&(data->header), sizeof(struct kmc_header_t), 1, fp);
+
+        /* calculate some auxiliary information */
+        data->signature_map_size = ((uint64_t) 1 << (2 * data->header.signature_length)) + 1;
+        uint64_t sig_map_size_byte = data->signature_map_size * sizeof(uint32_t);
+        uint64_t lut_area_size_in_bytes = size - sig_map_size_byte - header_offset - 8;
+        data->prefix_file_buf_size = (lut_area_size_in_bytes + 8) / sizeof(uint64_t);
+
+        /* read prefix offset */
+        data->prefix_file_buf= malloc(data->prefix_file_buf_size*8);
+        fseek(fp, 4, SEEK_SET);
+        size_t result = xfread(data->prefix_file_buf, 1, lut_area_size_in_bytes+8, fp);
+        if (result == 0)
+            __ERROR("wtf i am doing here\n");
+
+        data->prefix_file_buf[data->prefix_file_buf_size] = data->header.total_kmers + 1;
+
+        /* read signature map */
+        data->signature_map = malloc(sig_map_size_byte);
+        xfread(data->signature_map, data->signature_map_size, sizeof(uint32_t), fp);
+        fclose(fp);
+    } else if (kmer_type == 0) {
+	    printf("\n SIZE %d \n", size);
+        data->prefix_file_buf_size = (size - 4) / 8;		//reads without 4 bytes of a header_offset (and without markers)
+        data->prefix_file_buf = malloc(8*data->prefix_file_buf_size);
+        size_t result = xfread(data->prefix_file_buf, 8, data->prefix_file_buf_size, fp);
+        printf("I can read\n", size);
+        if (result == 0)
+            __ERROR("wtf i am doing here, too\n");
+
+        fseek(fp, -8, SEEK_END);
+
+        size = size - 4;
+
+        unsigned long long header_index = (size - header_offset) / sizeof(uint64);
+        uint64 last_data_index = header_index;
+
+        uint64 d = data->prefix_file_buf[header_index];
+
+        data->header.kmer_length = (uint32_t)d;			//- kmer's length
+        printf("kmer length load: %d\n", data->header.kmer_length);
+        data->header.mode = d >> 32;				//- mode: 0 or 1
+        printf("mode: %d\n", data->header.mode);
+
+        header_index++;
+        data->header.counter_size = (uint32_t)data->prefix_file_buf[header_index];	//- the size of a counter in bytes;
+        printf("counter size: %d\n", data->header.counter_size);
+        //- for mode 0 counter_size is 1, 2, 3, or 4 (or 5, 6, 7, 8 for small k values)
+        //- for mode = 1 counter_size is 4;
+        data->header.lut_prefix_length = data->prefix_file_buf[header_index] >> 32;		//- the number of prefix's symbols cut frm kmers;
+        printf("lut prefix len: %d\n", data->header.lut_prefix_length);
+        //- (kmer_length - lut_prefix_length) is divisible by 4
+
+        header_index++;
+        data->header.min_count = (uint32_t)data->prefix_file_buf[header_index];    //- the minimal number of kmer's appearances
+        printf("min count : %d\n", data->header.min_count);
+        data->header.max_count = data->prefix_file_buf[header_index] >> 32;      //- the maximal number of kmer's appearances
+
+        header_index++;
+        data->header.total_kmers = data->prefix_file_buf[header_index];					//- the total number of kmers
+
+        header_index++;
+        data->header.both_strands = (data->prefix_file_buf[header_index] & 0x000000000000000F) == 1;
+        data->header.both_strands = !data->header.both_strands;
+
+        data->header.max_count += data->prefix_file_buf[header_index] & 0xFFFFFFFF00000000;
+        printf("max count : %d\n", data->header.max_count);
+
+        data->prefix_file_buf[last_data_index] = data->header.total_kmers + 1;
+        printf("prove total kmer load: %lld\n", data->header.total_kmers);
+
+//        data->header.sufix_size = (data->header.kmer_length - data->header.lut_prefix_length) / 4;
+//
+//        sufix_rec_size = sufix_size + counter_size;
+//
+//        return true;
+//
+//        fseek(fp, -header_offset - 8, SEEK_END);
+//        xfread(&(data->header.kmer_length), 4, 1, fp);
+//        printf("kmer length load: %d\n", data->header.kmer_length);
+//        xfread(&(data->header.mode), 4, 1, fp);
+//        printf("mode: %d\n", data->header.mode);
+//        xfread(&(data->header.counter_size), 4, 1, fp);
+//        printf("counter size: %d\n", data->header.counter_size);
+//        xfread(&(data->header.lut_prefix_length), 4, 1, fp);
+//        printf("lut prefix len: %d\n", data->header.lut_prefix_length);
+//        xfread(&(data->header.min_count), 4, 1, fp);
+//        printf("min count : %d\n", data->header.min_count);
+//        xfread(&(data->header.max_count), 4, 1, fp);
+//        printf("max count : %d\n", data->header.max_count);
+//        xfread(&(data->header.total_kmers), 8, 1, fp);
+//        printf("total kmer load: %lld\n", data->header.total_kmers);
+//        fclose(fp);
+	}else {
+	    __ERROR("wrong format file\n");
+	}
 }
 
 struct reader_buffer_t {
@@ -137,7 +226,7 @@ void *KMC_worker_multi(void *raw_data)
 	// __VERBOSE("lo_prefix = %lu; hi_prefix = %lu\n", lo_prefix, hi_prefix);
 	for (i = lo_prefix; i < hi_prefix; ++i) {
 		prefix = i & prefix_mask;
-		n_kmers = data->prefix_offset[i + 1] - data->prefix_offset[i];
+		n_kmers = data->prefix_file_buf[i + 1] - data->prefix_file_buf[i];
 		for (k = 0; k < n_kmers; ++k) {
 			/* fill buffer */
 			if (b.rem_size < record_size) {
@@ -170,6 +259,7 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 			struct kmc_info_t *data, void *bundle,
 			void (*process)(int, uint8_t *, uint32_t, void*))
 {
+    printf("start retrieve kmer\n");
 	FILE *fp = fopen(path, "rb");
 	char sig[4];
 	/* read signature to check whether truncated file */
@@ -185,6 +275,7 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 	/* Calculate record size */
 	fseek(fp, 0, SEEK_END);
 	uint64_t file_size = ftell(fp) - 8;
+	printf("huuuu header %p %d\n", &(data->header), data->header.total_kmers);
 	if (file_size % data->header.total_kmers != 0)
 		__ERROR("Total kmer does not divide kmer record field total size");
 	int record_size = file_size / data->header.total_kmers;
@@ -205,8 +296,8 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 	i = 0;
 	worker_bundle[0].lo_prefix = 0;
 	worker_bundle[0].offset_kmer = 0;
-	while (data->prefix_offset[i + 1] != data->header.total_kmers + 1) {
-		cnt_kmers += data->prefix_offset[i + 1] - data->prefix_offset[i];
+	while (data->prefix_file_buf[i + 1] != data->header.total_kmers + 1) {
+		cnt_kmers += data->prefix_file_buf[i + 1] - data->prefix_file_buf[i];
 		if (cnt_kmers >= cap * (k + 1)) {
 			// worker_bundle[k].lo_prefix = cur_prefix;
 			worker_bundle[k].hi_prefix = i + 1;
@@ -280,9 +371,9 @@ void KMC_retrive_kmer(const char *path, struct kmc_info_t *data, void *bundle,
 	b.rem_size = fread(b.buf, 1, b.buf_size, fp);
 	b.cur_pos = 0;
 	uint8_t *kmer = alloca((data->header.kmer_length + 3) / 4);
-	while (data->prefix_offset[i + 1] != data->header.total_kmers + 1) {
+	while (data->prefix_file_buf[i + 1] != data->header.total_kmers + 1) {
 		prefix = i & prefix_mask;
-		n_kmers = data->prefix_offset[i + 1] - data->prefix_offset[i];
+		n_kmers = data->prefix_file_buf[i + 1] - data->prefix_file_buf[i];
 		for (k = 0; k < n_kmers; ++k) {
 			/* fill buffer */
 			if (b.rem_size < record_size) {

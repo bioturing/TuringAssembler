@@ -21,10 +21,10 @@ struct kmc_header_t {
 
 struct kmc_info_t {
 	struct kmc_header_t header;
-	uint64_t sig_map_size;
-	uint64_t prefix_offset_size;
-	uint64_t *prefix_offset;
-	uint32_t *sig_map;
+	uint64_t signature_map_size;
+	uint64_t prefix_file_buf_size;
+	uint64_t *prefix_file_buf;
+	uint32_t *signature_map;
 };
 
 void KMC_retrive_kmer(const char *path, struct kmc_info_t *data, void *bundle,

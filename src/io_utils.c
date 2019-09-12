@@ -32,7 +32,7 @@ size_t xfread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t ret = fread(ptr, size, nmemb, stream);
 	if (ret != nmemb)
-		__ERROR("fread, wrong file or file is corrupted\n");
+		__ERROR("fread, wrong file or file is corrupted nmem expected %d found %d\n", nmemb, ret);
 	return ret;
 }
 
