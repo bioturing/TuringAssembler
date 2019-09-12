@@ -901,4 +901,61 @@ int resolve_loop(struct asm_graph_t *g0)
 	return count;
 }
 
+int asm_resolve_local_loop(struct asm_graph_t *lg)
+{
+	int res = 0;
+	for (int e = 0; e < lg->n_e; ++e){
+		int rc = lg->edges[e].rc_id;
+		if (e > rc)
+			continue;
+		int tg = lg->edges[e].target;
+		int sr = lg->nodes[lg->edges[e].source].rc_id;
+		if (lg->nodes[tg].deg == 2 && lg->nodes[sr].deg == 2){
+			int loop_e = -1;
+			for (int i = 0; loop_e == -1 && i < 2; ++i){
+				for (int j = 0; loop_e == -1 && j < 2; ++j){
+					if (lg->nodes[tg].adj[i] ==
+						lg->edges[lg->nodes[sr].adj[j]].rc_id)
+						loop_e = lg->nodes[tg].adj[i];
+				}
+			}
+			if (loop_e == -1)
+				continue;
+			int e1 = lg->edges[lg->nodes[sr].adj[0]].rc_id != loop_e ?
+				lg->edges[lg->nodes[sr].adj[0]].rc_id :
+				lg->edges[lg->nodes[sr].adj[1]].rc_id;
+			int e2 = lg->nodes[tg].adj[0] != loop_e ?
+				lg->nodes[tg].adj[0] : lg->nodes[tg].adj[1];
+			if (e1 == e2 || e == loop_e)
+				continue;
+			__VERBOSE("Local loop detected, e1: %d, e: %d, loop e: %d, e2: %d, rc: %d\n",
+					e1, e, loop_e, e2, rc);
+
+			asm_append_barcode_readpair(lg, loop_e, e);
+			asm_append_seq(lg->edges + loop_e, lg->edges + e,
+					lg->ksize);
+			asm_append_barcode_readpair(lg, e, loop_e);
+			asm_append_seq(lg->edges + e, lg->edges + loop_e,
+					lg->ksize);
+			int loop_e_rc = lg->edges[loop_e].rc_id;
+			int e_rc = lg->edges[e].rc_id;
+			asm_append_barcode_readpair(lg, loop_e_rc, e_rc);
+			asm_append_seq(lg->edges + loop_e_rc, lg->edges + e_rc,
+					lg->ksize);
+			asm_append_barcode_readpair(lg, e_rc, loop_e_rc);
+			asm_append_seq(lg->edges + e_rc, lg->edges + loop_e_rc,
+					lg->ksize);
+
+			asm_remove_edge(lg, loop_e);
+			asm_remove_edge(lg, lg->edges[loop_e].rc_id);
+			++res;
+		}
+	}
+	struct asm_graph_t lg1;
+	asm_condense(lg, &lg1);
+	asm_graph_destroy(lg);
+	*lg = lg1;
+	return res;
+}
+
 
