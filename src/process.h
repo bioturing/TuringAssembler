@@ -23,4 +23,6 @@ void assembly2_process(struct opt_proc_t *opt);
 void assembly3_process(struct opt_proc_t *opt);
 void assembly_precount_process(struct opt_proc_t *opt);
 void build_bridge_process(struct opt_proc_t *opt);
+void resolve_local_process(struct opt_proc_t *opt);
+void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix);
 #endif /* __PROCESS_H__ */
