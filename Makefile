@@ -17,7 +17,7 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src 
+         -I ./src  -g 
 
 EXEC = skipping
 
@@ -83,11 +83,10 @@ $(EXEC_RELEASE): $(OBJ)
 	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
-debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
+debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g  -gdwarf-3
 debug: LIBS += -fsanitize=address -fno-omit-frame-pointer -lasan
 debug: CC = gcc
 debug: CXX = g++
-debug: EXEC = src/skipping 
 debug: $(EXEC)
 
 
@@ -96,7 +95,7 @@ release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread libs/libkmc_skipping.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
-       -Wl,--no-whole-archive -lm
+       -Wl,--no-whole-archive -lm 
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
