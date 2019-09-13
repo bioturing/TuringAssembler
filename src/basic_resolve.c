@@ -938,6 +938,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 			asm_append_barcode_readpair(g, e, loop_e);
 			asm_append_seq(g->edges + e, g->edges + loop_e,
 					g->ksize);
+			g->edges[e].count += g->edges[e].count + g->edges[loop_e].count;
 			int loop_e_rc = g->edges[loop_e].rc_id;
 			int e_rc = g->edges[e].rc_id;
 			asm_append_barcode_readpair(g, loop_e_rc, e_rc);
@@ -946,9 +947,9 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 			asm_append_barcode_readpair(g, e_rc, loop_e_rc);
 			asm_append_seq(g->edges + e_rc, g->edges + loop_e_rc,
 					g->ksize);
-
+			g->edges[e_rc].count = g->edges[e].count;
 			asm_remove_edge(g, loop_e);
-			asm_remove_edge(g, g->edges[loop_e].rc_id);
+			asm_remove_edge(g, loop_e_rc);
 			++res;
 		}
 	}
