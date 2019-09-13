@@ -280,22 +280,12 @@ void resolve_local_process(struct opt_proc_t *opt)
 		++ite;
 		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
 	} while(1);
-	/*ite = 0;
-	int resolved_branch = 0;
-	do{
-		int resolved = asm_resolve_dump_branch(&g0);
-		if (!resolved)
-			break;
-		resolved_branch += resolved;
-		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
-	} while(1);*/
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
 	save_asm_graph(&g0, path);
 
 	save_graph_info(opt->out_dir, &g0, "level_haha");
 	__VERBOSE_LOG("DUMP LOOP", "%d dump loop(s) resolved\n", resolved_loop);
-	//__VERBOSE_LOG("DUMP BRANCH", "%d dump branch(s) resolved\n", resolved_branch);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)

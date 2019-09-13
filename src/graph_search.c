@@ -499,3 +499,35 @@ void path_info_destroy(struct path_info_t *pinfo)
 	free(pinfo->paths);
 }
 
+void get_nearby_edges(struct asm_graph_t *g, int e, int radius, int **res,
+		int *n_nb)
+{
+	*res = (int *) calloc(g->n_e, sizeof(int));
+	*n_nb = 0;
+	int *dis = (int *) calloc(g->n_e, sizeof(int));
+	for (int i = 0; i < g->n_e; ++i)
+		dis[i] = -1;
+	dis[e] = 0;
+	int *queue = (int *) calloc(g->n_e, sizeof(int));
+	int fr = 0, bk = 1;
+	queue[0] = e;
+	while (fr < bk){
+		int u = queue[fr++];
+		(*res)[*n_nb] = u;
+		++(*n_nb);
+		if (dis[u] == radius)
+			continue;
+		int tg = g->edges[u].target;
+		for (int i = 0; i < g->nodes[tg].deg; ++i){
+			int v = g->nodes[tg].adj[i];
+			if (dis[v] == -1){
+				dis[v] = dis[u] + 1;
+				queue[bk++] = v;
+			}
+		}
+	}
+	free(dis);
+	free(queue);
+	*res = (int *) realloc(*res, *n_nb * sizeof(int));
+}
+

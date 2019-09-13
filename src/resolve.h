@@ -18,4 +18,5 @@ void do_some_resolve_bridge(struct asm_graph_t *g);
 int resolve_loop(struct asm_graph_t *g0);
 int asm_resolve_dump_loop(struct asm_graph_t *g);
 int asm_resolve_dump_branch(struct asm_graph_t *g);
+int detect_dump_jungle(struct asm_graph_t *g, int e);
 #endif /* __RESOLVE_H__ */

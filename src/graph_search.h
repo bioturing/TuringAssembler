@@ -79,4 +79,9 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 void path_info_init(struct path_info_t *path);
 void path_info_push(struct path_info_t *pinfo, int *path, int len);
 void path_info_destroy(struct path_info_t *pinfo);
+
+
+
+void get_nearby_edges(struct asm_graph_t *g, int e, int radius, int **res,
+		int *n_nb);
 #endif
