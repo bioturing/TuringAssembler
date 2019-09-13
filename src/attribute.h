@@ -60,6 +60,8 @@ struct opt_proc_t {
 	char *in_fastg;
 	char *in_contig_file;
 	int mmem;
+	char *lc;
+	int lk;
 };
 
 struct read_path_t {

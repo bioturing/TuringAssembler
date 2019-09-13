@@ -15,8 +15,8 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "utils.h"
-#include "verbose.h"
-
+#include "verbose.h" 
+#include "barcode_resolve2.h"
 KHASH_SET_INIT_INT64(gint);
 
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
@@ -25,17 +25,9 @@ KHASH_SET_INIT_INT64(gint);
 
 #define __is_hang_edge(g, set_e, e) (kh_get(gint, set_e, (g)->edges[e].rc_id) == kh_end(set_e))
 
-struct read_index_t {
-	int64_t r1_offset;
-	int64_t r2_offset;
-	int64_t r1_len;
-	int64_t r2_len;
-};
-
 #define read_index_get_key(p) ((p).r1_offset)
 RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
-KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
 struct opt_local_t {
 	char *out_dir;
@@ -103,6 +95,14 @@ static void kh_merge_set(khash_t(gint) *dst, khash_t(gint) *src)
 			continue;
 		kh_put(gint, dst, kh_key(src, k), &ret);
 	}
+}
+
+void destroy_read_path(struct read_path_t *reads)
+{
+	free(reads->R1_path);
+	free(reads->R2_path);
+	if (reads->idx_path != NULL)
+		free(reads->idx_path);
 }
 
 void find_region(struct asm_graph_t *g, gint_t se, uint32_t min_contig_len,
@@ -1556,6 +1556,55 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
+void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rpath,
+			khash_t(bcpos) *dict, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, const char *prefix)
+{
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath->R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
+	struct barcode_hash_t *h1, *h2;
+	h1 = g->edges[e1].barcodes + 2;
+	h2 = g->edges[e2].barcodes + 2;
+	kmint_t i, k;
+	khash_t(gint) *h1_key = kh_init(gint);
+	khash_t(gint) *h2_key = kh_init(gint);
+	for (i = 0; i < h1->size; ++i) {
+		if (h1->keys[i] != (uint64_t)-1) {
+			int ret;
+			kh_put(gint, h1_key, h1->keys[i], &ret);
+		}
+	}
+	for (i = 0; i < h2->size; ++i) {
+		if (h2->keys[i] != (uint64_t)-1) {
+			int ret;
+			kh_put(gint, h2_key, h2->keys[i], &ret);
+		}
+	}
+	int n_shared = 0;
+	int m_shared = 1;
+	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
+	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
+		uint64_t key = kh_key(h1_key, it);
+		khiter_t it2 = kh_get(gint, h2_key, key);
+		if (it2 == kh_end(h2_key))
+			continue;
+		if (n_shared == m_shared){
+			m_shared <<= 1;
+			shared = (uint64_t *) realloc(shared, m_shared * sizeof(uint64_t));
+		}
+		shared[n_shared++] = key;
+	}
+
+	filter_read(reads, dict, rpath, shared, n_shared);
+	free(shared);
+	kh_destroy(gint, h1_key);
+	kh_destroy(gint, h2_key);
+}
+
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix)
@@ -1565,6 +1614,7 @@ void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R1_path = strdup(path);
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
 	struct barcode_hash_t *h1, *h2;
 	h1 = g->edges[e1].barcodes + 2;
 	h2 = g->edges[e2].barcodes + 2;
@@ -1816,6 +1866,116 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 	cand_len[id] = e1_len + sum_len + e2_len - g->ksize;
 }
 
+struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2)
+{
+	struct read_path_t read_sorted_path, local_read_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
+	struct asm_graph_t lg, lg1;
+	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
+		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
+		&lg, g, e1, e2);
+	save_graph_info(work_dir, &lg, "local_lvl_0");
+	build_local_0_1(&lg, &lg1);
+	save_graph_info(work_dir, &lg1, "local_lvl_1");
+	kh_destroy(bcpos, dict);
+	destroy_read_path(&local_read_path);
+	return lg1;
+	// uint32_t *ret_seq, ret_len;
+	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
+	// if (ret) {
+	// 	free(ret_seq);
+	// }
+	// resolve_local(opt, &local_read_path, &lg1, work_dir);
+}
+
+struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2)
+{
+	struct read_path_t read_sorted_path, local_read_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
+	struct asm_graph_t lg, lg1;
+	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
+		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
+		&lg, g, e1, e2);
+	save_graph_info(work_dir, &lg, "local_lvl_0");
+	build_0_1(&lg, &lg1);
+	save_graph_info(work_dir, &lg1, "local_lvl_1");
+	struct result_local_t sret;
+	int ret = fill_path_local(g, &lg1, e1, e2, &sret);
+	gint_t e1_rc, e2_rc;
+	e1_rc = g->edges[e1].rc_id;
+	e2_rc = g->edges[e2].rc_id;
+	if (ret) {
+		asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
+			sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
+	}
+	save_graph_info("./", g, "level_noob");
+	test_asm_graph(g);
+	destroy_read_path(&read_sorted_path);
+	destroy_read_path(&local_read_path);
+	
+	return lg1;
+	// uint32_t *ret_seq, ret_len;
+	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
+	// if (ret) {
+	// 	free(ret_seq);
+	// }
+	// resolve_local(opt, &local_read_path, &lg1, work_dir);
+}
+
+int local_assembly(struct opt_local_t *opt, struct asm_graph_t *g0, gint_t e1,
+		gint_t e2, struct result_local_t *sret)
+{
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	struct read_path_t local_read;
+	get_local_reads(opt->read_path, &local_read, opt->dict, g0, e1, e2, work_dir);
+	struct asm_graph_t lg, lg1;
+	build_local_assembly_graph(opt->ksize, opt->n_threads, opt->mmem, 1,
+		&(local_read.R1_path), &(local_read.R2_path), work_dir, &lg, g0, e1, e2);
+	// save_graph_info(work_dir, &lg, "local_lvl_0");
+	build_0_1(&lg, &lg1);
+	int ret = fill_path_local(g0, &lg1, e1, e2, sret);
+	if (!ret) {
+		save_graph_info(work_dir, &lg1, "local_lvl_1");
+	}
+	// int ret = find_path_local(g, &lg1, e1, e2, sret);
+	// if (!ret) {
+	// 	save_graph_info(work_dir, &lg1, "local_lvl_1");
+	// }
+	asm_graph_destroy(&lg1);
+	destroy_read_path(&local_read);
+	return ret;
+}
+
 KHASH_INIT(used_pair, struct pair_contig_t, char, 0, __mix_2_64, __cmp_2_64);
 KHASH_MAP_INIT_INT64(cap_set, int);
 
@@ -1848,15 +2008,14 @@ void list_all_path(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 		if (kh_get(gint, set_e, e) == kh_end(set_e))
 			continue;
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_all_path(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize, set_e,
 				cap, opt);
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1875,15 +2034,14 @@ void list_all_path_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_all_path_local(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize,
 				cap, opt);
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1902,9 +2060,8 @@ void list_path_slim_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cu
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_path_slim_local(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize,
@@ -1912,7 +2069,7 @@ void list_path_slim_local(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cu
 			if (opt->cnt > opt->max_cnt)
 				return;
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1933,9 +2090,8 @@ void list_path_slim(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 		if (kh_get(gint, set_e, e) == kh_end(set_e))
 			continue;
 		khiter_t it = kh_get(cap_set, cap, e);
-		struct cov_range_t rcov = get_edge_cov_range(g, e, opt->uni_cov);
-		if (kh_value(cap, it) < rcov.hi) {
-			++kh_value(cap, it);
+		if (kh_value(cap, it)) {
+			--kh_value(cap, it);
 			opt->list_e[opt->n_e++] = e;
 			list_path_slim(g, g->edges[e].target, t,
 				cur_len + g->edges[e].seq_len - g->ksize, set_e,
@@ -1943,7 +2099,7 @@ void list_path_slim(struct asm_graph_t *g, gint_t u, gint_t t, uint32_t cur_len,
 			if (opt->cnt > opt->max_cnt)
 				return;
 			--opt->n_e;
-			--kh_value(cap, it);
+			++kh_value(cap, it);
 		}
 	}
 }
@@ -1978,6 +2134,7 @@ void reconstruct_path_global(struct asm_graph_t *g, gint_t e1, gint_t e2,
 	uint32_t e1_len, uint32_t e2_len, gint_t *list_e, uint32_t n_e,
 	struct result_local_t *sret)
 {
+	__VERBOSE_LOG("DEBUG", "n_e = %u\n", n_e);
 	uint32_t len, i, k, c;
 	gint_t e;
 	len = e1_len;
@@ -2001,7 +2158,7 @@ void reconstruct_path_global(struct asm_graph_t *g, gint_t e1, gint_t e2,
 			++len;
 		}
 	}
-	for (k = g->ksize; k < g->edges[e2].seq_len; ++k) {
+	for (k = g->ksize; k < e2_len; ++k) {
 		c = __binseq_get(g->edges[e2].seq, k);
 		__binseq_set(sret->seq, len, c);
 		++len;
@@ -2031,17 +2188,18 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 	khash_t(cap_set) *cap = kh_init(cap_set);
 	for (e = 0; e < g->n_e; ++e) {
 		it = kh_put(cap_set, cap, e, &hash_ret);
-		kh_value(cap, it) = 0;
+		kh_value(cap, it) = 4;
 	}
 	max_list_e = g->n_e * 4;
 
 	sprintf(fasta_path, "%s/candidates.fasta", opt->out_dir);
+	__VERBOSE_LOG("DEBUG", "fasta path: %s\n", fasta_path);
 
 	struct dfs_listpath_t dfs_opt;
 	dfs_opt.e1 = e1;
 	dfs_opt.e2 = e2;
 	dfs_opt.max_len = 3000;
-	dfs_opt.max_cnt = 100;
+	dfs_opt.max_cnt = 500;
 	dfs_opt.fp = xfopen(fasta_path, "wb");
 	dfs_opt.cnt = 0;
 	dfs_opt.cand_len = malloc((dfs_opt.max_cnt + 1) * sizeof(uint32_t));
@@ -2091,6 +2249,8 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 
 	list_path_slim_local(g, g->edges[e1].target, g->edges[e2].source, 0, cap,
 								&dfs_opt);
+	sret->seq = NULL;
+	sret->len = sret->trim_e1 = sret->trim_e2 = 0;
 	reconstruct_path_global(g, e1, e2, e1_len, e2_len, dfs_opt.list_e, dfs_opt.n_e, sret);
 	kh_destroy(contig_count, ctg_cnt);
 	ret = 1;
@@ -2187,75 +2347,6 @@ fill_path_clean:
 	return ret;
 }
 
-void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
-							gint_t e1, gint_t e2)
-{
-	struct read_path_t read_sorted_path, local_read_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		sort_read(opt, &read_sorted_path);
-	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
-	struct asm_graph_t lg, lg1;
-	build_local_assembly_graph(g->ksize, opt->n_threads, opt->mmem, 1,
-		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
-		&lg, g, e1, e2);
-	save_graph_info(work_dir, &lg, "local_lvl_0");
-	build_0_1(&lg, &lg1);
-	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	struct result_local_t sret;
-	//int ret = fill_path_local(g, &lg1, e1, e2, &sret);
-	//gint_t e1_rc, e2_rc;
-	//e1_rc = g->edges[e1].rc_id;
-	//e2_rc = g->edges[e2].rc_id;
-	//if (ret) {
-	//	asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
-	//		sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
-	//}
-	//save_graph_info("./", g, "level_noob");
-	//test_asm_graph(g);
-
-	// uint32_t *ret_seq, ret_len;
-	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
-	// if (ret) {
-	// 	free(ret_seq);
-	// }
-	// resolve_local(opt, &local_read_path, &lg1, work_dir);
-}
-
-int local_assembly(struct opt_local_t *opt, struct asm_graph_t *g0, gint_t e1,
-		gint_t e2, struct result_local_t *sret)
-{
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	struct read_path_t local_read;
-	get_local_reads(opt->read_path, &local_read, opt->dict, g0, e1, e2, work_dir);
-	struct asm_graph_t lg, lg1;
-	build_local_assembly_graph(opt->ksize, opt->n_threads, opt->mmem, 1,
-		&(local_read.R1_path), &(local_read.R2_path), work_dir, &lg, g0, e1, e2);
-	// save_graph_info(work_dir, &lg, "local_lvl_0");
-	build_0_1(&lg, &lg1);
-	int ret = fill_path_local(opt, g0, &lg1, e1, e2, sret);
-	if (!ret) {
-		save_graph_info(work_dir, &lg1, "local_lvl_1");
-	}
-	// int ret = find_path_local(g, &lg1, e1, e2, sret);
-	// if (!ret) {
-	// 	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	// }
-	asm_graph_destroy(&lg1);
-	return ret;
-}
 
 int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 			khash_t(gint) *set_leg, struct opt_local_t *opt,
@@ -2293,7 +2384,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		struct cov_range_t rcov = get_edge_cov_range(g, e, uni_cov);
 		max_list_e += rcov.hi;
 		it = kh_put(cap_set, cap, e, &hash_ret);
-		kh_value(cap, it) = 0;
+		kh_value(cap, it) = rcov.hi;
 	}
 
 	sprintf(fasta_path, "%s/candidates.fasta", work_dir);
@@ -2302,7 +2393,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	dfs_opt.e1 = e1_rc;
 	dfs_opt.e2 = e2;
 	dfs_opt.max_len = 3000;
-	dfs_opt.max_cnt = 100;
+	dfs_opt.max_cnt = 500;
 	dfs_opt.fp = xfopen(fasta_path, "wb");
 	dfs_opt.cnt = 0;
 	dfs_opt.cand_len = malloc((dfs_opt.max_cnt + 1) * sizeof(uint32_t));
@@ -2322,7 +2413,8 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		kh_value(ctg_cnt, k) = 0;
 	}
 	count_readpair_path(opt->n_threads, &local_read, fasta_path, ctg_cnt);
-
+	destroy_read_path(&local_read);
+	
 	__VERBOSE_LOG("", "Testing local path %ld <-> %ld\n", e1, e2);
 	int best_cnt, best_len, best_cand;
 	best_cnt = 0;
@@ -2450,7 +2542,7 @@ int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		kh_put(used_pair, assemblied_pair, used_key1, &hash_ret);
 		struct result_local_t sret;
 		int ret = local_assembly(opt, g, e1, e2, &sret);
-		if (ret) {
+		if (ret == 1) {
 			e1_rc = g->edges[e1].rc_id;
 			e2_rc = g->edges[e2].rc_id;
 			asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
@@ -2520,12 +2612,13 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 						set_v, set_e, set_leg, set_self);
 				n_leg = kh_size(set_leg);
 				n_self = kh_size(set_self);
-				if (n_self == 0 && n_leg == 2)
+				if (n_self == 0 && n_leg == 2){
 					resolve_local += join_1_1_jungle_la(g, set_e, set_leg,
 						&opt_local, assemblied_pair);
-				else if (n_self + n_leg >= 2)
-					resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
-						&opt_local, assemblied_pair);
+				} else if (n_self + n_leg >= 2){
+					/*resolve_local += join_n_m_complex_jungle_la(g, set_e, set_leg, set_self,
+						&opt_local, assemblied_pair);*/
+				}
 			}
 			kh_clear(gint, set_leg);
 			kh_clear(gint, set_e);

@@ -4,7 +4,8 @@
 #include "assembly_graph.h"
 
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g);
-
+void resolve_local_graph_operation(struct asm_graph_t *g0,
+		struct asm_graph_t *g);
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
 void asm_lazy_condense(struct asm_graph_t *g);
 void resolve_chain(struct asm_graph_t *g0, struct asm_graph_t *g1);

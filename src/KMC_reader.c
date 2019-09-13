@@ -60,7 +60,7 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         data->prefix_file_buf_size = (lut_area_size_in_bytes + 8) / sizeof(uint64_t);
 
         /* read prefix offset */
-        data->prefix_file_buf= malloc(data->prefix_file_buf_size*8);
+        data->prefix_file_buf= malloc(data->prefix_file_buf_size*8+8);
         fseek(fp, 4, SEEK_SET);
         size_t result = xfread(data->prefix_file_buf, 1, lut_area_size_in_bytes+8, fp);
         if (result == 0)
@@ -69,6 +69,11 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         data->prefix_file_buf[data->prefix_file_buf_size] = data->header.total_kmers + 1;
 
         /* read signature map */
+        if (data->signature_map == NULL ) {
+            printf(" is null\n");
+        } else {
+            printf("signature map %p\n", data->signature_map);
+        }
         data->signature_map = malloc(sig_map_size_byte);
         xfread(data->signature_map, data->signature_map_size, sizeof(uint32_t), fp);
         fclose(fp);

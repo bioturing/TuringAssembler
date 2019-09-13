@@ -117,7 +117,15 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 		gint_t deg_fw = g0->nodes[u].deg;
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
 		/* non-branching node */
-		if ((deg_fw == 1 && deg_rv == 1) || deg_fw + deg_rv == 0 || is_dead_end(g0, u))
+		int is_single_loop = 0;
+		if (deg_fw == 1 && deg_rv == 1){
+			int fw_e = g0->nodes[u].adj[0];
+			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
+			if (fw_e == rv_e)
+				is_single_loop = 1;
+		}
+		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
+				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
 			continue;
 		node_id[u] = n_v++;
 	}
@@ -726,7 +734,7 @@ gint_t resolve_align_bubble(struct asm_graph_t *g)
 	return cnt_collapsed;
 }
 
-void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
+void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
 	int iter = 0;
@@ -743,6 +751,46 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
+
+		 cnt_chimeric = remove_chimeric(g0);
+		asm_condense(g0, g);
+		asm_graph_destroy(g0);
+		*g0 = *g;
+
+		do {
+			cnt_loop = cnt_collapse = 0;
+
+			cnt_loop = unroll_simple_loop(g0);
+			cnt_collapse = resolve_simple_bubble(g0);
+			cnt_collapse += resolve_align_bubble(g0);
+			cnt_loop += resolve_loop(g0);
+			asm_lazy_condense(g0);
+		} while (cnt_loop + cnt_collapse);
+
+		asm_condense(g0, g);
+		asm_graph_destroy(g0);
+		*g0 = *g;
+
+	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
+}
+
+void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
+	int iter = 0;
+	do {
+		__VERBOSE("Iteration [%d]\n", ++iter);
+		cnt_tips = cnt_tips_complex = cnt_chimeric = 0;
+
+		cnt_tips = remove_tips(g0);
+		asm_condense(g0, g);
+		asm_graph_destroy(g0);
+		*g0 = *g;
+
+		/*cnt_tips_complex = remove_tips_topo(g0);
+		asm_condense(g0, g);
+		asm_graph_destroy(g0);
+		*g0 = *g;*/
 
 		cnt_chimeric = remove_chimeric(g0);
 		asm_condense(g0, g);

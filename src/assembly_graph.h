@@ -60,8 +60,8 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
-    struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
-    struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -134,11 +134,16 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand);
+void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
+				const char *fasta_path, khash_t(contig_count) *count_cand,
+				khash_t(contig_count) *count_err);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2);
-void test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+							gint_t e1, gint_t e2);
+struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
@@ -250,4 +255,7 @@ void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
+void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
+void asm_resolve_local_loop(struct asm_graph_t *lg);
+void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

@@ -22,5 +22,5 @@ void assembly_process(struct opt_proc_t *opt);
 void assembly2_process(struct opt_proc_t *opt);
 void assembly3_process(struct opt_proc_t *opt);
 void assembly_precount_process(struct opt_proc_t *opt);
-
+void build_bridge_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

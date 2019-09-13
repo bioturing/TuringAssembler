@@ -586,7 +586,8 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 			(void *)(&kmedge_bundle), assign_count_kedge_multi);
 	kmhash_destroy(&kmer_table);
-	/* FIXME: remove KMC database? */
+	destroy_kmc_info(&kmc_inf);
+
 }
 
 void build_initial_graph(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
@@ -734,5 +735,6 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e1);
 	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
 	kmhash_destroy(&kmer_table);
+	destroy_kmc_info(&kmc_inf);
 }
 

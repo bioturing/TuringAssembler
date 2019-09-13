@@ -9,6 +9,8 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
+#include "build_bridge.h"
+#include "read_list.h"
 #include "scaffolding/scaffolding.h"
 #include "barcode_resolve2.h"
 #include "basic_resolve.h"
@@ -38,6 +40,18 @@ void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 	build_initial_graph(opt, ksize, g);
 	// graph_build_KMC(opt, ksize, g);
 	test_asm_graph(g);
+}
+
+void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Resolve graph using small operation\n");
+	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	set_time_now();
+	resolve_local_graph_operation(g0, g);
+	// remove_tips(g0, g);
+	test_asm_graph(g);
+	__VERBOSE_LOG("TIMER", "Build graph level 1 time: %.3f\n", sec_from_prev_time());
 }
 
 void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
@@ -188,21 +202,68 @@ void graph_query_process(struct opt_proc_t *opt)
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
 		} else if (c == 'P') {
+			__VERBOSE("Building local graph\n");
 			fscanf(fp, "%ld\n", &v);
-			test_local_assembly(opt, g0, u, v);
+			struct asm_graph_t lg = test_local_assembly(opt, g0,
+							g0->edges[u].rc_id, v);
+			asm_graph_destroy(&lg);
 		} else if (c == 'S') {
 			fscanf(fp, "%ld %ld\n", &v, &v2);
 			print_test_barcode_superior(g0, u, v, v2);
-			// if (check_medium_pair_superior(g0, u, v, v2)) {
-			// 	printf("success\n");
-			// } else {
-			// 	printf("failed\n");
-			// }
 		}
-		// int qret = test_edge_barcode(g0, u, v);
-		// fprintf(stdout, "ret = %d\n", qret);
 	}
+}
+
+void build_bridge_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_file);
+	fprintf(stderr, "bin size = %d\n", g0->bin_size);
+	test_asm_graph(g0);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building bridges on scaffold:\n");
+	FILE *f = xfopen(opt->lc, "w");
+	FILE *fp = xfopen(opt->in_fasta, "r");
+	int n_paths;
+	fscanf(fp, "%d\n", &n_paths);
+	int *mark = (int *) calloc(g0->n_e, sizeof(int));
+	for (int i = 0; i < n_paths; ++i){
+		__VERBOSE_LOG("SCAFFOLD PATH", "Processing %d on %d paths\n", i + 1, n_paths);
+		int path_len;
+		fscanf(fp, "%d\n", &path_len);
+		int *path = (int *) calloc(path_len, sizeof(int));
+		for (int i = 0; i < path_len; ++i){
+			fscanf(fp, "%d", path + i);
+			mark[path[i]] = 1;
+			mark[g0->edges[path[i]].rc_id] = 1;
+		}
+		char *contig;
+		get_contig_from_scaffold_path(opt, g0, path, path_len, &contig);
+		fprintf(f, ">contig_path_%d\n", i);
+		fprintf(f, "%s\n", contig);
+		free(contig);
+		free(path);
+	}
+	for (int i = 0; i < g0->n_e; ++i){
+		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
+			continue;
+		if (mark[i] == 0){
+			int rc = g0->edges[i].rc_id;
+			char *tmp;
+			decode_seq(&tmp, g0->edges[i].seq, g0->edges[i].seq_len);
+			fprintf(f, ">%d_%d\n", i, rc);
+			fprintf(f, "%s\n", tmp);
+			free(tmp);
+			mark[rc] = 1;
+		}
+	}
+	fclose(f);
 	fclose(fp);
+	free(mark);
+	asm_graph_destroy(g0);
+	free(g0);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
