@@ -1362,8 +1362,12 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 void asm_graph_destroy(struct asm_graph_t *g)
 {
 	gint_t u, e;
-	for (e = 0; e < g->n_e; ++e)
+	for (e = 0; e < g->n_e; ++e){
+		int u = g->edges[e].source;
+		if (u == -1)
+			continue;
 		asm_clean_edge(g, e);
+	}
 	free(g->edges);
 	g->edges = NULL;
 	for (u = 0; u < g->n_v; ++u) {

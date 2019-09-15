@@ -8,13 +8,16 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-
+#include "graph_search.h"
+#include "kmer_hash.h"
+#define KSIZE_CHECK (g->ksize + 6)
 #define LEN_VAR				20
 #define MAX_JOIN_LEN			2000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
 	(uni_cov) + 0.499999999)
-
+#define JUNGLE_RADIUS 10
+#define MIN_NOTICE_ANCHOR 5000
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -999,6 +1002,200 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 	asm_condense(g, &g1);
 	asm_graph_destroy(g);
 	*g = g1;
+	return res;
+}
+
+int detect_dump_jungle(struct asm_graph_t *g, int e)
+{
+	//__VERBOSE("Detecting e %d\n", e);
+	int *nearby;
+	int n_nb;
+	struct graph_info_t ginfo;
+	graph_info_init(g, &ginfo, e, e);
+	get_nearby_edges(g, e, &ginfo, JUNGLE_RADIUS, &nearby, &n_nb);
+	graph_info_destroy(&ginfo);
+	/*__VERBOSE("nearby: ");
+	for (int i = 0; i < n_nb; ++i)
+		__VERBOSE("%d ", nearby[i]);
+	__VERBOSE("\n");*/
+
+	int e1 = e;
+	int e2 = -1;
+	for (int i = 0; i < n_nb; ++i){
+		if (nearby[i] == e || nearby[i] == g->edges[e].rc_id)
+			continue;
+		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_ANCHOR){
+			e2 = nearby[i];
+			break;
+		}
+	}
+	//__VERBOSE("e2 = %d\n", e2);
+	if (e2 == -1)
+		goto end_function;
+
+	graph_info_init(g, &ginfo, e, e);
+	mark_edge_trash(&ginfo, e1);
+	mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+	mark_edge_trash(&ginfo, e2);
+	mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+	int *nb1, n_nb1;
+	get_nearby_edges(g, e1, &ginfo, JUNGLE_RADIUS, &nb1, &n_nb1);
+	graph_info_destroy(&ginfo);
+	int *mark1 = (int *) calloc(g->n_e, sizeof(int));
+	for (int i = 1; i < n_nb1; ++i)
+		mark1[nb1[i]] = 1;
+	/*__VERBOSE("nb1: ");
+	for (int i = 1; i < n_nb1; ++i)
+		__VERBOSE("%d ", nb1[i]);
+	__VERBOSE("\n");*/
+	graph_info_init(g, &ginfo, e, e);
+	mark_edge_trash(&ginfo, e1);
+	mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+	mark_edge_trash(&ginfo, e2);
+	mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+	int *nb2, n_nb2;
+	get_nearby_edges(g, g->edges[e2].rc_id, &ginfo, JUNGLE_RADIUS, &nb2, &n_nb2);
+	graph_info_destroy(&ginfo);
+	int *mark2 = (int *) calloc(g->n_e, sizeof(int));
+	for (int i = 1; i < n_nb2; ++i)
+		mark2[g->edges[nb2[i]].rc_id] = 1;
+	/*__VERBOSE("nb2: ");
+	for (int i = 1; i < n_nb2; ++i)
+		__VERBOSE("%d ", nb2[i]);
+	__VERBOSE("\n");*/
+
+	int *join = (int *) calloc(n_nb1 + n_nb2, sizeof(int));
+	int n_join = 0;
+	for (int i = 1; i < n_nb1; ++i)
+		join[n_join++] = nb1[i];
+	for (int i = 1; i < n_nb2; ++i)
+		join[n_join++] = g->edges[nb2[i]].rc_id;
+	for (int i = 0; i < n_join; ++i){
+		int e = join[i];
+		if (mark1[e] && mark2[e])
+			continue;
+		e = g->edges[e].rc_id;
+		if (mark1[e] && mark2[e])
+			continue;
+		e2 = -1;
+		break;
+	}
+	free(nb1);
+	free(nb2);
+	free(mark1);
+	free(mark2);
+	free(join);
+	if (e2 != -1)
+		__VERBOSE("Dump jungle detected at %d and %d\n", e1, e2);
+end_function:
+	//__VERBOSE("e2 = %d\n", e2);
+	free(nearby);
+	return e2;
+}
+
+int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	int res = 0;
+	for (int e1 = 0; e1 < g->n_e; ++e1){
+		if (g->edges[e1].target == -1)
+			continue;
+		if (g->edges[e1].seq_len < MIN_NOTICE_ANCHOR)
+			continue;
+		int e2 = detect_dump_jungle(g, e1);
+		if (e2 == -1)
+			continue;
+		struct path_info_t pinfo;
+		path_info_init(&pinfo);
+		struct edge_map_info_t emap1;
+		struct edge_map_info_t emap2;
+		emap1.lc_e = e1;
+		emap2.lc_e = e2;
+
+		struct read_path_t local_read_path;
+		__VERBOSE("Get local reads\n");
+		get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
+		__VERBOSE("Hashing kmers\n");
+		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
+				local_read_path.R2_path, KSIZE_CHECK);
+		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
+				kmer_count);
+		kh_destroy(kmer_int, kmer_count);
+		int longest_path = 0;
+		for (int i = 0; i < pinfo.n_paths; ++i){
+			if (pinfo.path_lens[i] > pinfo.path_lens[longest_path])
+				longest_path = i;
+		}
+
+		int *path = pinfo.paths[longest_path];
+		int len = pinfo.path_lens[longest_path];
+		if (len == 2){
+			path_info_destroy(&pinfo);
+			continue;
+		}
+
+		g->edges = (struct asm_edge_t *) realloc(g->edges,
+				sizeof(struct asm_edge_t) * (g->n_e + 2));
+		memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
+		int p = g->n_e;
+		int q = g->n_e + 1;
+		for (int i = 1; i < len - 1; ++i){
+			int e1 = p;
+			int e2 = path[i];
+			asm_append_barcode_readpair(g, e1, e2);
+			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+			g->edges[e1].count += g->edges[e2].count;
+		}
+		asm_clone_seq_reverse(g->edges + q, g->edges + p);
+
+		int u = g->edges[path[0]].target;
+		int v = g->edges[path[len - 1]].source;
+		g->edges[p].source = u;
+		g->edges[p].target = v;
+		g->edges[p].rc_id = q;
+		g->nodes[u].adj = (gint_t *) realloc(g->nodes[u].adj,
+				sizeof(gint_t) * (g->nodes[u].deg + 1));
+		g->nodes[u].adj[g->nodes[u].deg] = p;
+		++g->nodes[u].deg;
+
+		int u_rc = g->nodes[u].rc_id;
+		int v_rc = g->nodes[v].rc_id;
+		g->edges[q].source = v_rc;
+		g->edges[q].target = u_rc;
+		g->edges[q].rc_id = p;
+		g->nodes[v_rc].adj = (gint_t *) realloc(g->nodes[v_rc].adj,
+				sizeof(gint_t) * (g->nodes[v_rc].deg + 1));
+		g->nodes[v_rc].adj[g->nodes[v_rc].deg] = q;
+		++g->nodes[v_rc].deg;
+		g->n_e += 2;
+
+
+		struct graph_info_t ginfo;
+		graph_info_init(g, &ginfo, e1, e2);
+		mark_edge_trash(&ginfo, e1);
+		mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+		mark_edge_trash(&ginfo, e2);
+		mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+		int *nearby, n_nb;
+		get_nearby_edges(g, e1, &ginfo, JUNGLE_RADIUS, &nearby, &n_nb);
+		for (int i = 0; i < n_nb; ++i){
+			int e = nearby[i];
+			int e_rc = g->edges[e].rc_id;
+			if (e == e1 || e == g->edges[e1].rc_id
+				|| e == e2 || e == g->edges[e2].rc_id)
+				continue;
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, e_rc);
+		}
+
+		path_info_destroy(&pinfo);
+		graph_info_destroy(&ginfo);
+		++res;
+	}
+	struct asm_graph_t g1;
+	asm_condense(g, &g1);
+	asm_graph_destroy(g);
+	*g = g1;
+	test_asm_graph(g);
 	return res;
 }
 

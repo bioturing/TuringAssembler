@@ -19,4 +19,7 @@ int resolve_loop(struct asm_graph_t *g0);
 int asm_resolve_dump_loop(struct asm_graph_t *g);
 int asm_resolve_dump_branch(struct asm_graph_t *g);
 int detect_dump_jungle(struct asm_graph_t *g, int e);
+int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g);
+void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
+		int e1, int e2, struct read_path_t *local_read_path);
 #endif /* __RESOLVE_H__ */

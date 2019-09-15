@@ -188,20 +188,22 @@ void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 	fclose(f);
 }
 
-void get_all_paths(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
-		struct path_info_t *pinfo)
+void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct path_info_t *pinfo)
 {
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
-	int *path = (int *) calloc(1024, sizeof(int));
+	mark_edge_trash(&ginfo, emap1->lc_e);
+	mark_edge_trash(&ginfo, lg->edges[emap1->lc_e].rc_id);
+	mark_edge_trash(&ginfo, lg->edges[emap2->lc_e].rc_id);
+	int path[1024];
 	find_all_paths(lg, &ginfo, emap1->lc_e, 0, path, pinfo);
-	free(path);
+	graph_info_destroy(&ginfo);
 }
 
-void get_all_paths_kmer_check(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
-		struct path_info_t *pinfo, int ksize, khash_t(kmer_int) *h)
+void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct path_info_t *pinfo,
+		int ksize, khash_t(kmer_int) *h)
 {
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
@@ -225,12 +227,11 @@ void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 	int tg = lg->edges[u].target;
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		gint_t v = lg->nodes[tg].adj[i];
-		if (v == ginfo->lc_e1)
-			continue;
-		if (lg->edges[v].rc_id == ginfo->lc_e2)
-			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
+		if (check_edge_visited(ginfo, v))
+			continue;
+		//__VERBOSE("%d %d %d\n", u, v, depth);
 		mark_edge_visited(ginfo, v);
 		find_all_paths(lg, ginfo, v, depth + 1, cur_path, pinfo);
 		unmark_edge_visited(ginfo, v);
@@ -499,8 +500,8 @@ void path_info_destroy(struct path_info_t *pinfo)
 	free(pinfo->paths);
 }
 
-void get_nearby_edges(struct asm_graph_t *g, int e, int radius, int **res,
-		int *n_nb)
+void get_nearby_edges(struct asm_graph_t *g, int e, struct graph_info_t *ginfo,
+		int radius, int **res, int *n_nb)
 {
 	*res = (int *) calloc(g->n_e, sizeof(int));
 	*n_nb = 0;
@@ -520,6 +521,8 @@ void get_nearby_edges(struct asm_graph_t *g, int e, int radius, int **res,
 		int tg = g->edges[u].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int v = g->nodes[tg].adj[i];
+			if (check_edge_trash(ginfo, v))
+				continue;
 			if (dis[v] == -1){
 				dis[v] = dis[u] + 1;
 				queue[bk++] = v;
