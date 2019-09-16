@@ -98,7 +98,7 @@ release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread KMC/libkmc.a \
        libs/libz.a libs/libbwa.a \
-       -Wl,--no-whole-archive -lm -lbz2 
+       -Wl,--no-whole-archive -lm libs/libbz2.a
 release: CC = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
 release: CXX = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
 release: $(EXEC_RELEASE)

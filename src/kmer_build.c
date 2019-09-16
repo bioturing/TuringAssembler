@@ -540,11 +540,21 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 						struct asm_graph_t *g)
 {
 	__VERBOSE("|---- Counting kmer\n");
-	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
-	memcpy(tmp_files, files_1, n_files * sizeof(char *));
-	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
-	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
-							n_files * 2, tmp_files);
+	// n_files < 0 mean we have one contig file at end of files_2
+    char **tmp_files;
+    if (n_files < 0) {
+        tmp_files = alloca((abs(n_files) * 2 +1) * sizeof(char *));
+        memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
+        memcpy(tmp_files + abs(n_files), files_2, (abs(n_files)+1) * sizeof(char *));
+        KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
+                                n_files * 2 + 1, tmp_files);
+	} else {
+        tmp_files = alloca(abs(n_files) * 2 * sizeof(char *));
+        memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
+        memcpy(tmp_files + abs(n_files), files_2, abs(n_files) * sizeof(char *));
+        KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
+                                n_files * 2, tmp_files);
+	}
 	__VERBOSE("\n");
 
 	__VERBOSE("|---- Retrieving kmer from KMC database\n");
