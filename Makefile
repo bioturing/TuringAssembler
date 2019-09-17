@@ -6,7 +6,7 @@ CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
        -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-       -Llibs KMC/kmc_lib.a -l:libbz2.so -l:libz.so \
+       -Llibs KMC/kmc_lib.a libs/libbz2.a libs/libz.a \
        libs/libbwa.a -lm 
 
 # KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a

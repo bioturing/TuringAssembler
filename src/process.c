@@ -271,42 +271,14 @@ void resolve_local_process(struct opt_proc_t *opt)
 	struct asm_graph_t g0;
 	load_asm_graph(&g0, opt->in_file);
 	int resolved_loop = 0;
-	int ite = 0;
-	do{
-		int resolved = asm_resolve_dump_loop(&g0);
-		if (!resolved)
-			break;
-		resolved_loop += resolved;
-		++ite;
-		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
-	} while(1);
-
-	int resolved_jungle = 0;
-	ite = 0;
-	do{
-		//__VERBOSE("DEBUG:\n");
-		//detect_dump_jungle(&g0, 395191);
-		int resolved = asm_resolve_dump_jungle(opt, &g0);
-		if (!resolved)
-			break;
-		resolved_jungle += resolved;
-		++ite;
-		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
-		char graph[1024];
-		sprintf(graph, "level_haha_%d_ite", ite);
-		save_graph_info(opt->out_dir, &g0, graph);
-		graph[0] = '\0';
-		sprintf(graph, "%s/graph_k_%d_level_haha_%d_ite.bin", opt->out_dir,
-				g0.ksize, ite);
-		save_asm_graph(&g0, graph);
-	} while(1);
+	asm_resolve_dump_loop_ite(&g0);
+	asm_resolve_dump_jungle_ite(opt, &g0);
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
 	save_asm_graph(&g0, path);
 
 	save_graph_info(opt->out_dir, &g0, "level_haha");
-	__VERBOSE_LOG("DUMP LOOP", "%d dump loop(s) resolved\n", resolved_loop);
-	__VERBOSE_LOG("DUMP JUNGLE", "%d dump jungle(s) resolved\n", resolved_jungle);
+	asm_graph_destroy(&g0);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)

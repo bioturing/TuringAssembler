@@ -207,11 +207,13 @@ void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *em
 {
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
-	int *path = (int *) calloc(1024, sizeof(int));
+	mark_edge_trash(&ginfo, emap1->lc_e);
+	mark_edge_trash(&ginfo, lg->edges[emap1->lc_e].rc_id);
+	mark_edge_trash(&ginfo, lg->edges[emap2->lc_e].rc_id);
+	int path[1024];
 	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
 			ksize, h);
 	graph_info_destroy(&ginfo);
-	free(path);
 }
 
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
@@ -255,10 +257,6 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 	decode_seq(&first, lg->edges[u].seq, lg->edges[u].seq_len);
 	for (int i = 0; i < lg->nodes[tg].deg; ++i){
 		gint_t v = lg->nodes[tg].adj[i];
-		if (v == ginfo->lc_e1)
-			continue;
-		if (lg->edges[v].rc_id == ginfo->lc_e2)
-			continue;
 		if (check_edge_trash(ginfo, v))
 			continue;
 		if (check_edge_visited(ginfo, v))

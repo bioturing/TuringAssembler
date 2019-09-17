@@ -2660,8 +2660,6 @@ void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 	} else {
 		__ERROR("Reads must be sorted\n");
 	}
-	printf("%s %s %s\n", read_sorted_path.R1_path, read_sorted_path.R2_path,
-			read_sorted_path.idx_path);
 	khash_t(bcpos) *dict = kh_init(bcpos);
 	construct_read_index(&read_sorted_path, dict);
 	char work_dir[MAX_PATH];
@@ -2672,4 +2670,14 @@ void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 	kh_destroy(bcpos, dict);
 }
 
+void get_union_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
+		int e1, int e2, khash_t(bcpos) *dict, struct read_path_t *read_sorted_path,
+		struct read_path_t *local_read_path)
+{
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	get_local_reads(read_sorted_path, local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir);
+}
 
