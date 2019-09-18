@@ -49,9 +49,9 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 		struct subseq_pos_t *local);
 int get_next_len_global(struct map_contig_t *mct, int pos);
 int get_next_len_local(struct map_contig_t *mct, int pos);
-khint32_t get_one_seq_kmer_hash(char *seq);
+uint64_t get_one_seq_kmer_hash(char *seq);
 int check_good_match(int point, float thresh);
-void add_kmer(khint32_t hash, khash_t(kmer_int) *kmers);
-void remove_kmer(khint32_t hash, khash_t(kmer_int) *kmers);
+void add_kmer(uint64_t hash, khash_t(kmer_int) *kmers);
+void remove_kmer(uint64_t hash, khash_t(kmer_int) *kmers);
 int check_stop(struct map_contig_t *mct);
 #endif

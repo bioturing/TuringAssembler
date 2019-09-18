@@ -26,8 +26,11 @@ void init_local_kmers(struct map_contig_t *mct)
 
 void get_all_seq_kmers(char *seq, int len, khash_t(kmer_int) **kmers)
 {
+	char *tmp = calloc(len + 1, sizeof(char));
+	strncpy(tmp, seq, len);
 	*kmers = kh_init(kmer_int);
-	count_hash_from_seq(seq, KSIZE, *kmers);
+	count_hash_from_seq(tmp, KSIZE, *kmers);
+	free(tmp);
 }
 
 void get_all_edge_kmers(struct asm_edge_t edge, khash_t(kmer_int) **kmers)
@@ -176,7 +179,7 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 			++it){
 		if (!kh_exist(local_kmers, it))
 			continue;
-		khint32_t key = kh_key(local_kmers, it);
+		uint64_t key = kh_key(local_kmers, it);
 		int val = kh_val(local_kmers, it);
 		khiter_t it2;
 		it2 = kh_get(kmer_int, global_start, key);
@@ -196,7 +199,7 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 		start_point[i] = cur_start_point;
 		end_point[i] = cur_end_point;
 		if (i > 0){
-			khint32_t pre_hash = get_one_seq_kmer_hash(local_seq
+			uint64_t pre_hash = get_one_seq_kmer_hash(local_seq
 					+ i - 1);
 			khiter_t it;
  			it = kh_get(kmer_int, global_start, pre_hash);
@@ -213,7 +216,7 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 			add_kmer(pre_hash, global_end);
 		}
 		if (i + WINDOW_SIZE <= (int) best_match.seq_len){
-			khint32_t next_hash = get_one_seq_kmer_hash(local_seq
+			uint64_t next_hash = get_one_seq_kmer_hash(local_seq
 					+ i + WINDOW_SIZE - KSIZE + 1);
 			khiter_t it;
 			it = kh_get(kmer_int, global_start, next_hash);
@@ -247,9 +250,9 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 	free(end_point);
 }
 
-khint32_t get_one_seq_kmer_hash(char *seq)
+uint64_t get_one_seq_kmer_hash(char *seq)
 {
-	khint32_t res = 0;
+	uint64_t res = 0;
 	for (int i = 0; i < KSIZE; ++i)
 		res = res * BASE + base_to_int(seq[i]);
 	return res;
@@ -272,7 +275,7 @@ int get_next_len_local(struct map_contig_t *mct, int pos)
 			- pos);
 }
 
-void add_kmer(khint32_t hash, khash_t(kmer_int) *kmers)
+void add_kmer(uint64_t hash, khash_t(kmer_int) *kmers)
 {
 	khiter_t it = kh_get(kmer_int, kmers, hash);
 	if (it == kh_end(kmers)){
@@ -283,7 +286,7 @@ void add_kmer(khint32_t hash, khash_t(kmer_int) *kmers)
 	++kh_val(kmers, it);
 }
 
-void remove_kmer(khint32_t hash, khash_t(kmer_int) *kmers)
+void remove_kmer(uint64_t hash, khash_t(kmer_int) *kmers)
 {
 	khiter_t it = kh_get(kmer_int, kmers, hash);
 	if (it == kh_end(kmers)){
