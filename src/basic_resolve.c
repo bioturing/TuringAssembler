@@ -1300,6 +1300,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		emap1.lc_e = e1;
 		emap2.lc_e = e2;
 
+		__VERBOSE("Get local reads\n");
 		struct read_path_t local_read_path;
 		get_union_barcode_reads(opt, g, e1, e2, dict, &read_sorted_path,
 				&local_read_path);
@@ -1338,8 +1339,8 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
 		int p = g->n_e;
 		int q = g->n_e + 1;
-		asm_clone_edge(g, p, path[1]);
-		for (int i = 2; i < len - 1; ++i){
+		asm_clone_edge(g, p, path[0]);
+		for (int i = 1; i < len; ++i){
 			int e1 = p;
 			int e2 = path[i];
 			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
@@ -1347,8 +1348,8 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 			g->edges[e1].count += g->edges[e2].count;
 		}
 
-		asm_clone_edge(g, q, g->edges[path[len - 2]].rc_id);
-		for (int i = len - 3; i >= 1; --i){
+		asm_clone_edge(g, q, g->edges[path[len - 1]].rc_id);
+		for (int i = len - 2; i >= 0; --i){
 			int e1 = q;
 			int e2 = g->edges[path[i]].rc_id;
 			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
@@ -1356,8 +1357,8 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 			g->edges[e1].count += g->edges[e2].count;
 		}
 
-		int u = g->edges[path[0]].target;
-		int v = g->edges[path[len - 1]].source;
+		int u = g->edges[path[0]].source;
+		int v = g->edges[path[len - 1]].target;
 		g->edges[p].source = u;
 		g->edges[p].target = v;
 		g->edges[p].rc_id = q;
@@ -1380,13 +1381,11 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		for (int i = 0; i < n_nb; ++i){
 			int e = nearby[i];
 			int e_rc = g->edges[e].rc_id;
-			if (e == e1 || e == g->edges[e1].rc_id
-				|| e == e2 || e == g->edges[e2].rc_id)
-				continue;
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 		}
-
+		asm_remove_edge(g, e2);
+		asm_remove_edge(g, g->edges[e2].rc_id);
 		path_info_destroy(&pinfo);
 		graph_info_destroy(&ginfo);
 		free(nearby);
