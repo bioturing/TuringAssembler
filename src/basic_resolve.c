@@ -1064,7 +1064,8 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 		++ite;
 		__VERBOSE("%d-th iteration: %d loop(s) resolved\n", ite, resolved);
 	} while(1);
-	__VERBOSE_LOG("RESOLVE", "%d dump loop(s) resolved\n", res);
+	__VERBOSE_LOG("RESOLVE", "%d dump loop(s) resolved after %d iterations\n",
+			res, ite);
 	return res;
 }
 
@@ -1184,15 +1185,16 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 		res += resolved;
 		++ite;
 		__VERBOSE("%d-th iteration: %d jungle(s) resolved\n", ite, resolved);
-		char graph[1024];
+		/*char graph[1024];
 		sprintf(graph, "level_haha_%d_ite", ite);
 		save_graph_info(opt->out_dir, g, graph);
 		graph[0] = '\0';
 		sprintf(graph, "%s/graph_k_%d_level_haha_%d_ite.bin", opt->out_dir,
 				g->ksize, ite);
-		save_asm_graph(g, graph);
+		save_asm_graph(g, graph);*/
 	} while(1);
-	__VERBOSE_LOG("RESOLVE", "%d dump jungle(s) resolved\n", res);
+	__VERBOSE_LOG("RESOLVE", "%d dump jungle(s) resolved after %d iterations\n",
+			res, ite);
 	return res;
 }
 
@@ -1285,6 +1287,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 	khash_t(bcpos) *dict = kh_init(bcpos);
 	construct_read_index(&read_sorted_path, dict);
 	int tmp = g->n_e;
+	int m_e = g->n_e;
 	for (int e1 = 0; e1 < tmp; ++e1){
 		if (g->edges[e1].target == -1)
 			continue;
@@ -1334,9 +1337,12 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		get_nearby_edges(g, e1, &ginfo, JUNGLE_RADIUS, &nearby, &n_nb);
 
 
-		g->edges = (struct asm_edge_t *) realloc(g->edges,
-				sizeof(struct asm_edge_t) * (g->n_e + 2));
-		memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
+		if (g->n_e == m_e){
+			g->edges = (struct asm_edge_t *) realloc(g->edges,
+					sizeof(struct asm_edge_t) * (m_e << 1));
+			memset(g->edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
+			m_e <<= 1;
+		}
 		int p = g->n_e;
 		int q = g->n_e + 1;
 		asm_clone_edge(g, p, path[0]);
@@ -1392,6 +1398,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		++res;
 	}
 	kh_destroy(bcpos, dict);
+	g->edges = realloc(g->edges, g->n_e * sizeof(struct asm_edge_t));
 	struct asm_graph_t g1;
 	__VERBOSE("Condesing graph\n");
 	asm_condense_barcode(g, &g1);

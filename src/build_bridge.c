@@ -310,8 +310,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t local_read_path;
 	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
 
-	/*unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
-			g->edges[next_e2], lg);*/
+	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
+			g->edges[next_e2], lg);
 	//cov_filter(g, lg, emap1, emap2);
 	connection_filter(g, lg, emap1, emap2);
 

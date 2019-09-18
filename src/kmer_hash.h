@@ -1,12 +1,14 @@
 #ifndef __KMER_HASH__
 #define __KMER_HASH__
+#define MODULO 2147483647UL
+#define BASE 7
 #include "read_list.h"
 #include "helper.h"
 #include "khash.h"
 KHASH_MAP_INIT_INT64(kmer_int, int);
 
 khash_t(kmer_int) *get_kmer_hash(char *r1_path, char *r2_path, int ksize);
-void count_hash_from_read(char *seq, int ksize, khash_t(kmer_int) *h);
+void count_hash_from_seq(char *seq, int ksize, khash_t(kmer_int) *h);
 int count_kmer_on_seq(khash_t(kmer_int) *h, char *seq, int ksize);
 void print_kmer_count_on_seq(khash_t(kmer_int) *h, char *seq, int ksize);
 int kmer_check(char *first, char *second, int overlap_ksize, int check_ksize,
