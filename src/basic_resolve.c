@@ -19,6 +19,7 @@
 	(uni_cov) + 0.499999999)
 #define JUNGLE_RADIUS 10
 #define MIN_NOTICE_ANCHOR 5000
+#define MIN_COVERAGE_RATIO 0.3
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -1221,6 +1222,14 @@ int detect_dump_jungle(struct asm_graph_t *g, int e)
 	if (e2 == -1)
 		goto end_function;
 
+	float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	if (cov1 > cov2)
+		swap(&cov1, &cov2, sizeof(float));
+	if (cov1 / cov2 < MIN_COVERAGE_RATIO){
+		e2 = -1;
+		goto end_function;
+	}
 	graph_info_init(g, &ginfo, e, e);
 	mark_edge_trash(&ginfo, e1);
 	mark_edge_trash(&ginfo, g->edges[e1].rc_id);
