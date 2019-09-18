@@ -310,9 +310,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t local_read_path;
 	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
 
-	unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
-			g->edges[next_e2], lg);
-	cov_filter(g, lg, emap1, emap2);
+	/*unrelated_filter(g, emap1, emap2, g->edges[pre_e1],
+			g->edges[next_e2], lg);*/
+	//cov_filter(g, lg, emap1, emap2);
 	connection_filter(g, lg, emap1, emap2);
 
 
@@ -333,7 +333,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 			local_read_path.R2_path, KSIZE_CHECK);
 	destroy_read_path(&local_read_path);
-	get_all_paths_kmer_check(g, lg, emap1, emap2, &pinfo, KSIZE_CHECK,
+	get_all_paths_kmer_check(lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
 	kh_destroy(kmer_int, kmer_count);
 
@@ -742,27 +742,6 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		}
 	}
 	kh_destroy(kmer_int, kmer_count);
-}
-
-void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int e1, int e2, struct read_path_t *local_read_path)
-{
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		__ERROR("Reads must be sorted\n");
-	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	get_local_reads_intersect(&read_sorted_path, local_read_path, dict, g,
-			g->edges[e1].rc_id, e2, work_dir);
-	kh_destroy(bcpos, dict);
 }
 
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,

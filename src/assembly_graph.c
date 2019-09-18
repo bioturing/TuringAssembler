@@ -323,6 +323,27 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 	dst->seq_len = seq_len;
 }
 
+void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src)
+{
+	if (dst->seq_len < CONTIG_LEVEL_0) {
+		barcode_hash_merge(dst->barcodes, src->barcodes);
+	}
+	if (dst->seq_len < CONTIG_LEVEL_1) {
+		if (dst->seq_len + CONTIG_LEVEL_0 >= CONTIG_LEVEL_1)
+			barcode_hash_merge(dst->barcodes + 1, src->barcodes);
+		else
+			barcode_hash_merge(dst->barcodes + 1, src->barcodes + 1);
+	}
+	if (dst->seq_len < CONTIG_LEVEL_2) {
+		if (dst->seq_len + CONTIG_LEVEL_0 >= CONTIG_LEVEL_2)
+			barcode_hash_merge(dst->barcodes + 2, src->barcodes);
+		else if (dst->seq_len + CONTIG_LEVEL_1 >= CONTIG_LEVEL_2)
+			barcode_hash_merge(dst->barcodes + 2, src->barcodes + 1);
+		else
+			barcode_hash_merge(dst->barcodes + 2, src->barcodes + 2);
+	}
+}
+
 void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
@@ -1362,8 +1383,12 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 void asm_graph_destroy(struct asm_graph_t *g)
 {
 	gint_t u, e;
-	for (e = 0; e < g->n_e; ++e)
+	for (e = 0; e < g->n_e; ++e){
+		int u = g->edges[e].source;
+		if (u == -1)
+			continue;
 		asm_clean_edge(g, e);
+	}
 	free(g->edges);
 	g->edges = NULL;
 	for (u = 0; u < g->n_v; ++u) {

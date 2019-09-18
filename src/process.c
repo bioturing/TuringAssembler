@@ -271,31 +271,14 @@ void resolve_local_process(struct opt_proc_t *opt)
 	struct asm_graph_t g0;
 	load_asm_graph(&g0, opt->in_file);
 	int resolved_loop = 0;
-	int ite = 0;
-	do{
-		int resolved = asm_resolve_dump_loop(&g0);
-		if (!resolved)
-			break;
-		resolved_loop += resolved;
-		++ite;
-		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
-	} while(1);
-	/*ite = 0;
-	int resolved_branch = 0;
-	do{
-		int resolved = asm_resolve_dump_branch(&g0);
-		if (!resolved)
-			break;
-		resolved_branch += resolved;
-		__VERBOSE("%d-th iteration: %d resolved\n", ite, resolved);
-	} while(1);*/
+	asm_resolve_dump_loop_ite(&g0);
+	asm_resolve_dump_jungle_ite(opt, &g0);
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
 	save_asm_graph(&g0, path);
 
 	save_graph_info(opt->out_dir, &g0, "level_haha");
-	__VERBOSE_LOG("DUMP LOOP", "%d dump loop(s) resolved\n", resolved_loop);
-	//__VERBOSE_LOG("DUMP BRANCH", "%d dump branch(s) resolved\n", resolved_branch);
+	asm_graph_destroy(&g0);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)

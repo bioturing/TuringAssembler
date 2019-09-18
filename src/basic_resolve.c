@@ -8,13 +8,17 @@
 #include "utils.h"
 #include "time_utils.h"
 #include "verbose.h"
-
+#include "graph_search.h"
+#include "kmer_hash.h"
+#include "process.h"
+#define KSIZE_CHECK (g->ksize + 6)
 #define LEN_VAR				20
 #define MAX_JOIN_LEN			2000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
 	(uni_cov) + 0.499999999)
-
+#define JUNGLE_RADIUS 10
+#define MIN_NOTICE_ANCHOR 5000
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -88,6 +92,153 @@ void asm_lazy_condense(struct asm_graph_t *g)
 			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 		}
 	}
+}
+
+void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	if (!(g0->aux_flag & ASM_HAVE_BARCODE))
+		__ERROR("Graph must have barcode\n");
+	gint_t *node_id;
+	gint_t n_v, n_e, m_e;
+	node_id = malloc(g0->n_v * sizeof(gint_t));
+	memset(node_id, 255, g0->n_v * sizeof(gint_t));
+
+	/* remove unused links */
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t c, deg;
+		deg = g0->nodes[u].deg;
+		g0->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g0->nodes[u].adj[c];
+			if (e_id != -1)
+				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
+		}
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
+					g0->nodes[u].deg * sizeof(gint_t));
+	}
+	/* nodes on new graph only consist of branching nodes on old graph */
+	n_v = 0;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t deg_fw = g0->nodes[u].deg;
+		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
+		/* non-branching node */
+		int is_single_loop = 0;
+		if (deg_fw == 1 && deg_rv == 1){
+			int fw_e = g0->nodes[u].adj[0];
+			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
+			if (fw_e == rv_e)
+				is_single_loop = 1;
+		}
+		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
+				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
+			continue;
+		node_id[u] = n_v++;
+	}
+	struct asm_node_t *nodes = calloc(n_v, sizeof(struct asm_node_t));
+	/* set reverse complement link between nodes */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, x_rc, u_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		u_rc = g0->nodes[u].rc_id;
+		x_rc = node_id[u_rc];
+		assert(x_rc != -1);
+		nodes[x].rc_id = x_rc;
+		nodes[x_rc].rc_id = x;
+		nodes[x].adj = NULL;
+		nodes[x].deg = 0;
+	}
+	n_e = 0;
+	m_e = 0x10000;
+	struct asm_edge_t *edges = calloc(m_e, sizeof(struct asm_edge_t));
+	/* construct new edges */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, y_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		gint_t c;
+		for (c = 0; c < g0->nodes[u].deg; ++c) {
+			if (n_e + 2 > m_e) {
+				edges = realloc(edges, (m_e << 1) * sizeof(struct asm_edge_t));
+				memset(edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
+				m_e <<= 1;
+			}
+			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
+			if (e == -1)
+				continue;
+			p = n_e; q = n_e + 1;
+			edges[p].rc_id = q;
+			edges[q].rc_id = p;
+			asm_clone_seq(edges + p, g0->edges + e);
+			edges[p].barcodes = calloc(3, sizeof(struct barcode_hash_t));
+			for (int i = 0; i < 3; ++i){
+				barcode_hash_clone(edges[p].barcodes + i,
+						g0->edges[e].barcodes + i);
+			}
+			int n_mid = 0;
+			int *mid_nodes = calloc(g0->n_v, sizeof(int));
+			do {
+				v = g0->edges[e].target;
+				mid_nodes[n_mid++] = v;
+				if (node_id[v] == -1) { /* middle node */
+					if (g0->nodes[v].deg != 1) {
+						fprintf(stderr, "Node %ld, deg = %ld\n",
+							v, g0->nodes[v].deg);
+						assert(0 && "Middle node degree is not equal to 1");
+					}
+					e = g0->nodes[v].adj[0];
+					assert(e != -1);
+					asm_append_seq(edges + p,
+						g0->edges + e, g0->ksize);
+					asm_append_barcode_edge(edges + p,
+							g0->edges + e);
+					edges[p].count += g0->edges[e].count;
+				} else {
+					break;
+				}
+			} while (1);
+			edges[p].source = x;
+			edges[p].target = node_id[v];
+			asm_clone_seq_reverse(edges + q, edges + p);
+			v_rc = g0->nodes[v].rc_id;
+			e_rc = g0->edges[e].rc_id;
+			edges[q].barcodes = calloc(3, sizeof(struct barcode_hash_t));
+			for (int i = 0; i < 3; ++i){
+				barcode_hash_clone(edges[q].barcodes + i,
+						g0->edges[e_rc].barcodes + i);
+			}
+			for (int i = n_mid - 2; i >= 0; --i){
+				int v = g0->nodes[mid_nodes[i]].rc_id;
+				int e_rc = g0->nodes[v].adj[0];
+				asm_append_barcode_edge(edges + q, g0->edges + e_rc);
+			}
+			free(mid_nodes);
+			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
+						g0->nodes[v_rc].deg, e_rc);
+			assert(j >= 0);
+			g0->nodes[v_rc].adj[j] = -1; y_rc = node_id[v_rc];
+			edges[q].source = y_rc;
+			edges[q].target = nodes[x].rc_id;
+
+			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
+			nodes[x].adj[nodes[x].deg++] = p;
+			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
+					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
+			n_e += 2;
+		}
+	}
+	free(node_id);
+	edges = realloc(edges, n_e * sizeof(struct asm_edge_t));
+	g->ksize = g0->ksize;
+	g->aux_flag = g0->aux_flag;
+	g->n_v = n_v;
+	g->n_e = n_e;
+	g->nodes = nodes;
+	g->edges = edges;
 }
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
@@ -901,10 +1052,29 @@ int resolve_loop(struct asm_graph_t *g0)
 	return count;
 }
 
+int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
+{
+	int ite = 0;
+	int res = 0;
+	do{
+		int resolved = asm_resolve_dump_loop(g);
+		if (!resolved)
+			break;
+		res += resolved;
+		++ite;
+		__VERBOSE("%d-th iteration: %d loop(s) resolved\n", ite, resolved);
+	} while(1);
+	__VERBOSE_LOG("RESOLVE", "%d dump loop(s) resolved\n", res);
+	return res;
+}
+
 int asm_resolve_dump_loop(struct asm_graph_t *g)
 {
+	if (!(g->aux_flag & ASM_HAVE_BARCODE))
+		__ERROR("Graph must have barcode\n");
 	int res = 0;
-	for (int e = 0; e < g->n_e; ++e){
+	int tmp_n_e = g->n_e;
+	for (int e = 0; e < tmp_n_e; ++e){
 		int rc = g->edges[e].rc_id;
 		if (e > rc)
 			continue;
@@ -932,28 +1102,30 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 				continue;
 			__VERBOSE("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d\n",
 					e1, e, loop_e, e2);
-			asm_append_barcode_readpair(g, loop_e, e);
 			asm_append_seq(g->edges + loop_e, g->edges + e,
 					g->ksize);
-			asm_append_barcode_readpair(g, e, loop_e);
+			asm_append_barcode_readpair(g, loop_e, e);
 			asm_append_seq(g->edges + e, g->edges + loop_e,
 					g->ksize);
+			asm_append_barcode_readpair(g, e, loop_e);
+			g->edges[e].count += g->edges[e].count + g->edges[loop_e].count;
 			int loop_e_rc = g->edges[loop_e].rc_id;
 			int e_rc = g->edges[e].rc_id;
-			asm_append_barcode_readpair(g, loop_e_rc, e_rc);
 			asm_append_seq(g->edges + loop_e_rc, g->edges + e_rc,
 					g->ksize);
-			asm_append_barcode_readpair(g, e_rc, loop_e_rc);
+			asm_append_barcode_readpair(g, loop_e_rc, e_rc);
 			asm_append_seq(g->edges + e_rc, g->edges + loop_e_rc,
 					g->ksize);
-
+			asm_append_barcode_readpair(g, e_rc, loop_e_rc);
+			g->edges[e_rc].count = g->edges[e].count;
 			asm_remove_edge(g, loop_e);
-			asm_remove_edge(g, g->edges[loop_e].rc_id);
+			asm_remove_edge(g, loop_e_rc);
 			++res;
 		}
 	}
 	struct asm_graph_t g1;
-	asm_condense(g, &g1);
+	__VERBOSE("Condensing graph\n");
+	asm_condense_barcode(g, &g1);
 	asm_graph_destroy(g);
 	*g = g1;
 	test_asm_graph(g);
@@ -998,6 +1170,234 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 	asm_condense(g, &g1);
 	asm_graph_destroy(g);
 	*g = g1;
+	return res;
+}
+
+int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	int ite = 0;
+	int res = 0;
+	do{
+		int resolved = asm_resolve_dump_jungle(opt, g);
+		if (!resolved)
+			break;
+		res += resolved;
+		++ite;
+		__VERBOSE("%d-th iteration: %d jungle(s) resolved\n", ite, resolved);
+		char graph[1024];
+		sprintf(graph, "level_haha_%d_ite", ite);
+		save_graph_info(opt->out_dir, g, graph);
+		graph[0] = '\0';
+		sprintf(graph, "%s/graph_k_%d_level_haha_%d_ite.bin", opt->out_dir,
+				g->ksize, ite);
+		save_asm_graph(g, graph);
+	} while(1);
+	__VERBOSE_LOG("RESOLVE", "%d dump jungle(s) resolved\n", res);
+	return res;
+}
+
+int detect_dump_jungle(struct asm_graph_t *g, int e)
+{
+	int *nearby;
+	int n_nb;
+	struct graph_info_t ginfo;
+	graph_info_init(g, &ginfo, e, e);
+	get_nearby_edges(g, e, &ginfo, JUNGLE_RADIUS, &nearby, &n_nb);
+	graph_info_destroy(&ginfo);
+
+	int e1 = e;
+	int e2 = -1;
+	for (int i = 0; i < n_nb; ++i){
+		if (nearby[i] == e || nearby[i] == g->edges[e].rc_id)
+			continue;
+		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_ANCHOR){
+			e2 = nearby[i];
+			break;
+		}
+	}
+	if (e2 == -1)
+		goto end_function;
+
+	graph_info_init(g, &ginfo, e, e);
+	mark_edge_trash(&ginfo, e1);
+	mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+	mark_edge_trash(&ginfo, e2);
+	mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+	int *nb1, n_nb1;
+	get_nearby_edges(g, e1, &ginfo, JUNGLE_RADIUS, &nb1, &n_nb1);
+	graph_info_destroy(&ginfo);
+	int *mark1 = (int *) calloc(g->n_e, sizeof(int));
+	for (int i = 1; i < n_nb1; ++i)
+		mark1[nb1[i]] = 1;
+	graph_info_init(g, &ginfo, e, e);
+	mark_edge_trash(&ginfo, e1);
+	mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+	mark_edge_trash(&ginfo, e2);
+	mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+	int *nb2, n_nb2;
+	get_nearby_edges(g, g->edges[e2].rc_id, &ginfo, JUNGLE_RADIUS, &nb2, &n_nb2);
+	graph_info_destroy(&ginfo);
+	int *mark2 = (int *) calloc(g->n_e, sizeof(int));
+	for (int i = 1; i < n_nb2; ++i)
+		mark2[g->edges[nb2[i]].rc_id] = 1;
+
+	int *join = (int *) calloc(n_nb1 + n_nb2, sizeof(int));
+	int n_join = 0;
+	for (int i = 1; i < n_nb1; ++i)
+		join[n_join++] = nb1[i];
+	for (int i = 1; i < n_nb2; ++i)
+		join[n_join++] = g->edges[nb2[i]].rc_id;
+	for (int i = 0; i < n_join; ++i){
+		int e = join[i];
+		if (mark1[e] && mark2[e])
+			continue;
+		e = g->edges[e].rc_id;
+		if (mark1[e] && mark2[e])
+			continue;
+		e2 = -1;
+		break;
+	}
+	free(nb1);
+	free(nb2);
+	free(mark1);
+	free(mark2);
+	free(join);
+	if (e2 != -1)
+		__VERBOSE("Dump jungle detected at %d and %d\n", e1, e2);
+end_function:
+	free(nearby);
+	return e2;
+}
+
+int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	if (!(g->aux_flag & ASM_HAVE_BARCODE))
+		__ERROR("Graph must have barcode\n");
+	int res = 0;
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		__ERROR("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+	int tmp = g->n_e;
+	for (int e1 = 0; e1 < tmp; ++e1){
+		if (g->edges[e1].target == -1)
+			continue;
+		if (g->edges[e1].seq_len < MIN_NOTICE_ANCHOR)
+			continue;
+		int e2 = detect_dump_jungle(g, e1);
+		if (e2 == -1)
+			continue;
+		struct path_info_t pinfo;
+		path_info_init(&pinfo);
+		struct edge_map_info_t emap1;
+		struct edge_map_info_t emap2;
+		emap1.lc_e = e1;
+		emap2.lc_e = e2;
+
+		__VERBOSE("Get local reads\n");
+		struct read_path_t local_read_path;
+		get_union_barcode_reads(opt, g, e1, e2, dict, &read_sorted_path,
+				&local_read_path);
+		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
+				local_read_path.R2_path, KSIZE_CHECK);
+		__VERBOSE("Finding paths between %d and %d\n", e1, e2);
+		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
+				kmer_count);
+		kh_destroy(kmer_int, kmer_count);
+		destroy_read_path(&local_read_path);
+		int longest_path = 0;
+		for (int i = 0; i < pinfo.n_paths; ++i){
+			if (pinfo.path_lens[i] > pinfo.path_lens[longest_path])
+				longest_path = i;
+		}
+		int *path = pinfo.paths[longest_path];
+		int len = pinfo.path_lens[longest_path];
+		if (len <= 2){
+			__VERBOSE("No reliable paths found, continue\n");
+			path_info_destroy(&pinfo);
+			continue;
+		}
+
+		struct graph_info_t ginfo;
+		graph_info_init(g, &ginfo, e1, e2);
+		mark_edge_trash(&ginfo, e1);
+		mark_edge_trash(&ginfo, g->edges[e1].rc_id);
+		mark_edge_trash(&ginfo, e2);
+		mark_edge_trash(&ginfo, g->edges[e2].rc_id);
+		int *nearby, n_nb;
+		get_nearby_edges(g, e1, &ginfo, JUNGLE_RADIUS, &nearby, &n_nb);
+
+
+		g->edges = (struct asm_edge_t *) realloc(g->edges,
+				sizeof(struct asm_edge_t) * (g->n_e + 2));
+		memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
+		int p = g->n_e;
+		int q = g->n_e + 1;
+		asm_clone_edge(g, p, path[0]);
+		for (int i = 1; i < len; ++i){
+			int e1 = p;
+			int e2 = path[i];
+			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+			asm_append_barcode_readpair(g, e1, e2);
+			g->edges[e1].count += g->edges[e2].count;
+		}
+
+		asm_clone_edge(g, q, g->edges[path[len - 1]].rc_id);
+		for (int i = len - 2; i >= 0; --i){
+			int e1 = q;
+			int e2 = g->edges[path[i]].rc_id;
+			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
+			asm_append_barcode_readpair(g, e1, e2);
+			g->edges[e1].count += g->edges[e2].count;
+		}
+
+		int u = g->edges[path[0]].source;
+		int v = g->edges[path[len - 1]].target;
+		g->edges[p].source = u;
+		g->edges[p].target = v;
+		g->edges[p].rc_id = q;
+		g->nodes[u].adj = realloc(g->nodes[u].adj, (g->nodes[u].deg + 1)
+				* sizeof(struct asm_edge_t));
+		g->nodes[u].adj[g->nodes[u].deg] = p;
+		++g->nodes[u].deg;
+		int u_rc = g->nodes[u].rc_id;
+		int v_rc = g->nodes[v].rc_id;
+		g->edges[q].source = v_rc;
+		g->edges[q].target = u_rc;
+		g->edges[q].rc_id = p;
+		g->nodes[v_rc].adj = realloc(g->nodes[v_rc].adj, (g->nodes[v_rc].deg + 1)
+				* sizeof(struct asm_edge_t));
+		g->nodes[v_rc].adj[g->nodes[v_rc].deg] = q;
+		++g->nodes[v_rc].deg;
+		g->n_e += 2;
+
+
+		for (int i = 0; i < n_nb; ++i){
+			int e = nearby[i];
+			int e_rc = g->edges[e].rc_id;
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, e_rc);
+		}
+		asm_remove_edge(g, e2);
+		asm_remove_edge(g, g->edges[e2].rc_id);
+		path_info_destroy(&pinfo);
+		graph_info_destroy(&ginfo);
+		free(nearby);
+		++res;
+	}
+	kh_destroy(bcpos, dict);
+	struct asm_graph_t g1;
+	__VERBOSE("Condesing graph\n");
+	asm_condense_barcode(g, &g1);
+	asm_graph_destroy(g);
+	*g = g1;
+	test_asm_graph(g);
 	return res;
 }
 

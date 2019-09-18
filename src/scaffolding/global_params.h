@@ -1,7 +1,7 @@
 #ifndef SCAFFOLDING_GLOBAL_PARAMS_H
 #define SCAFFOLDING_GLOBAL_PARAMS_H
 
-#include "assembly_graph.h"
+#include "../assembly_graph.h"
 
 #define LIST_GLOBAL_PARAMS \
 	X(int, global_thres_length , -1)\
