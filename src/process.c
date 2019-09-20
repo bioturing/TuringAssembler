@@ -245,10 +245,13 @@ void resolve_local_process(struct opt_proc_t *opt)
 	asm_resolve_dump_jungle_ite(opt, &g0);
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
-	save_asm_graph(&g0, path);
-
-	save_graph_info(opt->out_dir, &g0, "level_haha");
+	struct asm_graph_t g1;
+	asm_condense(&g0, &g1); // Remove barcode
 	asm_graph_destroy(&g0);
+	save_asm_graph(&g1, path);
+
+	save_graph_info(opt->out_dir, &g1, "level_haha");
+	asm_graph_destroy(&g1);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
