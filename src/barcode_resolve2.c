@@ -1867,7 +1867,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 }
 
 struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
-							gint_t e1, gint_t e2)
+					gint_t e1, gint_t e2, khash_t(bcpos) *dict)
 {
 	struct read_path_t read_sorted_path, local_read_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
@@ -1877,8 +1877,6 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	} else {
 		sort_read(opt, &read_sorted_path);
 	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
 
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
@@ -1891,7 +1889,6 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	save_graph_info(work_dir, &lg, "local_lvl_0");
 	build_local_0_1(&lg, &lg1);
 	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	kh_destroy(bcpos, dict);
 	destroy_read_path(&local_read_path);
 	return lg1;
 	// uint32_t *ret_seq, ret_len;

@@ -522,6 +522,18 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int *path, int path_len, char **contig)
 {
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+
 	*contig = (char *) calloc(1, sizeof(char));
 	char *tmp;
 	decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
@@ -537,7 +549,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int v = path[i];
 		int next_v = i + 1 == path_len ? -1 : path[i + 1];
 		struct asm_graph_t lg = get_local_assembly(opt, g,
-				g->edges[u].rc_id, v);
+				g->edges[u].rc_id, v, dict);
 		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
 		__VERBOSE_LOG("INFO", "Processing %d on %d bridges\n", i, path_len - 1);
 		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
@@ -559,6 +571,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		asm_graph_destroy(&lg);
 	}
 	fclose(f);
+	kh_destroy(bcpos, dict);
 	__VERBOSE_LOG("INFO", "Path summary:\n");
 	__VERBOSE_LOG("", "Number of trivial bridges: %d\n",
 			bridge_types[BRIDGE_TRIVIAL_BRIDGE]);
