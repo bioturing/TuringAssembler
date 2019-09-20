@@ -1588,6 +1588,8 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	int m_shared = 1;
 	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
 	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
+		if (!kh_exist(h1_key, it))
+			continue;
 		uint64_t key = kh_key(h1_key, it);
 		khiter_t it2 = kh_get(gint, h2_key, key);
 		if (it2 == kh_end(h2_key))
