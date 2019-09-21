@@ -16,9 +16,9 @@ void print_usage(const char *prog)
 void sort_read_process(struct opt_proc_t *opt)
 {
 	struct read_path_t read_sorted_path;
-	__VERBOSE("Sort reads by barcodes");
+	__VERBOSE("Sort reads by barcodes\n");
 	sort_read(opt, &read_sorted_path);
-	__VERBOSE("Done sorted");
+	__VERBOSE("Done sorted\n");
 }
 
 int main(int argc, char *argv[])
