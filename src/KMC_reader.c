@@ -264,7 +264,6 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 			struct kmc_info_t *data, void *bundle,
 			void (*process)(int, uint8_t *, uint32_t, void*))
 {
-    printf("start retrieve kmer\n");
 	FILE *fp = fopen(path, "rb");
 	char sig[4];
 	/* read signature to check whether truncated file */
@@ -280,7 +279,6 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 	/* Calculate record size */
 	fseek(fp, 0, SEEK_END);
 	uint64_t file_size = ftell(fp) - 8;
-	printf("huuuu header %p %d\n", &(data->header), data->header.total_kmers);
 	if (file_size % data->header.total_kmers != 0)
 		__ERROR("Total kmer does not divide kmer record field total size");
 	int record_size = file_size / data->header.total_kmers;

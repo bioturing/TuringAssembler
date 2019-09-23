@@ -694,6 +694,8 @@ void sort_read(struct opt_proc_t *opt, struct read_path_t *rpath)
 		producer_bundles = init_fastq_triple(opt->n_threads, opt->n_files,
 				opt->files_1, opt->files_2, opt->files_I);
 		buffer_iterator = ust_buffer_iterator;
+	} else {
+	    __ERROR("Wrong library format\n");
 	}
 	struct readsort_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));

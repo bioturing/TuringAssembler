@@ -23,7 +23,7 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
 
 EXEC = skipping
 
-EXEC_RELEASE = skipping_static
+EXEC_RELEASE = /src/skipping_static
 
 # SRC = $(wildcard src/*.c)
 
