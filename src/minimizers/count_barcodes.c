@@ -213,13 +213,11 @@ void mini_inc(struct mini_hash_t *h_table, uint8_t *data, int len)
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
 	if (h_table->key[slot] == 0) {
-		pthread_mutex_lock(&lock_key);
+		atomic_add_and_fetch64(h_table->h + slot, 1);
 		h_table->key[slot] = key;
-		h_table->key[slot] = 1;
-		pthread_mutex_unlock(&lock_key);
 	} else {
 		uint64_t probe = slot + 1;
-		while (h_table->key[probe] != HASH_END && probe != slot) {
+		while (h_table->h[probe] != 0 && probe != slot) {
 			probe = (++probe) % mask;
 		}
 		if (probe == slot)
@@ -227,10 +225,8 @@ void mini_inc(struct mini_hash_t *h_table, uint8_t *data, int len)
 		if (key == h_table->key[probe]) {
 			atomic_add_and_fetch64(h_table->h + probe, 1);
 		} else {
-			pthread_mutex_lock(&lock_key);
+			atomic_add_and_fetch64(h_table->h + probe, 1);
 			h_table->key[probe] = key;
-			h_table->key[probe] = 1;
-			pthread_mutex_unlock(&lock_key);
 		}
 	}
 }
