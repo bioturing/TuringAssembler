@@ -112,7 +112,7 @@ struct mini_hash_t *init_mini_hash()
 	return h_table;
 }
 
-struct mini_hash_t *h_table;
+static struct mini_hash_t *h_table;
 
 static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
 {
