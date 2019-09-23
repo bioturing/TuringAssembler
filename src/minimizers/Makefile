@@ -23,6 +23,7 @@ EXEC = skiminizer
 SRC =  \
 	   process.c \
 	   opt.c \
+	   count_barcodes.c \
       ../buffer_file_wrapper.c 	\
       ../buffer_file_wrapper.c 	\
       ../dqueue.c 					\

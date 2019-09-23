@@ -235,6 +235,8 @@ void mini_inc(struct mini_hash_t *h_table, uint8_t *data, int len)
 	}
 }
 
+static inline void *biot_buffer_iterator_simple(void *data);
+
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
 	pthread_mutex_init(&lock_key, NULL);
@@ -280,7 +282,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 
 }
 
-static void *biot_buffer_iterator_simple(void *data)
+static inline void *biot_buffer_iterator_simple(void *data)
 {
 	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
