@@ -760,10 +760,9 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e1, int e2)
 {
-	struct edge_map_info_t emap1;
+	struct edge_map_info_t emap1 = {0};
 	get_local_edge_head(*g, *lg, e1, &emap1);
-
-	struct edge_map_info_t emap2;
+	struct edge_map_info_t emap2 = {0};
 	get_local_edge_head(*g, *lg, e2, &emap2);
 
 	if (emap1.lc_e == emap2.lc_e)

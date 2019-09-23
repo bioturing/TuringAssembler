@@ -6,7 +6,7 @@
 #include "verbose.h"
 #include "kmer_hash.h"
 #define KSIZE 100
-#define WINDOW_SIZE 400
+#define WINDOW_SIZE 1000
 #define POINT_MEDIUM_TRHESH 0.6
 #define POINT_HIGH_THRESH 0.8
 
