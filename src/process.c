@@ -15,6 +15,7 @@
 #include "barcode_resolve2.h"
 #include "basic_resolve.h"
 #include "fastg.h"
+#include "fastq_reducer.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -264,6 +265,17 @@ void build_bridge_process(struct opt_proc_t *opt)
 	free(mark);
 	asm_graph_destroy(g0);
 	free(g0);
+}
+
+void reduce_read_process(struct opt_proc_t *opt)
+{
+	struct read_path_t org_rpath;
+	sprintf(org_rpath.R1_path, "%s", opt->files_1[0]);
+	sprintf(org_rpath.R2_path, "%s", opt->files_2[0]);
+	struct read_path_t reduced_rpath;
+	sprintf(reduced_rpath.R1_path, "reduced_%s", opt->files_1[0]);
+	sprintf(reduced_rpath.R2_path, "reduced_%s", opt->files_2[0]);
+	fastq_reducer(opt, &org_rpath, &reduced_rpath);
 }
 
 void resolve_local_process(struct opt_proc_t *opt)

@@ -14,6 +14,7 @@
 #include "../include/bwamem.h"
 #include "basic_resolve.h"
 #include "scaffolding/global_params.h"
+#include "barcode_builder.h"
 
 struct bccount_bundle_t {
 	struct asm_graph_t *g;
@@ -31,13 +32,6 @@ struct pathcount_bundle_t {
 	mem_opt_t *bwa_opt;
 	khash_t(contig_count) *count_cand;
 	khash_t(contig_count) *count_err;
-};
-
-struct asm_align_t {
-	int rid;
-	int pos;
-	int score:30, strand:2;
-	int aligned;
 };
 
 mem_opt_t *asm_memopt_init()
