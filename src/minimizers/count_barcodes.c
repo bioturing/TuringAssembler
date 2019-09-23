@@ -258,6 +258,9 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	struct readsort_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
 	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));
 	int i;
+	for (i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+	}
 
 	pthread_t *producer_threads, *worker_threads;
 	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
