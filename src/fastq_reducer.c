@@ -75,20 +75,38 @@ void fastq_reducer(struct opt_proc_t *opt, struct read_path_t *org_rpath,
 		for (int j = 0; j < n_contigs; ++j){
 			int id;
 			fscanf(f, "%d ", &id);
+			if (g0.edges[id].seq_len <= STRICT_HEAD_LEN * 2)
+				continue;
 			char *seq;
 			decode_seq(&seq, g0.edges[id].seq, g0.edges[id].seq_len);
 			fprintf(fo, ">%d\n%s\n", id, seq);
+			free(seq);
+
+			int rc_id = g0.edges[id].rc_id;
+			decode_seq(&seq, g0.edges[rc_id].seq, g0.edges[rc_id].seq_len);
+			fprintf(fo, ">%d\n%s\n", rc_id, seq);
 			free(seq);
 		}
 	}
 	fclose(f);
 	fclose(fo);
-
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
 	mem_opt_t *bwa_opt = asm_memopt_init();
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
+	char *buf[2];
+	pthread_mutex_t buf_lock[2];
+	pthread_mutex_t file_lock[2];
+	int buf_pos[2] = {0};
+	FILE *f_reduced[2];
+	f_reduced[0] = fopen(reduced_path->R1_path, "wb");
+	f_reduced[1] = fopen(reduced_path->R2_path, "wb");
+	for (int i = 0; i < 2; ++i){
+		pthread_mutex_init(&buf_lock[i], NULL);
+		pthread_mutex_init(&file_lock[i], NULL);
+		buf[i] = (char *) calloc(BUF_LEN, sizeof(char));
+	}
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	struct producer_bundle_t *producer_bundles = init_fastq_pair(opt->n_threads,
@@ -100,7 +118,13 @@ void fastq_reducer(struct opt_proc_t *opt, struct read_path_t *org_rpath,
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
-		worker_bundles[i].out_rpath = reduced_path;
+		for (int j = 0; j < 2; ++j){
+			worker_bundles[i].buf_lock[j] = &buf_lock[j];
+			worker_bundles[i].buf[j] = buf[j];
+			worker_bundles[i].file_lock[j] = &file_lock[j];
+			worker_bundles[i].buf_pos[j] = &buf_pos[j];
+			worker_bundles[i].f[j] = f_reduced[j];
+		}
 	}
 
 	pthread_t *producer_threads = calloc(1, sizeof(pthread_t));
@@ -114,8 +138,20 @@ void fastq_reducer(struct opt_proc_t *opt, struct read_path_t *org_rpath,
 
 
 	pthread_join(producer_threads[0], NULL);
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
 
-	// TODO 
+	for (int i = 0; i < 2; ++i){
+		if (buf_pos[i] > 0)
+			fwrite(buf[i], sizeof(char), buf_pos[i], f_reduced[i]);
+		fclose(f_reduced[i]);
+	}
+
+	for (int i = 0; i < 2; ++i){
+		pthread_mutex_destroy(&buf_lock[i]);
+		pthread_mutex_destroy(&file_lock[i]);
+		free(buf[i]);
+	}
 	free_fastq_pair(producer_bundles, 1);
 	free(worker_bundles);
 	free(producer_threads);
@@ -199,8 +235,42 @@ void reduce_read(struct read_t *r1, struct read_t *r2,
 		}
 	}
 
+	pthread_mutex_t **buf_lock = bundle->buf_lock;
+	pthread_mutex_t **file_lock = bundle->file_lock;
+	char **buf = bundle->buf;
+	int **buf_pos = bundle->buf_pos;
+	FILE **f = bundle->f;
 	if (is_mapped_head || (!is_mapped_head && !is_mapped_mid)){
-		__VERBOSE("%s\n%s\n", r1_seq, r2_seq);
+		for (int i = 0; i < 2; ++i){
+			char own_buf[1024];
+			char *name, *info, *qual, *path, *seq;
+			if (i == 0){
+				name = r1->name;
+				info = r1->info;
+				qual = r1->qual;
+				seq = r1->seq;
+			} else {
+				name = r2->name;
+				info = r2->info;
+				qual = r2->qual;
+				seq = r2->seq;
+			}
+			sprintf(own_buf, "@%s\t%s\n%s\n+\n%s\n", name, info, seq,
+					qual);
+			int len = strlen(own_buf);
+			pthread_mutex_lock(buf_lock[i]);
+			if (*(buf_pos[i]) + len > BUF_LEN){
+				pthread_mutex_lock(file_lock[i]);
+				fwrite(buf[i], sizeof(char), *(buf_pos[i]),
+						f[i]);
+				pthread_mutex_unlock(file_lock[i]);
+				*(buf_pos[i]) = 0;
+			}
+			memcpy(buf[i] + *(buf_pos[i]), own_buf,
+					len * sizeof(char));
+			*(buf_pos[i]) += len;
+			pthread_mutex_unlock(buf_lock[i]);
+		}
 	}
 	free(ar1.a);
 	free(ar2.a);

@@ -4,14 +4,18 @@
 #include "../include/bwa.h"
 #include "../include/bwamem.h"
 #include "attribute.h"
-#define STRICT_HEAD_LEN 3000
+#define STRICT_HEAD_LEN 1000
+#define BUF_LEN (1 << 26)
 
 struct fastq_reducer_bundle_t{
 	struct dqueue_t *q;
-	struct read_path_t *out_rpath;
 	bwaidx_t *bwa_idx;
 	mem_opt_t *bwa_opt;
-	pthread_t *write_thread;
+	pthread_mutex_t *buf_lock[2];
+	pthread_mutex_t *file_lock[2];
+	char *buf[2];
+	int *buf_pos[2];
+	FILE *f[2];
 };
 
 void fastq_reducer(struct opt_proc_t *opt, struct read_path_t *org_rpath,

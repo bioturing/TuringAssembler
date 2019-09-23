@@ -270,11 +270,19 @@ void build_bridge_process(struct opt_proc_t *opt)
 void reduce_read_process(struct opt_proc_t *opt)
 {
 	struct read_path_t org_rpath;
-	sprintf(org_rpath.R1_path, "%s", opt->files_1[0]);
-	sprintf(org_rpath.R2_path, "%s", opt->files_2[0]);
+	char path[1024];
+	sprintf(path, "%s", opt->files_1[0]);
+	org_rpath.R1_path = strdup(path);
+	sprintf(path, "%s", opt->files_2[0]);
+	org_rpath.R2_path = strdup(path);
+
+
 	struct read_path_t reduced_rpath;
-	sprintf(reduced_rpath.R1_path, "reduced_%s", opt->files_1[0]);
-	sprintf(reduced_rpath.R2_path, "reduced_%s", opt->files_2[0]);
+	sprintf(path, "%s/R1.added_barcode.reduced.fastq", opt->out_dir);
+	reduced_rpath.R1_path = strdup(path);
+	sprintf(path, "%s/R2.added_barcode.reduced.fastq", opt->out_dir);
+	reduced_rpath.R2_path = strdup(path);
+	__VERBOSE("REDUCING READS\n");
 	fastq_reducer(opt, &org_rpath, &reduced_rpath);
 }
 
