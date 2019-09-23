@@ -535,6 +535,45 @@ void kmbuild_bundle_destroy(struct kmbuild_bundle_t *b)
 	b->k1 = b->k2 = b->k1_rc = b->k2_rc = NULL;
 }
 
+int have_contig_file(int n_files) {
+    return n_files < 0;
+}
+
+void assign_count_contig(int thread_no, uint8_t *kmer, uint32_t count, void *data) {
+    int contig_count = 50;
+    struct kmedge_bundle_t *bundle = (struct kmedge_bundle_t *)data;
+    struct kmhash_t *h = bundle->h;
+    struct asm_graph_t *g = bundle->g;
+    int ksize = g->ksize + 1;
+    int word_size = (ksize + 3) >> 2;
+    kmint_t k = kmhash_get(h, kmer);
+    if (k == KMHASH_END(h)) {
+        return;
+    }
+    gint_t e = KMHASH_IDX(h, k);
+    atomic_add_and_fetch64(&g->edges[e].count, contig_count);
+    atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count, contig_count);
+    //todo
+    // (void *)(&kmbuild_bundle), count_kmer_for_contig);  it will count for contig with value according to file count.txt -1
+}
+
+void count_kmer_from_contig(int n_threads, char *count_kmer_dir, int ksize, struct kmhash_t kmer_index_table,
+                            struct asm_graph_t *g) {
+    char *kmc_pre = alloca(strlen(count_kmer_dir) + 50);
+    char *kmc_suf = alloca(strlen(count_kmer_dir) + 50);
+    sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", count_kmer_dir, ksize + 1);//todo fix for contig file
+    sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", count_kmer_dir, ksize + 1);
+    struct kmc_info_t kmc_inf;
+    KMC_read_prefix(kmc_pre, &kmc_inf);
+
+    struct kmedge_bundle_t kmedge_bundle;
+    kmedge_bundle.h = &kmer_index_table;
+    kmedge_bundle.g = g;
+    KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
+                            (void *)(&kmedge_bundle), assign_count_kedge_multi);
+}
+
+
 void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 				char **files_1, char **files_2, char *work_dir,
 						struct asm_graph_t *g)
@@ -542,18 +581,23 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	__VERBOSE("|---- Counting kmer\n");
 	// n_files < 0 mean we have one contig file at end of files_2
     char **tmp_files;
-    if (n_files < 0) {
+    char *count_kmer_dir = alloca(strlen(work_dir) + 50);
+    if (have_contig_file(n_files)) {
         tmp_files = alloca((abs(n_files) * 2 +1) * sizeof(char *));
         memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
         memcpy(tmp_files + abs(n_files), files_2, (abs(n_files)+1) * sizeof(char *));
         KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
-                                n_files * 2 + 1, tmp_files);
+                                abs(n_files)* 2 + 1, tmp_files);
+        sprintf(count_kmer_dir, "%s/count_kmer", work_dir);
+        mkdir(count_kmer_dir, 0777);
+        printf("count kmer dir is %s %s\n", count_kmer_dir, files_2[abs(n_files)+1]);
+        KMC_build_kmer_database(ksize + 1, count_kmer_dir, n_threads, mmem, abs(n_files)*2, &files_2[abs(n_files)+1]);
 	} else {
         tmp_files = alloca(abs(n_files) * 2 * sizeof(char *));
         memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
         memcpy(tmp_files + abs(n_files), files_2, abs(n_files) * sizeof(char *));
         KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
-                                n_files * 2, tmp_files);
+                                abs(n_files) * 2, tmp_files);
 	}
 	__VERBOSE("\n");
 
@@ -584,20 +628,25 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 								g->n_v, g->n_e);
 
 	__VERBOSE("|---- Assigning edge count\n");
-	kmhash_init(&kmer_table, table_size, (ksize + 4) >> 2,
+
+    struct kmhash_t kmer_index_table;
+	kmhash_init(&kmer_index_table, table_size, (ksize + 4) >> 2,
 						KM_AUX_IDX, n_threads);
-	build_edge_kmer_index_multi(n_threads, &kmer_table, g);
+	build_edge_kmer_index_multi(n_threads, &kmer_index_table, g);
 	__VERBOSE_LOG("BUILD", "Number of (k+1)-mer on edge: %lu\n",
-							kmer_table.n_item);
+							kmer_index_table.n_item);
 
 	struct kmedge_bundle_t kmedge_bundle;
-	kmedge_bundle.h = &kmer_table;
+	kmedge_bundle.h = &kmer_index_table;
 	kmedge_bundle.g = g;
-	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
-			(void *)(&kmedge_bundle), assign_count_kedge_multi);
-	kmhash_destroy(&kmer_table);
+	if (have_contig_file(n_files)) {
+	    count_kmer_from_contig(n_threads, count_kmer_dir, ksize, kmer_index_table, g);
+	} else {
+        KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
+                                (void *)(&kmedge_bundle), assign_count_kedge_multi);
+	}
+	kmhash_destroy(&kmer_index_table);
 	destroy_kmc_info(&kmc_inf);
-
 }
 
 void build_initial_graph(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
