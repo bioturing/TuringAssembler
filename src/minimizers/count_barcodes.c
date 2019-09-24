@@ -220,15 +220,21 @@ void mini_inc(uint64_t data, int len)
 		atomic_add_and_fetch64(h_table->h + slot, 1);
 	} else {
 		uint64_t probe = slot + 1;
-		while ((prev = atomic_val_CAS64(h_table->h + probe, 0, 1)) && !atomic_bool_CAS64(h_table->key + probe, data, data)) { 
-			probe = (probe++) % mask;
+		int i;
+		for (i = slot; i < h_table->size && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			prev = atomic_val_CAS64(h_table->h + i, 0, 1);
 		}
-		if (probe == slot)
+		if (i == h_table->size) {
+			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+				prev = atomic_val_CAS64(h_table->h + i, 0, 1);
+			}
+		}
+		if (i == slot)
 			__ERROR("No more slot in the hash table!");
 		if (!prev) { //room at probe is empty -> fill in
-			h_table->key[probe] = data;
+			h_table->key[i] = data;
 		} else{
-			atomic_add_and_fetch64(h_table->h + probe, 1);
+			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
 	}
 }
