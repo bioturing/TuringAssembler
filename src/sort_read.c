@@ -275,7 +275,7 @@ void *biot_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file biot\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
@@ -395,7 +395,7 @@ void *x10_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file when sort bc 10x\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_10x(&read1, &readbc);
@@ -518,7 +518,7 @@ void *ust_buffer_iterator(void *data)
 				get_read_from_fa(&readI, I_buf, &posI);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL || rcI == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file ust\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_ust_raw(&readI);

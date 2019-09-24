@@ -194,9 +194,12 @@ void *process_build_big_table(void *data)
 		struct asm_edge_t *e = &g->edges[i_contig];
         if (!is_long_contig(e))
             continue;
+        int N_READ_COUNT_BX = 4;
 		struct barcode_hash_t *buck = &e->barcodes_scaf;
 		for (int l = 0; l < buck->size; l++){
-			if (buck->keys[l] != (uint64_t)(-1)){
+//            printf("%d  %d\n", buck->cnts[l] , N_READ_COUNT_BX); //when save graph doesn't save cnt
+			if (buck->keys[l] != (uint64_t)(-1) )
+			{
 				uint64_t barcode = buck->keys[l];
 				pthread_mutex_lock(&lock_put_table);
 				khint_t k = kh_get(big_table, big_table, barcode);
