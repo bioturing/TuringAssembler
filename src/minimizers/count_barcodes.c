@@ -314,7 +314,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	mini_print(16);
+	mini_print(18);
 	destroy_mini_hash(h_table);
 }
 
@@ -354,11 +354,11 @@ static inline void *biot_buffer_iterator_simple(void *data)
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
-			int record_len, len1, len2;
-			if (barcode != (uint64_t)-1) { //read doesn't have barcode
+			if (barcode != (uint64_t)-1) {
+				// any main stuff goes here
 				mini_inc(barcode, sizeof(uint64_t) / sizeof(uint8_t));
 			} else {
-				// any main stuff goes here
+				//read doesn't have barcode
 			}
 			if (rc1 == READ_END)
 				break;
