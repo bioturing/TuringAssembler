@@ -254,7 +254,7 @@ void mini_print(size_t bx_size)
 	for (i = 0; i < h_table->size; ++i) {
 		if (h_table->h[i] != 0) {
 			j = bx_size;
-			int ret = h_table->key[i];
+			uint64_t ret = h_table->key[i];
 			while (j) {
 				c = ret % 5;
 				bx[--j] = nt5[c];
