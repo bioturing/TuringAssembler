@@ -208,24 +208,25 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 	return h2;
 }
 
-void mini_inc(uint8_t *data, int len)
+void mini_inc(uint64_t data, int len)
 {
-	uint64_t key = MurmurHash3_x64_64(data, len);
+	uint64_t key = MurmurHash3_x64_64((uint8_t *)&data, len);
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
-	uint64_t d = *((uint64_t *)data);
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
-		h_table->key[slot] = d;
+		h_table->key[slot] = data;
+	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)){
+		atomic_add_and_fetch64(h_table->h + slot, 1);
 	} else {
 		uint64_t probe = slot + 1;
-		while (!(prev = atomic_val_CAS64(h_table->h + probe, 0, 1)) && !atomic_bool_CAS64(h_table->key + probe, d, d)) { //TODO: not this condition
-			probe = (++probe) % mask;
+		while ((prev = atomic_val_CAS64(h_table->h + probe, 0, 1)) && !atomic_bool_CAS64(h_table->key + probe, data, data)) { 
+			probe = (probe++) % mask;
 		}
 		if (probe == slot)
 			__ERROR("No more slot in the hash table!");
 		if (!prev) { //room at probe is empty -> fill in
-			h_table->key[probe] = d;
+			h_table->key[probe] = data;
 		} else{
 			atomic_add_and_fetch64(h_table->h + probe, 1);
 		}
@@ -237,9 +238,10 @@ void mini_print()
 	FILE *fp = fopen("barcode_frequencies.txt", "w");
 	int i;
 	for (i = 0; i < h_table->size; ++i) {
-		if (h_table->h[i])
+		if (h_table->h[i] != 0)
 		fprintf(fp, "%lld\t%d\n", h_table->key[i], h_table->h[i]);
 	}
+	fclose(fp);
 }
 
 static inline void *biot_buffer_iterator_simple(void *data);
@@ -332,9 +334,9 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			int record_len, len1, len2;
 			if (barcode != (uint64_t)-1) { //read doesn't have barcode
+				mini_inc(barcode, sizeof(uint64_t) / sizeof(uint8_t));
 			} else {
 				// any main stuff goes here
-				mini_inc(&barcode, sizeof(uint64_t) / sizeof(uint8_t));
 			}
 			if (rc1 == READ_END)
 				break;
