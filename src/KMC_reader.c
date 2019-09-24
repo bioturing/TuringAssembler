@@ -145,7 +145,7 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 //        printf("total kmer load: %lld\n", data->header.total_kmers);
 //        fclose(fp);
 	}else {
-	    __ERROR("wrong format file\n");
+	    __ERROR("wrong format file kmc read prefix\n");
 	}
 }
 

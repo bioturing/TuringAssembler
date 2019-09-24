@@ -878,9 +878,12 @@ void *barcode_buffer_iterator(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file when build barcode scaffold\n");
 
 			barcode = get_barcode(&read1);
+			if (barcode == -1) {
+                continue;
+			}
 			if (mapper_algo == FOR_SCAFFOLD)
                 read_mapper_scaffold(&read1, &read2, barcode, bundle);
 			else
@@ -1088,7 +1091,7 @@ void *pathcount_buffer_iterator(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file in pathcount\n");
 
 			path_mapper(&read1, &read2, bundle);
 
