@@ -109,8 +109,15 @@ struct mini_hash_t *init_mini_hash()
 	h_table->key = calloc(BARCODES100M, sizeof(uint64_t));
 	h_table->size = BARCODES100M;
 	memset(h_table->h, 0, h_table->size);
-	memset(h_table->key, HASH_END, h_table->size);
+	memset(h_table->key, 0, h_table->size);
 	return h_table;
+}
+
+void destroy_mini_hash(struct mini_hash_t *h_table)
+{
+	free(h_table->h);
+	free(h_table->key);
+	free(h_table);
 }
 
 static struct mini_hash_t *h_table;
@@ -215,13 +222,12 @@ void mini_inc(uint64_t data, int len)
 	uint64_t slot = key % mask;
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
-		h_table->key[slot] = data;
+		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
 	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)){
 		atomic_add_and_fetch64(h_table->h + slot, 1);
-	} else {
-		uint64_t probe = slot + 1;
+	} else { //linear probing
 		int i;
-		for (i = slot; i < h_table->size && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+		for (i = slot + 1; i < h_table->size && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
 			prev = atomic_val_CAS64(h_table->h + i, 0, 1);
 		}
 		if (i == h_table->size) {
@@ -230,9 +236,9 @@ void mini_inc(uint64_t data, int len)
 			}
 		}
 		if (i == slot)
-			__ERROR("No more slot in the hash table!");
+			__ERROR("No more slot in the hash table! There are more than 100 millions distinct barcodes in \n your data. Please check it or let tan@bioturing.com know to increase the size of the hash table!");
 		if (!prev) { //room at probe is empty -> fill in
-			h_table->key[i] = data;
+			atomic_bool_CAS64(h_table->key + i, 0, data); //TODO: check return
 		} else{
 			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
@@ -299,7 +305,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	free(worker_bundles);
 
 	mini_print();
-
+	destroy_mini_hash();
 }
 
 static inline void *biot_buffer_iterator_simple(void *data)
