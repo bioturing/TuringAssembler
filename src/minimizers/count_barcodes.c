@@ -33,8 +33,6 @@
 
 pthread_mutex_t lock_key;
 
-#define HASH_END LONG_MAX
-
 #define BARCODES100M 100663320
 #define BIG_CONSTANT(x) (x##LLU)
 
@@ -245,13 +243,25 @@ void mini_inc(uint64_t data, int len)
 	}
 }
 
-void mini_print()
+void mini_print(size_t bx_size)
 {
 	FILE *fp = fopen("barcode_frequencies.txt", "w");
-	int i;
+	int i, j, c;
+	char bx[bx_size + 1];
+	char nt5[5] = "ACGTN";
+
+	memset(bx, '\0', bx_size + 1);
 	for (i = 0; i < h_table->size; ++i) {
-		if (h_table->h[i] != 0)
-		fprintf(fp, "%lld\t%d\n", h_table->key[i], h_table->h[i]);
+		if (h_table->h[i] != 0) {
+			j = bx_size;
+			int ret = h_table->key[i];
+			while (j) {
+				c = ret % 5;
+				bx[--j] = nt5[c];
+				ret = (ret - c)/5;
+			}
+			fprintf(fp, "%s\t%d\n", bx, h_table->h[i]);
+		}
 	}
 	fclose(fp);
 }
@@ -271,7 +281,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	void *(*buffer_iterator)(void *) = biot_buffer_iterator_simple;
 	struct producer_bundle_t *producer_bundles = NULL;
 	if (opt->lib_type != LIB_TYPE_BIOT) {
-		__ERROR("Only accept 'bioturing' library at this stage, Sorry!");
+		__ERROR("Only accept 'bioturing' library, e.g barcode size 18bp, at this stage, Sorry!");
 	}
 	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 		                                   opt->files_1, opt->files_2);
@@ -304,8 +314,8 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	mini_print();
-	destroy_mini_hash();
+	mini_print(16);
+	destroy_mini_hash(h_table);
 }
 
 static inline void *biot_buffer_iterator_simple(void *data)
