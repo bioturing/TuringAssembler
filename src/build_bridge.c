@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include "kmer_hash.h"
 #include "resolve.h"
+#include "utils.h"
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -132,9 +133,11 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 		if (bad[i])
 			asm_remove_edge(lg, i);
 	}
+	char tmp_name[1024];
+	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
-	asm_clone_graph(lg, &g_bak);
+	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
 		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
@@ -648,7 +651,9 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	}
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
-	asm_clone_graph(lg, &g_bak);
+	char tmp_name[1024];
+	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
+	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
 		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
@@ -697,7 +702,9 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	free(bad);
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
-	asm_clone_graph(lg, &g_bak);
+	char tmp_name[1024];
+	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
+	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
 		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
@@ -768,4 +775,206 @@ int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 	if (emap1.lc_e == emap2.lc_e)
 		return 1;
 	return 0;
+}
+
+void build_bridge(struct opt_proc_t *opt, FILE *f)
+{
+	struct asm_graph_t *g0;
+	g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_file);
+	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	test_asm_graph(g0);
+	int *mark = (int *) calloc(g0->n_e, sizeof(int));
+
+	struct scaffold_record_t scaffold;
+	struct query_record_t query_record;
+	FILE *fp = fopen(opt->in_fasta, "r");
+	int n_paths;
+	fscanf(fp, "%d\n", &n_paths);
+	scaffold.n_paths = n_paths;
+	scaffold.path_lens = calloc(n_paths, sizeof(int));
+	scaffold.paths = calloc(n_paths, sizeof(int *));
+	query_record.e1 = NULL;
+	query_record.e2 = NULL;
+	query_record.pre_e1 = NULL;
+	query_record.next_e2 = NULL;
+	query_record.process_pos = 0;
+	query_record.n_process = 0;
+	for (int i = 0; i < n_paths; ++i){
+		int path_len;
+		fscanf(fp, "%d\n", &path_len);
+		scaffold.path_lens[i] = path_len;
+		scaffold.paths[i] = calloc(path_len, sizeof(int));
+		query_record.n_process += path_len - 1;
+		query_record.e1 = realloc(query_record.e1, query_record.n_process
+				* sizeof(int));
+		query_record.e2 = realloc(query_record.e2, query_record.n_process
+				* sizeof(int));
+		query_record.pre_e1 = realloc(query_record.pre_e1, query_record.n_process
+				* sizeof(int));
+		query_record.next_e2 = realloc(query_record.next_e2, query_record.n_process
+				* sizeof(int));
+		for (int j = 0; j < path_len; ++j){
+			fscanf(fp, "%d", scaffold.paths[i] + j);
+			mark[scaffold.paths[i][j]] = 1;
+			mark[g0->edges[scaffold.paths[i][j]].rc_id] = 1;
+		}
+		for (int j = 1; j < path_len; ++j){
+			query_record.e1[query_record.process_pos] = scaffold.paths[i][j - 1];
+			query_record.e2[query_record.process_pos] = scaffold.paths[i][j];
+			query_record.pre_e1[query_record.process_pos] = j == 1?
+				-1 : scaffold.paths[i][j - 2];
+			query_record.next_e2[query_record.process_pos] = j == path_len - 1?
+				-1 : scaffold.paths[i][j + 1];
+			++query_record.process_pos;
+		}
+	}
+	query_record.process_pos = 0;
+	fclose(fp);
+
+	__VERBOSE("+------------------------------------------------------+\n");
+	__VERBOSE("Getting all local graphs\n");
+	get_all_local_graphs(opt, g0, &query_record);
+	__VERBOSE("Done getting all local graphs\n");
+	__VERBOSE("+------------------------------------------------------+\n");
+	char **bridges = calloc(query_record.n_process, sizeof(char *));
+	pthread_mutex_t query_lock;
+	pthread_mutex_init(&query_lock, NULL);
+	pthread_mutex_t bridge_lock;
+	pthread_mutex_init(&bridge_lock, NULL);
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
+			sizeof(struct build_bridge_bundle_t));
+	for (int i = 0; i < opt->n_threads; ++i){
+		worker_bundles[i].opt = opt;
+		worker_bundles[i].g = g0;
+		worker_bundles[i].query_record = &query_record;
+		worker_bundles[i].query_lock = &query_lock;
+		worker_bundles[i].bridge_lock = &bridge_lock;
+		worker_bundles[i].bridges = bridges;
+	}
+	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	__VERBOSE("Building bridges on scaffold:\n");
+	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, build_bridge_iterator,
+				worker_bundles + i);
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+	free(query_record.e1);
+	free(query_record.e2);
+	free(query_record.pre_e1);
+	free(query_record.next_e2);
+	pthread_mutex_destroy(&query_lock);
+	pthread_mutex_destroy(&bridge_lock);
+	free(worker_bundles);
+	free(worker_threads);
+
+
+	__VERBOSE("DONE, printing bridges\n");
+	int p = 0;
+	int **paths = scaffold.paths;
+	int *path_lens = scaffold.path_lens;
+	for (int i = 0; i < scaffold.n_paths; ++i){
+		fprintf(f, ">contig_%d\n", i);
+		char *seq;
+		decode_seq(&seq, g0->edges[paths[i][0]].seq,
+				g0->edges[paths[i][0]].seq_len);
+		fprintf(f, "%s", seq);
+		for (int j = 1; j < path_lens[i]; ++j){
+			fprintf(f, "%s", bridges[p] +
+					g0->edges[paths[i][j - 1]].seq_len);
+			++p;
+		}
+		fprintf(f, "\n");
+	}
+	for (int i = 0; i < query_record.n_process; ++i)
+		free(bridges[i]);
+	free(bridges);
+	free(scaffold.path_lens);
+	for (int i = 0; i < scaffold.n_paths; ++i)
+		free(scaffold.paths[i]);
+	free(scaffold.paths);
+
+	for (int i = 0; i < g0->n_e; ++i){
+		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
+			continue;
+		if (mark[i] == 0){
+			int rc = g0->edges[i].rc_id;
+			char *tmp;
+			decode_seq(&tmp, g0->edges[i].seq, g0->edges[i].seq_len);
+			fprintf(f, ">%d_%d\n", i, rc);
+			fprintf(f, "%s\n", tmp);
+			free(tmp);
+			mark[rc] = 1;
+		}
+	}
+	free(mark);
+	asm_graph_destroy(g0);
+	free(g0);
+}
+
+void *build_bridge_iterator(void *data)
+{
+	struct build_bridge_bundle_t *bundle = (struct build_bridge_bundle_t *)
+			data;
+	while (1){
+		pthread_mutex_lock(bundle->query_lock);
+		int process_pos = bundle->query_record->process_pos;
+		++bundle->query_record->process_pos;
+		pthread_mutex_unlock(bundle->query_lock);
+		if (process_pos >= bundle->query_record->n_process)
+			break;
+
+		int e1 = bundle->query_record->e1[process_pos];
+		int e2 = bundle->query_record->e2[process_pos];
+		int pre_e1 = bundle->query_record->pre_e1[process_pos];
+		int next_e2 = bundle->query_record->next_e2[process_pos];
+		struct opt_proc_t opt = *(bundle->opt);
+		//opt.n_threads = 1;
+		char *seq;
+		int seq_len;
+
+		char graph_bin_path[1024];
+		sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
+				opt.out_dir, bundle->g->edges[e1].rc_id, e2,
+				opt.lk);
+		struct asm_graph_t lg;
+		load_asm_graph(&lg, graph_bin_path);
+		get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
+				&seq_len);
+		pthread_mutex_lock(bundle->bridge_lock);
+		bundle->bridges[process_pos] = seq;
+		pthread_mutex_unlock(bundle->bridge_lock);
+		asm_graph_destroy(&lg);
+	}
+}
+
+void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct query_record_t *query)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	for (int i = 0; i < query->n_process; ++i){
+		__VERBOSE("Processing %d on %d local graphs\n", i,
+				query->n_process);
+		int e1 = query->e1[i];
+		int e2 = query->e2[i];
+		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
+				e2, dict);
+		asm_graph_destroy(&lg);
+	}
+	kh_destroy(bcpos, dict);
 }

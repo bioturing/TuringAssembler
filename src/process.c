@@ -217,54 +217,9 @@ void graph_query_process(struct opt_proc_t *opt)
 
 void build_bridge_process(struct opt_proc_t *opt)
 {
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
-	fprintf(stderr, "bin size = %d\n", g0->bin_size);
-	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building bridges on scaffold:\n");
 	FILE *f = xfopen(opt->lc, "w");
-	FILE *fp = xfopen(opt->in_fasta, "r");
-	int n_paths;
-	fscanf(fp, "%d\n", &n_paths);
-	int *mark = (int *) calloc(g0->n_e, sizeof(int));
-	for (int i = 0; i < n_paths; ++i){
-		__VERBOSE_LOG("SCAFFOLD PATH", "Processing %d on %d paths\n", i + 1, n_paths);
-		int path_len;
-		fscanf(fp, "%d\n", &path_len);
-		int *path = (int *) calloc(path_len, sizeof(int));
-		for (int i = 0; i < path_len; ++i){
-			fscanf(fp, "%d", path + i);
-			mark[path[i]] = 1;
-			mark[g0->edges[path[i]].rc_id] = 1;
-		}
-		char *contig;
-		get_contig_from_scaffold_path(opt, g0, path, path_len, &contig);
-		fprintf(f, ">contig_path_%d\n", i);
-		fprintf(f, "%s\n", contig);
-		free(contig);
-		free(path);
-	}
-	for (int i = 0; i < g0->n_e; ++i){
-		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
-			continue;
-		if (mark[i] == 0){
-			int rc = g0->edges[i].rc_id;
-			char *tmp;
-			decode_seq(&tmp, g0->edges[i].seq, g0->edges[i].seq_len);
-			fprintf(f, ">%d_%d\n", i, rc);
-			fprintf(f, "%s\n", tmp);
-			free(tmp);
-			mark[rc] = 1;
-		}
-	}
+	build_bridge(opt, f);
 	fclose(f);
-	fclose(fp);
-	free(mark);
-	asm_graph_destroy(g0);
-	free(g0);
 }
 
 void reduce_read_process(struct opt_proc_t *opt)

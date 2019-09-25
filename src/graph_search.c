@@ -2,8 +2,8 @@
 #include "verbose.h"
 #include "helper.h"
 #include <math.h>
-#define MAX_VISITED_COUNT 100000
 #define PATH_NOT_FOUND -1
+#define MAX_VISITED_EDGE 20000
 
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 			int lc_e1, int lc_e2)
@@ -247,7 +247,7 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 		int u, int depth, int *cur_path, struct path_info_t *pinfo,
 		int *n_visited, int ksize, khash_t(kmer_int) *h)
 {
-	if (pinfo->n_paths == MAX_PATH_COUNT || *n_visited == MAX_VISITED_COUNT)
+	if (pinfo->n_paths == MAX_PATH_COUNT || *n_visited >= MAX_VISITED_EDGE)
 		return;
 	++(*n_visited);
 	cur_path[depth] = u;

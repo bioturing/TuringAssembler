@@ -1402,10 +1402,14 @@ void asm_graph_destroy(struct asm_graph_t *g)
 	g->bin_size = 0;
 }
 
-void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
+void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
+		char *tmp_name)
 {
-	save_asm_graph(g0, "tmp_graph.bin");
-	load_asm_graph(g1, "tmp_graph.bin");
+	save_asm_graph(g0, tmp_name);
+	load_asm_graph(g1, tmp_name);
+	int status = remove(tmp_name);
+	if (status != 0)
+		__ERROR("Unable to remove %s\n", tmp_name);
 	return;
 	g1->ksize = g0->ksize;
 	g1->bin_size = g0->bin_size;
