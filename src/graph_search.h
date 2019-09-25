@@ -10,7 +10,6 @@
 #include "map_contig.h"
 #include "kmer_hash.h"
 #include <stdio.h>
-#define PATH_NOT_FOUND -1
 KHASH_MAP_INIT_INT64(gint_int, int);
 struct graph_info_t{
 	struct asm_graph_t *g;
@@ -74,7 +73,7 @@ void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo);
 void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo,
-		int ksize, khash_t(kmer_int) *h);
+		int *n_visited, int ksize, khash_t(kmer_int) *h);
 void path_info_init(struct path_info_t *path);
 void path_info_push(struct path_info_t *pinfo, int *path, int len);
 void path_info_destroy(struct path_info_t *pinfo);

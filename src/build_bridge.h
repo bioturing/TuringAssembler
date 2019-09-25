@@ -27,7 +27,32 @@
 #include "khash.h"
 #include "map_contig.h"
 #include "graph_search.h"
+
 KHASH_MAP_INIT_STR(str_int, int);
+
+struct scaffold_record_t{
+	int n_paths;
+	int *path_lens;
+	int **paths;
+};
+
+struct query_record_t{
+	int *e1;
+	int *e2;
+	int *pre_e1;
+	int *next_e2;
+	int process_pos;
+	int n_process;
+};
+
+struct build_bridge_bundle_t{
+	struct opt_proc_t *opt;
+	struct asm_graph_t *g;
+	struct query_record_t *query_record;
+	pthread_mutex_t *query_lock;
+	char **bridges;
+	pthread_mutex_t *bridge_lock;
+};
 
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e, struct edge_map_info_t *emap);
@@ -93,4 +118,8 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e1, int e2);
+void build_bridge(struct opt_proc_t *opt, FILE *f);
+void *build_bridge_iterator(void *data);
+void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct query_record_t *query);
 #endif

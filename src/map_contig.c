@@ -174,7 +174,7 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 	int *end_point = (int *) calloc(best_match.seq_len, sizeof(int));
 	int cur_start_point = count_match_kmer(global_start, local_kmers);
 	int cur_end_point = count_match_kmer(global_end, local_kmers);
-	
+
 	for (khiter_t it = kh_begin(local_kmers); it != kh_end(local_kmers);
 			++it){
 		if (!kh_exist(local_kmers, it))
