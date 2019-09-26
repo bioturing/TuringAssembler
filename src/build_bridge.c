@@ -10,7 +10,8 @@
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
-#define SYNC_MAX 2
+#define SYNC_MAX_GLOBAL 2
+#define SYNC_MAX_LOCAL 3
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -84,11 +85,21 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 		*res_seq = (char *) calloc(len + 1, sizeof(char));
 		strncpy(*res_seq, local_seq, local_pos.end);
 		strcpy(*res_seq + local_pos.end, global_seq + global_pos.end);
-	} else {
-		int len = local_pos.end - local_pos.start
-			+ max(local_pos.start, global_pos.start)
+	} else if (sync_type == SYNC_MAX_GLOBAL){
+		int len = global_pos.start + local_pos.end - local_pos.start
 			+ max(local.seq_len - local_pos.end,
 					global.seq_len - global_pos.end);
+		*res_seq = calloc(len + 1, sizeof(char));
+		strncat(*res_seq, global_seq, global_pos.start);
+		strncat(*res_seq, local_seq + local_pos.start,
+				local_pos.end - local_pos.start);
+		if (global.seq_len - global_pos.end > local.seq_len - local_pos.end)
+			strcat(*res_seq, global_seq + global_pos.end);
+		else
+			strcat(*res_seq, local_seq + local_pos.end);
+	} else {
+		int len = global.seq_len - global_pos.end + local_pos.end - local_pos.start
+			+ max(local_pos.start, global_pos.start);
 		*res_seq = calloc(len + 1, sizeof(char));
 		if (global_pos.start > local_pos.start)
 			strncat(*res_seq, global_seq, global_pos.start);
@@ -96,10 +107,7 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 			strncat(*res_seq, local_seq, local_pos.start);
 		strncat(*res_seq, local_seq + local_pos.start,
 				local_pos.end - local_pos.start);
-		if (global.seq_len - global_pos.end > local.seq_len - local_pos.end)
-			strcat(*res_seq, global_seq + global_pos.end);
-		else
-			strcat(*res_seq, local_seq + local_pos.end);
+		strcat(*res_seq, global_seq + global_pos.end);
 	}
 	free(global_seq);
 	free(local_seq);
@@ -623,9 +631,9 @@ void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 	*res_seq = (char *) calloc(1, sizeof(char));
 	char *first, *second;
 	sync_global_local_edge(g->edges[emap1->gl_e], lg->edges[emap1->lc_e],
-			emap1->gpos, emap1->lpos, SYNC_MAX, &first);
+			emap1->gpos, emap1->lpos, SYNC_MAX_GLOBAL, &first);
 	sync_global_local_edge(g->edges[emap2->gl_e], lg->edges[emap2->lc_e],
-			emap2->gpos, emap2->lpos, SYNC_MAX, &second);
+			emap2->gpos, emap2->lpos, SYNC_MAX_LOCAL, &second);
 	char *dump_N;
 	get_dump_N(&dump_N);
 	join_seq(res_seq, first);
