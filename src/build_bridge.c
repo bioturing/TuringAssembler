@@ -6,7 +6,14 @@
 #include "kmer_hash.h"
 #include "resolve.h"
 #include "utils.h"
+<<<<<<< HEAD
 #include "log.h"
+=======
+#define MIN_PROCESS_COV 500
+#define SYNC_KEEP_GLOBAL 0
+#define SYNC_KEEP_LOCAL 1
+#define SYNC_MAX 2
+>>>>>>> Add SYNC_MAX and remove POINT_MEDIUM_THREASH in mapping contig
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -75,11 +82,27 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 		*res_seq = (char *) calloc(len + 1, sizeof(char));
 		strncpy(*res_seq, global_seq, global_pos.start);
 		strcpy(*res_seq + global_pos.start, local_seq + local_pos.start);
-	} else {
+	} else if (sync_type == SYNC_KEEP_LOCAL){
 		int len = local_pos.end + global.seq_len - global_pos.end;
 		*res_seq = (char *) calloc(len + 1, sizeof(char));
 		strncpy(*res_seq, local_seq, local_pos.end);
 		strcpy(*res_seq + local_pos.end, global_seq + global_pos.end);
+	} else {
+		int len = local_pos.end - local_pos.start
+			+ max(local_pos.start, global_pos.start)
+			+ max(local.seq_len - local_pos.end,
+					global.seq_len - global_pos.end);
+		*res_seq = calloc(len + 1, sizeof(char));
+		if (global_pos.start > local_pos.start)
+			strncat(*res_seq, global_seq, global_pos.start);
+		else
+			strncat(*res_seq, local_seq, local_pos.start);
+		strncat(*res_seq, local_seq + local_pos.start,
+				local_pos.end - local_pos.start);
+		if (global.seq_len - global_pos.end > local.seq_len - local_pos.end)
+			strcat(*res_seq, global_seq + global_pos.end);
+		else
+			strcat(*res_seq, local_seq + local_pos.end);
 	}
 	free(global_seq);
 	free(local_seq);
@@ -603,9 +626,9 @@ void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 	*res_seq = (char *) calloc(1, sizeof(char));
 	char *first, *second;
 	sync_global_local_edge(g->edges[emap1->gl_e], lg->edges[emap1->lc_e],
-			emap1->gpos, emap1->lpos, SYNC_KEEP_GLOBAL, &first);
+			emap1->gpos, emap1->lpos, SYNC_MAX, &first);
 	sync_global_local_edge(g->edges[emap2->gl_e], lg->edges[emap2->lc_e],
-			emap2->gpos, emap2->lpos, SYNC_KEEP_LOCAL, &second);
+			emap2->gpos, emap2->lpos, SYNC_MAX, &second);
 	char *dump_N;
 	get_dump_N(&dump_N);
 	join_seq(res_seq, first);
@@ -934,24 +957,28 @@ void *build_bridge_iterator(void *data)
 		int e2 = bundle->query_record->e2[process_pos];
 		int pre_e1 = bundle->query_record->pre_e1[process_pos];
 		int next_e2 = bundle->query_record->next_e2[process_pos];
-		struct opt_proc_t opt = *(bundle->opt);
-		//opt.n_threads = 1;
+		struct asm_graph_t *g = bundle->g;
 		char *seq;
 		int seq_len;
 
-		char graph_bin_path[1024];
-		sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
-				opt.out_dir, bundle->g->edges[e1].rc_id, e2,
-				opt.lk);
-		struct asm_graph_t lg;
-		load_asm_graph(&lg, graph_bin_path);
-		local_asm_res = get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
-				&seq_len);
+		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
+			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
+		} else {
+			char graph_bin_path[1024];
+			sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
+					bundle->opt->out_dir, bundle->g->edges[e1].rc_id, e2,
+					bundle->opt->lk);
+			struct asm_graph_t lg;
+			load_asm_graph(&lg, graph_bin_path);
+			local_asm_res = get_bridge(bundle->opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
+					&seq_len);
+			asm_graph_destroy(&lg);
+		}
 		pthread_mutex_lock(bundle->bridge_lock);
 		log_debug("Local assembly status for edges %d and %d: %s", e1, e2, local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
-		asm_graph_destroy(&lg);
 	}
 }
 
@@ -978,6 +1005,11 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		/*
 		 * Build the local assembly graph for two edges: e1.rev and e2
 		 */
+		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
+			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+			log_debug("Too complex region, continue");
+			continue;
+		}
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
 				e2, dict);
 		asm_graph_destroy(&lg);

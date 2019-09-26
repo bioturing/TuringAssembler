@@ -19,8 +19,6 @@
 #define BRIDGE_MULTIPLE_PATH 2
 #define BRIDGE_PATH_NOT_FOUND 3
 #define N_BRIDGE_TYPE 4
-#define SYNC_KEEP_GLOBAL 0
-#define SYNC_KEEP_LOCAL 1
 #include <stdlib.h>
 #include "assembly_graph.h"
 #include "verbose.h"

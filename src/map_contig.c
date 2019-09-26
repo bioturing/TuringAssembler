@@ -61,7 +61,7 @@ int find_match_from_pos(struct map_contig_t *mct)
 		points[i] = count_match_kmer(kmers, mct->kmers[i]);
 		max_point = max(max_point, points[i]);
 
-		if (check_good_match(points[i], POINT_MEDIUM_TRHESH)){
+		if (check_good_match(points[i], POINT_HIGH_THRESH)){
 			match_id = i;
 			res = i;
 			break;
