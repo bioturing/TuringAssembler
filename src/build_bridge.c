@@ -6,14 +6,11 @@
 #include "kmer_hash.h"
 #include "resolve.h"
 #include "utils.h"
-<<<<<<< HEAD
 #include "log.h"
-=======
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
 #define SYNC_MAX 2
->>>>>>> Add SYNC_MAX and remove POINT_MEDIUM_THREASH in mapping contig
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -859,6 +856,9 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
+
+
+
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
 
 	pthread_mutex_t query_lock;
@@ -911,6 +911,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 					g0->edges[paths[i][j - 1]].seq_len);
 			++p;
 		}
+		free(seq);
 		fprintf(f, "\n");
 	}
 	for (int i = 0; i < query_record.n_process; ++i)
@@ -985,6 +986,10 @@ void *build_bridge_iterator(void *data)
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)
 {
+	char marker[1024];
+	sprintf(marker, "%s/done", opt->out_dir);
+	if (access(marker, F_OK) != -1)
+		return;
 	struct read_path_t read_sorted_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
 		read_sorted_path.R1_path = opt->files_1[0];
@@ -1016,4 +1021,5 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
+	fclose(fopen(marker, "w"));
 }
