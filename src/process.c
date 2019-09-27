@@ -110,7 +110,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	fclose(out_file);
 	asm_graph_destroy(g0);
 	free(g0);
-	fclose(log_fp);
+	close_logger();
 }
 
 void build_scaffolding_test_process(struct opt_proc_t *opt)
@@ -309,7 +309,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
-	fclose(log_fp);
+	close_logger();
 }
 
 void assembly_process(struct opt_proc_t *opt)
@@ -352,7 +352,7 @@ void assembly3_process(struct opt_proc_t *opt)
 
 	// asm_graph_destroy(&g1);
 	// asm_graph_destroy(&g2);
-	fclose(log_fp);
+	close_logger();
 }
 
 void build_0_process(struct opt_proc_t *opt)
