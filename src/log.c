@@ -100,7 +100,7 @@ void init_logger(int level, const char * file_path)
 {
 	FILE *fp = fopen(file_path, "w");
 	log_set_fp(fp);
-	log_set_level(__min(level, LOG_DEBUG));
+	log_set_level(__min(level, LOG_INFO));
 	L.usage = malloc(sizeof(struct rusage));
 }
 
