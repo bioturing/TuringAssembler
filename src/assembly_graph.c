@@ -1178,7 +1178,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	if (strncmp(sig, "asmg", 4))
 		log_error("Not assembly graph format file");
 	xfread(&g->aux_flag, 4, 1, fp);
-	log_debug("aux_flag = %u\n", g->aux_flag);
+	log_debug("aux_flag = %u", g->aux_flag);
 
 	/* load the graph topology and sequence information */
 	gint_t u, e;
