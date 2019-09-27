@@ -5,25 +5,19 @@ CXX = g++
 CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
-       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -lbz2 -Llibs KMC/libkmc.a  -l:libz.so \
-       libs/libbwa.a -lm 
-#	   -lasan\
-
-# KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
+       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
+       libs/bwa/libbwa.a -lm
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
 CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
-         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-		 -fPIC\
-         -I ./src -lbz2
-#	     -fsanitize=address -fno-omit-frame-pointer -g \
+         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
 
 EXEC = skipping
 
-EXEC_RELEASE = /src/skipping_static
+EXEC_RELEASE = skipping_static
 
 # SRC = $(wildcard src/*.c)
 
@@ -98,10 +92,10 @@ debug: $(EXEC)
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread KMC/libkmc.a \
-       libs/libz.a libs/libbwa.a \
-       -Wl,--no-whole-archive -lm libs/libbz2.a
-release: CC = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
-release: CXX = docker run -it -v $(PWD)/KMC:/KMC -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
+       libs/zlib/libz.a libs/bwa/libbwa.a \
+       -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a
+release: CC = gcc 
+release: CXX = g++
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
