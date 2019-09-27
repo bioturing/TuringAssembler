@@ -110,7 +110,6 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		return;
 
 	struct barcode_hash_t *buck = &rev_e->barcodes_scaf;
-	int total_count = 0;
 	for (int j = 0; j < buck->size; j++){
 		if (buck->keys[j] != (uint64_t)(-1)) {
 			uint64_t barcode = buck->keys[j];
@@ -118,10 +117,9 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 			if (k == kh_end(big_table))
 				continue;
 			struct list_position *pos = kh_value(big_table, k);
-			total_count = count_pos(count, pos);
+			count_pos(count, pos);
 		}
 	}
-	VERBOSE_FLAG(0, "i_edge %d n_items %d sum_count_pos",  i_edge, buck->n_item, total_count);
 
 	for (int i_contig = 0; i_contig < g->n_e; i_contig++) {
 		if (is_very_short_contig(&g->edges[i_contig]))
@@ -158,7 +156,6 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		{
 			for (int j = 0; j < *n_local_edges; j++) {
 				struct scaffold_edge e_j = (*list_local_edges)[j];
-				VERBOSE_FLAG(0, "ffff %f\n", e_j.score.bc_score);
 			}
 			*n_local_edges = i;
 			break;
@@ -327,12 +324,6 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 		if (edge_cov >= 3 || edge_cov <= 0.25) {
 			g->edges[i_e].seq_len = 0;
 		}
-//		if (edge_cov <3 ){
-//			int rc_id = g->edges[i_e].rc_id;
-//			g->edges[rc_id].rc_id = count;
-//			g->edges[count] =  g->edges[i_e];
-//			count++;
-//		}
 	}
 }
 
@@ -348,63 +339,8 @@ void pre_calc_score(struct asm_graph_t *g,struct opt_proc_t* opt, struct edges_s
 
 	*edges_score = params_candidate->list_candidate_edges;
 
-//	VERBOSE_FLAG(1, "find real edge");
-//	int i_candidate_edge = 0;
-//	qsort(para->list_candidate_edges, para->n_candidate_edges, sizeof(struct candidate_edge),
-//			ascending_index_edge);
-//	for (int i_contig = 0; i_contig < g->n_e; i_contig++) if (!is_very_short_contig(&g->edges[i_contig])) {
-//		VERBOSE_FLAG(0, "i contig %d\n", i_contig);
-//		struct scaffold_edge *list_edges = NULL;
-//		int size_list_edge = 0;
-//		int n_edges = 0;
-//		while (i_candidate_edge < para->n_candidate_edges &&
-//			para->list_candidate_edges[i_candidate_edge].src <= i_contig) {
-//			int src = para->list_candidate_edges[i_candidate_edge].src;
-//			assert(src == i_contig);
-//			int des = para->list_candidate_edges[i_candidate_edge].des;
-//			struct pair_contigs_score score = para->list_candidate_edges[i_candidate_edge].score;
-//					para->list_candidate_edges[i_candidate_edge].src, des, score.bc_score, score.m_score, t);
-//			struct scaffold_edge *new_edge = new_scaffold_edge(i_contig, des, &score);
-//			n_edges++;
-//			if (n_edges > size_list_edge) {
-//				size_list_edge = get_new_size(size_list_edge);
-//				list_edges = realloc(list_edges, size_list_edge * (sizeof(struct scaffold_edge)));
-//			}
-//			list_edges[n_edges-1] = *new_edge;
-//			i_candidate_edge++;
-//		}
-//		qsort(list_edges, n_edges, sizeof(struct scaffold_edge), decending_edge_score);
-//		for (int i_edge = 0; i_edge < MIN(global_number_degree, n_edges) ; i_edge++) {
-//			struct pair_contigs_score *score = &list_edges[i_edge].score;
-//			append_edge_score(edges_score, &(list_edges[i_edge]));
-//			//todo huu not hardcode
-//			if (score->bc_score == 0) {
-//				break;
-//			}
-//		}
-//		free(list_edges);
-//	}
-//	free(para);
 	destroy_params_build_candidate(params_candidate);
 	kh_destroy(big_table, big_table);
-}
-
-int get_highest_cov_contig(struct asm_graph_t *g, int *mark, int start)
-{
-//	float max_edge_cov = -1;
-// 	int max_edge_index = -1;
-//	for (int i = 0; i < g->n_e; i++) if (is_long_contig(&g->edges[i]) && mark[i] == 0) {
-//		float edge_cov = __get_edge_cov(&g->edges[i], g->ksize);
-//		if (edge_cov > max_edge_cov) {
-//			max_edge_cov = edge_cov;
-//			max_edge_index = i;
-//		}
-//	}
-//	return max_edge_index;
-	for (int i = start; i < g->n_e; i++) if (is_long_contig(&g->edges[i]) && mark[i]) {
-		return i;
-	}
-	return -1;
 }
 
 struct pair_contigs_score *get_score_edge(struct edges_score_type *edges_score, int src, int des)
@@ -699,7 +635,7 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 		struct opt_proc_t *opt) 
 {
 	init_global_params(g);
-	VERBOSE_FLAG(0, "init global params done\n");
+	VERBOSE_FLAG(1, "init global params done\n");
 	check_global_params(g);
 	if (!opt->metagenomics) {
 		remove_lov_high_cov(g);
