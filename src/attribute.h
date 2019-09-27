@@ -62,6 +62,7 @@ struct opt_proc_t {
 	int mmem;
 	char *lc;
 	int lk;
+	int log_level;
 };
 
 struct read_path_t {

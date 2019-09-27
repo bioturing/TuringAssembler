@@ -96,8 +96,7 @@ struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
 
 void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 {
-	FILE *log_fp = fopen("./build_scaffolding_1_2.log", "w");
-	log_set_fp(log_fp);
+	init_logger(opt->log_level, "./build_scaffolding_1_2.log");
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 	log_info("Build scaffolding with kmer size: %d", g0->ksize);
@@ -290,8 +289,7 @@ void build_barcode_info(struct opt_proc_t *opt)
 
 void build_barcode_scaffold(struct opt_proc_t *opt)
 {
-	FILE *log_fp = fopen("./build_barcode_scaffold.log", "w");
-	log_set_fp(log_fp);
+	init_logger(opt->log_level, "./build_barcode_scaffold.log");
 	struct asm_graph_t g;
 	struct read_path_t read_sorted_path;
 
@@ -333,8 +331,7 @@ void assembly_process(struct opt_proc_t *opt)
 
 void assembly3_process(struct opt_proc_t *opt)
 {
-	FILE *log_fp = fopen("./assembly3.log", "w");
-	log_set_fp(log_fp);
+	init_logger(opt->log_level, "./assembly3.log");
 
 	struct asm_graph_t g1, g2;
 	build_0_KMC(opt, opt->k0, &g1);
