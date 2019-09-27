@@ -45,6 +45,7 @@ static struct {
     int level;
     int quiet;
     struct rusage *usage;
+    time_t start_time;
 } L;
 
 
@@ -103,6 +104,7 @@ void init_logger(int level, const char * file_path)
 	log_set_fp(fp);
 	log_set_level(__min(level, LOG_INFO));
 	L.usage = malloc(sizeof(struct rusage));
+	L.start_time = time(NULL);
 }
 
 void close_logger()
@@ -118,23 +120,21 @@ void log_set_quiet(int enable)
 
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
-	/* Get used time and memory */
-	getrusage(RUSAGE_SELF, L.usage);
-	time_t sys_time = L.usage->ru_stime.tv_sec; /* System time */
-	time_t usr_time = L.usage->ru_utime.tv_sec; /* User time */
-	uint64_t ru_ixrss = L.usage->ru_ixrss; /* Integral shared memory */
-
 	/* Get current time */
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
+
+	/* Get used time and memory */
+	getrusage(RUSAGE_SELF, L.usage);
+	time_t usr_time = t - L.start_time;
 
 	/* Log to file . Always log to file*/
 	if (L.fp) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s:%d:\t%.2f\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-			sys_time/60, usr_time/60, ru_ixrss/1024);
+		fprintf(L.fp, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
+			usr_time/60, ru_ixrss/1024);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -156,11 +156,11 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
 #ifdef LOG_USE_COLOR
 		fprintf(
-      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%.2f\t%.2f\t%ldMB\t",
-      buf, level_colors[level], level_names[level], file, line, sys_time/60, usr_time/60, ru_ixrss/1024);
+      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%.2f\t%ldMB\t",
+      buf, level_colors[level], level_names[level], file, line,  usr_time/60, ru_ixrss/1024);
 #else
-		fprintf(stderr, "%s %-5s %s:%d:\t%.2f\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-		        sys_time/60, usr_time/60, ru_ixrss/1024);
+		fprintf(stderr, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
+		        usr_time/60, ru_ixrss/1024);
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
