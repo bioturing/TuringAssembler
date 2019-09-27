@@ -117,6 +117,10 @@ void log_set_quiet(int enable)
 
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
+	/* Get current time */
+	time_t t = time(NULL);
+	struct tm *lt = localtime(&t);
+
 	/* Log to file . Always log to file*/
 	if (L.fp) {
 		va_list args;
@@ -136,10 +140,6 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 
 	/* Acquire lock */
 	lock();
-
-	/* Get current time */
-	time_t t = time(NULL);
-	struct tm *lt = localtime(&t);
 
 	/* Log to stderr */
 	if (!L.quiet) {
