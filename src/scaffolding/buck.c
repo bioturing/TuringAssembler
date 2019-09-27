@@ -7,9 +7,6 @@
 int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e)
 {
 	int res = 0, l = 0, r = MIN_CONTIG_BARCODE, sum_holes = 0;
-//	for (int i = 0; i < e->n_holes; ++i){
-//		VERBOSE_FLAG(log_hole, "holeee %d %d %d\n" , e->seq_len, e->l_holes[i], e->p_holes[i]);
-//	}
 	for (uint32_t i = 0; i < e->n_holes; ++i){
 		int pos = e->p_holes[i] + sum_holes;
 		if (pos >= r){
@@ -27,7 +24,7 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bi
 		struct opt_proc_t *opt)
 {
 	if (get_amount_hole(g, e)  > 0.7*MIN_CONTIG_BARCODE) {
-		VERBOSE_FLAG(2, "NNNNN size is to big ");
+		log_debug("NNNNN size is to big ");
 		return 0;
 	}
 	return 1;
@@ -54,7 +51,7 @@ float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buc
 			}
 		}
 	}
-	VERBOSE_FLAG(3, "res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
+	log_trace("res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
 	cnt0 = buck0->n_item;
 	cnt1 = buck1->n_item;
 	return get_bc_score(res2, cnt0, cnt1, avg_bin_hash);

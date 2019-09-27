@@ -19,8 +19,6 @@
 LIST_GLOBAL_PARAMS
 #undef X
 
-extern int log_level;
-
 void init_global_params(struct asm_graph_t *g);
 void check_global_params();
 

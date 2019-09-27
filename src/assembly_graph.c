@@ -136,7 +136,7 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 			continue;
 		sum_len += g->edges[e].seq_len;
 		sum_cov += g->edges[e].seq_len * cov;
-		VERBOSE_FLAG(2, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
+		log_debug("sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	}
 	log_debug("sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	return sum_cov/sum_len;
