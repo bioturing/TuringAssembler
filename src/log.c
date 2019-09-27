@@ -48,6 +48,8 @@ static struct {
     int quiet;
     struct rusage *usage;
     time_t start_time;
+    time_t last_time;
+    unsigned int mem_used;
 } L;
 
 
@@ -125,22 +127,35 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
 	char src_code[LOG_PADDING];
+	time_t usr_time, t;
+	unsigned int ru_maxrss;
 
 	/* Get used time and memory */
-	getrusage(RUSAGE_SELF, L.usage); /* Get resource usage */
-	time_t usr_time = t - L.start_time;
+	if (level > LOG_TRACE) {
+		t = time(NULL);
+		usr_time = t - L.start_time;
+		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage */
+		ru_maxrss = L.usage->ru_maxrss;
+		L.mem_used = ru_maxrss;
+		L.last_time = usr_time;
+	} else{
+		usr_time = L.last_time;
+		ru_maxrss = L.mem_used;
+	}
 
-	/* Log to file . Always log to file*/
+	/* Cast the file name and line number into a file to easily align */
 	sprintf(src_code, "%s:%d", file, line);
 	int l = strlen(src_code);
 	memset(src_code + l, ' ', LOG_PADDING - l - 1);
 	src_code[LOG_PADDING - 1] = '\0';
+
+	/* Log to file . Always log to file*/
 	if (L.fp) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
 		fprintf(L.fp, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-			usr_time, ru_ixrss);
+			usr_time, ru_maxrss);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -163,10 +178,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 #ifdef LOG_USE_COLOR
 		fprintf(
       stderr, "%s %s%-5s\x1b[0m \x1b[90m%s\x1b[0m\t%ld seconds\t%uMB\t",
-      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_ixrss);
+      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_maxrss);
 #else
 		fprintf(stderr, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-		        usr_time, ru_ixrss);
+		        usr_time, ru_maxrss);
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
