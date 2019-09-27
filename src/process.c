@@ -300,6 +300,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 		read_sorted_path.R2_path = opt->files_2[0];
 		read_sorted_path.idx_path = opt->files_I[0];
 	} else {
+		log_info("Read library is not sorted (type %d). Rearranging reads by barcodes", opt->lib_type);
 		sort_read(opt, &read_sorted_path);
 	}
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
