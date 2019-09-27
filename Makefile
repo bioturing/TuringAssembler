@@ -4,16 +4,13 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -pthread -O3 -std=c++11 \
-       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-       -Llibs KMC/kmc_lib.a libs/libbz2.a libs/libz.a \
-       libs/libbwa.a -lm 
-
-# KMC_LIBS =  KMC/kmc_lib.a KMC/kmer_counter/libs/libz.a KMC/kmer_counter/libs/libbz2.a
+LIBS = -pthread -std=c++11 \
+       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
+       libs/bwa/libbwa.a -lm
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -g -O1 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
@@ -102,7 +99,6 @@ release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a
 release: CC = gcc 
 release: CXX = g++
->>>>>>> edit make file
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
