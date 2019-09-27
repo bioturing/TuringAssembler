@@ -63,7 +63,6 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/score.c 						\
       src/scaffolding/scaffolding.c 						\
       src/scaffolding/scaffold.c 						\
-      src/scaffolding/contig_graph.c 						\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
