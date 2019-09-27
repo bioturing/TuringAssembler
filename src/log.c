@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "log.h"
 
