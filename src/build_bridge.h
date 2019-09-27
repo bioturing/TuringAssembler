@@ -39,8 +39,7 @@ struct scaffold_record_t{
 struct query_record_t{
 	int *e1;
 	int *e2;
-	int *pre_e1;
-	int *next_e2;
+	int *path_id;
 	int process_pos;
 	int n_process;
 };
@@ -49,6 +48,7 @@ struct build_bridge_bundle_t{
 	struct opt_proc_t *opt;
 	struct asm_graph_t *g;
 	struct query_record_t *query_record;
+	struct scaffold_record_t *scaffold_record;
 	pthread_mutex_t *query_lock;
 	char **bridges;
 	pthread_mutex_t *bridge_lock;
@@ -59,8 +59,8 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e, struct edge_map_info_t *emap);
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
-		char **res_seq, int *seq_len);
+		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
+		int n_scaff, char **res_seq, int *seq_len);
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq);
 gint_t get_edge_code(gint_t u, gint_t v);
@@ -79,7 +79,7 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int *path, int path_len, char **contig);
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int pre_e1, int next_e2,
+		struct asm_graph_t *lg, int *scaffolds, int n_scaff,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq, int *seq_len);
 void join_complex_path(struct asm_edge_t e1, struct asm_edge_t e2,
@@ -98,8 +98,8 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
 void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, struct asm_edge_t pre_e1,
-		struct asm_edge_t next_e2, struct asm_graph_t *lg);
+		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
+		struct asm_graph_t *lg);
 void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 		char **res_seq);
 void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
@@ -107,7 +107,7 @@ void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 		char **res_seq);
 void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, int pre_e1, int next_e2,
+		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
 		int **path, int *path_len);
 void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);

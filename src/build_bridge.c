@@ -115,14 +115,24 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 }
 
 void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, struct asm_edge_t pre_e1,
-		struct asm_edge_t next_e2, struct asm_graph_t *lg)
+		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
+		struct asm_graph_t *lg)
 {
 	log_debug("Filter irrelevant edges");
 	log_debug("Before filter: %d edges", lg->n_e);
 	int e1 = emap1->gl_e;
 	int e2 = emap2->gl_e;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
+	for (int i = 0; i < n_scaff; ++i){
+		struct map_contig_t mct;
+		init_map_contig(&mct, g->edges[scaffolds[i]], *lg);
+		find_match(&mct);
+		for (int j = 0; j < lg->n_e; ++j){
+			int rc_id = lg->edges[j].rc_id;
+			bad[j] |= mct.is_match[j] || mct.is_match[rc_id];
+		}
+		map_contig_destroy(&mct);
+	}
 	struct map_contig_t mct_1;
 	init_map_contig(&mct_1, g->edges[g->edges[e1].rc_id], *lg);
 	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
@@ -131,7 +141,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	init_map_contig(&mct_2, g->edges[e2], *lg);
 	int lc_e2 = find_match(&mct_2);
 
-	for (int i = 0; i < lg->n_e; ++i){
+	/*for (int i = 0; i < lg->n_e; ++i){
 		int rc_id = lg->edges[i].rc_id;
 		bad[i] |= mct_1.is_match[i] || mct_1.is_match[rc_id]
 			|| mct_2.is_match[i] || mct_2.is_match[rc_id];
@@ -156,7 +166,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 			bad[i] |= mct_4.is_match[i] || mct_4.is_match[rc_id];
 		}
 		map_contig_destroy(&mct_4);
-	}
+	}*/
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
 		= bad[lg->edges[lc_e2].rc_id] = 0;
 	for (int i = 0; i < lg->n_e; ++i){
@@ -189,8 +199,8 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 }
 
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
-		char **res_seq, int *seq_len)
+		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
+		int n_scaff, char **res_seq, int *seq_len)
 {
 	struct edge_map_info_t emap1;
 	get_local_edge_head(*g, *lg, e1, &emap1);
@@ -200,7 +210,7 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 	get_local_edge_tail(*g, *lg, e2, &emap2);
 
 	print_log_edge_map(&emap1, &emap2);
-	int res = try_bridging(opt, g, lg, pre_e1, next_e2, &emap1, &emap2,
+	int res = try_bridging(opt, g, lg, scaffolds, n_scaff, &emap1, &emap2,
 			res_seq, seq_len);
 	return res;
 }
@@ -269,7 +279,7 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 }
 
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, int pre_e1, int next_e2,
+		struct asm_graph_t *lg, int *scaffolds, int n_scaff,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq, int *seq_len)
 {
@@ -295,7 +305,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 	} else {
 		int *path;
 		int path_len;
-		get_best_path(opt, g, lg, emap1, emap2, pre_e1, next_e2,
+		get_best_path(opt, g, lg, emap1, emap2, scaffolds, n_scaff,
 				&path, &path_len);
 		if (path_len == 0){
 			bridge_type = BRIDGE_PATH_NOT_FOUND;
@@ -319,7 +329,7 @@ end_function:
 
 void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, int pre_e1, int next_e2,
+		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
 		int **path, int *path_len)
 {
 	*path = NULL;
@@ -330,19 +340,19 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int lc_e2 = emap2->lc_e;
 	struct asm_edge_t edge_pre_e1;
 	struct asm_edge_t edge_next_e2;
-	if (pre_e1 == -1)
+	/*if (pre_e1 == -1)
 		edge_pre_e1.source = -1;
 	else
 		edge_pre_e1 = g->edges[pre_e1];
 	if (next_e2 == -1)
 		edge_next_e2.source = -1;
 	else
-		edge_next_e2 = g->edges[next_e2];
+		edge_next_e2 = g->edges[next_e2];*/
 
 	struct read_path_t local_read_path;
 	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
 
-	unrelated_filter(g, emap1, emap2, edge_pre_e1, edge_next_e2, lg);
+	unrelated_filter(g, emap1, emap2, scaffolds, n_scaff, lg);
 	//cov_filter(g, lg, emap1, emap2);
 	connection_filter(g, lg, emap1, emap2);
 
@@ -580,7 +590,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		log_info("Building bridge from %d to %d", u, v);
 		char *seq;
 		int leng;
-		int res = get_bridge(opt, g, &lg, u, v, pre_u, next_v,
+		int res = get_bridge(opt, g, &lg, u, v, path, path_len,
 				&seq, &leng);
 		join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
 		int closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
@@ -822,8 +832,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	scaffold.paths = calloc(n_paths, sizeof(int *));
 	query_record.e1 = NULL;
 	query_record.e2 = NULL;
-	query_record.pre_e1 = NULL;
-	query_record.next_e2 = NULL;
+	query_record.path_id = NULL;
 	query_record.process_pos = 0;
 	query_record.n_process = 0;
 	/*
@@ -840,9 +849,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 				* sizeof(int));
 		query_record.e2 = realloc(query_record.e2, query_record.n_process
 				* sizeof(int));
-		query_record.pre_e1 = realloc(query_record.pre_e1, query_record.n_process
-				* sizeof(int));
-		query_record.next_e2 = realloc(query_record.next_e2, query_record.n_process
+		query_record.path_id = realloc(query_record.path_id, query_record.n_process
 				* sizeof(int));
 		for (int j = 0; j < path_len; ++j){
 			fscanf(fp, "%d", scaffold.paths[i] + j);
@@ -852,10 +859,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		for (int j = 1; j < path_len; ++j){
 			query_record.e1[query_record.process_pos] = scaffold.paths[i][j - 1];
 			query_record.e2[query_record.process_pos] = scaffold.paths[i][j];
-			query_record.pre_e1[query_record.process_pos] = j == 1?
-				-1 : scaffold.paths[i][j - 2];
-			query_record.next_e2[query_record.process_pos] = j == path_len - 1?
-				-1 : scaffold.paths[i][j + 1];
+			query_record.path_id[query_record.process_pos] = i;
 			++query_record.process_pos;
 		}
 	}
@@ -889,6 +893,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		worker_bundles[i].query_lock = &query_lock;
 		worker_bundles[i].bridge_lock = &bridge_lock;
 		worker_bundles[i].bridges = bridges;
+		worker_bundles[i].scaffold_record = &scaffold;
 	}
 	log_info("Building bridges on scaffold");
 	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
@@ -899,8 +904,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		pthread_join(worker_threads[i], NULL);
 	free(query_record.e1);
 	free(query_record.e2);
-	free(query_record.pre_e1);
-	free(query_record.next_e2);
+	free(query_record.path_id);
 	pthread_mutex_destroy(&query_lock);
 	pthread_mutex_destroy(&bridge_lock);
 	free(worker_bundles);
@@ -967,8 +971,9 @@ void *build_bridge_iterator(void *data)
 
 		int e1 = bundle->query_record->e1[process_pos];
 		int e2 = bundle->query_record->e2[process_pos];
-		int pre_e1 = bundle->query_record->pre_e1[process_pos];
-		int next_e2 = bundle->query_record->next_e2[process_pos];
+		int path_id = bundle->query_record->path_id[process_pos];
+		int *scaffolds = bundle->scaffold_record->paths[path_id];
+		int n_scaff = bundle->scaffold_record->path_lens[path_id];
 		struct asm_graph_t *g = bundle->g;
 		char *seq;
 		int seq_len;
@@ -982,8 +987,8 @@ void *build_bridge_iterator(void *data)
 					bundle->opt->lk);
 			struct asm_graph_t lg;
 			load_asm_graph(&lg, graph_bin_path);
-			local_asm_res = get_bridge(bundle->opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
-					&seq_len);
+			local_asm_res = get_bridge(bundle->opt, bundle->g, &lg, e1, e2, scaffolds,
+					n_scaff, &seq, &seq_len);
 			asm_graph_destroy(&lg);
 		}
 		pthread_mutex_lock(bundle->bridge_lock);

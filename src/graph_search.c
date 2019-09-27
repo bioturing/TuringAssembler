@@ -138,7 +138,7 @@ int check_key_exist(khash_t(gint_int) *h, gint_t key)
 
 void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 {
-	char path[1024];
+	/*char path[1024];
 	sprintf(path, "%d_%d_local.gfa", lc_e1, lc_e2);
 	FILE *f = fopen(path, "w");
 	int *mark = (int *) calloc(lg->n_e, sizeof(int));
@@ -187,7 +187,8 @@ void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 		}
 	}
 	free(mark);
-	fclose(f);
+	fclose(f);*/
+	save_graph_info("local_graphs", lg, "filtered");
 }
 
 void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
