@@ -24,6 +24,9 @@
  * IN THE SOFTWARE.
  */
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -32,12 +35,15 @@
 
 #include "log.h"
 
+#define __max(a, b) 		((a) > (b) ? (a) : (b))
+
 static struct {
     void *udata;
     log_LockFn lock;
     FILE *fp;
     int level;
     int quiet;
+    struct rusage *usage;
 } L;
 
 
@@ -52,46 +58,72 @@ static const char *level_colors[] = {
 #endif
 
 
-static void lock(void)   {
+static void lock(void)
+{
 	if (L.lock) {
 		L.lock(L.udata, 1);
 	}
 }
 
-
-static void unlock(void) {
+static void unlock(void)
+{
 	if (L.lock) {
 		L.lock(L.udata, 0);
 	}
 }
 
 
-void log_set_udata(void *udata) {
+void log_set_udata(void *udata)
+{
 	L.udata = udata;
 }
 
 
-void log_set_lock(log_LockFn fn) {
+void log_set_lock(log_LockFn fn)
+{
 	L.lock = fn;
 }
 
 
-void log_set_fp(FILE *fp) {
+void log_set_fp(FILE *fp)
+{
 	L.fp = fp;
 }
 
 
-void log_set_level(int level) {
+void log_set_level(int level)
+{
 	L.level = level;
 }
 
+void init_logger(int level, const char * file_path)
+{
+	FILE *fp = fopen(file_path, "w");
+	log_set_fp(fp);
+	log_get_level(__min(level, LOG_DEBUG));
+	L.usage = malloc(sizeof(struct rusage));
+}
 
-void log_set_quiet(int enable) {
+void log_set_quiet(int enable)
+{
 	L.quiet = enable ? 1 : 0;
 }
 
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
+	/* Log to file . Always log to file*/
+	if (L.fp) {
+		va_list args;
+		char buf[32];
+		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
+		fprintf(L.fp, "%s %-5s %s:%d: ", buf, level_names[level], file, line);
+		va_start(args, fmt);
+		vfprintf(L.fp, fmt, args);
+		va_end(args);
+		fprintf(L.fp, "\n");
+		fflush(L.fp);
+	}
+
 	if (level < L.level) {
 		return;
 	}
@@ -120,19 +152,6 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		va_end(args);
 		fprintf(stderr, "\n");
 		fflush(stderr);
-	}
-
-	/* Log to file */
-	if (L.fp) {
-		va_list args;
-		char buf[32];
-		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s:%d: ", buf, level_names[level], file, line);
-		va_start(args, fmt);
-		vfprintf(L.fp, fmt, args);
-		va_end(args);
-		fprintf(L.fp, "\n");
-		fflush(L.fp);
 	}
 
 	/* Release lock */
