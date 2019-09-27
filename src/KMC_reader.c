@@ -8,6 +8,7 @@
 #include "KMC_reader.h"
 #include "utils.h"
 #include "verbose.h"
+#include "log.h"
 
 void destroy_kmc_info(struct kmc_info_t *inf)
 {
@@ -20,7 +21,6 @@ void destroy_kmc_info(struct kmc_info_t *inf)
 typedef unsigned long long uint64;
 void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 {
-    printf("Open file prefix %s\n", path);
 	FILE *fp = xfopen(path, "rb");
 	char sig[4];
 	/* read signature to check whether not truncated file */
@@ -39,7 +39,7 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 	int header_offset;
 	fseek(fp, -8, SEEK_END);
 	xfread(&header_offset, 4, 1, fp);
-	printf("header position %d \n", header_offset);
+	log_debug("header position %d", header_offset);
 
 	int kmer_type;
 	fseek(fp, -12, SEEK_END);
@@ -64,7 +64,7 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         fseek(fp, 4, SEEK_SET);
         size_t result = xfread(data->prefix_file_buf, 1, lut_area_size_in_bytes+8, fp);
         if (result == 0)
-            __ERROR("wtf i am doing here\n");
+            log_error("wtf am i doing here");
 
         data->prefix_file_buf[data->prefix_file_buf_size] = data->header.total_kmers + 1;
 
@@ -73,13 +73,13 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         xfread(data->signature_map, data->signature_map_size, sizeof(uint32_t), fp);
         fclose(fp);
     } else if (kmer_type == 0) {
-	    printf("\n SIZE %d \n", size);
+	    log_debug("SIZE %d", size);
         data->prefix_file_buf_size = (size - 4) / 8;		//reads without 4 bytes of a header_offset (and without markers)
         data->prefix_file_buf = malloc(8*data->prefix_file_buf_size);
         size_t result = xfread(data->prefix_file_buf, 8, data->prefix_file_buf_size, fp);
-        printf("I can read\n", size);
+        log_debug("I can read", size);
         if (result == 0)
-            __ERROR("wtf i am doing here, too\n");
+            log_error("wtf i am doing here, too");
 
         fseek(fp, -8, SEEK_END);
 
@@ -91,22 +91,22 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         uint64 d = data->prefix_file_buf[header_index];
 
         data->header.kmer_length = (uint32_t)d;			//- kmer's length
-        printf("kmer length load: %d\n", data->header.kmer_length);
+        log_debug("kmer length load: %d", data->header.kmer_length);
         data->header.mode = d >> 32;				//- mode: 0 or 1
-        printf("mode: %d\n", data->header.mode);
+        log_debug("mode: %d", data->header.mode);
 
         header_index++;
         data->header.counter_size = (uint32_t)data->prefix_file_buf[header_index];	//- the size of a counter in bytes;
-        printf("counter size: %d\n", data->header.counter_size);
+        log_debug("counter size: %d", data->header.counter_size);
         //- for mode 0 counter_size is 1, 2, 3, or 4 (or 5, 6, 7, 8 for small k values)
         //- for mode = 1 counter_size is 4;
         data->header.lut_prefix_length = data->prefix_file_buf[header_index] >> 32;		//- the number of prefix's symbols cut frm kmers;
-        printf("lut prefix len: %d\n", data->header.lut_prefix_length);
+        log_debug("lut prefix len: %d", data->header.lut_prefix_length);
         //- (kmer_length - lut_prefix_length) is divisible by 4
 
         header_index++;
         data->header.min_count = (uint32_t)data->prefix_file_buf[header_index];    //- the minimal number of kmer's appearances
-        printf("min count : %d\n", data->header.min_count);
+        log_debug("min count : %d", data->header.min_count);
         data->header.max_count = data->prefix_file_buf[header_index] >> 32;      //- the maximal number of kmer's appearances
 
         header_index++;
@@ -117,10 +117,10 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         data->header.both_strands = !data->header.both_strands;
 
         data->header.max_count += data->prefix_file_buf[header_index] & 0xFFFFFFFF00000000;
-        printf("max count : %d\n", data->header.max_count);
+        log_debug("max count : %d", data->header.max_count);
 
         data->prefix_file_buf[last_data_index] = data->header.total_kmers + 1;
-        printf("prove total kmer load: %lld\n", data->header.total_kmers);
+        log_debug("prove total kmer load: %lld", data->header.total_kmers);
 
 //        data->header.sufix_size = (data->header.kmer_length - data->header.lut_prefix_length) / 4;
 //
@@ -130,22 +130,22 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 //
 //        fseek(fp, -header_offset - 8, SEEK_END);
 //        xfread(&(data->header.kmer_length), 4, 1, fp);
-//        printf("kmer length load: %d\n", data->header.kmer_length);
+//        log_debug("kmer length load: %d\n", data->header.kmer_length);
 //        xfread(&(data->header.mode), 4, 1, fp);
-//        printf("mode: %d\n", data->header.mode);
+//        log_debug("mode: %d\n", data->header.mode);
 //        xfread(&(data->header.counter_size), 4, 1, fp);
-//        printf("counter size: %d\n", data->header.counter_size);
+//        log_debug("counter size: %d\n", data->header.counter_size);
 //        xfread(&(data->header.lut_prefix_length), 4, 1, fp);
-//        printf("lut prefix len: %d\n", data->header.lut_prefix_length);
+//        log_debug("lut prefix len: %d\n", data->header.lut_prefix_length);
 //        xfread(&(data->header.min_count), 4, 1, fp);
-//        printf("min count : %d\n", data->header.min_count);
+//        log_debug("min count : %d\n", data->header.min_count);
 //        xfread(&(data->header.max_count), 4, 1, fp);
-//        printf("max count : %d\n", data->header.max_count);
+//        log_debug("max count : %d\n", data->header.max_count);
 //        xfread(&(data->header.total_kmers), 8, 1, fp);
-//        printf("total kmer load: %lld\n", data->header.total_kmers);
+//        log_debug("total kmer load: %lld\n", data->header.total_kmers);
 //        fclose(fp);
 	}else {
-	    __ERROR("wrong format file kmc read prefix\n");
+	    log_error("wrong format file kmc read prefix");
 	}
 }
 
