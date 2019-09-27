@@ -114,12 +114,12 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 	memcpy(buf + len, r->name, tlen);
 	len += tlen;
 	if (rI->seq != NULL) {
-		buf[len++] = '\t';
+		buf[len++] = ' ';
 		memcpy(buf + len, "BX:Z:", 5);
 		len += 5;
 		memcpy(buf + len, rI->seq, rI->len);
 		len += rI->len;
-		buf[len++] = '\t';
+		buf[len++] = ' ';
 		memcpy(buf + len, "QB:Z:", 5);
 		len += 5;
 		if (input_format == TYPE_FASTQ && rI->qual != NULL) {
