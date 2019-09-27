@@ -18,10 +18,11 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
          -I ./src  -fPIC -g 
+         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
 
 EXEC = skipping
 
-EXEC_RELEASE = /src/skipping_static
+EXEC_RELEASE = skipping_static
 
 # SRC = $(wildcard src/*.c)
 
@@ -98,6 +99,11 @@ release: LIBS = -pthread -static -O3 -std=c++11 \
        -lpthread KMC/libkmc.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm 
+       libs/zlib/libz.a libs/bwa/libbwa.a \
+       -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a
+release: CC = gcc 
+release: CXX = g++
+>>>>>>> edit make file
 release: $(EXEC_RELEASE)
 
 .PHONY: clean
