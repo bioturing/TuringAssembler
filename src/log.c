@@ -142,8 +142,8 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-			usr_time/60, ru_ixrss);
+		fprintf(L.fp, "%s %-5s %s:%d:\t%ld\t%uMB\t", buf, level_names[level], file, line,
+			usr_time, ru_ixrss);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -165,11 +165,11 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
 #ifdef LOG_USE_COLOR
 		fprintf(
-      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%.2f\t%ldMB\t",
-      buf, level_colors[level], level_names[level], file, line,  usr_time/60, ru_ixrss);
+      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%ld\t%uMB\t",
+      buf, level_colors[level], level_names[level], file, line,  usr_time, ru_ixrss);
 #else
-		fprintf(stderr, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-		        usr_time/60, ru_ixrss);
+		fprintf(stderr, "%s %-5s %s:%d:\t%ld\t%uMB\t", buf, level_names[level], file, line,
+		        usr_time, ru_ixrss);
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
