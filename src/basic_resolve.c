@@ -173,7 +173,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 					if (g0->nodes[v].deg != 1) {
 						fprintf(stderr, "Node %ld, deg = %ld\n",
 							v, g0->nodes[v].deg);
-						log_error("Middle node degree is not equal to 1");
+						log_debug("Middle node degree is not equal to 1");
 						assert(0 && "Middle node degree is not equal to 1");
 					}
 					e = g0->nodes[v].adj[0];
@@ -346,7 +346,7 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 	}
 	free(d);
 	free(degs);
-	log_error("Number of tips remove using graph topology: %ld", cnt_removed);
+	log_debug("Number of tips remove using graph topology: %ld", cnt_removed);
 	return cnt_removed;
 }
 
@@ -403,7 +403,7 @@ gint_t remove_tips(struct asm_graph_t *g)
 			}
 		}
 	}
-	log_error("Number of trivial tips removed: %ld", cnt_removed);
+	log_debug("Number of trivial tips removed: %ld", cnt_removed);
 	return cnt_removed;
 }
 
@@ -448,7 +448,7 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 			++cnt_removed;
 		}
 	}
-	log_error("Number of chimeric edge removed: %ld", cnt_removed);
+	log_debug("Number of chimeric edge removed: %ld", cnt_removed);
 	return cnt_removed;
 }
 
@@ -604,7 +604,7 @@ gint_t unroll_simple_loop(struct asm_graph_t *g)
 		cnt_double += (ret == 3);
 		cnt_false += (ret == -1);
 	}
-	log_error("Number of unroll: self loop (%ld), self loop reverse (%ld), double loop (%ld), false loop (%ld)",
+	log_debug("Number of unroll: self loop (%ld), self loop reverse (%ld), double loop (%ld), false loop (%ld)",
 		cnt_self, cnt_self_rv, cnt_double, cnt_false);
 	return cnt_self + cnt_self_rv + cnt_double + cnt_false;
 }
@@ -718,7 +718,7 @@ gint_t resolve_simple_bubble(struct asm_graph_t *g)
 			continue;
 		cnt_collapsed += check_simple_bubble(g, e);
 	}
-	log_error("Number of collapsed bubble: %ld", cnt_collapsed);
+	log_debug("Number of collapsed bubble: %ld", cnt_collapsed);
 	return cnt_collapsed;
 }
 
@@ -731,7 +731,7 @@ gint_t resolve_align_bubble(struct asm_graph_t *g)
 			continue;
 		cnt_collapsed += check_align_bubble(g, e);
 	}
-	log_error("Number of collapsed aligned bubble: %ld", cnt_collapsed);
+	log_debug("Number of collapsed aligned bubble: %ld", cnt_collapsed);
 	return cnt_collapsed;
 }
 
@@ -740,7 +740,7 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
 	int iter = 0;
 	do {
-		log_error("Iteration [%d]", ++iter);
+		log_debug("Iteration [%d]", ++iter);
 		cnt_tips = cnt_tips_complex = cnt_chimeric = 0;
 
 		cnt_tips = remove_tips(g0);
@@ -780,7 +780,7 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
 	int iter = 0;
 	do {
-		log_error("Iteration [%d]", ++iter);
+		log_debug("Iteration [%d]", ++iter);
 		cnt_tips = cnt_tips_complex = cnt_chimeric = 0;
 
 		cnt_tips = remove_tips(g0);
@@ -880,12 +880,12 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 //		return 0;
 	float cov_e2 = __get_edge_cov(e2, g->ksize);
 	float cov_e4 = __get_edge_cov(e4, g->ksize);
-	log_error("cov e2 %f e4 %f e4len %d", cov_e2, cov_e4, e4->seq_len);
+	log_debug("cov e2 %f e4 %f e4len %d", cov_e2, cov_e4, e4->seq_len);
 	if (cov_e2 < cov_e4)
 		return 0;
 	if (e4->seq_len > 200)
 		return 0;
-	log_error("check cov ok");
+	log_debug("check cov ok");
 	asm_remove_edge(g, i_e4);
 	int i_e4_rc = g->edges[i_e4].rc_id;
 	asm_remove_edge(g, i_e4_rc);
@@ -898,7 +898,7 @@ int resolve_loop(struct asm_graph_t *g0)
 	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++) if (g0->edges[i_e2].source != -1) {
 		count += check_loop(g0, i_e2);
 	}
-	log_error("remove %d loop", count);
+	log_debug("remove %d loop", count);
 	return count;
 }
 
