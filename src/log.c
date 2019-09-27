@@ -38,6 +38,8 @@
 
 #define __min(a, b) 		((a) < (b) ? (a) : (b))
 
+#define LOG_PADDING 30
+
 static struct {
     void *udata;
     log_LockFn lock;
@@ -118,31 +120,26 @@ void log_set_quiet(int enable)
 	L.quiet = enable ? 1 : 0;
 }
 
-unsigned int mem()
-{
-	unsigned int memTotal, memFree, buffers, cached;
-	FILE * const file = fopen( "/proc/meminfo", "r" ); //only available for UNIX
-	fscanf(file, "%*19s %i %*2s %*19s %i %*2s %*[^\n]\n %*19s %i %*2s %*19s %i", &memTotal, &memFree, &buffers, &cached);
-	fclose(file);
-	return ((memTotal - memFree) - (buffers + cached)) / 1024;
-}
-
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	/* Get current time */
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
-	unsigned int ru_ixrss = mem(); /* Integral shared memory */
+	char src_code[LOG_PADDING];
 
 	/* Get used time and memory */
-	getrusage(RUSAGE_SELF, L.usage);
+	getrusage(RUSAGE_SELF, L.usage); /* Get resource usage */
 	time_t usr_time = t - L.start_time;
 
 	/* Log to file . Always log to file*/
+	sprintf(src_code, "%s:%d", file, line);
+	int l = strlen(src_code);
+	memset(src_code + l, ' ', LOG_PADDING - l - 1);
+	src_code[LOG_PADDING - 1] = '\0';
 	if (L.fp) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s:%d:\t%ld\t%uMB\t", buf, level_names[level], file, line,
+		fprintf(L.fp, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
 			usr_time, ru_ixrss);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
@@ -165,10 +162,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
 #ifdef LOG_USE_COLOR
 		fprintf(
-      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%ld\t%uMB\t",
-      buf, level_colors[level], level_names[level], file, line,  usr_time, ru_ixrss);
+      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s\x1b[0m\t%ld seconds\t%uMB\t",
+      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_ixrss);
 #else
-		fprintf(stderr, "%s %-5s %s:%d:\t%ld\t%uMB\t", buf, level_names[level], file, line,
+		fprintf(stderr, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
 		        usr_time, ru_ixrss);
 #endif
 		va_start(args, fmt);
