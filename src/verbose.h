@@ -52,6 +52,10 @@
 
 #define __VERBOSE_LOG(tag, fmt, args...)
 
+#define __LOG(tag, fmt, args...) do {				       \
+	log_write("[" tag "] " fmt, ##args);					       \
+} while (0) /* LOG */
+
 #define __VERBOSE(fmt, args...) do {					       \
 	fprintf(stderr, fmt, ##args);					       \
 	fflush(stderr);							       \

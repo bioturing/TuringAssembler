@@ -7,6 +7,7 @@
 #include "resolve.h"
 #include "utils.h"
 #include "log.h"
+#include "io_utils.h"
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
@@ -793,7 +794,7 @@ int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 	struct edge_map_info_t emap2 = {0};
 	get_local_edge_head(*g, *lg, e2, &emap2);
 
-	if (emap1.lc_e == emap2.lc_e)
+	if (emap1.lc_e == emap2.lc_e || emap1.lc_e == -1 || emap2.lc_e == -1)
 		return 1;
 	return 0;
 }
@@ -813,7 +814,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 
 	struct scaffold_record_t scaffold;
 	struct query_record_t query_record;
-	FILE *fp = fopen(opt->in_fasta, "r");
+	FILE *fp = xfopen(opt->in_fasta, "r");
 	int n_paths;
 	fscanf(fp, "%d\n", &n_paths); /* Total number of paths in the scaffolds */
 	scaffold.n_paths = n_paths;
@@ -860,6 +861,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	}
 	query_record.process_pos = 0;
 	fclose(fp);
+	__LOG("PROGRESS", "Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
@@ -917,6 +919,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		for (int j = 1; j < path_lens[i]; ++j){
 			fprintf(f, "%s", bridges[p] +
 					g0->edges[paths[i][j - 1]].seq_len);
+			//printf(">hao\n%s\n", bridges[p]);
 			++p;
 		}
 		free(seq);
@@ -969,7 +972,6 @@ void *build_bridge_iterator(void *data)
 		struct asm_graph_t *g = bundle->g;
 		char *seq;
 		int seq_len;
-
 		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
 			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
 			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
@@ -994,10 +996,6 @@ void *build_bridge_iterator(void *data)
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)
 {
-	char marker[1024];
-	sprintf(marker, "%s/done", opt->out_dir);
-	if (access(marker, F_OK) != -1)
-		return;
 	struct read_path_t read_sorted_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
 		read_sorted_path.R1_path = opt->files_1[0];
@@ -1023,11 +1021,18 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 			log_debug("Too complex region, continue");
 			continue;
 		}
+		char marker[1024];
+		sprintf(marker, "%s/local_assembly_%d_%d/done_%d", opt->out_dir,
+				g->edges[e1].rc_id, e2, opt->lk);
+		if (access(marker, F_OK) != -1){
+			log_debug("Graph is already built, continuing");
+			continue;
+		}
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
 				e2, dict);
 		asm_graph_destroy(&lg);
+		fclose(fopen(marker, "w"));
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
-	fclose(fopen(marker, "w"));
 }

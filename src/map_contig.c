@@ -242,6 +242,14 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 		if (end_point[i] > end_point[local->end])
 			local->end = i;
 	}
+	/*int diff = global->end - global->start;
+	for (int i = 0; i < (int) best_match.seq_len; ++i){
+		int p = local->start + diff;
+		if (end_point[i] > end_point[local->end] ||
+			(end_point[i] == end_point[local->end] &&
+			 	abs(i - p) < abs(local->end - p)))
+			local->end = i;
+	}*/
 	free(local_seq);
 	kh_destroy(kmer_int, global_start);
 	kh_destroy(kmer_int, global_end);
