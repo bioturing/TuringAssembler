@@ -49,7 +49,7 @@ void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 	resolve_local_graph_operation(g0, g);
 	// remove_tips(g0, g);
 	test_asm_graph(g);
-	log_info"Build graph level 1 time: %.3f", sec_from_prev_time());
+	log_info("Build graph level 1 time: %.3f", sec_from_prev_time());
 }
 
 void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
