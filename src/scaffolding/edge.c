@@ -188,7 +188,7 @@ void print_edge_score(struct edges_score_type *edges_score)
 {
 	for (int i = 0; i < edges_score->n_edge; i++) {
 		struct scaffold_edge *edge = &edges_score->list_edge[i];
-		VERBOSE_FLAG(0, "edges score %d %d %f %f share_bc %f\n", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
+		VERBOSE_FLAG(2, "edges score %d %d %f %f share_bc %f\n", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
 	}
 }
 
