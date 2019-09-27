@@ -130,19 +130,19 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 //
 //        fseek(fp, -header_offset - 8, SEEK_END);
 //        xfread(&(data->header.kmer_length), 4, 1, fp);
-//        log_debug("kmer length load: %d\n", data->header.kmer_length);
+//        log_debug("kmer length load: %d", data->header.kmer_length);
 //        xfread(&(data->header.mode), 4, 1, fp);
-//        log_debug("mode: %d\n", data->header.mode);
+//        log_debug("mode: %d", data->header.mode);
 //        xfread(&(data->header.counter_size), 4, 1, fp);
-//        log_debug("counter size: %d\n", data->header.counter_size);
+//        log_debug("counter size: %d", data->header.counter_size);
 //        xfread(&(data->header.lut_prefix_length), 4, 1, fp);
-//        log_debug("lut prefix len: %d\n", data->header.lut_prefix_length);
+//        log_debug("lut prefix len: %d", data->header.lut_prefix_length);
 //        xfread(&(data->header.min_count), 4, 1, fp);
-//        log_debug("min count : %d\n", data->header.min_count);
+//        log_debug("min count : %d", data->header.min_count);
 //        xfread(&(data->header.max_count), 4, 1, fp);
-//        log_debug("max count : %d\n", data->header.max_count);
+//        log_debug("max count : %d", data->header.max_count);
 //        xfread(&(data->header.total_kmers), 8, 1, fp);
-//        log_debug("total kmer load: %lld\n", data->header.total_kmers);
+//        log_debug("total kmer load: %lld", data->header.total_kmers);
 //        fclose(fp);
 	}else {
 	    log_error("wrong format file kmc read prefix");

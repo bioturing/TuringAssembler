@@ -569,23 +569,23 @@ int check_2_2_high_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov
 		if (check_barcode_superior(g, legs[1], legs[3], legs[2]) == 0 ||
 			check_barcode_superior(g, legs[2], legs[0], legs[1]) == 0 ||
 			check_barcode_superior(g, legs[3], legs[1], legs[0]) == 0) {
-			log_debug("[High strict 1] Not enough condition for superior pairs %ld %ld\n", e, e_rc);
+			log_debug("[High strict 1] Not enough condition for superior pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 0) {
-			log_debug("[High strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[High strict 1] Contradict condition for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
 			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
-			log_debug("[High strict 1] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[High strict 1] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[High strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[High strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
-		log_debug("[High strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[High strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -599,23 +599,23 @@ int check_2_2_high_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov
 		if (check_barcode_superior(g, legs[1], legs[2], legs[3]) == 0 ||
 			check_barcode_superior(g, legs[2], legs[1], legs[0]) == 0 ||
 			check_barcode_superior(g, legs[3], legs[0], legs[1]) == 0) {
-			log_debug("[High strict 2] Not enough condition for superior pairs %ld %ld\n", e, e_rc);
+			log_debug("[High strict 2] Not enough condition for superior pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 0) {
-			log_debug("[High strict 2] Contradict for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[High strict 2] Contradict for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
 			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
-			log_debug("[High strict 2] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[High strict 2] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[High strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[High strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
-		log_debug("[High strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[High strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -665,23 +665,23 @@ int check_2_2_med_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			check_barcode_greater(g, legs[1], legs[2], legs[3]) == 1 ||
 			check_barcode_greater(g, legs[2], legs[1], legs[0]) == 1 ||
 			check_barcode_greater(g, legs[3], legs[0], legs[1]) == 1) {
-			log_debug("[Med strict 1] Contradict pair chosen %ld %ld\n", e, e_rc);
+			log_debug("[Med strict 1] Contradict pair chosen %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 0) {
-			log_debug("[Med strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[Med strict 1] Contradict condition for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
 			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
-			log_debug("[Med strict 1] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[Med strict 1] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[Med strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Med strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
-		log_debug("[Med strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Med strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -699,23 +699,23 @@ int check_2_2_med_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 			check_barcode_greater(g, legs[1], legs[3], legs[2]) == 1 ||
 			check_barcode_greater(g, legs[2], legs[0], legs[1]) == 1 ||
 			check_barcode_greater(g, legs[3], legs[1], legs[0]) == 1) {
-			log_debug("[Med strict 2] Constradict pair chosen %ld %ld\n", e, e_rc);
+			log_debug("[Med strict 2] Constradict pair chosen %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 0) {
-			log_debug("[Med strict 2] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[Med strict 2] Contradict condition for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
 			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
-			log_debug("[Med strict 2] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[Med strict 2] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[Med strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Med strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
-		log_debug("[Med strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Med strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -761,23 +761,23 @@ int check_2_2_low_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		check_barcode_positive(g, legs[1], legs[3]) == 1) {
 		if (check_barcode_positive(g, legs[0], legs[3]) == 1 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 1) {
-			log_debug("[Low strict 1] Contradict pair chosen %ld %ld\n", e, e_rc);
+			log_debug("[Low strict 1] Contradict pair chosen %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[2]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 0) {
-			log_debug("[Med strict 1] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[Med strict 1] Contradict condition for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[2], rcov[0], rcov[2]) ||
 			!__check_coverage(fcov[1], fcov[3], rcov[1], rcov[3])) {
-			log_debug("[Low strict 1] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[Low strict 1] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[Low strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Low strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
-		log_debug("[Low strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Low strict 1] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -791,23 +791,23 @@ int check_2_2_low_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		check_barcode_positive(g, legs[1], legs[2]) == 1) {
 		if (check_barcode_positive(g, legs[0], legs[2]) == 1 ||
 			check_barcode_positive(g, legs[1], legs[3]) == 1) {
-			log_debug("[Low strict 2] Contradict pair chosen %ld %ld\n", e, e_rc);
+			log_debug("[Low strict 2] Contradict pair chosen %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (check_barcode_positive(g, legs[0], legs[3]) == 0 ||
 			check_barcode_positive(g, legs[1], legs[2]) == 0) {
-			log_debug("[Low strict 2] Contradict condition for positive pairs %ld %ld\n", e, e_rc);
+			log_debug("[Low strict 2] Contradict condition for positive pairs %ld %ld", e, e_rc);
 			return 0;
 		}
 		if (!__check_coverage(fcov[0], fcov[3], rcov[0], rcov[3]) ||
 			!__check_coverage(fcov[1], fcov[2], rcov[1], rcov[2])) {
-			log_debug("[Low strict 2] Incompatible coverage range %ld(%ld)\n", e, e_rc);
+			log_debug("[Low strict 2] Incompatible coverage range %ld(%ld)", e, e_rc);
 			return 0;
 		}
-		log_debug("[Low strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Low strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[0]].rc_id, legs[0], e, e_rc,
 			legs[3], g->edges[legs[3]].rc_id);
-		log_debug("[Low strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+		log_debug("[Low strict 2] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 			g->edges[legs[1]].rc_id, legs[1], e, e_rc,
 			legs[2], g->edges[legs[2]].rc_id);
 		asm_join_edge3(g, g->edges[legs[0]].rc_id, legs[0], e, e_rc,
@@ -878,11 +878,11 @@ int check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				continue;
 			et1 = bc_find_pair(g, e2, legs1, n_leg1);
 			if (et1 != -1 && et1 != e1) {
-				log_debug("[n-m Edge] Not best pair: (%ld, %ld) <-> %ld\n", e1, et1, e2);
+				log_debug("[n-m Edge] Not best pair: (%ld, %ld) <-> %ld", e1, et1, e2);
 				continue;
 			}
 			add_count = g->edges[e].count * (fcov1 + fcov2) / 2.0 / e_cov;
-			log_debug("[n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+			log_debug("[n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 				g->edges[e1].rc_id, e1, e, e_rc, e2, g->edges[e2].rc_id);
 			gint_t etmp = g->edges[e1].rc_id;
 			asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
@@ -918,7 +918,7 @@ int check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 				__check_coverage(fcov2, e_cov, rcov2, e_rcov)) {
 			// if (check_barcode_positive(g, e1, e2) &&
 			// 	__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
-				log_debug("n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)\n",
+				log_debug("n-m Edge] Join %ld(%ld) <-> %ld(%ld) <-> %ld(%ld)",
 					g->edges[e1].rc_id, e1, e, e_rc, e2, g->edges[e2].rc_id);
 				asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 					e2, g->edges[e2].rc_id, g->edges[e].count);
@@ -992,10 +992,10 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 				continue;
 			et1 = bc_find_pair(g, e2, legs1, n_leg1);
 			if (et1 != -1 && et1 != e1) {
-				log_debug("[n-m Node] Not best pair: (%ld, %ld) <-> %ld\n", e1, et1, e2);
+				log_debug("[n-m Node] Not best pair: (%ld, %ld) <-> %ld", e1, et1, e2);
 				continue;
 			}
-			log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)\n",
+			log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)",
 				g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 			n_leg1 -= remove_array_element(legs1, n_leg1, e1);
@@ -1015,7 +1015,7 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 			g->edges[e2].seq_len >= MIN_CONTIG_READPAIR) {
 			if (check_barcode_positive(g, e1, e2) && __check_coverage(fcov1, fcov2, rcov1, rcov2)) {
-				log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)\n",
+				log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)",
 					g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				++ret;
@@ -1024,7 +1024,7 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 			}
 		} else {
 			if (__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
-				log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)\n",
+				log_debug("[n-m Node] Join %ld(%ld) <-> %ld(%ld)",
 					g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 				++ret;
@@ -1091,11 +1091,11 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 				continue;
 			et1 = bc_find_pair_check_path(g, set_e, e2, set_leg);
 			if (et1 != -1 && e1 != et1) {
-				log_debug("[Small Jungle] Not best pair (%ld, %ld) <-> %ld\n",
+				log_debug("[Small Jungle] Not best pair (%ld, %ld) <-> %ld",
 					e1, et1, e2);
 				continue;
 			}
-			log_debug("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)\n",
+			log_debug("[Small Jungle] Join %ld(%ld) <-> %ld(%ld)",
 				g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
 			asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
 				e2, g->edges[e2].rc_id, 50);
@@ -1174,7 +1174,7 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 			e1 = g->nodes[u_rc].adj[j];
 	}
 	if (e_return_rc != g->edges[e_return].rc_id) {
-		log_debug("Something happens\n");
+		log_debug("Something happens");
 		return 0;
 	}
 	double fcov_e, fcov_e_return;
@@ -1187,7 +1187,7 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 	// rep = __min(rep, 2);
 	if (rep <= 0) {
 		if (g->edges[e_return].seq_len < MIN_NOTICE_LEN || fcov_e < fcov_e_return) {
-			log_debug("[Loop] Remove edge %ld(%ld)\n", e_return, e_return_rc);
+			log_debug("[Loop] Remove edge %ld(%ld)", e_return, e_return_rc);
 			asm_remove_edge(g, e_return);
 			asm_remove_edge(g, e_return_rc);
 			return 1;
@@ -1195,7 +1195,7 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 			rep = 1;
 		}
 	}
-	log_debug("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d\n",
+	log_debug("[Loop] Unroll %ld(%ld) <-> %ld(%ld) <-> %ld(%ld) rep = %d",
 		e, e_rc, e_return, e_return_rc, e, e_rc, rep);
 	asm_unroll_loop_forward(g, e, e_return, rep);
 	asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
@@ -1225,14 +1225,14 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 		flag3 = check_barcode_positive(g, e1, e2);
 
 	if ((flag1 && flag2) || (flag3 && (flag1 || flag2 || g->edges[e].seq_len < MIN_NOTICE_LEN))) {
-		log_debug("[Loop] Join\n");
+		log_debug("[Loop] Join");
 		asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
 				e2, g->edges[e2].rc_id, g->edges[e].count);
 		asm_remove_edge(g, e);
 		asm_remove_edge(g, e_rc);
 		return 1;
 	} else {
-		log_debug("[Loop] Break\n");
+		log_debug("[Loop] Break");
 		if (!flag1)
 			isolate_edge(g, e);
 		if (!flag2)
@@ -1263,7 +1263,7 @@ gint_t resolve_2_2_bridge_high_strict(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_debug("Number of joined 2-2 bridge (using barcode highly strict): %ld\n", cnt);
+	log_debug("Number of joined 2-2 bridge (using barcode highly strict): %ld", cnt);
 	return cnt;
 }
 
@@ -1287,7 +1287,7 @@ gint_t resolve_2_2_bridge_med_strict(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_debug("Number of joined 2-2 bridge (using barcode med strict): %ld\n", cnt);
+	log_debug("Number of joined 2-2 bridge (using barcode med strict): %ld", cnt);
 	return cnt;
 }
 
@@ -1311,7 +1311,7 @@ gint_t resolve_2_2_bridge_low_strict(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_debug("Number of joined 2-2 bridge (using barcode med strict): %ld\n", cnt);
+	log_debug("Number of joined 2-2 bridge (using barcode med strict): %ld", cnt);
 	return cnt;
 }
 
@@ -1335,7 +1335,7 @@ gint_t collapse_n_m_bridge(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_debug("Number of joined n-m bridge: %ld\n", cnt);
+	log_debug("Number of joined n-m bridge: %ld", cnt);
 	return cnt;
 }
 
@@ -1350,7 +1350,7 @@ gint_t collapse_n_m_node(struct asm_graph_t *g)
 			cnt_local += check_n_m_node(g, u, uni_cov);
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_debug("Number of joined n-m node: %ld\n", cnt);
+	log_debug("Number of joined n-m node: %ld", cnt);
 	return cnt;
 }
 
@@ -1388,7 +1388,7 @@ void resolve_simple_complex(struct asm_graph_t *g)
 		kh_clear(gint, set_v);
 		kh_clear(gint, set_self);
 	}
-	log_debug("Number of joined 1-1 pair(s) through jungle: %ld\n", ret);
+	log_debug("Number of joined 1-1 pair(s) through jungle: %ld", ret);
 }
 
 void resolve_n_m_simple(struct asm_graph_t *g0, struct asm_graph_t *g)
@@ -1456,7 +1456,7 @@ void resolve_complex(struct asm_graph_t *g, struct asm_graph_t *gd)
 		kh_clear(gint, set_v);
 		kh_clear(gint, set_self);
 	}
-	log_debug("Number of joined pair(s) through jungle: %ld\n", ret);
+	log_debug("Number of joined pair(s) through jungle: %ld", ret);
 	asm_condense(g, gd);
 }
 
@@ -1850,7 +1850,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 			}
 		}
 	}
-	log_debug( "Candidate %u, len: %u\n", id, sum_len + g->ksize);
+	log_debug( "Candidate %u, len: %u", id, sum_len + g->ksize);
 	e2_len = __min(g->edges[e2].seq_len, 200);
 	for (k = g->ksize; k < e2_len; ++k) {
 		buf[buf_len++] = nt4_char[__binseq_get(g->edges[e2].seq, k)];
@@ -2223,7 +2223,7 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 	}
 	count_readpair_path(opt->n_threads, opt->read_path, fasta_path, ctg_cnt);
 
-	log_debug( "Testing path on local graph\n");
+	log_debug( "Testing path on local graph");
 	int best_cnt, best_len, best_cand;
 	best_cnt = 0;
 	best_len = 0;
@@ -2240,7 +2240,7 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		}
-		log_debug( "Candidate %ld with %d counts!\n", kh_key(ctg_cnt, k),
+		log_debug( "Candidate %ld with %d counts!", kh_key(ctg_cnt, k),
 			kh_value(ctg_cnt, k));
 	}
 	dfs_opt.max_cnt = best_cand;
@@ -2272,33 +2272,33 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 {
 	int ksize, ret, i;
 	ret = 0;
-	log_debug( "Find path local assembly %ld(%ld) <-> %ld(%ld)\n",
+	log_debug( "Find path local assembly %ld(%ld) <-> %ld(%ld)",
 		g0->edges[e1].rc_id, e1, e2, g0->edges[e2].rc_id);
 	khash_t(graph_index) *kdict = kh_init(graph_index);
 	ksize = __min(g->ksize, 31);
 	build_local_graph_index(g, kdict, ksize);
 	gint_t e1_rc = g0->edges[e1].rc_id;
 	struct seq_path_t ep1, ep2;
-	log_debug("Find path for e1\n");
+	log_debug("Find path for e1");
 	find_path_on_graph(g, kdict, ksize, g0->edges[e1_rc].seq, g0->edges[e1_rc].seq_len, &ep1);
 	if (ep1.len == 0) {
-		log_debug( "e1: null path\n");
+		log_debug( "e1: null path");
 	} else {
-		log_debug("ep1.len = %d\n", ep1.len);
-		log_debug( "e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d\n",
+		log_debug("ep1.len = %d", ep1.len);
+		log_debug( "e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d",
 			ep1.e0_beg, ep1.en_end, ep1.seq_beg, ep1.seq_end);
 		for (i = 0; i < ep1.len; ++i) {
 			fprintf(stderr, "%ld, ", ep1.seq[i]);
 		}
 		fprintf(stderr, "\n");
 	}
-	log_debug("Find path for e2\n");
+	log_debug("Find path for e2");
 	find_path_on_graph(g, kdict, ksize, g0->edges[e2].seq, g0->edges[e2].seq_len, &ep2);
 	if (ep2.len == 0) {
-		log_debug("e2: null path\n");
+		log_debug("e2: null path");
 	} else {
-		log_debug("ep2.len = %d\n", ep2.len);
-		log_debug("e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d\n",
+		log_debug("ep2.len = %d", ep2.len);
+		log_debug("e0_beg = %d; en_end = %d; seq_beg = %d; seq_end = %d",
 			ep2.e0_beg, ep2.en_end, ep2.seq_beg, ep2.seq_end);
 		for (i = 0; i < ep2.len; ++i) {
 			fprintf(stderr, "%ld, ", ep2.seq[i]);
@@ -2313,9 +2313,9 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 		sret->trim_e1 = g0->edges[e1].seq_len - ep1.seq_end - 1;
 		sret->trim_e2 = ep2.seq_beg;
 		get_sub_edge(g->edges[ep2.seq[0]].seq, ep1.en_end + 1, ep2.e0_beg, &(sret->seq), &(sret->len));
-		log_debug("trim_e1 = %d; trim_e2 = %d; len = %d\n",
+		log_debug("trim_e1 = %d; trim_e2 = %d; len = %d",
 			sret->trim_e1, sret->trim_e2, sret->len);
-		log_debug("Easy peasy case %ld <-> %ld: success\n", e1, e2);
+		log_debug("Easy peasy case %ld <-> %ld: success", e1, e2);
 		ret = 1;
 	} else {
 		sret->trim_e1 = g0->edges[e1].seq_len - ep1.seq_end - 1;
@@ -2334,11 +2334,11 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 		ret = find_best_local_path(opt, g, ep1.seq[ep1.len - 1], ep2.seq[0],
 			sub_e1, sub_e2, sret);
 		if (ret == 1)
-			log_debug( "Found path: %ld <-> %ld\n", e1, e2);
+			log_debug( "Found path: %ld <-> %ld", e1, e2);
 		else if (ret == 2)
-			log_debug( "Too many path:  %ld <-> %ld\n", e1, e2);
+			log_debug( "Too many path:  %ld <-> %ld", e1, e2);
 		else if (ret == -1)
-			log_debug( "No path:  %ld <-> %ld\n", e1, e2);
+			log_debug( "No path:  %ld <-> %ld", e1, e2);
 	}
 fill_path_clean:
 	free(ep1.seq);
@@ -2415,7 +2415,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	count_readpair_path(opt->n_threads, &local_read, fasta_path, ctg_cnt);
 	destroy_read_path(&local_read);
 	
-	log_debug( "Testing local path %ld <-> %ld\n", e1, e2);
+	log_debug( "Testing local path %ld <-> %ld", e1, e2);
 	int best_cnt, best_len, best_cand;
 	best_cnt = 0;
 	best_len = 0;
@@ -2432,7 +2432,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		}
-		log_debug( "Candidate %ld with %d counts!\n", kh_key(ctg_cnt, k),
+		log_debug( "Candidate %ld with %d counts!", kh_key(ctg_cnt, k),
 			kh_value(ctg_cnt, k));
 	}
 	dfs_opt.max_cnt = best_cand;
@@ -2443,7 +2443,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	struct result_local_t sret;
 	reconstruct_path(g, dfs_opt.list_e, dfs_opt.n_e, &sret);
 	correct_local_path(g, &sret);
-	log_debug( "Middle part len: %d\n", sret.len);
+	log_debug( "Middle part len: %d", sret.len);
 	asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
 		sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
 	free(sret.seq);
@@ -2633,7 +2633,7 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 	kh_destroy(gint, set_e);
 	kh_destroy(gint, set_v);
 	kh_destroy(gint, set_self);
-	log_debug("Number of joined pair(s) through jungle: %ld\n", ret);
+	log_debug("Number of joined pair(s) through jungle: %ld", ret);
 }
 
 

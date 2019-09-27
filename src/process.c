@@ -192,7 +192,7 @@ void graph_query_process(struct opt_proc_t *opt)
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
 		} else if (c == 'P') {
-			log_info("Building local graph\n");
+			log_info("Building local graph");
 			fscanf(fp, "%ld\n", &v);
 			struct asm_graph_t lg = test_local_assembly(opt, g0,
 							g0->edges[u].rc_id, v);

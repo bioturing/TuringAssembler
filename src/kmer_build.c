@@ -87,9 +87,9 @@ void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, 
 	int word_size = (ksize + 3) >> 2;
 	// char *s = alloca(ksize + 2);
 	// dump_kmer(kedge, ksize + 1, s);
-	// log_debug("kedge = %s\n", s);
+	// log_debug("kedge = %s", s);
 	// if (s[0] != 'A')
-	// 	log_debug("ok kmer = %s\n", s);
+	// 	log_debug("ok kmer = %s", s);
 	uint8_t *k1, *k2, *k1_rc, *k2_rc;
 	kmint_t ik1, ik2;
 	int c1, c2;
@@ -110,7 +110,7 @@ void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, 
 	c2 = (kedge[ksize >> 2] >> ((ksize & 0x3) << 1)) ^ 0x3;
 	// assert(c2 == (nt4_table[(int)s[0]] ^ 3));
 	// if (c2 != 3)
-	// 	log_debug("c1 = %d; c2 = %d\n", c1, c2);
+	// 	log_debug("c1 = %d; c2 = %d", c1, c2);
 	if (km_cmp(k1, k1_rc, word_size) <= 0) {
 		kmhash_set_adj_multi(h, k1, c1, h->locks + thread_no);
 		// ik1 = kmhash_put(h, k1);
@@ -301,7 +301,7 @@ static void *build_graph_worker(void *data)
 	krev = alloca(word_size);
 	cur_knum = alloca(word_size);
 	cur_krev = alloca(word_size);
-	// log_debug("it_l = %ld; it_r = %ld\n", it_l, it_r);
+	// log_debug("it_l = %ld; it_r = %ld", it_l, it_r);
 
 	kmint_t i, k;
 	for (i = it_l; i < it_r; ++i) {
@@ -423,7 +423,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 		adj_rv = KMHASH_ADJ(h, i) >> 4;
 		deg_fw = __bin_degree4(adj_fw);
 		deg_rv = __bin_degree4(adj_rv);
-		// log_debug("deg_fw = %d; deg_rv = %d\n", deg_fw, deg_rv);
+		// log_debug("deg_fw = %d; deg_rv = %d", deg_fw, deg_rv);
 		if (deg_fw == 1 && deg_rv == 1)
 			continue;
 		n_e += (deg_fw + deg_rv);

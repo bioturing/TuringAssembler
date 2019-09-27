@@ -18,7 +18,7 @@ struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int 
 	assert(rev_i0 < g->n_e);
 	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
 	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
-	log_trace("len e0, e1: %d %d \n" , e0_len, e1_len);
+	log_trace("len e0, e1: %d %d " , e0_len, e1_len);
 
 	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
 	float cov_e1 = __get_edge_cov(e1, g->ksize);
@@ -90,7 +90,7 @@ void build_V_from_E(struct scaffold_edge *listE, int n_e, int **listV, int *n_v)
 	*listV = NULL; 
 	*n_v = 0;
 	for (int i = 0; i < n_e; i++) {
-		log_trace("listE edges: %d %d BBBB\n", listE[i].src, listE[i].des);
+		log_trace("listE edges: %d %d BBBB", listE[i].src, listE[i].des);
 
 		++(*n_v);
 		int t = (*n_v)*sizeof(int);
@@ -188,7 +188,7 @@ void print_edge_score(struct edges_score_type *edges_score)
 {
 	for (int i = 0; i < edges_score->n_edge; i++) {
 		struct scaffold_edge *edge = &edges_score->list_edge[i];
-		log_debug("edges score %d %d %f %f share_bc %f\n", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
+		log_debug("edges score %d %d %f %f share_bc %f", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
 	}
 }
 
