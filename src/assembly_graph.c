@@ -1139,15 +1139,15 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
+	log_debug("Writing asm_node_t, number of nodes: %d", g->n_v);
 	for (u = 0; u < g->n_v; ++u) {
-		log_debug("Writing asm_node_t, number of nodes: %d", g->n_v);
 		xfwrite(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfwrite(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
 		if (g->nodes[u].deg)
 			xfwrite(g->nodes[u].adj, sizeof(gint_t), g->nodes[u].deg, fp);
 	}
+	log_debug("Writing asm_edge_t, number of edges: %d", g->n_e);
 	for (e = 0; e < g->n_e; ++e) {
-		log_debug("Writing asm_edge_t, number of edges: %d", g->n_e);
 		xfwrite(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfwrite(&g->edges[e].target, sizeof(gint_t), 1, fp);
 		if (g->edges[e].source == -1)
@@ -1164,8 +1164,8 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* save the barcode information */
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
-		log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
@@ -1185,8 +1185,8 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 		}
 	}
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
-		log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 		for (e = 0; e < g->n_e; ++e) {
 		    if (g->edges[e].source == -1)
 			continue;
@@ -1222,8 +1222,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
 	g->nodes = calloc(g->n_v, sizeof(struct asm_node_t));
 	g->edges = calloc(g->n_e, sizeof(struct asm_edge_t));
+	log_debug("Reading asm_node_t, number of nodes: %d", g->n_v);
 	for (u = 0; u < g->n_v; ++u) {
-		log_debug("Reading asm_node_t, number of nodes: %d", g->n_v);
 		xfread(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfread(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
 		if (g->nodes[u].deg) {
@@ -1233,8 +1233,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			g->nodes[u].adj = NULL;
 		}
 	}
+	log_debug("Reading asm_edge_t, number of edges: %d", g->n_e);
 	for (e = 0; e < g->n_e; ++e) {
-		log_debug("Reading asm_edge_t, number of edges: %d", g->n_e);
 		xfread(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfread(&g->edges[e].target, sizeof(gint_t), 1, fp);
 		if (g->edges[e].source == -1)
@@ -1257,8 +1257,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* load the barcode information */
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
-		log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
 				continue;
@@ -1286,8 +1286,8 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 		}
 	}
 
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
-		log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 		for (e = 0; e < g->n_e; ++e) {
 		    if (g->edges[e].source == -1)
 			continue;
