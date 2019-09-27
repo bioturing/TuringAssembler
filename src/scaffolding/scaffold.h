@@ -17,8 +17,6 @@ void prepend_i_contig(struct scaffold_path *path, int i_contig);
 
 struct scaffold_type *new_scaffold_type();
 void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type *scaffold);
-void add_edge(struct scaffold_type *scaffold, struct scaffold_edge *edge);
-void add_i_contig(struct scaffold_path *path, int i_contig);
 void add_path(struct scaffold_type *scaffold, struct scaffold_path *path);
 void destroy_path(struct scaffold_path *path);
 void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffold);
