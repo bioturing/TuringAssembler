@@ -1171,6 +1171,7 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 
 void load_asm_graph(struct asm_graph_t *g, const char *path)
 {
+    __VERBOSE("Load asm graph\n");
 	FILE *fp = xfopen(path, "rb");
 	char sig[4];
 	xfread(sig, 4, 1, fp);

@@ -303,6 +303,7 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo)
 {
+    __VERBOSE("construct aux info\n");
 	if (aux_build | ASM_BUILD_BARCODE)
 		init_barcode_graph(g, mapper_algo);
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
@@ -334,6 +335,8 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	pthread_t *producer_threads, *worker_threads;
 	/* FIXME: not actually opt->n_files, noob */
+
+	opt->n_files = 1;
 	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
 	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
 
@@ -847,6 +850,7 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 
 void *barcode_buffer_iterator(void *data)
 {
+    __VERBOSE("barcode buffer iterator\n");
 	struct bccount_bundle_t *bundle = (struct bccount_bundle_t *)data;
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2;
