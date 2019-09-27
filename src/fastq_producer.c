@@ -92,11 +92,10 @@ void *fastq_producer(void *data)
 		prev_processed = cur_processed;
 		percentage = global_processed * 100 / total_size;
 		percentage = __min(percentage, 99);
-		log_info("\rLoad %ld%%", percentage);
+		__VERBOSE("\rLoad %ld%%", percentage);
 	}
 	buffer_free(own_buf);
 	log_info("\rLoad 100%%");
-	log_info("\n");
 	int cur;
 	pthread_barrier_wait(bundle->barrier);
 	while (1) {
