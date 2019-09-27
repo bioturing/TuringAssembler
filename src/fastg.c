@@ -296,7 +296,7 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 		uint64_t hash1 = fastg_hash_kmer1(seq->seq.s, ksize, seq->seq.l);
 		uint64_t hash2 = fastg_hash_kmer2(seq->seq.s, ksize, seq->seq.l);
 
-		//__VERBOSE("Hashed kmer1: %u, kmer2: %u\n", hash1, hash2);
+		//log_info("Hashed kmer1: %u, kmer2: %u\n", hash1, hash2);
 		char *p, *s = seq->name.s;
 		int is_comp;
 		for (p = s; *p && *p != ':' && *p != ';'; ++p);
@@ -330,8 +330,8 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 		++g->n_e;
 	}	
 	
-	__VERBOSE("Number of nodes: %d\n", (int) g->n_v);
-	__VERBOSE("Number of edges: %d\n", (int) g->n_e);
+	log_info("Number of nodes: %d\n", (int) g->n_v);
+	log_info("Number of edges: %d\n", (int) g->n_e);
 
 	// Set the reverse complement of node and edge
 	int i;

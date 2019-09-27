@@ -87,9 +87,9 @@ void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, 
 	int word_size = (ksize + 3) >> 2;
 	// char *s = alloca(ksize + 2);
 	// dump_kmer(kedge, ksize + 1, s);
-	// __VERBOSE("kedge = %s\n", s);
+	// log_debug("kedge = %s\n", s);
 	// if (s[0] != 'A')
-	// 	__VERBOSE("ok kmer = %s\n", s);
+	// 	log_debug("ok kmer = %s\n", s);
 	uint8_t *k1, *k2, *k1_rc, *k2_rc;
 	kmint_t ik1, ik2;
 	int c1, c2;
@@ -110,7 +110,7 @@ void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, 
 	c2 = (kedge[ksize >> 2] >> ((ksize & 0x3) << 1)) ^ 0x3;
 	// assert(c2 == (nt4_table[(int)s[0]] ^ 3));
 	// if (c2 != 3)
-	// 	__VERBOSE("c1 = %d; c2 = %d\n", c1, c2);
+	// 	log_debug("c1 = %d; c2 = %d\n", c1, c2);
 	if (km_cmp(k1, k1_rc, word_size) <= 0) {
 		kmhash_set_adj_multi(h, k1, c1, h->locks + thread_no);
 		// ik1 = kmhash_put(h, k1);
@@ -301,7 +301,7 @@ static void *build_graph_worker(void *data)
 	krev = alloca(word_size);
 	cur_knum = alloca(word_size);
 	cur_krev = alloca(word_size);
-	// __VERBOSE("it_l = %ld; it_r = %ld\n", it_l, it_r);
+	// log_debug("it_l = %ld; it_r = %ld\n", it_l, it_r);
 
 	kmint_t i, k;
 	for (i = it_l; i < it_r; ++i) {
@@ -423,7 +423,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 		adj_rv = KMHASH_ADJ(h, i) >> 4;
 		deg_fw = __bin_degree4(adj_fw);
 		deg_rv = __bin_degree4(adj_rv);
-		// __VERBOSE("deg_fw = %d; deg_rv = %d\n", deg_fw, deg_rv);
+		// log_debug("deg_fw = %d; deg_rv = %d\n", deg_fw, deg_rv);
 		if (deg_fw == 1 && deg_rv == 1)
 			continue;
 		n_e += (deg_fw + deg_rv);
@@ -578,7 +578,7 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 				char **files_1, char **files_2, char *work_dir,
 						struct asm_graph_t *g)
 {
-	__VERBOSE("|---- Counting kmer\n");
+	log_debug("|---- Counting kmer\n");
 	// n_files < 0 mean we have one contig file at end of files_2
     char **tmp_files;
     char *count_kmer_dir = alloca(strlen(work_dir) + 50);
@@ -599,9 +599,9 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
         KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
                                 abs(n_files) * 2, tmp_files);
 	}
-	__VERBOSE("\n");
+	log_debug("\n");
 
-	__VERBOSE("|---- Retrieving kmer from KMC database\n");
+	log_debug("|---- Retrieving kmer from KMC database\n");
 	struct kmhash_t kmer_table;
 	struct kmc_info_t kmc_inf;
 
@@ -619,21 +619,21 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	kmbuild_bundle_destroy(&kmbuild_bundle);
 	uint64_t table_size = kmer_table.size;
 	/* FIXME: additional kmer here */
-	__VERBOSE_LOG("BUILD", "Number of kmer: %lu\n", kmer_table.n_item);
+	log_info("Number of kmer: %lu\n", kmer_table.n_item);
 
-	__VERBOSE("|---- Building graph connection\n");
+	log_debug("|---- Building graph connection\n");
 	build_asm_graph_from_kmhash(n_threads, ksize, &kmer_table, g);
 	kmhash_destroy(&kmer_table);
-	__VERBOSE_LOG("BUILD", "Number of nodes: %ld; Number of edges: %ld\n",
+	log_info("Number of nodes: %ld; Number of edges: %ld\n",
 								g->n_v, g->n_e);
 
-	__VERBOSE("|---- Assigning edge count\n");
+	log_debug("|---- Assigning edge count\n");
 
     struct kmhash_t kmer_index_table;
 	kmhash_init(&kmer_index_table, table_size, (ksize + 4) >> 2,
 						KM_AUX_IDX, n_threads);
 	build_edge_kmer_index_multi(n_threads, &kmer_index_table, g);
-	__VERBOSE_LOG("BUILD", "Number of (k+1)-mer on edge: %lu\n",
+	log_info("Number of (k+1)-mer on edge: %lu\n",
 							kmer_index_table.n_item);
 
 	struct kmedge_bundle_t kmedge_bundle;
@@ -744,15 +744,15 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2)
 {
-	__VERBOSE("|---- Counting kmer\n");
+	log_debug("|---- Counting kmer\n");
 	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, files_1, n_files * sizeof(char *));
 	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
 	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
 							n_files * 2, tmp_files);
-	__VERBOSE("\n");
+	log_debug("\n");
 
-	__VERBOSE("|---- Retrieving kmer from KMC database\n");
+	log_debug("|---- Retrieving kmer from KMC database\n");
 	struct kmhash_t kmer_table;
 	struct kmc_info_t kmc_inf;
 	char *kmc_pre = alloca(strlen(work_dir) + 50);
@@ -770,20 +770,20 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 
 	add_garbage(ksize, &kmer_table, g0, e1);
 	add_garbage(ksize, &kmer_table, g0, e2);
-	__VERBOSE_LOG("BUILD", "Number of kmer: %lu\n", kmer_table.n_item);
+	log_info("Number of kmer: %lu\n", kmer_table.n_item);
 
-	__VERBOSE("|---- Building graph connection\n");
+	log_debug("|---- Building graph connection\n");
 	build_asm_graph_from_kmhash(n_threads, ksize, &kmer_table, g);
 	uint64_t table_size = kmer_table.size;
 	kmhash_destroy(&kmer_table);
-	__VERBOSE_LOG("BUILD", "Number of nodes: %ld; Number of edges: %ld\n",
+	log_info("Number of nodes: %ld; Number of edges: %ld\n",
 								g->n_v, g->n_e);
 
-	__VERBOSE("|---- Assigning edge count\n");
+	log_debug("|---- Assigning edge count\n");
 	kmhash_init(&kmer_table, table_size, (ksize + 4) >> 2,
 						KM_AUX_IDX, n_threads);
 	build_edge_kmer_index_multi(n_threads, &kmer_table, g);
-	__VERBOSE_LOG("BUILD", "Number of (k+1)-mer on edge: %lu\n",
+	log_info("Number of (k+1)-mer on edge: %lu\n",
 							kmer_table.n_item);
 
 	struct kmedge_bundle_t kmedge_bundle;
