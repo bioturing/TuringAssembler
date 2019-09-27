@@ -19,13 +19,13 @@
 void graph_convert_process(struct opt_proc_t *opt)
 {
 	char path[1024];
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Dump graph from bin archive\n");
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Dump graph from bin archive\n");
 	struct asm_graph_t *g;
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g->ksize);
+	log_info("Input graph kmer size: %d\n", g->ksize);
+	log_info("kmer size: %d\n", g->ksize);
 	test_asm_graph(g);
 	snprintf(path, 1024, "%s/graph_k_%d_loaded.gfa", opt->out_dir, g->ksize);
 	write_gfa(g, path);
@@ -43,7 +43,7 @@ void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 
 void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
+	log_info("\n+------------------------------------------------------------------------------+\n");
 	log_info("Resolve graph using small operation\n");
 	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
@@ -55,9 +55,9 @@ void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolve graph using small operation\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Resolve graph using small operation\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	resolve_graph_operation(g0, g);
 	// remove_tips(g0, g);
@@ -67,9 +67,9 @@ void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_1_2b(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolving graph using barcode (local assembly included)\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Resolving graph using barcode (local assembly included)\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	// resolve_tips_topo(g0, g);
 	// remove_tips_topology(g0, g);
@@ -80,9 +80,9 @@ void build_1_2b(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Removing tips using graph topology\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Removing tips using graph topology\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	// resolve_tips_topo(g0, g);
 	// remove_tips_topology(g0, g);
@@ -100,9 +100,11 @@ struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
 
 void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 {
+	FILE *log_fp = fopen("./build_scaffolding_1_2.log", "w");
+	log_set_fp(log_fp);
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	log_info("Build scaffolding with kmer size: %d\n", g0->ksize);
 
 	char *out_name = str_concate(opt->out_dir, "/scaffolds.fasta");
 	FILE *out_file = fopen(out_name, "w");
@@ -113,6 +115,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	fclose(out_file);
 	asm_graph_destroy(g0);
 	free(g0);
+	fclose(log_fp);
 }
 
 void build_scaffolding_test_process(struct opt_proc_t *opt)
@@ -128,9 +131,9 @@ void build_scaffolding_test_process(struct opt_proc_t *opt)
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolving small complex structure\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Resolving small complex structure\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	// resolve_chain(g0, g);
 	test_asm_graph(g);
@@ -139,9 +142,9 @@ void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_3_4(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolving graph using read pair + barcode (simple repetitive)\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Resolving graph using read pair + barcode (simple repetitive)\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	resolve_n_m_simple(g0, g);
 	test_asm_graph(g);
@@ -150,9 +153,9 @@ void build_3_4(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_4_5(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolving graph using read pair + barcode (complex jungle)\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Resolving graph using read pair + barcode (complex jungle)\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	resolve_complex(g0, g);
 	test_asm_graph(g);
@@ -161,9 +164,9 @@ void build_4_5(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building barcode information\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Building barcode information\n");
+	log_info("Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
 	// construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
@@ -171,9 +174,9 @@ void build_barcode(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building barcode information\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Building barcode information\n");
+	log_info("Input graph kmer size: %d\n", g->ksize);
 	set_time_now();
 	// construct_aux_information(opt, g, ASM_BUILD_BARCODE | ASM_BUILD_READPAIR | ASM_BUILD_COVERAGE);
 	__VERBOSE_LOG("TIMER", "Build barcode information time: %.3f\n", sec_from_prev_time());
@@ -186,9 +189,9 @@ void graph_query_process(struct opt_proc_t *opt)
 	load_asm_graph(g0, opt->in_file);
 	fprintf(stderr, "bin size = %d\n", g0->bin_size);
 	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Querying pair-edge barcode information\n");
+	log_info("kmer size: %d\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Querying pair-edge barcode information\n");
 	gint_t u, v, v2;
 	FILE *fp;
 	fp = xfopen(opt->in_fasta, "r");
@@ -201,7 +204,7 @@ void graph_query_process(struct opt_proc_t *opt)
 			fscanf(fp, "%ld\n", &v);
 			print_test_barcode_edge(g0, u, v);
 		} else if (c == 'P') {
-			__VERBOSE("Building local graph\n");
+			log_info("Building local graph\n");
 			fscanf(fp, "%ld\n", &v);
 			struct asm_graph_t lg = test_local_assembly(opt, g0,
 							g0->edges[u].rc_id, v);
@@ -220,16 +223,16 @@ void build_bridge_process(struct opt_proc_t *opt)
 	load_asm_graph(g0, opt->in_file);
 	fprintf(stderr, "bin size = %d\n", g0->bin_size);
 	test_asm_graph(g0);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building bridges on scaffold:\n");
+	log_info("Building bridges with local kmer size: %ld\n", g0->ksize);
+	log_info("\n+------------------------------------------------------------------------------+\n");
+	log_info("Building bridges on scaffold:\n");
 	FILE *f = xfopen(opt->lc, "w");
 	FILE *fp = xfopen(opt->in_fasta, "r");
 	int n_paths;
 	fscanf(fp, "%d\n", &n_paths);
 	int *mark = (int *) calloc(g0->n_e, sizeof(int));
 	for (int i = 0; i < n_paths; ++i){
-		__VERBOSE_LOG("SCAFFOLD PATH", "Processing %d on %d paths\n", i + 1, n_paths);
+		log_info("SCAFFOLD PATH: Processing %d on %d paths\n", i + 1, n_paths);
 		int path_len;
 		fscanf(fp, "%d\n", &path_len);
 		int *path = (int *) calloc(path_len, sizeof(int));
@@ -268,9 +271,9 @@ void build_bridge_process(struct opt_proc_t *opt)
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
 {
 	char path[1024];
-	__VERBOSE_LOG("graph_k_%d_%s", "Number of nodes: %ld\n",
+	log_info("graph_k_%d_%s: Number of nodes: %ld\n",
 						g->ksize, suffix, g->n_v);
-	__VERBOSE_LOG("graph_k_%d_%s", "Number of edges: %ld\n",
+	log_info("graph_k_%d_%s: Number of edges: %ld\n",
 						g->ksize, suffix, g->n_e);
 	snprintf(path, 1024, "%s/graph_k_%d_%s.gfa",
 						out_dir, g->ksize, suffix);
@@ -308,25 +311,28 @@ void build_barcode_info(struct opt_proc_t *opt)
 
 void build_barcode_scaffold(struct opt_proc_t *opt)
 {
-    struct asm_graph_t g;
-    struct read_path_t read_sorted_path;
+	FILE *log_fp = fopen("./build_barcode_scaffold.log", "w");
+	log_set_fp(log_fp);
+	struct asm_graph_t g;
+	struct read_path_t read_sorted_path;
 
-    load_asm_graph(&g, opt->in_file);
-    char fasta_path[MAX_PATH];
-    if (opt->lib_type == LIB_TYPE_SORTED) {
-        read_sorted_path.R1_path = opt->files_1[0];
-        read_sorted_path.R2_path = opt->files_2[0];
-        read_sorted_path.idx_path = opt->files_I[0];
-    } else {
-        sort_read(opt, &read_sorted_path);
-    }
-    sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
-    mkdir(fasta_path, 0755);
-    sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
-    write_fasta_seq(&g, fasta_path);
-    construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
-    save_graph_info(opt->out_dir, &g, "added_barcode");
-    asm_graph_destroy(&g);
+	load_asm_graph(&g, opt->in_file);
+	char fasta_path[MAX_PATH];
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g, fasta_path);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+	save_graph_info(opt->out_dir, &g, "added_barcode");
+	asm_graph_destroy(&g);
+	fclose(log_fp);
 }
 
 void assembly_process(struct opt_proc_t *opt)
@@ -348,6 +354,9 @@ void assembly_process(struct opt_proc_t *opt)
 
 void assembly3_process(struct opt_proc_t *opt)
 {
+	FILE *log_fp = fopen("./assembly3.log", "w");
+	log_set_fp(log_fp);
+
 	struct asm_graph_t g1, g2;
 	build_0_KMC(opt, opt->k0, &g1);
 	save_graph_info(opt->out_dir, &g1, "level_0");
@@ -367,6 +376,7 @@ void assembly3_process(struct opt_proc_t *opt)
 
 	// asm_graph_destroy(&g1);
 	// asm_graph_destroy(&g2);
+	fclose(log_fp);
 }
 
 void build_0_process(struct opt_proc_t *opt)

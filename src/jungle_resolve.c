@@ -77,7 +77,7 @@ static int is_large_loop(struct asm_graph_t *g, khash_t(khInt) *h, khash_t(khInt
 		if (kh_exist(h, k)){
 			key = kh_key(h, k);
 			if (is_source_edge(g, key, comp_set) && is_sink_edge(g, key, comp_set)){
-				__VERBOSE(KRED "Self loop detect e.i is both source and sink %d\n" RESET, key);
+				log_info(KRED "Self loop detect e.i is both source and sink %d\n" RESET, key);
 				return 1;
 			}
 		}
@@ -225,7 +225,7 @@ int simple_tandem(struct asm_graph_t *g, gint_t e_i, uint32_t *comp_sz, khash_t(
 		dest = e[u].target;
 		for (j = 0; j < v[dest].deg; j++) {
 			if (kh_get(khInt, set_v, v[dest].adj[j]) == kh_end(set_v)){
-				__VERBOSE("%d - One remain node* have outgoing edge* or region is too complex\n", e_i);
+				log_info("%d - One remain node* have outgoing edge* or region is too complex\n", e_i);
 				return 0;
 			}
 		}
@@ -322,7 +322,7 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 	for (j = 0; j < 4; ++j) {
 		for (i = j + 1; i < 4; ++i) {
 			int ret = test_edge_barcode2(g, tmp[j], tmp[i], bx_bin, &score);
-			__VERBOSE("Test connection %ld <-> %ld: %s%d\n" RESET,
+			log_info("Test connection %ld <-> %ld: %s%d\n" RESET,
 				tmp[j], tmp[i], ret == 1?KGRN:KRED, ret);
 			//print_test_barcode_edge(g, tmp[j], tmp[i]);
 			if (ret == 1) {
@@ -367,7 +367,7 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 		e_rc1 = tmp[y];
 		e1 = g->edges[e_rc1].rc_id;
 		
-		__VERBOSE(KCYN "One pair %d - %d\n" RESET, e1, e2);
+		log_info(KCYN "One pair %d - %d\n" RESET, e1, e2);
 		if (g->edges[e1].source == -1 || e1 == e2 || e1 == e_rc2)
 			return 0;
 		
@@ -406,7 +406,7 @@ static void resolve_baby_flow(struct asm_graph_t *g, gint_t e, float gcov)
 	for (j = 0; j < g->nodes[src].deg; ++j){
 		int cov_o = (int)(__get_edge_cov(g->edges + g->nodes[src].adj[j], g->ksize) / gcov + 0.499999);
 		if (cov_o == 1 && cov_i == 1){
-			__VERBOSE(KCYN "Remove the baby %d\n " RESET, e);
+			log_info(KCYN "Remove the baby %d\n " RESET, e);
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, g->edges[e].rc_id);
 			break;
@@ -428,7 +428,7 @@ int jungle_resolve_flow(struct asm_graph_t *g, khash_t(khInt) *h,
 		gint_t len = get_edge_len(g->edges + e);
 		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
 		if (!cov){
-			__VERBOSE(KCYN "Found the baby %d\n " RESET, e);
+			log_info(KCYN "Found the baby %d\n " RESET, e);
 			resolve_baby_flow(g, e, gcov);
 		}
 	}
@@ -524,7 +524,7 @@ static void polish_link(struct asm_graph_t *g0, gint_t *fw_link, gint_t *rv_link
 	gint_t tmp;
 	for (i = 0; i < g0->n_e; ++i){
 		if (fw_link[i] == fw_link[g0->edges[i].rc_id] && fw_link[i] != 0){
-			__VERBOSE(KGRN "Duplicated %d - %d - %d\n" RESET, i, g0->edges[i].rc_id,
+			log_info(KGRN "Duplicated %d - %d - %d\n" RESET, i, g0->edges[i].rc_id,
 					fw_link[i]);
 			if (fw_link[fw_link[i]] == i){
 				// i is more confident than rev(i)
@@ -571,7 +571,7 @@ static void scaffold_one_step(struct asm_graph_t *g0, gint_t *fw_link,
 	kh_put(khInt, set, ei, &ret);
 	while (e_it != 0) {
 		printf("%d-", e_it);
-		__VERBOSE(KCYN "%d - %d\n" RESET, ei, e_it);
+		log_info(KCYN "%d - %d\n" RESET, ei, e_it);
 		tmp = fw_link[g0->edges[e_it].rc_id];
 		//asm_append_pair(g0, ei, g0->edges[e_it].rc_id);
 		e_it = tmp;
@@ -587,7 +587,7 @@ static void iterative_scaffolding(struct asm_graph_t *g0, gint_t *fw_link)
 	int i;
 	for (i = 0; i < g0->n_e; ++i){
 		if (fw_link[i] == 0 && fw_link[g0->edges[i].rc_id] != 0){
-			__VERBOSE(KCYN "Found %d\n" RESET, i);
+			log_info(KCYN "Found %d\n" RESET, i);
 			if (kh_get(khInt, set, g0->edges[i].rc_id) == kh_end(set)){
 				scaffold_one_step(g0, fw_link, g0->edges[i].rc_id, set);
 			}
@@ -635,13 +635,13 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 
 		if (simple_tandem(g0, i, &comp_sz, lg, comp_set, is_visited)){
 			set_visited_edge(g0, is_visited, comp_set);
-			__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
-			__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
-			__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
-			__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
+			log_info(KGRN "Complex Tandem %d\n" RESET, i);
+			log_info(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
+			log_info(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
+			log_info(KWHT "Size of the complex %d\n" RESET, comp_sz);
 			if (kh_size(lg) <= MAX_NUMBER_LEGS){
 				if (is_large_loop(g0, lg, comp_set)){
-					__VERBOSE(KRED "Is a self loop complex\n" RESET);
+					log_info(KRED "Is a self loop complex\n" RESET);
 					jungle_resolve_flow(g0, lg, comp_set, gcov);
 				}
 				/* resolve 1-1 complex */
@@ -667,16 +667,16 @@ void detect_simple_tandem(struct asm_graph_t *g0)
 
 		if (simple_tandem(g0, i, &comp_sz, lg, comp_set, is_visited)){
 			set_visited_edge(g0, is_visited, comp_set);
-			__VERBOSE(KGRN "Complex Tandem %d\n" RESET, i);
-			__VERBOSE(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
-			__VERBOSE(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
-			__VERBOSE(KWHT "Size of the complex %d\n" RESET, comp_sz);
+			log_info(KGRN "Complex Tandem %d\n" RESET, i);
+			log_info(KBLU "Numer of keys %d\n" RESET, kh_size(lg));
+			log_info(KMAG "Numer of edges in the complex %d\n" RESET, kh_size(comp_set));
+			log_info(KWHT "Size of the complex %d\n" RESET, comp_sz);
 			resolve_one_complex(g0, lg, bx_bin, fw_link, rv_link);
 			kh_put(khInt, set_v, i, &missing);
 		}
 	}
 	polish_link(g0, fw_link, rv_link);
 	iterative_scaffolding(g0, fw_link);
-	__VERBOSE("Number of resolved jungle: %d\n", cnt);
+	log_info("Number of resolved jungle: %d\n", cnt);
 }
 
