@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "log.h"
+
 #if defined(_MSC_VER)
 #define __VERBOSE_INFO(tag, fmt, ...) do {				       \
 	fprintf(stderr, "[" tag "] " fmt, __VA_ARGS__);			       \

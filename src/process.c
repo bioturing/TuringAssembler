@@ -36,8 +36,7 @@ void graph_convert_process(struct opt_proc_t *opt)
 
 void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 {
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building assembly graph from read using kmer size %d\n", ksize);
+	log_info("Building assembly graph from read using kmer size %d\n", ksize);
 	build_initial_graph(opt, ksize, g);
 	// graph_build_KMC(opt, ksize, g);
 	test_asm_graph(g);
@@ -46,8 +45,8 @@ void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
 void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Resolve graph using small operation\n");
-	__VERBOSE_LOG("INFO", "Input graph kmer size: %d\n", g0->ksize);
+	log_info("Resolve graph using small operation\n");
+	log_info("Input graph kmer size: %d\n", g0->ksize);
 	set_time_now();
 	resolve_local_graph_operation(g0, g);
 	// remove_tips(g0, g);
