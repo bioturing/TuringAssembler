@@ -117,6 +117,12 @@ void log_set_quiet(int enable)
 
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
+	/* Get used time and memory */
+	getrusage(RUSAGE_SELF, L.usage);
+	time_t sys_time = L.usage->ru_stime.tv_sec; /* System time */
+	time_t usr_time = L.usage->ru_utime.tv_sec; /* User time */
+	uint64_t ru_ixrss = L.usage->ru_ixrss; /* Integral shared memory */
+
 	/* Get current time */
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
@@ -126,7 +132,8 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s:%d: ", buf, level_names[level], file, line);
+		fprintf(L.fp, "%s %-5s %s:%d:\t%.2f\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
+			sys_time/60, usr_time/60, ru_ixrss/1024);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
