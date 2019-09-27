@@ -124,14 +124,14 @@ void log_set_quiet(int enable)
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	/* Get current time */
+	time_t usr_time, t;
+	t = time(NULL);
 	struct tm *lt = localtime(&t);
 	char src_code[LOG_PADDING];
-	time_t usr_time, t;
 	unsigned int ru_maxrss;
 
 	/* Get used time and memory */
 	if (level > LOG_TRACE) {
-		t = time(NULL);
 		usr_time = t - L.start_time;
 		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage */
 		ru_maxrss = L.usage->ru_maxrss;
@@ -154,7 +154,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
 		fprintf(L.fp, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-			usr_time, ru_maxrss);
+			usr_time, ru_maxrss/1024);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -177,10 +177,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 #ifdef LOG_USE_COLOR
 		fprintf(
       stderr, "%s %s%-5s\x1b[0m \x1b[90m%s\x1b[0m\t%ld seconds\t%uMB\t",
-      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_maxrss);
+      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_maxrss/1024);
 #else
 		fprintf(stderr, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-		        usr_time, ru_maxrss);
+		        usr_time, ru_maxrss/1024);
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
