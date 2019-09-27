@@ -136,9 +136,8 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 			continue;
 		sum_len += g->edges[e].seq_len;
 		sum_cov += g->edges[e].seq_len * cov;
-		log_debug("sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	}
-	log_debug("sumlen %d sumcov %lf\n", sum_len, sum_cov);
+	log_debug("total sumlen %d sumcov %lf", sum_len, sum_cov);
 	return sum_cov/sum_len;
 }
 
@@ -183,7 +182,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
 // 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-// 	// log_info("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e), fcov);
 // }
 
@@ -207,7 +206,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
 // 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-// 	// log_info("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e1), fcov1);
 // }
 
@@ -981,7 +980,7 @@ void test_asm_graph(struct asm_graph_t *g)
 		}
 		/* Test 4: Node reverse complement id within [0, g->n_v) */
 		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
-			log_debug("node = %ld; rc_id = %ld\n", u, g->nodes[u].rc_id);
+			log_debug("node = %ld; rc_id = %ld", u, g->nodes[u].rc_id);
 			log_error("Node has undefined reverse complement");
 		}
 		/* Test 5: Continous edges share kmer */
@@ -1012,16 +1011,16 @@ void test_asm_graph(struct asm_graph_t *g)
 		gint_t e_rc = g->edges[e].rc_id;
 		/* Test 1: Check correct reverse complement edge id */
 		if (e_rc < 0 || e_rc >= g->n_e) {
-			log_debug("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
 			log_error("Edge has undefined reverse complement");
 		}
 		if (e != g->edges[e_rc].rc_id) {
-			log_debug("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			log_debug("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
 			log_error("Edge reverse complement link is not 2-way");
@@ -1029,10 +1028,10 @@ void test_asm_graph(struct asm_graph_t *g)
 		/* Test 2: source and target within [0, g->n_e) */
 		if (g->edges[e].source < 0 || g->edges[e].target >= g->n_v ||
 			g->edges[e_rc].source < 0 || g->edges[e_rc].target >= g->n_v) {
-			log_debug("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			log_debug("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
 			log_error("Edge source and target node are undefined");
@@ -1071,14 +1070,14 @@ void test_asm_graph(struct asm_graph_t *g)
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e);
-			// log_info("%s\n", seq);
+			// log_info("%s", seq);
 			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e_rc);
-			log_debug("seq_len = %lu; seq = %s\n", strlen(seq), seq);
-			// log_info("%s\n", seq);
+			log_debug("seq_len = %lu; seq = %s", strlen(seq), seq);
+			// log_info("%s", seq);
 			log_error("Edge and rc sequence is not reverse complemented");
 		}
 		if (!is_hole_rc(g->edges + e, g->edges + e_rc)) {
@@ -1109,7 +1108,7 @@ void test_asm_graph(struct asm_graph_t *g)
 	// 	uint32_t len = get_edge_len(g->edges + e);
 	// 	double cov = __get_edge_cov(g->edges + e, g->ksize);
 	// 	if (len > 5000 && cov < 100.0)
-	// 		log_info("WARNING: Edge %ld has length %u with cov ~ %.6lf\n",
+	// 		log_info("WARNING: Edge %ld has length %u with cov ~ %.6lf",
 	// 			e, len, cov);
 	// }
 }
@@ -1519,7 +1518,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		g1->edges[i].target = g0->edges[i].target;
 		g1->edges[i].rc_id = g0->edges[i].rc_id;
 		pthread_mutex_init(&g1->edges[i].lock, NULL);
-		log_debug("seq len %d\n", g1->edges[i].seq_len);
+		log_debug("seq len %d", g1->edges[i].seq_len);
 		log_debug("g0->edges[i].seq == NULL or not: %d", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
 				sizeof(uint32_t));

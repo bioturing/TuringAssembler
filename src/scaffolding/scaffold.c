@@ -122,7 +122,7 @@ void reverse_n_th(struct asm_graph_t *g, struct scaffold_path *path, int is_left
 				assert(0);
 			int x = path->right_half[pos];
 			reverse_contig(g, &path->right_half[pos]);
-			log_debug("reverse edge:%d\n", path->right_half[pos]);
+			log_debug("reverse edge:%d", path->right_half[pos]);
 		}
 	} else {
 		if (pos + 1 <= path->n_right_half)
@@ -132,7 +132,7 @@ void reverse_n_th(struct asm_graph_t *g, struct scaffold_path *path, int is_left
 			if (pos >= path->n_left_half)
 				assert(0);
 			reverse_contig(g, &path->left_half[pos]);
-            log_debug("reverse edge:%d\n", path->left_half[pos]);
+            log_debug("reverse edge:%d", path->left_half[pos]);
 		}
 	}
 }

@@ -136,7 +136,7 @@ void print_set_info(khash_t(gint) *set_e)
 	khiter_t k;
 	for (k = kh_begin(set_e); k != kh_end(set_e); ++k) {
 		if (kh_exist(set_e, k))
-			log_info("%ld\n", kh_key(set_e, k));
+			log_info("%ld", kh_key(set_e, k));
 	}
 }
 
@@ -297,7 +297,7 @@ gint_t bc_find_pair_check_path_strict(struct asm_graph_t *g, khash_t(gint) *set_
 	if (!__positive_ratio(ret_ratio))
 		return -1;
 	if (second_best != -1 && !__strictly_greater(ret_ratio, second_best)) {
-		log_info("Best = %ld(~%.6lf); second best = %ld(~%.6lf)\n",
+		log_info("Best = %ld(~%.6lf); second best = %ld(~%.6lf)",
 			ret_e, ret_ratio, second_e, second_best);
 		return -2;
 	}
@@ -329,7 +329,7 @@ gint_t bc_find_pair_strict(struct asm_graph_t *g, gint_t se, gint_t *adj,
 	if (!__positive_ratio(ret_ratio))
 		return -1;
 	if (second_best != -1 && !__strictly_greater(ret_ratio, second_best)) {
-		log_info("Best = %ld(~%.6lf); second best = %ld(~%.6lf)\n",
+		log_info("Best = %ld(~%.6lf); second best = %ld(~%.6lf)",
 			ret_e, ret_ratio, second_e, second_best);
 		return -2;
 	}
@@ -376,7 +376,7 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 		ret = sum_cov / cnt;
 	else
 		ret = uni_cov;
-//	log_info("Global cov ~ %.6lf. Local cov ~ %.6lf\n", uni_cov, ret);
+//	log_info("Global cov ~ %.6lf. Local cov ~ %.6lf", uni_cov, ret);
 	return ret;
 }
 
@@ -581,7 +581,7 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 				continue;
 			et1 = bc_find_pair_strict(g, e2, g->nodes[u_rc].adj, g->nodes[u_rc].deg);
 			if (et1 != e1) {
-				log_info("Not best pair: (%ld, %ld) <-> %ld\n", e1, et1, e2);
+				log_info("Not best pair: (%ld, %ld) <-> %ld", e1, et1, e2);
 				continue;
 			}
 			asm_join_edge3(g, g->edges[e1].rc_id, e1, e, e_rc,
@@ -603,7 +603,7 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 		rcov2 = convert_cov_range(fcov2);
 		double ratio = get_barcode_ratio(g, e1, e2);
 		/* FIXME: may need more complicated resolve here */
-		log_info("Leftover path: %ld(~%.6lf) -> %ld -> %ld(~%.6lf), ratio: %.6lf\n",
+		log_info("Leftover path: %ld(~%.6lf) -> %ld -> %ld(~%.6lf), ratio: %.6lf",
 				e1, fcov1, e, e2, fcov2, ratio);
 		if ((__positive_ratio(ratio) || ratio < 0) &&
 			__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
@@ -679,7 +679,7 @@ gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t u, double uni_cov)
 				continue;
 			et1 = bc_find_pair_strict(g, e2, g->nodes[u_rc].adj, g->nodes[u_rc].deg);
 			if (et1 != e1) {
-				log_info("Not best pair: (%ld, %ld) <-> %ld\n", e1, et1, e2);
+				log_info("Not best pair: (%ld, %ld) <-> %ld", e1, et1, e2);
 				continue;
 			}
 			asm_join_edge(g, g->edges[e1].rc_id, e1, e2, g->edges[e2].rc_id);
@@ -696,7 +696,7 @@ gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t u, double uni_cov)
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
 		double ratio = get_barcode_ratio(g, e1, e2);
-		log_info("Leftover path: %ld(~%.6lf) ->%ld(~%.6lf), ratio: %.6lf\n",
+		log_info("Leftover path: %ld(~%.6lf) ->%ld(~%.6lf), ratio: %.6lf",
 			e1, fcov1, e2, fcov2, ratio);
 		if ((__positive_ratio(ratio) || ratio < 0) &&
 			__check_coverage(fcov1, fcov2, rcov1, rcov2)) {
@@ -791,7 +791,7 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 				continue;
 			et1 = bc_find_pair_check_path(g, set_e, e2, legs, n_leg);
 			if (et1 != e1) {
-				log_info("Not best pair (%ld, %ld) <-> %ld\n",
+				log_info("Not best pair (%ld, %ld) <-> %ld",
 					e1, et1, e2);
 				continue;
 			}
@@ -853,7 +853,7 @@ gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 			gap_size = get_distance(g, MIN_CONTIG_BARCODE, set_e,
 				g->nodes[g->edges[e1].source].rc_id,
 				g->edges[e2].source);
-			log_info("Join %ld v %ld (gap size = %u)\n", e1, e2, gap_size);
+			log_info("Join %ld v %ld (gap size = %u)", e1, e2, gap_size);
 			if (gap_size)
 				asm_join_edge_with_gap(g, g->edges[e1].rc_id, e1,
 					e2, g->edges[e2].rc_id, gap_size);
@@ -899,7 +899,7 @@ gint_t collapse_2_2_bridge_strict(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_info("Number of resolved 2-2 strict bridges: %ld\n", cnt);
+	log_info("Number of resolved 2-2 strict bridges: %ld", cnt);
 	return cnt;
 }
 
@@ -923,7 +923,7 @@ gint_t collapse_2_2_small_bridge(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_info("Number of resolved 2-2 small bridges: %ld\n", cnt);
+	log_info("Number of resolved 2-2 small bridges: %ld", cnt);
 	return cnt;
 }
 
@@ -959,7 +959,7 @@ gint_t collapse_simple_jungle_strict(struct asm_graph_t *g)
 		kh_clear(gint, set_v);
 		kh_clear(gint, set_self);
 	}
-	log_info("Number of pair-edge join through simple jungle: %ld\n", ret);
+	log_info("Number of pair-edge join through simple jungle: %ld", ret);
 	return ret;
 }
 
@@ -995,7 +995,7 @@ gint_t collapse_complex_jungle_strict(struct asm_graph_t *g)
 		kh_clear(gint, set_v);
 		kh_clear(gint, set_self);
 	}
-	log_info("Number of pair-edge join through complex jungle: %ld\n", ret);
+	log_info("Number of pair-edge join through complex jungle: %ld", ret);
 	return ret;
 }
 
@@ -1012,7 +1012,7 @@ gint_t collapse_n_m_bridge_strict(struct asm_graph_t *g)
 		}
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_info("Number of strictly joined path through bridge: %ld\n", cnt);
+	log_info("Number of strictly joined path through bridge: %ld", cnt);
 	return cnt;
 }
 
@@ -1026,7 +1026,7 @@ gint_t collapse_n_m_node_strict(struct asm_graph_t *g)
 			cnt_local += check_n_m_node_strict(g, u, uni_cov);
 		cnt += cnt_local;
 	} while (cnt_local);
-	log_info("Number of strictly joined path through node: %ld\n", cnt);
+	log_info("Number of strictly joined path through node: %ld", cnt);
 	return cnt;
 }
 

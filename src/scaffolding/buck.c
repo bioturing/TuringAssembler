@@ -51,7 +51,7 @@ float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buc
 			}
 		}
 	}
-	log_trace("res %d cnt0 %d cnt1 %d \n", res2, cnt0, cnt1 );
+	log_trace("res %d cnt0 %d cnt1 %d ", res2, cnt0, cnt1 );
 	cnt0 = buck0->n_item;
 	cnt1 = buck1->n_item;
 	return get_bc_score(res2, cnt0, cnt1, avg_bin_hash);

@@ -18,6 +18,7 @@
 #include "scaffolding/output.h"
 #include "scaffolding/khash.h"
 #include "scaffolding/scaffold.h"
+#include "log.h"
 
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_put_table = PTHREAD_MUTEX_INITIALIZER;
@@ -87,7 +88,6 @@ void destroy_params_build_candidate(struct params_build_candidate_edges *para)
 int count_pos(int *count, struct list_position *pos)
 {
 	assert(pos != NULL && count != NULL);
-	log_trace("n pos %d\n", pos->n_pos);
 	int res = 0;
 	for (int i = 0; i < pos->n_pos; i++){
 	    res++;
@@ -226,7 +226,7 @@ void *process_build_big_table(void *data)
 
 khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-	log_info("----- Start build big table ------\n");
+	log_info("----- Start build big table ------");
 	pthread_t *thr = (pthread_t *)calloc(opt->n_threads, sizeof(pthread_t));
 	pthread_attr_t attr = init_thread_attr();
 
@@ -246,7 +246,7 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 	khash_t(big_table) *big_table = params_build_table->big_table ;
 	free(params_build_table);
 
-	log_info("----- Build done -------\n");
+	log_info("----- Build done -------");
 	return big_table;
 }
 
@@ -322,13 +322,13 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 
 void calc_score_pairwise(struct asm_graph_t *g, struct opt_proc_t* opt, struct edges_score_type **edges_score)
 {
-	log_info("----- Build candidate edge -----\n");
+	log_info("----- Build candidate edge -----");
 	khash_t(big_table) *big_table = build_big_table(g, opt);
 	struct params_build_candidate_edges *params_candidate =
 		new_params_build_candidate_edges(g, opt, big_table);
 	run_parallel_build_candidate_edges(params_candidate, opt->n_threads);
 	// sorted candidate edge
-	log_info("----- Done build candidate edge -----\n");
+	log_info("----- Done build candidate edge -----");
 
 	*edges_score = params_candidate->list_candidate_edges;
 
@@ -386,7 +386,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	score->bc_score += i_score->bc_score/2;
 	int i = 0;
 	int distance = get_edge_len(&g->edges[last]);
-	log_trace("scascore %d %d %f\n", last, des, score->bc_score);
+	log_trace("scascore %d %d %f", last, des, score->bc_score);
 	while (1) {
 		if (distance > global_distance)
 			break;
@@ -403,7 +403,7 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
-	log_trace("\ndonescascore %f %f %f\n", score->bc_score, score->m_score, score->m2_score);
+	log_trace("donescascore %f %f %f", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
@@ -433,11 +433,11 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	struct pair_contigs_score *max_score = calloc(1, sizeof(struct pair_contigs_score));
 	//todo @huu dynamic this thres
 //	max_score->bc_score = 0.05;
-	log_trace("Find best edge from %d\n", start_contig);
+	log_trace("Find best edge from %d", start_contig);
 	int best_edge = -1;
 	for (int i = 0; i < n_edge_adj; i++) {
 		int des = list_edge_adj[i].des;
-		log_trace("des %d\n", des);
+		log_trace("des %d", des);
 		if (des == start_contig)
 			continue;
 		if (!mark[des]) continue;
@@ -455,7 +455,7 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	res->score = *max_score;
 	if (!better_edge(&res->score, thres_score))
 		res->i_contig = -1;
-	log_trace("res icontig %d thres score %f\n\n", res->i_contig, thres_score->bc_score);
+	log_trace("res icontig %d thres score %f", res->i_contig, thres_score->bc_score);
 	return res;
 }
 
@@ -488,7 +488,7 @@ void refine_path(struct asm_graph_t *g, struct edges_score_type *edges_score, st
 		int right = get_last_n(path, 1, j+1);
 		struct pair_contigs_score *normal_score = get_score_tripple(edges_score, left, mid, right);
 		struct pair_contigs_score *reverse_score = get_score_tripple(edges_score, left, get_rc_id(g, mid), right);
-		log_trace("get score tripple %d %d %d normal %f reverse %f\n", left, mid, right, normal_score->bc_score, reverse_score->bc_score);
+		log_trace("get score tripple %d %d %d normal %f reverse %f", left, mid, right, normal_score->bc_score, reverse_score->bc_score);
 		if (better_edge(reverse_score, normal_score)) {
 			reverse_n_th(g, path, 1, j);
 			j++;
@@ -500,12 +500,12 @@ void refine_path(struct asm_graph_t *g, struct edges_score_type *edges_score, st
 
 void refine_scaffold(struct asm_graph_t *g, struct edges_score_type *edges_score, struct scaffold_type *scaffold) 
 {
-	log_info("----- Start refine scaffold------\n");
+	log_info("----- Start refine scaffold------");
 	for (int i = 0; i < scaffold->n_path; i++) {
 		struct scaffold_path *path = &scaffold->path[i];
 		refine_path(g, edges_score, path);
 	}
-	log_info("----- Refine scaffold done------\n");
+	log_info("----- Refine scaffold done------");
 }
 
 struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g, 
@@ -527,7 +527,7 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		next_l_contig = find_best_edge(g, edges_score, i_l_contig, path, mark, 1, divn(thres_score, 5*(*count)));
 		next_r_contig = find_best_edge(g, edges_score, i_r_contig, path, mark, 0, divn(thres_score, 5*(*count)));
 
-		log_trace("next l contig %d next r contig %d\n", next_l_contig->i_contig, next_r_contig->i_contig);
+		log_trace("next l contig %d next r contig %d", next_l_contig->i_contig, next_r_contig->i_contig);
 		if (next_r_contig->i_contig == -1 && next_l_contig->i_contig == -1) {
 			break;
 		}
@@ -566,14 +566,14 @@ void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
 void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_score_type *edges_score,
  		struct scaffold_type *scaffold)
 {
-	log_info("----- Start find scaffold------\n");
+	log_info("----- Start find scaffold------");
 	int *mark = calloc(g->n_e, sizeof(int));
 	init_mark(g, opt, mark);
 	int count = 0;
 	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
 	for (int i = 0; i < g->n_e; i++) if (mark[i] && is_long_contig(&g->edges[i])){
 		int start_contig = i;
-		log_trace("Start find scaffolds from %d\n", start_contig);
+		log_trace("Start find scaffolds from %d", start_contig);
 		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig, 
 							thres_score, &count);
 		add_path(scaffold, path);
@@ -587,7 +587,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	free(mark);
 	free(thres_score);
 	print_scaffold_contig(opt, scaffold);
-	log_info("----- Find scaffold done ------\n");
+	log_info("----- Find scaffold done ------");
 }
 
 void print_contig_info(struct asm_graph_t *g)
@@ -596,7 +596,7 @@ void print_contig_info(struct asm_graph_t *g)
     for (int i_e = 0; i_e < g->n_e; i_e++) {
         struct asm_edge_t *edge = &g->edges[i_e];
         float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
-        log_debug("edge %d len:%d cov: %f count_bc %d\n",
+        log_debug("edge %d len:%d cov: %f count_bc %d",
                      i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
     }
 }

@@ -143,7 +143,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	}
 
 	/* Cast the file name and line number into a file to easily align */
-	sprintf(src_code, "%s:%d", file, line);
+	snprintf(src_code, LOG_PADDING -1, "%s:%d", file, line);
 	int l = strlen(src_code);
 	memset(src_code + l, ' ', LOG_PADDING - l - 1);
 	src_code[LOG_PADDING - 1] = '\0';
