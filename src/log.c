@@ -104,6 +104,12 @@ void init_logger(int level, const char * file_path)
 	L.usage = malloc(sizeof(struct rusage));
 }
 
+void close_logger()
+{
+	fclose(L.fp);
+	free(L.usage);
+}
+
 void log_set_quiet(int enable)
 {
 	L.quiet = enable ? 1 : 0;
