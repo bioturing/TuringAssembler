@@ -15,7 +15,7 @@ GIT_SHA := $(shell git rev-parse HEAD)
 
 CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
-         -DGIT_SHA='"$(GIT_SHA)"' \
+         -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
 		 -fPIC\
          -I ./src -lbz2
