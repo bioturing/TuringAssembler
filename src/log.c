@@ -38,7 +38,7 @@
 
 #define __min(a, b) 		((a) < (b) ? (a) : (b))
 
-#define LOG_PADDING 30
+#define LOG_PADDING 40
 
 static struct {
     void *udata;
