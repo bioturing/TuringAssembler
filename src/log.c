@@ -118,11 +118,20 @@ void log_set_quiet(int enable)
 	L.quiet = enable ? 1 : 0;
 }
 
+unsigned int mem()
+{
+	unsigned int memTotal, memFree, buffers, cached;
+	FILE * const file = fopen( "/proc/meminfo", "r" ); //only available for UNIX
+	fscanf(file, "%*19s %i %*2s %*19s %i %*2s %*[^\n]\n %*19s %i %*2s %*19s %i", &memTotal, &memFree, &buffers, &cached);
+	fclose(file);
+	return ((memTotal - memFree) - (buffers + cached)) / 1024;
+}
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	/* Get current time */
 	time_t t = time(NULL);
 	struct tm *lt = localtime(&t);
+	unsigned int ru_ixrss = mem(); /* Integral shared memory */
 
 	/* Get used time and memory */
 	getrusage(RUSAGE_SELF, L.usage);
@@ -134,7 +143,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
 		fprintf(L.fp, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-			usr_time/60, ru_ixrss/1024);
+			usr_time/60, ru_ixrss);
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -157,10 +166,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 #ifdef LOG_USE_COLOR
 		fprintf(
       stderr, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m\t%.2f\t%ldMB\t",
-      buf, level_colors[level], level_names[level], file, line,  usr_time/60, ru_ixrss/1024);
+      buf, level_colors[level], level_names[level], file, line,  usr_time/60, ru_ixrss);
 #else
 		fprintf(stderr, "%s %-5s %s:%d:\t%.2f\t%ldMB\t", buf, level_names[level], file, line,
-		        usr_time/60, ru_ixrss/1024);
+		        usr_time/60, ru_ixrss);
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
