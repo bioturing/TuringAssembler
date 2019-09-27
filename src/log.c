@@ -35,7 +35,7 @@
 
 #include "log.h"
 
-#define __max(a, b) 		((a) > (b) ? (a) : (b))
+#define __min(a, b) 		((a) < (b) ? (a) : (b))
 
 static struct {
     void *udata;
@@ -100,7 +100,7 @@ void init_logger(int level, const char * file_path)
 {
 	FILE *fp = fopen(file_path, "w");
 	log_set_fp(fp);
-	log_get_level(__min(level, LOG_DEBUG));
+	log_set_level(__min(level, LOG_DEBUG));
 	L.usage = malloc(sizeof(struct rusage));
 }
 
