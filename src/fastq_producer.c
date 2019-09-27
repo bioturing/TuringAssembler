@@ -92,7 +92,7 @@ void *fastq_producer(void *data)
 		prev_processed = cur_processed;
 		percentage = global_processed * 100 / total_size;
 		percentage = __min(percentage, 99);
-		if (!(percentage % 10))
+		if (!(percentage % 20))
 			log_info("Load %ld%% reads", percentage);
 	}
 	buffer_free(own_buf);
