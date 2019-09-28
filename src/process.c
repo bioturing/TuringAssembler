@@ -316,6 +316,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
+	log_info("Aligning reads on two heads of each contigs using BWA");
 	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
@@ -353,10 +354,9 @@ void assembly3_process(struct opt_proc_t *opt)
 
 	build_0_1(&g1, &g2); /* Simplify g1 to g2 */
 	save_graph_info(opt->out_dir, &g2, "level_1");
-	asm_graph_destroy(&g1);
 
 	/**
-	 * Rearrange fastq file. Reads from the same barcodes are grouped together
+	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
 	 */
 	char fasta_path[MAX_PATH];
 	if (opt->lib_type == LIB_TYPE_SORTED) {
@@ -374,8 +374,11 @@ void assembly3_process(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	log_info("Write down temporary contigs for indexing.");
 	write_fasta_seq(&g2, fasta_path);
+	log_info("Aligning reads on two heads of each contigs using BWA");
 	construct_aux_info(opt, &g2, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+	log_info("Done alignment. Serializing assembly graph to disk.");
 	save_graph_info(opt->out_dir, &g2, "added_barcode"); /* Barcode-added assembly graph */
 
 	/**
@@ -383,9 +386,11 @@ void assembly3_process(struct opt_proc_t *opt)
 	 */
 	char out_name[MAX_PATH];
 	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);
+	log_info("Construct the scaffolds using barcode information.");
 	FILE *out_file = fopen(out_name, "w");
 	scaffolding(out_file, &g2, opt);
 	fclose(out_file);
+	log_info("Done scaffolding. The assembly process is completed.");
 
 	asm_graph_destroy(&g2);
 	close_logger();
