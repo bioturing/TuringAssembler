@@ -111,6 +111,14 @@ void init_logger(int level, const char * file_path)
 	L.start_time = time(NULL);
 }
 
+void log_change_file(const char *file_path)
+{
+	if (L.fp) {
+		fclose(L.fp);
+	}
+	L.fp = fopen(file_path, "w");
+}
+
 void close_logger()
 {
 	fclose(L.fp);
@@ -133,7 +141,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	/* Get used time and memory */
 	if (level > LOG_TRACE) {
 		usr_time = t - L.start_time;
-		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage */
+		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage, only available for UNIX */
 		ru_maxrss = L.usage->ru_maxrss;
 		L.mem_used = ru_maxrss;
 		L.last_time = usr_time;
