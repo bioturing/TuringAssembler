@@ -331,6 +331,11 @@ void assembly_process(struct opt_proc_t *opt)
 	// save_graph_info(opt->out_dir, &g2, "level_2");
 }
 
+/**
+ * @brief Main process for the assembly. Any step further please add into this.
+ * Only add after a pull request acceptance
+ * @param opt Main option structure of the process
+ */
 void assembly3_process(struct opt_proc_t *opt)
 {
 	init_logger(opt->log_level, "./assembly3.log");
