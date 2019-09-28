@@ -114,12 +114,12 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 	memcpy(buf + len, r->name, tlen);
 	len += tlen;
 	if (rI->seq != NULL) {
-		buf[len++] = '\t';
+		buf[len++] = ' ';
 		memcpy(buf + len, "BX:Z:", 5);
 		len += 5;
 		memcpy(buf + len, rI->seq, rI->len);
 		len += rI->len;
-		buf[len++] = '\t';
+		buf[len++] = ' ';
 		memcpy(buf + len, "QB:Z:", 5);
 		len += 5;
 		if (input_format == TYPE_FASTQ && rI->qual != NULL) {
@@ -275,7 +275,7 @@ void *biot_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file biot\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
@@ -395,7 +395,7 @@ void *x10_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file when sort bc 10x\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_10x(&read1, &readbc);
@@ -518,7 +518,7 @@ void *ust_buffer_iterator(void *data)
 				get_read_from_fa(&readI, I_buf, &posI);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL || rcI == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				__ERROR("\nWrong format file ust\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_ust_raw(&readI);
@@ -694,6 +694,8 @@ void sort_read(struct opt_proc_t *opt, struct read_path_t *rpath)
 		producer_bundles = init_fastq_triple(opt->n_threads, opt->n_files,
 				opt->files_1, opt->files_2, opt->files_I);
 		buffer_iterator = ust_buffer_iterator;
+	} else {
+	    __ERROR("Wrong library format\n");
 	}
 	struct readsort_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));

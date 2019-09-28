@@ -20,7 +20,6 @@ __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1
 							__mix_2_64, __cmp_2_64);
 
 __KHASH_IMPL(contig_count, , gint_t, int, 1, kh_int64_hash_func, kh_int64_hash_equal);
-
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
 	if (e1->n_holes != e2->n_holes)
@@ -137,9 +136,8 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 			continue;
 		sum_len += g->edges[e].seq_len;
 		sum_cov += g->edges[e].seq_len * cov;
-		VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
 	}
-	VERBOSE_FLAG(0, "sumlen %d sumcov %lf\n", sum_len, sum_cov);
+	log_debug("total sumlen %d sumcov %lf", sum_len, sum_cov);
 	return sum_cov/sum_len;
 }
 
@@ -173,7 +171,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 		return;
 // 	double fcov;
 // 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-// 	// __VERBOSE("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
+// 	// log_info("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
 // 	// 			get_edge_len(g->edges + e), fcov, cov);
 
 // 	g->edges = realloc(g->edges, (g->n_e + 1) * sizeof(struct asm_edge_t));
@@ -184,7 +182,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
 // 	fcov = __get_edge_cov(g->edges + e, g->ksize);
-// 	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e), fcov);
 // }
 
@@ -193,7 +191,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	double fcov1, fcov2;
 // 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
 // 	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
-// 	// __VERBOSE("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
+// 	// log_info("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
 // 	// 	e1, get_edge_len(g->edges + e1), fcov1,
 // 	// 	e2, get_edge_len(g->edges + e2), fcov2, cov);
 
@@ -208,7 +206,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
 // 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-// 	// __VERBOSE("[len=%u][cov~%.3lf] after duplicate\n",
+// 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e1), fcov1);
 // }
 
@@ -361,7 +359,7 @@ void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
 	m = (dst->seq_len - trim_dst + 15) >> 4;
 	dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
 	if (dst->seq == NULL)
-		__ERROR("Unable to realloc");
+		log_error("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
 	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
@@ -895,7 +893,7 @@ static void debug_dump_adj(struct asm_graph_t *g, gint_t u)
 	for (k = 0; k < g->nodes[u].deg; ++k) {
 		e = g->nodes[u].adj[k];
 		dump_edge_seq_h(&seq, &lseq, g->edges + e);
-		__VERBOSE("e = %ld: %s\n", e, seq);
+		log_debug("e = %ld: %s", e, seq);
 	}
 	free(seq);
 }
@@ -912,7 +910,7 @@ void test_asm_graph(struct asm_graph_t *g)
 {
 	gint_t le_idx = get_longest_edge(g);
 	if (le_idx != -1) {
-		__VERBOSE("Longest edge %ld_%ld, length %u\n",
+		log_info("Longest edge %ld_%ld, length %u",
 			le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
 	}
 	uint64_t sum_count = 0;
@@ -924,7 +922,7 @@ void test_asm_graph(struct asm_graph_t *g)
 			continue;
 		sum_count += g->edges[e].count;
 	}
-	__VERBOSE("sum_count = %lu\n", sum_count);
+	log_info("sum_count = %lu", sum_count);
 
 	gint_t u, e, j, k;
 	for (u = 0; u < g->n_v; ++u) {
@@ -932,10 +930,10 @@ void test_asm_graph(struct asm_graph_t *g)
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
 			if (g->edges[e].source != u) {
-				__VERBOSE("node = %ld; edge = [%ld](%ld->%ld)\n",
+				log_debug("node = %ld; edge = [%ld](%ld->%ld)",
 					u, e,
 					g->edges[e].source, g->edges[e].target);
-				assert(0 && "Node's adjs are node consistent with edges's source");
+				log_error("Node's adjs are node consistent with edges's source");
 			}
 		}
 		/* Test 2: consistency of sequence of edges from one node */
@@ -947,7 +945,7 @@ void test_asm_graph(struct asm_graph_t *g)
 				int nu = __binseq_get(g->edges[e].seq, c);
 				if (nu != prev_nu && prev_nu != -1) {
 					debug_dump_adj(g, u);
-					assert(0 && "Edges from same node not have same k-prefix");
+					log_error("Edges from same node not have same k-prefix");
 				}
 				prev_nu = nu;
 			}
@@ -956,14 +954,13 @@ void test_asm_graph(struct asm_graph_t *g)
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
 			if (e < 0 || e >= g->n_e) {
-				__VERBOSE("node = %ld; edge = %ld\n", u, e);
-				assert(0 && "Node has undefined edges");
+				log_error("node = %ld; edge = %ld", u, e);
 			}
 		}
 		/* Test 4: Node reverse complement id within [0, g->n_v) */
 		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
-			__VERBOSE("node = %ld; rc_id = %ld\n", u, g->nodes[u].rc_id);
-			assert(0 && "Node has undefined reverse complement");
+			log_debug("node = %ld; rc_id = %ld", u, g->nodes[u].rc_id);
+			log_error("Node has undefined reverse complement");
 		}
 		/* Test 5: Continous edges share kmer */
 		gint_t u_rc, e1, e2;
@@ -975,14 +972,14 @@ void test_asm_graph(struct asm_graph_t *g)
 				j = g->edges[e2].seq_len - g->ksize + k;
 				if (__binseq_get(g->edges[e2].seq, j) !=
 					__binseq_get(g->edges[e1].seq, k)) {
-					printf("(%ld, %ld) -> (%ld, %ld)\n",
+					log_debug("(%ld, %ld) -> (%ld, %ld)",
 						g->edges[e2].source,
 						g->edges[e2].target,
 						g->edges[e1].source,
 						g->edges[e1].target);
 					deb_dump_seq(g, e2);
 					deb_dump_seq(g, e1);
-					assert(0 && "Continuous edges not share kmer");
+					log_error("Continuous edges not share kmer");
 				}
 			}
 		}
@@ -993,30 +990,30 @@ void test_asm_graph(struct asm_graph_t *g)
 		gint_t e_rc = g->edges[e].rc_id;
 		/* Test 1: Check correct reverse complement edge id */
 		if (e_rc < 0 || e_rc >= g->n_e) {
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			assert(0 && "Edge has undefined reverse complement");
+			log_error("Edge has undefined reverse complement");
 		}
 		if (e != g->edges[e_rc].rc_id) {
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
-			assert(0 && "Edge reverse complement link is not 2-way");
+			log_error("Edge reverse complement link is not 2-way");
 		}
 		/* Test 2: source and target within [0, g->n_e) */
 		if (g->edges[e].source < 0 || g->edges[e].target >= g->n_v ||
 			g->edges[e_rc].source < 0 || g->edges[e_rc].target >= g->n_v) {
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
-			assert(0 && "Edge source and target node are undefined");
+			log_error("Edge source and target node are undefined");
 		}
 		gint_t src, dst, src_rc, dst_rc;
 		src = g->edges[e].source;
@@ -1025,9 +1022,9 @@ void test_asm_graph(struct asm_graph_t *g)
 		gint_t idx = find_adj_idx(g->nodes[src].adj,
 						g->nodes[src].deg, e);
 		if (idx == -1) {
-			__VERBOSE("node [%ld]; edge [%ld](%ld->%ld)\n",
+			log_debug("node [%ld]; edge [%ld](%ld->%ld)",
 				src, e, src, dst);
-			assert(0 && "Edge not in source's adj");
+			log_error("Edge not in source's adj");
 		}
 		src_rc = g->edges[e_rc].source;
 		dst_rc = g->edges[e_rc].target;
@@ -1035,56 +1032,54 @@ void test_asm_graph(struct asm_graph_t *g)
 		 * complemented nodes
 		 */
 		if (src != g->nodes[dst_rc].rc_id || dst != g->nodes[src_rc].rc_id) {
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
-			assert(0 && "Edge and reverse complement not link between reverse complemented nodes");
+			log_error("Edge and reverse complement not link between reverse complemented nodes");
 		}
 		/* Test 5: Sequence reverse complement */
 		if (!is_seq_rc(g->edges[e].seq, g->edges[e].seq_len,
 				g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
 			char *seq = NULL;
 			uint32_t lseq = 0;
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e);
-			// __VERBOSE("%s\n", seq);
+			// log_info("%s", seq);
 			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e_rc);
-			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
-			// __VERBOSE("%s\n", seq);
-			assert(0 && "Edge and rc sequence is not reverse complemented");
+			log_debug("seq_len = %lu; seq = %s", strlen(seq), seq);
+			// log_info("%s", seq);
+			log_error("Edge and rc sequence is not reverse complemented");
 		}
 		if (!is_hole_rc(g->edges + e, g->edges + e_rc)) {
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e, g->edges[e].source, g->edges[e].target,
 				g->edges[e].rc_id);
-			__VERBOSE("n_holes = %u; seq_len = %u",
+			log_debug("n_holes = %u; seq_len = %u",
 				g->edges[e].n_holes, g->edges[e].seq_len);
 			uint32_t j;
 			for (j = 0; j < g->edges[e].n_holes; ++j)
-				__VERBOSE("(p=%u, l=%u) ",
+				log_debug("(p=%u, l=%u) ",
 					g->edges[e].p_holes[j],
 					g->edges[e].l_holes[j]);
-			__VERBOSE("\n");
-			__VERBOSE("edge [%ld](%ld->%ld); rc_id = %ld\n",
+			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
 				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
 				g->edges[e_rc].rc_id);
-			__VERBOSE("n_holes = %u; seq_len = %u",
+			log_debug("n_holes = %u; seq_len = %u",
 				g->edges[e_rc].n_holes, g->edges[e_rc].seq_len);
 			for (j = 0; j < g->edges[e_rc].n_holes; ++j)
-				__VERBOSE("(p=%u, l=%u) ",
+				log_debug("(p=%u, l=%u) ",
 					g->edges[e_rc].p_holes[j],
 					g->edges[e_rc].l_holes[j]);
-			__VERBOSE("\n");
-			assert(0 && "Edge and rc holes is not symmetric");
+			log_error("Edge and rc holes is not symmetric");
 		}
 	}
 
@@ -1092,7 +1087,7 @@ void test_asm_graph(struct asm_graph_t *g)
 	// 	uint32_t len = get_edge_len(g->edges + e);
 	// 	double cov = __get_edge_cov(g->edges + e, g->ksize);
 	// 	if (len > 5000 && cov < 100.0)
-	// 		__VERBOSE("WARNING: Edge %ld has length %u with cov ~ %.6lf\n",
+	// 		log_info("WARNING: Edge %ld has length %u with cov ~ %.6lf",
 	// 			e, len, cov);
 	// }
 }
@@ -1109,12 +1104,14 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
+	log_info("Writing asm_node_t, number of nodes: %d", g->n_v);
 	for (u = 0; u < g->n_v; ++u) {
 		xfwrite(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfwrite(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
 		if (g->nodes[u].deg)
 			xfwrite(g->nodes[u].adj, sizeof(gint_t), g->nodes[u].deg, fp);
 	}
+	log_info("Writing asm_edge_t, number of edges: %d", g->n_e);
 	for (e = 0; e < g->n_e; ++e) {
 		xfwrite(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfwrite(&g->edges[e].target, sizeof(gint_t), 1, fp);
@@ -1132,6 +1129,7 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* save the barcode information */
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
@@ -1152,32 +1150,34 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 		}
 	}
+	log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
-        for (e = 0; e < g->n_e; ++e) {
-            if (g->edges[e].source == -1)
-                continue;
-            struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
-            xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-            xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-            xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-            h = &g->edges[e].barcodes_scaf2;
-            xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-            xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-            xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-        }
+		for (e = 0; e < g->n_e; ++e) {
+		    if (g->edges[e].source == -1)
+			continue;
+		    struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
+		    xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+		    xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+		    xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+		    h = &g->edges[e].barcodes_scaf2;
+		    xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+		    xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+		    xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+		}
 	}
 	fclose(fp);
 }
 
 void load_asm_graph(struct asm_graph_t *g, const char *path)
 {
+        log_info("Loading asm graph");
 	FILE *fp = xfopen(path, "rb");
 	char sig[4];
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, "asmg", 4))
-		__ERROR("Not assembly graph format file");
+		log_error("Not assembly graph format file");
 	xfread(&g->aux_flag, 4, 1, fp);
-	__VERBOSE("aux_flag = %u\n", g->aux_flag);
+	log_debug("aux_flag = %u", g->aux_flag);
 
 	/* load the graph topology and sequence information */
 	gint_t u, e;
@@ -1186,6 +1186,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
 	g->nodes = calloc(g->n_v, sizeof(struct asm_node_t));
 	g->edges = calloc(g->n_e, sizeof(struct asm_edge_t));
+	log_debug("Reading asm_node_t, number of nodes: %d", g->n_v);
 	for (u = 0; u < g->n_v; ++u) {
 		xfread(&g->nodes[u].rc_id, sizeof(gint_t), 1, fp);
 		xfread(&g->nodes[u].deg, sizeof(gint_t), 1, fp);
@@ -1196,6 +1197,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			g->nodes[u].adj = NULL;
 		}
 	}
+	log_debug("Reading asm_edge_t, number of edges: %d", g->n_e);
 	for (e = 0; e < g->n_e; ++e) {
 		xfread(&g->edges[e].source, sizeof(gint_t), 1, fp);
 		xfread(&g->edges[e].target, sizeof(gint_t), 1, fp);
@@ -1219,6 +1221,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* load the barcode information */
+	log_info("Reading barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
@@ -1247,24 +1250,25 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 		}
 	}
 
+	log_info("Reading barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
-        for (e = 0; e < g->n_e; ++e) {
-            if (g->edges[e].source == -1)
-                continue;
-            struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
-            xfread(&h->size, sizeof(uint32_t), 1, fp);
-            xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-            h->keys = malloc(h->size * sizeof(uint64_t));
-            xfread(h->keys, sizeof(uint64_t), h->size, fp);
-            h->cnts = NULL;
+		for (e = 0; e < g->n_e; ++e) {
+		    if (g->edges[e].source == -1)
+			continue;
+		    struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
+		    xfread(&h->size, sizeof(uint32_t), 1, fp);
+		    xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+		    h->keys = malloc(h->size * sizeof(uint64_t));
+		    xfread(h->keys, sizeof(uint64_t), h->size, fp);
+		    h->cnts = NULL;
 
-            h = &g->edges[e].barcodes_scaf2;
-            xfread(&h->size, sizeof(uint32_t), 1, fp);
-            xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-            h->keys = malloc(h->size * sizeof(uint64_t));
-            xfread(h->keys, sizeof(uint64_t), h->size, fp);
-            h->cnts = NULL;
-        }
+		    h = &g->edges[e].barcodes_scaf2;
+		    xfread(&h->size, sizeof(uint32_t), 1, fp);
+		    xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+		    h->keys = malloc(h->size * sizeof(uint64_t));
+		    xfread(h->keys, sizeof(uint64_t), h->size, fp);
+		    h->cnts = NULL;
+		}
 	}
 	fclose(fp);
 }
@@ -1326,8 +1330,9 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	g->nodes = NULL;
 	g->n_v = g->n_e = 0;
 	gzFile fp = gzopen(path, "r");
-	if (!fp)
-		__ERROR("Unable to open file [%s] to read", path);
+	if (!fp) {
+		log_error("Unable to open file [%s] to read", path);
+	}
 	kseq_t *seq = kseq_init(fp);
 	while (kseq_read(seq) >= 0) {
 		/* add new edge */
@@ -1414,7 +1419,7 @@ void asm_resolve_local_loop(struct asm_graph_t *lg)
 				lg->nodes[tg].adj[0] : lg->nodes[tg].adj[1];
 			if (e1 == e2 || e == loop_e)
 				continue;
-			__VERBOSE("Local loop detected, e1: %d, e: %d, loop e: %d, e2: %d, rc: %d\n",
+			log_debug("Local loop detected, e1: %d, e: %d, loop e: %d, e2: %d, rc: %d",
 					e1, e, loop_e, e2, rc);
 
 			asm_append_barcode_readpair(lg, loop_e, e);
@@ -1484,17 +1489,14 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 		g1->edges[i].target = g0->edges[i].target;
 		g1->edges[i].rc_id = g0->edges[i].rc_id;
 		pthread_mutex_init(&g1->edges[i].lock, NULL);
-		__VERBOSE("seq len %d\n", g1->edges[i].seq_len);
-		__VERBOSE("%d\n", g0->edges[i].seq == NULL);
+		log_debug("seq len %d", g1->edges[i].seq_len);
+		log_debug("g0->edges[i].seq == NULL or not: %d", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
 				sizeof(uint32_t));
 		for (int j = 0; j < g0->edges[i].seq_len; ++j)
-			__VERBOSE("%d", __binseq_get(g0->edges[i].seq, j));
-		__VERBOSE("\n");
-		__VERBOSE("copy mem\n");
+			log_debug("%d", __binseq_get(g0->edges[i].seq, j));
 		memcpy(g1->edges[i].seq, g0->edges[i].seq,
 				sizeof(uint32_t) * ((g1->edges[i].seq_len + 3) / 4));
-		__VERBOSE("done seq\n");
 		if (g1->edges[i].n_holes > 0){
 			g1->edges[i].p_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
 					sizeof(uint32_t));
@@ -1506,5 +1508,5 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1)
 					sizeof(uint32_t) * g1->edges[i].n_holes);
 		}
 	}
-	__VERBOSE("DONE\n");
+	log_info("DONE cloning assembly edges");
 }

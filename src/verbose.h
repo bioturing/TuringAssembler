@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "log.h"
+
 #if defined(_MSC_VER)
 #define __VERBOSE_INFO(tag, fmt, ...) do {				       \
 	fprintf(stderr, "[" tag "] " fmt, __VA_ARGS__);			       \
@@ -20,8 +22,6 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
-#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
-
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
 #else
@@ -34,7 +34,7 @@
 /* FIXME: Write error handler: i.e. delete temporary files */
 #define __ERROR(fmt, ...)do {						       \
 	fprintf(stderr, "[ERROR] " fmt "\n", __VA_ARGS__);		       \
-	log_write("[ERROR] " fmt "\n", __VA_ARGS__);			       \
+	log_write("[ERROR] " fmt "", __VA_ARGS__);			       \
 	exit(EXIT_FAILURE);						       \
 } while(0) /* ERROR */
 
@@ -55,8 +55,6 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE */
 
-#define VERBOSE_FLAG(level, ...) if (level <= log_level) { __VERBOSE("[log_level_"#level"] "); __VERBOSE(__VA_ARGS__);}
-
 #if defined(NDEBUG)
 #define __DEBUG(fmt, ...) 0
 #else
@@ -65,7 +63,7 @@
 
 #define __ERROR(fmt, args...) do {					       \
 	fprintf(stderr, "[ERROR] " fmt "\n", ##args);			       \
-	log_write("[ERROR] " fmt "\n", ##args);				       \
+	log_write("[ERROR] " fmt "", ##args);				       \
 	exit(EXIT_FAILURE);						       \
 } while(0) /* ERROR */
 #endif /* __MSC_VER */
