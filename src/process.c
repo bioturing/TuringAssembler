@@ -342,26 +342,52 @@ void assembly_process(struct opt_proc_t *opt)
 void assembly3_process(struct opt_proc_t *opt)
 {
 	init_logger(opt->log_level, "./assembly3.log");
+	struct read_path_t read_sorted_path; /* To sort fastq file if needed */
 
+	/**
+	 * Build Assembly graph from scratch
+	 */
 	struct asm_graph_t g1, g2;
-	build_0_KMC(opt, opt->k0, &g1);
+	build_0_KMC(opt, opt->k0, &g1); /* Do kmer counting using KMC */
 	save_graph_info(opt->out_dir, &g1, "level_0");
 
-	build_0_1(&g1, &g2);
+	build_0_1(&g1, &g2); /* Simplify g1 to g2 */
 	save_graph_info(opt->out_dir, &g2, "level_1");
 	asm_graph_destroy(&g1);
 
-	// build_barcode(opt, &g2);
-	// build_3_4(&g2, &g1);
-	// save_graph_info(opt->out_dir, &g1, "level_4");
-	// asm_graph_destroy(&g2);
+	/**
+	 * Rearrange fastq file. Reads from the same barcodes are grouped together
+	 */
+	char fasta_path[MAX_PATH];
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Read library is not sorted (type %d). Rearranging reads by barcodes", opt->lib_type);
+		sort_read(opt, &read_sorted_path);
+	}
 
-	// build_barcode(opt, &g1);
-	// build_4_5(&g1, &g2);
-	// save_graph_info(opt->out_dir, &g2, "level_5");
+	/**
+	 * Use bwa to align reads on two ends of each contigs, barcode awared.
+	 */
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g2, fasta_path);
+	construct_aux_info(opt, &g2, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+	save_graph_info(opt->out_dir, &g2, "added_barcode"); /* Barcode-added assembly graph */
 
-	// asm_graph_destroy(&g1);
-	// asm_graph_destroy(&g2);
+	/**
+	 * Scaffolding
+	 */
+	char out_name[MAX_PATH];
+	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);
+	FILE *out_file = fopen(out_name, "w");
+	scaffolding(out_file, &g2, opt);
+	fclose(out_file);
+
+	asm_graph_destroy(&g2);
 	close_logger();
 }
 
