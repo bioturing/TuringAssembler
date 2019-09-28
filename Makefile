@@ -68,7 +68,7 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(EXEC_RELEASE): $(OBJ)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
