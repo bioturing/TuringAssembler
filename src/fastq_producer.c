@@ -6,6 +6,10 @@
 #include "utils.h"
 #include "verbose.h"
 
+#define LOGGING_STEP_SIZE 10
+
+static int progress_indicator = 0;
+
 void *init_single_buffer()
 {
 	struct single_buffer_t *ret = malloc(sizeof(struct single_buffer_t));
@@ -82,6 +86,7 @@ void *fastq_producer(void *data)
 	int64_t total_size = bundle->total_size;
 
 	int64_t prev_processed = 0, cur_processed, global_processed, percentage;
+	int i = 0;
 	percentage = 0;
 	while ((cur_processed = gb_get_data(input_stream, own_buf)) >= 0) {
 		external_buf = d_dequeue_out(q);
@@ -92,8 +97,10 @@ void *fastq_producer(void *data)
 		prev_processed = cur_processed;
 		percentage = global_processed * 100 / total_size;
 		percentage = __min(percentage, 99);
-		if (!(percentage % 20))
-			log_info("Load %ld%% reads", percentage);
+		i = percentage / LOGGING_STEP_SIZE;
+		if (atomic_bool_CAS64(&progress_indicator, i-1 , i)) {
+			log_info("Load %ld%% reads", i*LOGGING_STEP_SIZE);
+		}
 	}
 	buffer_free(own_buf);
 	log_info("Load 100%% reads");
@@ -163,6 +170,7 @@ struct producer_bundle_t *init_fastq_single(int n_threads, int n_files,
 struct producer_bundle_t *init_fastq_pair(int n_threads, int n_files,
 					char **R1_files, char **R2_files)
 {
+	progress_indicator = 0;
 	struct producer_bundle_t *ret;
 	struct dqueue_t *q;
 	int i;

@@ -10,7 +10,7 @@ LIBS = -pthread -std=c++11 \
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -g -O1 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -g -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
