@@ -1150,7 +1150,6 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* save the barcode information */
-	log_info("Write barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
@@ -1171,7 +1170,6 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 		}
 	}
-	log_info("Write barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
 		for (e = 0; e < g->n_e; ++e) {
 		    if (g->edges[e].source == -1)
@@ -1242,7 +1240,6 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* load the barcode information */
-	log_info("Reading barcode information with flag ASM_HAVE_BARCODE");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
@@ -1271,7 +1268,6 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 		}
 	}
 
-	log_info("Reading barcode information with flag ASM_HAVE_BARCODE_SCAF");
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
 		for (e = 0; e < g->n_e; ++e) {
 		    if (g->edges[e].source == -1)

@@ -216,6 +216,7 @@ void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *em
 	int n_visited = 0;
 	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
 			&n_visited, ksize, h);
+	log_info("%d paths found", pinfo->n_paths);
 	graph_info_destroy(&ginfo);
 }
 
@@ -253,7 +254,6 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 	cur_path[depth] = u;
 	if (u == ginfo->lc_e2){
 		path_info_push(pinfo, cur_path, depth + 1);
-		__VERBOSE("%d paths found\n", pinfo->n_paths);
 		return;
 	}
 	int tg = lg->edges[u].target;
