@@ -60,7 +60,7 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
         data->prefix_file_buf_size = (lut_area_size_in_bytes + 8) / sizeof(uint64_t);
 
         /* read prefix offset */
-        data->prefix_file_buf= malloc(data->prefix_file_buf_size*8);
+        data->prefix_file_buf= malloc(data->prefix_file_buf_size*8+8);
         fseek(fp, 4, SEEK_SET);
         size_t result = xfread(data->prefix_file_buf, 1, lut_area_size_in_bytes+8, fp);
         if (result == 0)
