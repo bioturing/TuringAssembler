@@ -270,12 +270,11 @@ void barcode_hash_clone(struct barcode_hash_t *dst, struct barcode_hash_t *src)
 {
 	dst->size = src->size;
 	dst->n_item = src->n_item;
-	// dst->n_unique = src->n_unique;
+	dst->n_unique = src->n_unique;
 	dst->keys = malloc(dst->size * sizeof(uint64_t));
-	dst->cnts = NULL;
-	// dst->cnts = malloc(dst->size * sizeof(uint32_t));
+	//dst->cnts = malloc(dst->size * sizeof(uint32_t));
 	memcpy(dst->keys, src->keys, dst->size * sizeof(uint64_t));
-	// memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
+	//memcpy(dst->cnts, src->cnts, dst->size * sizeof(uint32_t));
 }
 
 // void barcode_hash_merge_barcode(struct barcode_hash_t *dst, struct barcode_hash_t *src)
