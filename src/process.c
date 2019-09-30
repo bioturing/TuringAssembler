@@ -386,9 +386,42 @@ void assembly3_process(struct opt_proc_t *opt)
 	FILE *out_file = fopen(out_name, "w");
 	scaffolding(out_file, &g2, opt);
 	fclose(out_file);
-	log_info("Done scaffolding. The assembly process is completed.");
-
+	log_info("Done scaffolding. Please see the file: %s/scaffolds.fasta", opt->out_dir);
 	asm_graph_destroy(&g2);
+
+	/**
+	 * Build barcode for local assembly
+	 */
+	struct asm_graph_t g3;
+	char asm_path[1024];
+	sprintf(asm_path, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
+	load_asm_graph(&g3, asm_path);
+	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g3, fasta_path);
+	construct_aux_info(opt, &g3, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
+	save_graph_info(opt->out_dir, &g3, "local_added_barcode");
+	asm_graph_destroy(&g3);
+
+	/**
+	 * Local assembly
+	 */
+        log_info("Start local assembly process with kmer size %d", opt->lk);
+        opt->in_file = malloc(1024);
+	opt->in_fasta= malloc(1024);
+	opt->lc = malloc(1024);
+	sprintf(opt->lc, "%s/scaffold.full.fasta", opt->out_dir);
+	sprintf(opt->in_file, "%s/graph_k_%d_local_added_barcode.bin", opt->out_dir, opt->k0);
+        sprintf(opt->in_fasta, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
+	opt->files_1[0] = read_sorted_path.R1_path;
+	opt->files_2[0] = read_sorted_path.R2_path;
+	opt->files_I = malloc(sizeof(char *));
+	opt->files_I[0] = read_sorted_path.idx_path;
+	opt->lib_type = 0;
+        build_bridge_process(opt);
+        log_info("Done local assembly. Please see the file: %s", opt->lc);
+
 	close_logger();
 }
 
