@@ -34,13 +34,6 @@ struct pathcount_bundle_t {
     khash_t(contig_count) *count_err;
 };
 
-struct asm_align_t {
-    int rid;
-    int pos;
-    int score:30, strand:2;
-    int aligned;
-};
-
 mem_opt_t *asm_memopt_init() {
 	mem_opt_t *o;
 	o = calloc(1, sizeof(mem_opt_t));

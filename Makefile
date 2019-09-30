@@ -5,7 +5,7 @@ CXX = g++
 CPP = cpp
 
 LIBS = -pthread -std=c++11 \
-       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
+       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive libs/KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
        libs/bwa/libbwa.a -lm
 
 GIT_SHA := $(shell git rev-parse HEAD)
@@ -14,8 +14,8 @@ CFLAGS = -std=gnu99 -m64 -g -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src  -fPIC -g 
-         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
+         -I ./src  -fPIC -g \
+	 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
 
 EXEC = skipping
 
@@ -63,7 +63,7 @@ SRC = src/assembly_graph.c 				\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
-      src/main.c
+      src/main.c \
       src/log.c
 
 OBJ = $(SRC:.c=.o)
@@ -71,8 +71,7 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-
-$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(EXEC_RELEASE): $(OBJ)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
@@ -93,7 +92,7 @@ debug: $(EXEC)
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
-       -lpthread KMC/libkmc.a \
+       -lpthread libs/KMC/libkmc.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm \
        libs/zlib/libz.a libs/bwa/libbwa.a \
