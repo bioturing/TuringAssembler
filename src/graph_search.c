@@ -188,7 +188,9 @@ void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 	}
 	free(mark);
 	fclose(f);*/
-	save_graph_info("local_graphs", lg, "filtered");
+	char path[1024];
+	sprintf(path, "filtered_%d_%d", lc_e1, lc_e2);
+	save_graph_info("local_graphs", lg, path);
 }
 
 void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,

@@ -1080,7 +1080,6 @@ void *pathcount_buffer_iterator(void *data) {
 			      get_read_from_fq(&read2, buf2, &pos2) :
 			      get_read_from_fa(&read2, buf2, &pos2);
 
-
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				__ERROR("\nWrong format file in pathcount\n");
 

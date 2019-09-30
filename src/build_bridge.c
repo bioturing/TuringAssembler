@@ -366,7 +366,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_log_edge_map(emap1, emap2);
 	__VERBOSE("DONE\n");*/
 	//link_filter(opt, g, lg, emap1, emap2);
-	//print_graph(lg, emap1->gl_e, emap2->gl_e);
+	print_graph(lg, emap1->gl_e, emap2->gl_e);
 
 	log_info("Start finding paths");
 	struct path_info_t pinfo;
@@ -384,6 +384,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	float *scores;
 	float *error;
 	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
+	for (int i = 0; i < pinfo.n_paths; ++i)
+		__VERBOSE("%.3f ", scores[i]);
+	__VERBOSE("\n");
 	float best_score = 0;
 	int best_path = 0;
 	int min_score = 1e9;
@@ -865,7 +868,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	}
 	query_record.process_pos = 0;
 	fclose(fp);
-	__LOG("PROGRESS", "Done initializing scaffold paths\n");
+	__VERBOSE_LOG("INFO", "Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
