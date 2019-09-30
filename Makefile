@@ -5,7 +5,7 @@ CXX = g++
 CPP = cpp
 
 LIBS = -pthread -std=c++11 \
-       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
+       -Wl,--whole-archive -lpthread -Wl,--no-whole-archive libs/KMC/libkmc.a libs/zlib/libz.a libs/bzip2/libbz2.a  \
        libs/bwa/libbwa.a -lm
 
 GIT_SHA := $(shell git rev-parse HEAD)
@@ -92,7 +92,7 @@ debug: $(EXEC)
 .PHONY: release
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
-       -lpthread KMC/libkmc.a \
+       -lpthread libs/KMC/libkmc.a \
        libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm \
        libs/zlib/libz.a libs/bwa/libbwa.a \
