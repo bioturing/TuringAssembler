@@ -163,7 +163,6 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
 		char **res_seq, int *seq_len)
 {
-	log_debug("Matching edges %d and %d ...", e1, e2);
 	struct edge_map_info_t emap1;
 	get_local_edge_head(*g, *lg, e1, &emap1);
 
@@ -910,6 +909,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 
 void *build_bridge_iterator(void *data)
 {
+	int local_asm_res;
 	struct build_bridge_bundle_t *bundle = (struct build_bridge_bundle_t *)
 			data;
 	while (1){
@@ -935,9 +935,10 @@ void *build_bridge_iterator(void *data)
 				opt.lk);
 		struct asm_graph_t lg;
 		load_asm_graph(&lg, graph_bin_path);
-		get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
+		local_asm_res = get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
 				&seq_len);
 		pthread_mutex_lock(bundle->bridge_lock);
+		log_debug("Local assembly status for edges %d and %d: %s", e1, e2, local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
 		asm_graph_destroy(&lg);
@@ -959,13 +960,18 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 	construct_read_index(&read_sorted_path, dict);
 
 	for (int i = 0; i < query->n_process; ++i){
-		log_trace("Processing %d on %d local graphs", i,
+		if (!(i % 10) && i < query->n_process - 1)
+			log_info("Processing %d on %d local graphs", i,
 				query->n_process);
 		int e1 = query->e1[i];
 		int e2 = query->e2[i];
+		/*
+		 * Build the local assembly graph for two edges: e1.rev and e2
+		 */
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
 				e2, dict);
 		asm_graph_destroy(&lg);
 	}
+	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
 }
