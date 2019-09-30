@@ -10,7 +10,6 @@
 #include "map_contig.h"
 #include "kmer_hash.h"
 #include <stdio.h>
-#define PATH_NOT_FOUND -1
 KHASH_MAP_INIT_INT64(gint_int, int);
 struct graph_info_t{
 	struct asm_graph_t *g;
@@ -65,18 +64,22 @@ void print_path(int *path, int path_len);
 void find_middle_edge_candidates(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int *path, int depth, int *mark);
 void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2);
-void get_all_paths(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
-		struct path_info_t *pinfo);
-void get_all_paths_kmer_check(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
-		struct path_info_t *pinfo, int ksize, khash_t(kmer_int) *h);
+void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct path_info_t *pinfo);
+void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2, struct path_info_t *pinfo,
+		int ksize, khash_t(kmer_int) *h);
 void find_all_paths(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo);
 void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 		int u, int depth, int *cur_path, struct path_info_t *pinfo,
-		int ksize, khash_t(kmer_int) *h);
+		int *n_visited, int ksize, khash_t(kmer_int) *h);
 void path_info_init(struct path_info_t *path);
 void path_info_push(struct path_info_t *pinfo, int *path, int len);
 void path_info_destroy(struct path_info_t *pinfo);
+
+
+
+void get_nearby_edges(struct asm_graph_t *g, int e, struct graph_info_t *ginfo,
+		int radius, int **res, int *n_nb);
 #endif

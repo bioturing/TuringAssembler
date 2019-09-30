@@ -291,6 +291,34 @@ void build_bridge_opt_process(int argc, char *argv[])
 	free(opt);
 }
 
+void reduce_read_opt_process(int argc, char *argv[])
+{
+	struct opt_proc_t *opt;
+	opt = parse_proc_option(argc - 2, argv + 2);
+	if (opt == NULL){
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	char tmp_dir[1024];
+	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/reduce_read.log");
+	init_log(tmp_dir);
+	init_clock();
+	reduce_read_process(opt);
+	free(opt);
+}
+
+void resolve_local_opt_process(int argc, char *argv[])
+{
+	struct opt_proc_t *opt;
+	opt = parse_proc_option(argc - 2, argv + 2);
+	if (opt == NULL){
+		print_usage_build(argv[0]);
+		__ERROR("Error parsing arguments");
+	}
+	resolve_local_process(opt);
+	free(opt);
+}
+
 void graph_convert_opt_process(int argc, char *argv[])
 {
 	struct opt_proc_t *opt;
@@ -346,6 +374,10 @@ int main(int argc, char *argv[])
 		graph_query_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_bridge"))
 		build_bridge_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "reduce_reads"))
+		reduce_read_opt_process(argc, argv);
+	else if (!strcmp(argv[1], "resolve_local"))
+		resolve_local_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_scaffolding_1_2"))
 		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
 	else if (!strcmp(argv[1], "build_scaffolding_test"))

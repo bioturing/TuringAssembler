@@ -13,6 +13,8 @@ GIT_SHA := $(shell git rev-parse HEAD)
 CFLAGS = -std=gnu99 -m64 -g -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
+         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
+         -I ./src  -fPIC -g 
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
 
 EXEC = skipping
@@ -60,7 +62,8 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/scaffold.c 						\
       src/read_list.c 								\
       src/kmer_hash.c 								\
-      src/main.c \
+      src/fastq_reducer.c 						\
+      src/main.c
       src/log.c
 
 OBJ = $(SRC:.c=.o)
@@ -68,6 +71,7 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
+
 $(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(EXEC_RELEASE): $(OBJ)
@@ -79,11 +83,10 @@ $(EXEC_RELEASE): $(OBJ)
 	@$(CPP) $(CFLAGS) $(LDFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: debug
-debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g 
-debug: LIBS += -lasan
-debug: CC = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 gcc
-debug: CXX = docker run -it -v $(PWD)/include:/include -v $(PWD)/libs:/libs -v $(PWD)/src:/src gcc:7.4.0 g++
-debug: EXEC = src/skipping 
+debug: CFLAGS += -fsanitize=address -fno-omit-frame-pointer -g  -gdwarf-3
+debug: LIBS += -fsanitize=address -fno-omit-frame-pointer -lasan
+debug: CC = gcc
+debug: CXX = g++
 debug: $(EXEC)
 
 
@@ -91,6 +94,8 @@ debug: $(EXEC)
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread KMC/libkmc.a \
+       libs/libz.a libs/libbz2.a libs/libbwa.a \
+       -Wl,--no-whole-archive -lm \
        libs/zlib/libz.a libs/bwa/libbwa.a \
        -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a
 release: CC = gcc 

@@ -14,6 +14,7 @@
 #include "../include/bwamem.h"
 #include "basic_resolve.h"
 #include "scaffolding/global_params.h"
+#include "barcode_builder.h"
 
 struct bccount_bundle_t {
     struct asm_graph_t *g;
@@ -945,7 +946,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			p2[n2++] = a;
 		}
 	}
-	FILE *f = fopen("err.cnt", "a");
+	//FILE *f = fopen("err.cnt", "a");
 	for (i = 0; i < n1; ++i) {
 		if (p1[i].aligned < r1->len)
 			continue;
@@ -970,7 +971,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 				khiter_t it = kh_get(contig_count, count_err, c1);
 				if (it != kh_end(count_err)) {
 					atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-					fprintf(f, "%d 1 %d %d\n", c1, p1[i].pos, p1[i].aligned);
+					//fprintf(f, "%d 1 %d %d\n", c1, p1[i].pos, p1[i].aligned);
 				}
 			}
 		}
@@ -978,7 +979,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			khiter_t it = kh_get(contig_count, count_err, c1);
 			if (it != kh_end(count_err)) {
 				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-				fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
+				//fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
 			}
 		}
 	}
@@ -1002,12 +1003,12 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			khiter_t it = kh_get(contig_count, count_err, c2);
 			if (it != kh_end(count_err)) {
 				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-				fprintf(f, "%d 2 %d %d\n", c2, p2[i].pos, p2[i].aligned);
+				//fprintf(f, "%d 2 %d %d\n", c2, p2[i].pos, p2[i].aligned);
 			}
 		}
 	}
-	fclose(f);
-	f = fopen("read_map.txt", "a");
+	//fclose(f);
+	//f = fopen("read_map.txt", "a");
 	/*for (int i = 0; i < n1; ++i){
 		if (p1[i].aligned < r1->len)
 			continue;
@@ -1026,7 +1027,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			fprintf(f, "%d 2 %d %d\n", c, p2[i].pos, p2[i].aligned);
 		}
 	}*/
-	for (i = 0; i < n1; ++i) {
+	/*for (i = 0; i < n1; ++i) {
 		if (p1[i].aligned < r1->len)
 			continue;
 		int c1, c2;
@@ -1044,7 +1045,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 			}
 		}
 	}
-	fclose(f);
+	fclose(f);*/
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);

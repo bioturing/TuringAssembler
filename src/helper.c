@@ -1,4 +1,5 @@
 #include "helper.h"
+#include "utils.h"
 char __base[5] = {'A', 'C', 'G', 'T', 'N'};
 
 char int_to_base(int x)
@@ -8,18 +9,12 @@ char int_to_base(int x)
 
 int base_to_int(char ch)
 {
-	for (int i = 0; i < 4; ++i)
-		if (ch == __base[i])
-			return i;
-	return 0;
+	return nt4_table[ch];
 }
 
 char flip(char ch)
 {
-	for (int i = 0; i < 4; ++i)
-		if (__base[i] == ch)
-			return __base[i ^ 3];
-	return 'N';
+	return rev_nt4_char[nt4_table[ch]];
 }
 
 void flip_reverse(char *seq)
