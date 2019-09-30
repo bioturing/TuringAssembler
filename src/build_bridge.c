@@ -771,11 +771,16 @@ int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 	return 0;
 }
 
+/**
+ * @brief The main function for local assembly process
+ * @param opt main options struct
+ * @param f the final scaffolds file with gap closed.
+ */
 void build_bridge(struct opt_proc_t *opt, FILE *f)
 {
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
+	load_asm_graph(g0, opt->in_file); /* The global assembly graph */
 	test_asm_graph(g0);
 	int *mark = (int *) calloc(g0->n_e, sizeof(int));
 
@@ -783,7 +788,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	struct query_record_t query_record;
 	FILE *fp = fopen(opt->in_fasta, "r");
 	int n_paths;
-	fscanf(fp, "%d\n", &n_paths);
+	fscanf(fp, "%d\n", &n_paths); /* Total number of paths in the scaffolds */
 	scaffold.n_paths = n_paths;
 	scaffold.path_lens = calloc(n_paths, sizeof(int));
 	scaffold.paths = calloc(n_paths, sizeof(int *));
@@ -793,6 +798,10 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	query_record.next_e2 = NULL;
 	query_record.process_pos = 0;
 	query_record.n_process = 0;
+	/*
+	 * Prepare the bundle structs for local assembly
+	 * One local assembly process needs an e1, e2, pre e1, next e2
+	 */
 	for (int i = 0; i < n_paths; ++i){
 		int path_len;
 		fscanf(fp, "%d\n", &path_len);
@@ -826,9 +835,10 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	fclose(fp);
 
 	log_info("Getting all local graphs");
-	get_all_local_graphs(opt, g0, &query_record);
+	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
+
 	pthread_mutex_t query_lock;
 	pthread_mutex_init(&query_lock, NULL);
 	pthread_mutex_t bridge_lock;
@@ -837,6 +847,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	opt->n_threads = 1; /* Edit to 1 thread */
 	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
 			sizeof(struct build_bridge_bundle_t));
 	for (int i = 0; i < opt->n_threads; ++i){
@@ -863,8 +874,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	free(worker_bundles);
 	free(worker_threads);
 
-
-	log_info("Done local assembly. Now printing all bridge sequences");
+	log_info("Done local assembly. Now print all the bridged sequences");
 	int p = 0;
 	int **paths = scaffold.paths;
 	int *path_lens = scaffold.path_lens;
@@ -889,6 +899,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		free(scaffold.paths[i]);
 	free(scaffold.paths);
 
+	log_info("Print remain sequences");
 	for (int i = 0; i < g0->n_e; ++i){
 		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
 			continue;
