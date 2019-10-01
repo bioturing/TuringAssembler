@@ -150,7 +150,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	/* Get used time and memory */
 	if (level > LOG_TRACE) {
 		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage, only available for UNIX */
-		ru_maxrss = L.usage->ru_maxrss;
+		ru_maxrss = 1<<20;
 		L.mem_used = ru_maxrss;
 	} else{
 		ru_maxrss = L.mem_used;
