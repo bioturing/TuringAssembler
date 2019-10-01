@@ -27,8 +27,9 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 			get_cov(*ginfo->g, ginfo->lc_e2)) / 2;
 	for (int i = 0; i < ginfo->g->n_e; ++i){
 		int cov = get_cov(*(ginfo->g), i);
-		//ginfo->edge_max_vst[i] = (int) max(1, round(1.0 * cov / init_cov));
-		ginfo->edge_max_vst[i] = 1;
+		ginfo->edge_max_vst[i] = (int) max(1, round(1.0 * cov / init_cov));
+		//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
+		//ginfo->edge_max_vst[i] = 1;
 	}
 }
 
