@@ -93,7 +93,6 @@ debug: $(EXEC)
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread libs/KMC/libkmc.a \
-       libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm \
        libs/zlib/libz.a libs/bwa/libbwa.a \
        -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a
