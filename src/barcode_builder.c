@@ -603,6 +603,8 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			p2[n2++] = a;
 		}
 	}
+	if (ar1.n > 2 || ar2.n > 2 || ar1.a->score < 50 || ar2.a->score < 50)
+		return;
 	if (bundle->aux_build & ASM_BUILD_CANDIDATE) { /* read information */
 		for (i = 0; i < n1; ++i) {
 			struct fasta_ref_t ref;
