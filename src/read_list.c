@@ -9,7 +9,6 @@ void read_list_init(struct read_list_t *rlist)
 
 void load_reads_from_fastq(char *r_path, struct read_list_t *rlist)
 {
-	__VERBOSE("Loading reads\n");
 	read_list_init(rlist);
 	FILE *f = fopen(r_path, "r");
 

@@ -30,6 +30,8 @@
 
 KHASH_MAP_INIT_STR(str_int, int);
 
+static char *local_asm_result[4] = {"BRIDGE_LOCAL_NOT_FOUND", "BRIDGE_TRIVIAL_BRIDGE", "BRIDGE_MULTIPLE_PATH", "BRIDGE_PATH_NOT_FOUND"};
+
 struct scaffold_record_t{
 	int n_paths;
 	int *path_lens;

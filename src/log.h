@@ -32,6 +32,7 @@ void log_set_lock(log_LockFn fn);
 void log_set_fp(FILE *fp);
 void log_set_level(int level);
 void log_set_quiet(int enable);
+void set_log_stage(char *stage);
 
 void log_log(int level, const char *file, int line, const char *fmt, ...);
 

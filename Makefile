@@ -10,7 +10,7 @@ LIBS = -pthread -std=c++11 \
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -g -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
@@ -93,7 +93,6 @@ debug: $(EXEC)
 release: LIBS = -pthread -static -O3 -std=c++11 \
        -Wl,--whole-archive              \
        -lpthread libs/KMC/libkmc.a \
-       libs/libz.a libs/libbz2.a libs/libbwa.a \
        -Wl,--no-whole-archive -lm \
        libs/zlib/libz.a libs/bwa/libbwa.a \
        -Wl,--no-whole-archive -lm libs/bzip2/libbz2.a

@@ -586,19 +586,18 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	}
 	free(mark);
 	free(thres_score);
-	print_scaffold_contig(opt, scaffold);
 	log_info("----- Find scaffold done ------");
 }
 
 void print_contig_info(struct asm_graph_t *g)
 {
-    float cvr = global_genome_coverage;
-    for (int i_e = 0; i_e < g->n_e; i_e++) {
-        struct asm_edge_t *edge = &g->edges[i_e];
-        float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
-        log_debug("edge %d len:%d cov: %f count_bc %d",
-                     i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
-    }
+	float cvr = global_genome_coverage;
+	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		struct asm_edge_t *edge = &g->edges[i_e];
+		float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
+		log_debug("edge %d len:%d cov: %f count_bc %d",
+			     i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
+	}
 }
 
 void scaffolding(FILE *out_file, struct asm_graph_t *g,
@@ -615,14 +614,14 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	struct edges_score_type *edges_score = NULL;
 	calc_score_pairwise(g, opt, &edges_score);
 
-    struct scaffold_type *scaffold = new_scaffold_type();
+        struct scaffold_type *scaffold = new_scaffold_type();
 	sort_edges_score(edges_score);
 	print_edge_score(edges_score);
 	find_scaffolds(g, opt, edges_score, scaffold);
 
 	refine_scaffold(g, edges_score, scaffold);
 
-	print_scaffold_contig(opt, scaffold);
+	print_scaffold_contig(opt, scaffold); /* print scaffold path into local_assembly_scaffold_path.txt */
 	print_scaffold(g, out_file, scaffold);
 }
 
@@ -635,4 +634,3 @@ void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 	check_global_params(g);
 }
-

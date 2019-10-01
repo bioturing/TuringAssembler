@@ -89,20 +89,19 @@ struct opt_proc_t *init_opt_proc()
 	struct opt_proc_t *opt;
 	opt = calloc(1, sizeof(struct opt_proc_t));
 	opt->log_level = LOG_INFO;
-	opt->n_threads = 1;
+	opt->n_threads = 4;
 	opt->hash_size = 1 << 24;
-	opt->k0 = 17;
-	opt->k1 = 31;
-	opt->k2 = 55;
+	opt->k0 = 45; /* Default kmer size */
 	opt->n_files = 0;
 	opt->split_len = 1000;
 	opt->files_1 = opt->files_2 = NULL;
 	opt->in_file = NULL;
 	opt->in_fasta = NULL;
         opt->in_fastg = NULL;
-	opt->out_dir = ".";
-	opt->lib_type = 0;
-	opt->mmem = 32;
+	opt->out_dir = "."; /* Default output folder */
+	opt->lib_type = 0; /* Default read library */
+	opt->mmem = 32; /*Default memory limit for reads sorting */
+	opt->lk = 31; /* Default local kmer size */
 	return opt;
 }
 
@@ -150,9 +149,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
-        } else if (!strcmp(argv[pos], "-fg")) {
-            opt->in_fastg = argv[pos + 1];
-            pos += 2;
+                } else if (!strcmp(argv[pos], "-fg")) {
+                        opt->in_fastg = argv[pos + 1];
+                        pos += 2;
 		} else if (!strcmp(argv[pos], "-cf")) {
 			opt->in_contig_file = argv[pos + 1];
 			pos += 2;
@@ -200,7 +199,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 				++opt->n_files;
 			}
 		} else if (!strcmp(argv[pos], "-lc")){
-			opt->lc = argv[pos + 1];
+			sprintf(opt->lc, "%s/scaffold.full.fasta", argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-lk")){
 			opt->lk = atoi(argv[pos + 1]);

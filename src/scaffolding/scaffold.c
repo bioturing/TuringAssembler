@@ -65,9 +65,10 @@ void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffol
 	for (int i = 0; i < scaffold->n_path; ++i)
 		n_paths += scaffold->path[i].n_left_half
 			+ scaffold->path[i].n_right_half > 1;
-	char tmp_dir[1024];
-	snprintf(tmp_dir, 1024, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
-	FILE *f = fopen(tmp_dir, "w");
+	char tmp_file[1024];
+	snprintf(tmp_file, 1024, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
+	FILE *f = fopen(tmp_file, "w");
+	log_debug("Number of scaffold paths: %d", n_paths);
 	fprintf(f, "%d\n", n_paths);
 	for (int i = 0 ; i < scaffold->n_path; i++) {
 		struct scaffold_path *path = &scaffold->path[i];
@@ -85,6 +86,7 @@ void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffol
 		fprintf(f, "\n");
 		free(list_contig);
 	}
+	fclose(f);
 }
 
 int get_last_n(struct scaffold_path *path, int is_left, int pos)

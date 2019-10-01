@@ -6,6 +6,7 @@
 #include "kmer_hash.h"
 #include "resolve.h"
 #include "utils.h"
+#include "log.h"
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -88,8 +89,8 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2, struct asm_edge_t pre_e1,
 		struct asm_edge_t next_e2, struct asm_graph_t *lg)
 {
-	__VERBOSE_LOG("UNRELATED FILTER", "+++++++++++++++++++++++++++\n");
-	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
+	log_debug("Filter irrelevant edges");
+	log_debug("Before filter: %d edges", lg->n_e);
 	int e1 = emap1->gl_e;
 	int e2 = emap2->gl_e;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
@@ -140,7 +141,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		log_debug("Condensed graph degenerated, aborting filtering!");
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -148,7 +149,7 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		log_debug("After filter: %d edges", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -162,7 +163,6 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int pre_e1, int next_e2,
 		char **res_seq, int *seq_len)
 {
-	__VERBOSE("Matching edges...\n");
 	struct edge_map_info_t emap1;
 	get_local_edge_head(*g, *lg, e1, &emap1);
 
@@ -178,15 +178,15 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
 {
-	__VERBOSE_LOG("", "Local edge 1: %d\n", emap1->lc_e);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+	log_trace("Local edge 1: %d", emap1->lc_e);
+	log_trace("Global edge starts from: %d, ends at: %d",
 			emap1->gpos.start, emap1->gpos.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+	log_trace("Local edge starts from: %d, ends at: %d",
 			emap1->lpos.start, emap1->lpos.end);
-	__VERBOSE_LOG("", "Local edge 2: %d\n", emap2->lc_e);
-	__VERBOSE_LOG("", "Global edge starts from: %d, ends at: %d\n",
+	log_trace("Local edge 2: %d", emap2->lc_e);
+	log_trace("Global edge starts from: %d, ends at: %d",
 			emap2->gpos.start, emap2->gpos.end);
-	__VERBOSE_LOG("", "Local edge starts from: %d, ends at: %d\n",
+	log_trace("Local edge starts from: %d, ends at: %d",
 			emap2->lpos.start, emap2->lpos.end);
 }
 
@@ -330,7 +330,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//link_filter(opt, g, lg, emap1, emap2);
 	//print_graph(lg, emap1->gl_e, emap2->gl_e);
 
-	__VERBOSE("Start finding paths\n");
+	log_info("Start finding paths");
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
@@ -342,14 +342,12 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	if (pinfo.n_paths == 0)
 		goto end_function;
-	__VERBOSE_LOG("PATH", "Found %d paths, finding the best one\n",
-			pinfo.n_paths);
+	log_debug("Found %d paths, finding the best one", pinfo.n_paths);
 	float *scores;
 	float *error;
 	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
 	float best_score = 0;
 	int best_path = 0;
-	//FILE *f = fopen("loghao.txt", "w");
 	int min_score = 1e9;
 	int max_err = 0;
 	for (int i = 0; i < pinfo.n_paths; ++i){
@@ -357,21 +355,18 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		max_err = max(max_err, error[i]);
 	}
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		//fprintf(f, "%d %d %d\n", i, (int) scores[i], (int) error[i]);
-		/*__VERBOSE_LOG("", "Path %d: scores %.3f, err %.3f\n", i,
-				scores[i], error[i]);*/
+		log_trace("%d %d %d", i, (int) scores[i], (int) error[i]);
+		log_trace("Path %d: scores %.3f, err %.3f", i,
+				scores[i], error[i]);
 		if (scores[i] - min_score + max_err - error[i]  > best_score){
 			best_path = i;
 			best_score = scores[i] - min_score + max_err - error[i];
 		}
 	}
-	//fclose(f);
-	__VERBOSE_LOG("", "Found best path id: %d, scores: %.3f\n",
+	log_debug("Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
 	for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-		__VERBOSE("%d ", pinfo.paths[best_path][i]);
-	__VERBOSE("\n");
-	__VERBOSE_LOG("", "-----------------------------------------\n");
+		log_debug("%d ", pinfo.paths[best_path][i]);
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
@@ -414,7 +409,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		read_sorted_path.R2_path = opt->files_2[0];
 		read_sorted_path.idx_path = opt->files_I[0];
 	} else {
-		__ERROR("Reads must be sorted\n");
+		log_error("Reads must be sorted\n");
 	}
 	char r1_path[1024], r2_path[1024];
 	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
@@ -503,7 +498,7 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 	char *head_seq, *tail_seq;
 	int lc_e1 = path[0];
 	int lc_e2 = path[path_len - 1];
-	__VERBOSE("Joining from %d to %d\n", lc_e1, lc_e2);
+	log_debug("Joining from %d to %d", lc_e1, lc_e2);
 	sync_global_local_edge(e1, lg.edges[lc_e1], gpos1, lpos1,
 			SYNC_KEEP_GLOBAL, &head_seq);
 	sync_global_local_edge(e2, lg.edges[lc_e2], gpos2, lpos2,
@@ -553,9 +548,8 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 		int next_v = i + 1 == path_len ? -1 : path[i + 1];
 		struct asm_graph_t lg = get_local_assembly(opt, g,
 				g->edges[u].rc_id, v, dict);
-		__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-		__VERBOSE_LOG("INFO", "Processing %d on %d bridges\n", i, path_len - 1);
-		__VERBOSE_LOG("PATH", "Building bridge from %d to %d\n", u, v);
+		log_info("Processing %d on %d bridges", i, path_len - 1);
+		log_info("Building bridge from %d to %d", u, v);
 		char *seq;
 		int leng;
 		int res = get_bridge(opt, g, &lg, u, v, pre_u, next_v,
@@ -565,7 +559,7 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 			- g->edges[path[i]].seq_len);
 
 		++bridge_types[res];
-		__VERBOSE_LOG("GAP", "Closed gap: %d\n", closed_gap);
+		log_debug("Closed gap: %d", closed_gap);
 		fprintf(f, "Gap from %d to %d: %d\n", path[i],
 				path[i - 1], closed_gap);
 		fprintf(f, "%d %d %d\n", g->edges[path[i - 1]].seq_len,
@@ -575,14 +569,14 @@ void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g
 	}
 	fclose(f);
 	kh_destroy(bcpos, dict);
-	__VERBOSE_LOG("INFO", "Path summary:\n");
-	__VERBOSE_LOG("", "Number of trivial bridges: %d\n",
+	log_info("Path summary:");
+	log_debug("Number of trivial bridges: %d",
 			bridge_types[BRIDGE_TRIVIAL_BRIDGE]);
-	__VERBOSE_LOG("", "Number of cases where local edges not found: %d\n",
+	log_debug("Number of cases where local edges not found: %d",
 			bridge_types[BRIDGE_LOCAL_NOT_FOUND]);
-	__VERBOSE_LOG("", "Number of multiple paths: %d\n",
+	log_debug("Number of multiple paths: %d",
 			bridge_types[BRIDGE_MULTIPLE_PATH]);
-	__VERBOSE_LOG("", "Number of disconnected region: %d\n",
+	log_debug("Number of disconnected region: %d",
 			bridge_types[BRIDGE_PATH_NOT_FOUND]);
 }
 
@@ -640,8 +634,8 @@ void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
 {
-	__VERBOSE_LOG("COV FILTER", "+----------------------------------+\n");
-	__VERBOSE_LOG("", "Before filter: %ld edges\n", lg->n_e);
+	log_info("Filter by coverage");
+	log_debug("Before filter: %ld edges\n", lg->n_e);
 	int thresh = (int) (MIN_DEPTH_RATIO *
 			min(get_cov(*lg, emap1->lc_e),
 				get_cov(*lg, emap2->lc_e)));
@@ -656,7 +650,7 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		log_debug("Condensed graph degenerated, aborting filtering!\n");
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -664,7 +658,7 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		log_debug("After filter: %d edges\n", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -674,8 +668,8 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
 {
-	__VERBOSE_LOG("CONNECTION FILTER", "+----------------------------------+\n");
-	__VERBOSE_LOG("", "Before filter: %d edges\n", lg->n_e);
+	log_info("Filter by connections");
+	log_debug("Before filter: %d edges", lg->n_e);
 	int *forward_len, *backward_len;
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
@@ -707,7 +701,7 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		__VERBOSE_LOG("", "Condensed graph degenerated, aborting filtering!\n");
+		log_debug("Condensed graph degenerated, aborting filtering!");
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -715,7 +709,7 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		__VERBOSE_LOG("", "After filter: %d edges\n", lg1.n_e);
+		log_debug("After filter: %d edges", lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -777,12 +771,16 @@ int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 	return 0;
 }
 
+/**
+ * @brief The main function for local assembly process
+ * @param opt main options struct
+ * @param f the final scaffolds file with gap closed.
+ */
 void build_bridge(struct opt_proc_t *opt, FILE *f)
 {
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
-	__VERBOSE_LOG("INFO", "kmer size: %d\n", g0->ksize);
+	load_asm_graph(g0, opt->in_file); /* The global assembly graph */
 	test_asm_graph(g0);
 	int *mark = (int *) calloc(g0->n_e, sizeof(int));
 
@@ -790,7 +788,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	struct query_record_t query_record;
 	FILE *fp = fopen(opt->in_fasta, "r");
 	int n_paths;
-	fscanf(fp, "%d\n", &n_paths);
+	fscanf(fp, "%d\n", &n_paths); /* Total number of paths in the scaffolds */
 	scaffold.n_paths = n_paths;
 	scaffold.path_lens = calloc(n_paths, sizeof(int));
 	scaffold.paths = calloc(n_paths, sizeof(int *));
@@ -800,6 +798,10 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	query_record.next_e2 = NULL;
 	query_record.process_pos = 0;
 	query_record.n_process = 0;
+	/*
+	 * Prepare the bundle structs for local assembly
+	 * One local assembly process needs an e1, e2, pre e1, next e2
+	 */
 	for (int i = 0; i < n_paths; ++i){
 		int path_len;
 		fscanf(fp, "%d\n", &path_len);
@@ -832,12 +834,11 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	query_record.process_pos = 0;
 	fclose(fp);
 
-	__VERBOSE("+------------------------------------------------------+\n");
-	__VERBOSE("Getting all local graphs\n");
-	get_all_local_graphs(opt, g0, &query_record);
-	__VERBOSE("Done getting all local graphs\n");
-	__VERBOSE("+------------------------------------------------------+\n");
+	log_info("Getting all local graphs");
+	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
+	log_info("Done getting all local graphs");
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
+
 	pthread_mutex_t query_lock;
 	pthread_mutex_init(&query_lock, NULL);
 	pthread_mutex_t bridge_lock;
@@ -846,6 +847,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	opt->n_threads = 1; /* Edit to 1 thread */
 	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
 			sizeof(struct build_bridge_bundle_t));
 	for (int i = 0; i < opt->n_threads; ++i){
@@ -856,8 +858,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		worker_bundles[i].bridge_lock = &bridge_lock;
 		worker_bundles[i].bridges = bridges;
 	}
-	__VERBOSE("\n+------------------------------------------------------------------------------+\n");
-	__VERBOSE("Building bridges on scaffold:\n");
+	log_info("Building bridges on scaffold");
 	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_create(worker_threads + i, &attr, build_bridge_iterator,
@@ -873,8 +874,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	free(worker_bundles);
 	free(worker_threads);
 
-
-	__VERBOSE("DONE, printing bridges\n");
+	log_info("Done local assembly. Now print all the bridged sequences");
 	int p = 0;
 	int **paths = scaffold.paths;
 	int *path_lens = scaffold.path_lens;
@@ -899,6 +899,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		free(scaffold.paths[i]);
 	free(scaffold.paths);
 
+	log_info("Print remain sequences");
 	for (int i = 0; i < g0->n_e; ++i){
 		if (g0->edges[i].seq_len < MIN_OUTPUT_CONTIG_LEN)
 			continue;
@@ -919,6 +920,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 
 void *build_bridge_iterator(void *data)
 {
+	int local_asm_res;
 	struct build_bridge_bundle_t *bundle = (struct build_bridge_bundle_t *)
 			data;
 	while (1){
@@ -944,9 +946,10 @@ void *build_bridge_iterator(void *data)
 				opt.lk);
 		struct asm_graph_t lg;
 		load_asm_graph(&lg, graph_bin_path);
-		get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
+		local_asm_res = get_bridge(&opt, bundle->g, &lg, e1, e2, pre_e1, next_e2, &seq,
 				&seq_len);
 		pthread_mutex_lock(bundle->bridge_lock);
+		log_debug("Local assembly status for edges %d and %d: %s", e1, e2, local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
 		asm_graph_destroy(&lg);
@@ -968,13 +971,18 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 	construct_read_index(&read_sorted_path, dict);
 
 	for (int i = 0; i < query->n_process; ++i){
-		__VERBOSE("Processing %d on %d local graphs\n", i,
+		if (!(i % 10) && i < query->n_process - 1)
+			log_info("Processing %d on %d local graphs", i,
 				query->n_process);
 		int e1 = query->e1[i];
 		int e2 = query->e2[i];
+		/*
+		 * Build the local assembly graph for two edges: e1.rev and e2
+		 */
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
 				e2, dict);
 		asm_graph_destroy(&lg);
 	}
+	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
 }

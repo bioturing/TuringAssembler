@@ -38,7 +38,7 @@
 
 #define __min(a, b) 		((a) < (b) ? (a) : (b))
 
-#define LOG_PADDING 40
+#define LOG_PADDING 30
 
 static struct {
     void *udata;
@@ -50,6 +50,7 @@ static struct {
     time_t start_time;
     time_t last_time;
     unsigned int mem_used;
+    char *stage;
 } L;
 
 
@@ -109,6 +110,12 @@ void init_logger(int level, const char * file_path)
 	log_set_level(__min(level, LOG_INFO));
 	L.usage = malloc(sizeof(struct rusage));
 	L.start_time = time(NULL);
+	L.stage = "General";
+}
+
+void set_log_stage(char *stage)
+{
+	L.stage = stage;
 }
 
 void log_change_file(const char *file_path)
@@ -135,34 +142,29 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	time_t usr_time, t;
 	t = time(NULL);
 	struct tm *lt = localtime(&t);
-	char src_code[LOG_PADDING];
+	char src_code[128];
 	unsigned int ru_maxrss;
 
+	usr_time = t - L.start_time;
+	struct tm *lt_real = localtime(&usr_time);
 	/* Get used time and memory */
 	if (level > LOG_TRACE) {
-		usr_time = t - L.start_time;
 		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage, only available for UNIX */
 		ru_maxrss = L.usage->ru_maxrss;
 		L.mem_used = ru_maxrss;
-		L.last_time = usr_time;
 	} else{
-		usr_time = L.last_time;
 		ru_maxrss = L.mem_used;
 	}
 
 	/* Cast the file name and line number into a file to easily align */
-	snprintf(src_code, LOG_PADDING -1, "%s:%d", file, line);
-	int l = strlen(src_code);
-	memset(src_code + l, ' ', LOG_PADDING - l - 1);
-	src_code[LOG_PADDING - 1] = '\0';
-
+	sprintf(src_code, "%s:%d", file, line);
 	/* Log to file . Always log to file*/
 	if (L.fp) {
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-			usr_time, ru_maxrss/1024);
+		fprintf(L.fp, "%s %-5s %-40s\t%-20s\t%.2f GB\t", buf, level_names[level], src_code,
+			L.stage, (double)ru_maxrss/(1<<20));
 		va_start(args, fmt);
 		vfprintf(L.fp, fmt, args);
 		va_end(args);
@@ -181,14 +183,14 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	if (!L.quiet) {
 		va_list args;
 		char buf[16];
-		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt)] = '\0';
+		buf[strftime(buf, sizeof(buf), "%H:%M:%S", lt_real)] = '\0';
 #ifdef LOG_USE_COLOR
 		fprintf(
-      stderr, "%s %s%-5s\x1b[0m \x1b[90m%s\x1b[0m\t%ld seconds\t%uMB\t",
-      buf, level_colors[level], level_names[level], src_code,  usr_time, ru_maxrss/1024);
+      stderr, "%s %s%-5s\x1b[0m \x1b[90m%-40s\x1b[0m\t%-20s\t%.2f GB\t",
+      buf, level_colors[level], level_names[level], src_code,  L.stage, (double)ru_maxrss/(1<<20));
 #else
-		fprintf(stderr, "%s %-5s %s\t%ld seconds\t%uMB\t", buf, level_names[level], src_code,
-		        usr_time, ru_maxrss/1024);
+		fprintf(stderr, "%s %-5s %-40s\t%-20s\t%.2fGB\t", buf, level_names[level], src_code,
+		        L.stage, (double)ru_maxrss/(1<<20));
 #endif
 		va_start(args, fmt);
 		vfprintf(stderr, fmt, args);
