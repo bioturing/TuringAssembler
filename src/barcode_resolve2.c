@@ -1587,16 +1587,20 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 			kh_put(gint, h2_key, h2->keys[i], &ret);
 		}
 	}
-	for (int i = 0; i < h_head->size; ++i){
-		if (h_head->keys[i] != (uint64_t) -1){
-			int ret;
-			kh_put(gint, h_exclude, h_head->keys[i], &ret);
+	if (g->edges[e1].seq_len >= CONTIG_LEVEL_1 + CONTIG_LEVEL_2){
+		for (int i = 0; i < h_head->size; ++i){
+			if (h_head->keys[i] != (uint64_t) -1){
+				int ret;
+				kh_put(gint, h_exclude, h_head->keys[i], &ret);
+			}
 		}
 	}
-	for (int i = 0; i < h_tail->size; ++i){
-		if (h_tail->keys[i] != (uint64_t) -1){
-			int ret;
-			kh_put(gint, h_exclude, h_tail->keys[i], &ret);
+	if (g->edges[e2].seq_len >= CONTIG_LEVEL_1 + CONTIG_LEVEL_2){
+		for (int i = 0; i < h_tail->size; ++i){
+			if (h_tail->keys[i] != (uint64_t) -1){
+				int ret;
+				kh_put(gint, h_exclude, h_tail->keys[i], &ret);
+			}
 		}
 	}
 	int n_shared = 0;

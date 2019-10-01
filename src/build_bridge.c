@@ -886,7 +886,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	opt->n_threads = 1; /* Edit to 1 thread */
+	//opt->n_threads = 1; /* Edit to 1 thread */
 	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
 			sizeof(struct build_bridge_bundle_t));
 	for (int i = 0; i < opt->n_threads; ++i){
@@ -1033,7 +1033,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		sprintf(marker, "%s/local_assembly_%d_%d/done_%d", opt->out_dir,
 				g->edges[e1].rc_id, e2, opt->lk);
 		if (access(marker, F_OK) != -1){
-			log_debug("Graph is already built, continuing");
+			log_debug("Graph is already built, continuing: %s", marker);
 			continue;
 		}
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
