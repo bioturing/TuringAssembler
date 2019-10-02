@@ -1587,7 +1587,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 			kh_put(gint, h2_key, h2->keys[i], &ret);
 		}
 	}
-	if (g->edges[e1].seq_len >= CONTIG_LEVEL_1 + CONTIG_LEVEL_2){
+	if (g->edges[e1].seq_len >= 6000){
 		for (int i = 0; i < h_head->size; ++i){
 			if (h_head->keys[i] != (uint64_t) -1){
 				int ret;
@@ -1595,7 +1595,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 			}
 		}
 	}
-	if (g->edges[e2].seq_len >= CONTIG_LEVEL_1 + CONTIG_LEVEL_2){
+	if (g->edges[e2].seq_len >= 6000){
 		for (int i = 0; i < h_tail->size; ++i){
 			if (h_tail->keys[i] != (uint64_t) -1){
 				int ret;
@@ -1606,6 +1606,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	int n_shared = 0;
 	int m_shared = 1;
 	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
+	int total = 0;
 	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
 		if (!kh_exist(h1_key, it))
 			continue;
@@ -1613,6 +1614,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 		khiter_t it2 = kh_get(gint, h2_key, key);
 		if (it2 == kh_end(h2_key))
 			continue;
+		++total;
 		it2 = kh_get(gint, h_exclude, key);
 		if (it2 != kh_end(h_exclude))
 			continue;
@@ -1622,8 +1624,8 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 		}
 		shared[n_shared++] = key;
 	}
-
-	filter_read(reads, dict, rpath, shared, n_shared);
+	log_debug("Keep %d barcodes in %d total", n_shared, total);
+	filter_read(reads, dict, rpath, shared, 1);
 	free(shared);
 	kh_destroy(gint, h1_key);
 	kh_destroy(gint, h2_key);

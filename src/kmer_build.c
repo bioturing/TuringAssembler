@@ -11,6 +11,7 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
+#include "io_utils.h"
 #include "../include/kmc_skipping.h"
 
 #define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
@@ -747,9 +748,20 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, files_1, n_files * sizeof(char *));
 	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
+	/*for (int i = 0; i < n_files; ++i){
+		if (check_file_empty(tmp_files[i])){
+			memset(g0, 0, sizeof(struct asm_graph_t));
+			return;
+		}
+	}*/
+	for (int i = 0; i < n_files; ++i){
+		printf("%s\n", tmp_files[i]);
+	}
+	printf("%s\n", work_dir);
 	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
 							n_files * 2, tmp_files);
 	log_debug("|---- Retrieving kmer from KMC database");
+	printf("haha\n");
 	struct kmhash_t kmer_table;
 	struct kmc_info_t kmc_inf;
 	char *kmc_pre = alloca(strlen(work_dir) + 50);
@@ -769,6 +781,7 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	add_garbage(ksize, &kmer_table, g0, e2);
 	log_info("Number of kmer: %lu", kmer_table.n_item);
 
+	printf("hihi\n");
 	log_debug("|---- Building graph connection");
 	build_asm_graph_from_kmhash(n_threads, ksize, &kmer_table, g);
 	uint64_t table_size = kmer_table.size;
@@ -791,5 +804,10 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
 	kmhash_destroy(&kmer_table);
 	destroy_kmc_info(&kmc_inf);
+	for (int i = 0; i < g->n_e; ++i){
+		if (g->edges[i].seq_len < 10000)
+			continue;
+		printf("%d %d\n", i, g->edges[i].seq_len);
+	}
 }
 
