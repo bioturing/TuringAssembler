@@ -17,9 +17,9 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -I ./src  -fPIC -g \
 	 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
 
-EXEC = skipping
+EXEC = TuringAssembler_dev
 
-EXEC_RELEASE = skipping_static
+EXEC_RELEASE = TuringAssembler
 
 # SRC = $(wildcard src/*.c)
 
