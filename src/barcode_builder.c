@@ -603,6 +603,8 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			p2[n2++] = a;
 		}
 	}
+	if (ar1.n != 2 || ar2.n != 2|| ar1.a->score < 50 || ar2.a->score < 50)
+		return;
 	if (bundle->aux_build & ASM_BUILD_CANDIDATE) { /* read information */
 		for (i = 0; i < n1; ++i) {
 			struct fasta_ref_t ref;
@@ -1079,7 +1081,6 @@ void *pathcount_buffer_iterator(void *data) {
 			rc2 = input_format == TYPE_FASTQ ?
 			      get_read_from_fq(&read2, buf2, &pos2) :
 			      get_read_from_fa(&read2, buf2, &pos2);
-
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				__ERROR("\nWrong format file in pathcount\n");

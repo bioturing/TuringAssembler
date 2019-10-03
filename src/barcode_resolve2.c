@@ -18,7 +18,7 @@
 #include "verbose.h" 
 #include "barcode_resolve2.h"
 KHASH_SET_INIT_INT64(gint);
-
+#define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
 #define __positive_ratio_unique(r)	((r) + EPS >= 0.08)
 #define MAX_EDGE_COUNT			10000
@@ -1569,9 +1569,27 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	struct barcode_hash_t *h1, *h2;
 	h1 = g->edges[e1].barcodes + 2;
 	h2 = g->edges[e2].barcodes + 2;
+	struct barcode_hash_t *h_head;
+	/*if (g->edges[e1].seq_len >= CONTIG_LEVEL_2)
+		h_head = g->edges[g->edges[e1].rc_id].barcodes + 2;
+	else if(g->edges[e1].seq_len >= CONTIG_LEVEL_1)
+		h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
+	else
+		h_head = g->edges[g->edges[e1].rc_id].barcodes;*/
+	struct barcode_hash_t *h_tail;
+	/*if (g->edges[e2].seq_len >= CONTIG_LEVEL_2)
+		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 2;
+	else if(g->edges[e2].seq_len >= CONTIG_LEVEL_1)
+		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
+	else
+		h_tail = g->edges[g->edges[e2].rc_id].barcodes;*/
+
+	h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
+	h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
 	kmint_t i, k;
 	khash_t(gint) *h1_key = kh_init(gint);
 	khash_t(gint) *h2_key = kh_init(gint);
+	khash_t(gint) *h_exclude = kh_init(gint);
 	for (i = 0; i < h1->size; ++i) {
 		if (h1->keys[i] != (uint64_t)-1) {
 			int ret;
@@ -1584,9 +1602,26 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 			kh_put(gint, h2_key, h2->keys[i], &ret);
 		}
 	}
+	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
+		for (int i = 0; i < h_head->size; ++i){
+			if (h_head->keys[i] != (uint64_t) -1){
+				int ret;
+				kh_put(gint, h_exclude, h_head->keys[i], &ret);
+			}
+		}
+	}
+	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
+		for (int i = 0; i < h_tail->size; ++i){
+			if (h_tail->keys[i] != (uint64_t) -1){
+				int ret;
+				kh_put(gint, h_exclude, h_tail->keys[i], &ret);
+			}
+		}
+	}
 	int n_shared = 0;
 	int m_shared = 1;
 	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
+	int total = 0;
 	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
 		if (!kh_exist(h1_key, it))
 			continue;
@@ -1594,17 +1629,22 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 		khiter_t it2 = kh_get(gint, h2_key, key);
 		if (it2 == kh_end(h2_key))
 			continue;
+		++total;
+		it2 = kh_get(gint, h_exclude, key);
+		if (it2 != kh_end(h_exclude))
+			continue;
 		if (n_shared == m_shared){
 			m_shared <<= 1;
 			shared = (uint64_t *) realloc(shared, m_shared * sizeof(uint64_t));
 		}
 		shared[n_shared++] = key;
 	}
-
+	log_debug("Keep %d barcodes in %d total", n_shared, total);
 	filter_read(reads, dict, rpath, shared, n_shared);
 	free(shared);
 	kh_destroy(gint, h1_key);
 	kh_destroy(gint, h2_key);
+	kh_destroy(gint, h_exclude);
 }
 
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
@@ -1883,7 +1923,7 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
-	get_local_reads(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
+	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
 	struct asm_graph_t lg, lg1;
 	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
 		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,

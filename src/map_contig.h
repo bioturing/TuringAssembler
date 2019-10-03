@@ -7,8 +7,7 @@
 #include "kmer_hash.h"
 #define KSIZE 100
 #define WINDOW_SIZE 1000
-#define POINT_MEDIUM_TRHESH 0.6
-#define POINT_HIGH_THRESH 0.8
+#define POINT_HIGH_THRESH 0.9
 
 struct map_contig_t{
 	struct asm_edge_t global_edge;
