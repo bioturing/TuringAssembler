@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #if defined(_MSC_VER)
 #include <time.h>
@@ -138,5 +139,22 @@ void unique(int *listV, int *n_v)
 		i = j;
 	}
 	*n_v = new_n_v;
+}
+/**
+ * Function to check whether a file exists or not using
+ * stat() function. It returns 1 if file exists at
+ * given path otherwise returns 0.
+ */
+int is_exist_stats(const char *path)
+{
+	struct stat stats;
+
+	stat(path, &stats);
+
+	// Check for file existence
+	if (stats.st_mode & F_OK)
+		return 1;
+
+	return 0;
 }
 

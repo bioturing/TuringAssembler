@@ -96,7 +96,8 @@ struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
 
 void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 {
-	init_logger(opt->log_level, "./build_scaffolding_1_2.log");
+	char *log_file = str_concate(opt->out_dir, "/build_scaffolding_1_2.log");
+	init_logger(opt->log_level, log_file);
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
 	log_info("Build scaffolding with kmer size: %d", g0->ksize);
@@ -207,6 +208,8 @@ void graph_query_process(struct opt_proc_t *opt)
 
 void build_bridge_process(struct opt_proc_t *opt)
 {
+	char *log_file = str_concate(opt->out_dir, "/build_bridge.log");
+	init_logger(opt->log_level, log_file);
 	FILE *f = xfopen(opt->lc, "w");
 	build_bridge(opt, f);
 	fclose(f);
@@ -289,7 +292,8 @@ void build_barcode_info(struct opt_proc_t *opt)
 
 void build_barcode_scaffold(struct opt_proc_t *opt)
 {
-	init_logger(opt->log_level, "./build_barcode_scaffold.log");
+	char *log_file = str_concate(opt->out_dir, "/build_barcode_scaffold.log");
+	init_logger(opt->log_level, log_file);
 	struct asm_graph_t g;
 	struct read_path_t read_sorted_path;
 
@@ -300,7 +304,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 		read_sorted_path.R2_path = opt->files_2[0];
 		read_sorted_path.idx_path = opt->files_I[0];
 	} else {
-		log_info("Read library is not sorted (type %d). Rearranging reads by barcodes", opt->lib_type);
+		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
 		sort_read(opt, &read_sorted_path);
 	}
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
@@ -338,7 +342,8 @@ void assembly_process(struct opt_proc_t *opt)
  */
 void assembly3_process(struct opt_proc_t *opt)
 {
-	 init_logger(opt->log_level, "./assembly3.log");
+	char *log_file = str_concate(opt->out_dir, "/assembly3.log");
+	 init_logger(opt->log_level, log_file);
 	 struct read_path_t read_sorted_path; /* To sort fastq file if needed */
 
 	 /**
@@ -362,7 +367,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	 	read_sorted_path.R2_path = opt->files_2[0];
 	 	read_sorted_path.idx_path = opt->files_I[0];
 	 } else {
-	 	log_info("Read library is not sorted (type %d). Rearranging reads by barcodes", opt->lib_type);
+	 	log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
 	 	set_log_stage("SortReads");
 	 	sort_read(opt, &read_sorted_path);
 	 }
