@@ -1024,17 +1024,9 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 			log_debug("Too complex region, continue");
 			continue;
 		}
-		char marker[1024];
-		sprintf(marker, "%s/local_assembly_%d_%d/done_%d", opt->out_dir,
-				g->edges[e1].rc_id, e2, opt->lk);
-		if (access(marker, F_OK) != -1){
-			log_debug("Graph is already built, continuing: %s", marker);
-			continue;
-		}
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
 				e2, dict);
 		asm_graph_destroy(&lg);
-		fclose(fopen(marker, "w"));
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
