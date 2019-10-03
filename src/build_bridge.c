@@ -979,20 +979,30 @@ void *build_bridge_iterator(void *data)
 		int seq_len;
 		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
 			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+			log_info("Graph is too complex, filling Ns");
 			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
 		} else {
 			char graph_bin_path[1024];
 			sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
-					bundle->opt->out_dir, bundle->g->edges[e1].rc_id, e2,
-					bundle->opt->lk);
-			struct asm_graph_t lg;
-			load_asm_graph(&lg, graph_bin_path);
-			local_asm_res = get_bridge(bundle->opt, bundle->g, &lg, e1, e2, scaffolds,
-					n_scaff, &seq, &seq_len);
-			asm_graph_destroy(&lg);
+					bundle->opt->out_dir,
+					bundle->g->edges[e1].rc_id,
+					e2, bundle->opt->lk);
+			if (access(graph_bin_path, F_OK) == -1){
+				log_info("Local graph not found, filling Ns");
+				join_bridge_dump(g->edges[e1], g->edges[e2],
+						&seq);
+			} else {
+				struct asm_graph_t lg;
+				load_asm_graph(&lg, graph_bin_path);
+				local_asm_res = get_bridge(bundle->opt, bundle->g, &lg,
+						e1, e2, scaffolds, n_scaff, &seq,
+						&seq_len);
+				asm_graph_destroy(&lg);
+			}
 		}
 		pthread_mutex_lock(bundle->bridge_lock);
-		log_debug("Local assembly status for edges %d and %d: %s", e1, e2, local_asm_result[local_asm_res]);
+		log_debug("Local assembly status for edges %d and %d: %s", e1, e2,
+				local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
 	}
@@ -1016,6 +1026,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		log_info("Processing %d on %d local graphs", i, query->n_process);
 		int e1 = query->e1[i];
 		int e2 = query->e2[i];
+		log_debug("Bridge contigs: %d %d", e1, e2);
 		/*
 		 * Build the local assembly graph for two edges: e1.rev and e2
 		 */
@@ -1025,7 +1036,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 			continue;
 		}
 		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
-				e2, dict);
+						e2, dict);
 		asm_graph_destroy(&lg);
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");

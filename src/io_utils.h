@@ -78,4 +78,6 @@ void destroy_shared_stream(struct shared_fstream_t *p, int n);
 
 /* flush buffer to output */
 void sfs_flush(struct shared_fstream_t *p);
+
+int check_file_empty(char *file_path);
 #endif

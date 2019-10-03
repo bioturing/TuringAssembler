@@ -744,10 +744,10 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2)
 {
-	log_debug("|---- Counting kmer");
 	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, files_1, n_files * sizeof(char *));
 	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
+	log_debug("|---- Counting kmer");
 	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
 							n_files * 2, tmp_files);
 	log_debug("|---- Retrieving kmer from KMC database");
