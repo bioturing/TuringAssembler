@@ -1591,20 +1591,20 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	khash_t(gint) *h2_key = kh_init(gint);
 	khash_t(gint) *h_exclude = kh_init(gint);
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] != (uint64_t)-1 && h1->cnts[i] > 1) {
+		if (h1->keys[i] != (uint64_t)-1) {
 			int ret;
 			kh_put(gint, h1_key, h1->keys[i], &ret);
 		}
 	}
 	for (i = 0; i < h2->size; ++i) {
-		if (h2->keys[i] != (uint64_t)-1 && h2->cnts[i] > 1) {
+		if (h2->keys[i] != (uint64_t)-1) {
 			int ret;
 			kh_put(gint, h2_key, h2->keys[i], &ret);
 		}
 	}
 	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
 		for (int i = 0; i < h_head->size; ++i){
-			if (h_head->keys[i] != (uint64_t) -1 && h_head->cnts[i] > 1){
+			if (h_head->keys[i] != (uint64_t) -1){
 				int ret;
 				kh_put(gint, h_exclude, h_head->keys[i], &ret);
 			}
@@ -1612,7 +1612,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	}
 	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
 		for (int i = 0; i < h_tail->size; ++i){
-			if (h_tail->keys[i] != (uint64_t) -1 && h_tail->cnts[i] > 1){
+			if (h_tail->keys[i] != (uint64_t) -1){
 				int ret;
 				kh_put(gint, h_exclude, h_tail->keys[i], &ret);
 			}
