@@ -366,7 +366,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_log_edge_map(emap1, emap2);
 	__VERBOSE("DONE\n");*/
 	//link_filter(opt, g, lg, emap1, emap2);
-	print_graph(lg, emap1->gl_e, emap2->gl_e);
+	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
 	log_info("Start finding paths");
 	struct path_info_t pinfo;
@@ -384,9 +384,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	float *scores;
 	float *error;
 	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
-	for (int i = 0; i < pinfo.n_paths; ++i)
-		__VERBOSE("%.3f ", scores[i]);
-	__VERBOSE("\n");
 	float best_score = 0;
 	int best_path = 0;
 	int min_score = 1e9;
@@ -396,9 +393,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		max_err = max(max_err, error[i]);
 	}
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		log_trace("%d %d %d", i, (int) scores[i], (int) error[i]);
+		/*log_trace("%d %d %d", i, (int) scores[i], (int) error[i]);
 		log_trace("Path %d: scores %.3f, err %.3f", i,
-				scores[i], error[i]);
+				scores[i], error[i]);*/
 		if (scores[i] - min_score + max_err - error[i]  > best_score){
 			best_path = i;
 			best_score = scores[i] - min_score + max_err - error[i];
@@ -406,8 +403,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	log_debug("Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
-	for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-		log_debug("%d ", pinfo.paths[best_path][i]);
+	/*for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
+		log_debug("%d ", pinfo.paths[best_path][i]);*/
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
@@ -868,7 +865,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	}
 	query_record.process_pos = 0;
 	fclose(fp);
-	__VERBOSE_LOG("INFO", "Done initializing scaffold paths\n");
+	log_info("Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
@@ -1016,9 +1013,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 	construct_read_index(&read_sorted_path, dict);
 
 	for (int i = 0; i < query->n_process; ++i){
-		if (!(i % 10) && i < query->n_process - 1)
-			log_info("Processing %d on %d local graphs", i,
-				query->n_process);
+		log_info("Processing %d on %d local graphs", i, query->n_process);
 		int e1 = query->e1[i];
 		int e2 = query->e2[i];
 		/*

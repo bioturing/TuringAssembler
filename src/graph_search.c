@@ -2,6 +2,7 @@
 #include "verbose.h"
 #include "helper.h"
 #include <math.h>
+#include "process.h"
 #define PATH_NOT_FOUND -1
 #define MAX_VISITED_EDGE 20000
 
@@ -138,7 +139,8 @@ int check_key_exist(khash_t(gint_int) *h, gint_t key)
 	return it != kh_end(h);
 }
 
-void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
+void print_graph(struct opt_proc_t *opt, struct asm_graph_t *lg, int lc_e1,
+		int lc_e2)
 {
 	/*char path[1024];
 	sprintf(path, "%d_%d_local.gfa", lc_e1, lc_e2);
@@ -191,8 +193,10 @@ void print_graph(struct asm_graph_t *lg, int lc_e1, int lc_e2)
 	free(mark);
 	fclose(f);*/
 	char path[1024];
-	sprintf(path, "filtered_%d_%d", lc_e1, lc_e2);
-	save_graph_info("local_graphs", lg, path);
+	sprintf(path, "%s", opt->out_dir);
+	char file_name[1024];
+	sprintf(file_name, "filtered_%d_%d", lc_e1, lc_e2);
+	save_graph_info(path, lg, file_name);
 }
 
 void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,

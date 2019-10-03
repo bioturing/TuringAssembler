@@ -748,16 +748,6 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **tmp_files = alloca(n_files * 2 * sizeof(char *));
 	memcpy(tmp_files, files_1, n_files * sizeof(char *));
 	memcpy(tmp_files + n_files, files_2, n_files * sizeof(char *));
-	/*for (int i = 0; i < n_files; ++i){
-		if (check_file_empty(tmp_files[i])){
-			memset(g0, 0, sizeof(struct asm_graph_t));
-			return;
-		}
-	}*/
-	for (int i = 0; i < n_files; ++i){
-		printf("%s\n", tmp_files[i]);
-	}
-	printf("%s\n", work_dir);
 	KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
 							n_files * 2, tmp_files);
 	log_debug("|---- Retrieving kmer from KMC database");
@@ -776,8 +766,9 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 			(void *)(&kmbuild_bundle), split_kmer_from_kedge_multi);
 	kmbuild_bundle_destroy(&kmbuild_bundle);
 
-	//add_garbage(ksize, &kmer_table, g0, e1);
-	//add_garbage(ksize, &kmer_table, g0, e2);
+	//TODO FIX ME
+	add_garbage(ksize, &kmer_table, g0, e1);
+	add_garbage(ksize, &kmer_table, g0, e2);
 	log_info("Number of kmer: %lu", kmer_table.n_item);
 
 	log_debug("|---- Building graph connection");
@@ -797,14 +788,10 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	kmedge_bundle.g = g;
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 			(void *)(&kmedge_bundle), assign_count_kedge_multi);
-	//assign_count_garbage(ksize + 1, &kmer_table, g, g0, e1);
-	//assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
+	//TODO: FIX ME
+	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e1);
+	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
 	kmhash_destroy(&kmer_table);
 	destroy_kmc_info(&kmc_inf);
-	for (int i = 0; i < g->n_e; ++i){
-		if (g->edges[i].seq_len < 10000)
-			continue;
-		printf("%d %d\n", i, g->edges[i].seq_len);
-	}
 }
 

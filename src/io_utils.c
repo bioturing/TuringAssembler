@@ -153,12 +153,3 @@ void sfs_flush(struct shared_fstream_t *p)
 	pthread_mutex_unlock(p->lock);
 	p->buf_len = 0;
 }
-
-int check_file_empty(char *dir)
-{
-	struct stat st;
-	stat(dir, &st);
-	if (st.st_size == 0)
-		return 1;
-	return 0;
-}

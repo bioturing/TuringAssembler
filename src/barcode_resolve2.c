@@ -18,7 +18,7 @@
 #include "verbose.h" 
 #include "barcode_resolve2.h"
 KHASH_SET_INIT_INT64(gint);
-
+#define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
 #define __positive_ratio_unique(r)	((r) + EPS >= 0.08)
 #define MAX_EDGE_COUNT			10000
@@ -1570,19 +1570,19 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	h1 = g->edges[e1].barcodes + 2;
 	h2 = g->edges[e2].barcodes + 2;
 	struct barcode_hash_t *h_head;
-	if (g->edges[e1].seq_len >= CONTIG_LEVEL_2)
+	/*if (g->edges[e1].seq_len >= CONTIG_LEVEL_2)
 		h_head = g->edges[g->edges[e1].rc_id].barcodes + 2;
 	else if(g->edges[e1].seq_len >= CONTIG_LEVEL_1)
 		h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
 	else
-		h_head = g->edges[g->edges[e1].rc_id].barcodes;
+		h_head = g->edges[g->edges[e1].rc_id].barcodes;*/
 	struct barcode_hash_t *h_tail;
-	if (g->edges[e2].seq_len >= CONTIG_LEVEL_2)
+	/*if (g->edges[e2].seq_len >= CONTIG_LEVEL_2)
 		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 2;
 	else if(g->edges[e2].seq_len >= CONTIG_LEVEL_1)
 		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
 	else
-		h_tail = g->edges[g->edges[e2].rc_id].barcodes;
+		h_tail = g->edges[g->edges[e2].rc_id].barcodes;*/
 
 	h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
 	h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
@@ -1591,21 +1591,18 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	khash_t(gint) *h2_key = kh_init(gint);
 	khash_t(gint) *h_exclude = kh_init(gint);
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] != (uint64_t) -1)
-			__VERBOSE("%d ", h1->cnts[i]);
 		if (h1->keys[i] != (uint64_t)-1 && h1->cnts[i] > 1) {
 			int ret;
 			kh_put(gint, h1_key, h1->keys[i], &ret);
 		}
 	}
-	__VERBOSE("\n");
 	for (i = 0; i < h2->size; ++i) {
 		if (h2->keys[i] != (uint64_t)-1 && h2->cnts[i] > 1) {
 			int ret;
 			kh_put(gint, h2_key, h2->keys[i], &ret);
 		}
 	}
-	if (g->edges[e1].seq_len >= 6000){
+	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
 		for (int i = 0; i < h_head->size; ++i){
 			if (h_head->keys[i] != (uint64_t) -1 && h_head->cnts[i] > 1){
 				int ret;
@@ -1613,7 +1610,7 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 			}
 		}
 	}
-	if (g->edges[e2].seq_len >= 6000){
+	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
 		for (int i = 0; i < h_tail->size; ++i){
 			if (h_tail->keys[i] != (uint64_t) -1 && h_tail->cnts[i] > 1){
 				int ret;
