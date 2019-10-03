@@ -32,6 +32,7 @@ void init_global_params(struct asm_graph_t *g)
 	global_n_candidate = 11;
 	global_count_bc_size = 3000;
 	global_distance = 60000;
+	global_number_n = 100;
   log_info("------Init global params done---------");
   check_global_params(g);
 }

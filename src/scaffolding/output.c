@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include "scaffolding/edge.h"
 #include "scaffolding/contig.h"
+#include "global_params.h"
+#include "output.h"
 
 gint_t dump_edge_seq_reduce_N(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 {
@@ -39,12 +41,15 @@ void print_seq(FILE *fp, int index, char *seq, int len, int cov)
 	}
 }
 
-void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig, int *list_contig)
+struct contig_statictis print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig, int *list_contig)
 {
+	struct contig_statictis sta;
+	sta.number_N = 0;
+	sta.contig_length = 0;
 	if (n_contig == 0)
-		return;
+		return sta;
 	char *seq = NULL, *total_seq = NULL, *NNN = NULL;
-	const int len_NNN = 300;
+	const int len_NNN = global_number_n;
 	NNN = calloc(len_NNN, sizeof(char));
 	for (int i = 0; i < len_NNN; i++) 
 		NNN[i] = 'N';
@@ -57,8 +62,10 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 		memcpy(total_seq + total_len, seq, len_of_contig);
 		memcpy(total_seq + total_len + len_of_contig, NNN, len_NNN);
 		total_len += len_of_contig + len_NNN;
+		sta.number_N += len_NNN;
 	}
 	total_len -= len_NNN;
+	sta.number_N -= len_NNN;
 	print_seq(out_file, index, total_seq, total_len, 1);
 	for(int i = 0; i < n_contig; i++) {
 		int e = list_contig[i];
@@ -66,6 +73,8 @@ void print_contig(struct asm_graph_t *g, FILE *out_file, int index, int n_contig
 	free(seq);
 	free(total_seq);
 	free(NNN);
+	sta.contig_length = total_len;
+	return sta;
 }
 
 void print_gfa_from_E(struct asm_graph_t *g, int n_e, struct scaffold_edge *listE, int n_v, int *listV, FILE *out_graph)

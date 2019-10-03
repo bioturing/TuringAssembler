@@ -7,8 +7,22 @@
 #include "utils.h"
 #include "scaffolding/global_params.h"
 
+int greater_int(const void *a, const void *b) {
+	int x = *(int *) a;
+	int y = *(int *) b;
+	if (x < y) {
+		return 1;
+	} else if (x == y) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
 void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type *scaffold)
 {
+	int total_length = 0, total_N = 0, largest_contig=0, N50 = 0, Gaps= 0, L50 = 0;
+	int *list_length = calloc(scaffold->n_path, sizeof(int));
 	for (int i = 0; i < scaffold->n_path; i++)  {
 		struct scaffold_path *path = &scaffold->path[i];
 		int sum_n = path->n_left_half + path->n_right_half;
@@ -16,9 +30,32 @@ void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type 
 		for(int i = 0; i < path->n_left_half; i++)
 			list_contig[path->n_left_half - 1 - i] = path->left_half[i];
 		COPY_ARR(path->right_half, list_contig + path->n_left_half, path->n_right_half);
-		print_contig(g, out_file, i, sum_n, list_contig);
+		struct contig_statictis sta = print_contig(g, out_file, i, sum_n, list_contig);
+		total_length += sta.contig_length;
+		total_N += sta.number_N;
+		if (sta.contig_length > largest_contig )
+			largest_contig = sta.contig_length;
+		list_length[i] =  sta.contig_length;
 		free(list_contig);
 	}
+	qsort(list_length, scaffold->n_path, sizeof(int), greater_int);
+	int cur_sum_len = 0;
+	for (int i = 0; i < scaffold->n_path; i++) {
+		cur_sum_len += list_length[i];
+		if (cur_sum_len >= total_length/2) {
+			L50 = i+1;
+			N50 = list_length[i];
+			break;
+		}
+	}
+	Gaps = total_N/ global_number_n;
+	log_info("------- INFO SUMMARY ------ ");
+	log_info("Total length: %d", total_length);
+	log_info("Total N: %d", total_N);
+	log_info("Largest contig: %d", largest_contig);
+	log_info("N50 :%d", N50);
+	log_info("L50 :%d", L50);
+	log_info("");
 }
 
 void append_i_contig(struct scaffold_path *path, int i_contig)
@@ -63,8 +100,8 @@ void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffol
 {
 	int n_paths = 0;
 	for (int i = 0; i < scaffold->n_path; ++i)
-		n_paths += scaffold->path[i].n_left_half
-			+ scaffold->path[i].n_right_half > 1;
+		n_paths += (scaffold->path[i].n_left_half
+			+ scaffold->path[i].n_right_half) > 1;
 	char tmp_file[1024];
 	snprintf(tmp_file, 1024, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
 	FILE *f = fopen(tmp_file, "w");
