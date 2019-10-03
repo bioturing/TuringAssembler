@@ -33,11 +33,7 @@ void print_usage()
 {
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler is a program developed by BioTuring for doing genome assembly with read-cloud technology\n");
-	__VERBOSE("Please contact info@bioturing.com if you need further support.\n");
-	__VERBOSE("This is an academic version, which is free for academic labs\n");
-	__VERBOSE("No IP or commercial work can be derived from using this free academic version\n");
-	__VERBOSE("If you are using TuringAssembler for IP or commercial related work, please contact\n");
-	__VERBOSE("support@bioturing.com to obtain a license\n");
+	__VERBOSE("Please contact support@bioturing.com if you need further support.\n");
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler - A genome assembler for read-cloud technology\n");
 	__VERBOSE("Version: %s%s\n", VERSION_STRING, GIT_SHA);
@@ -68,11 +64,7 @@ void check_process_assembly3(int argc, struct opt_proc_t *opt)
 	int stop = 0;
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler is a program developed by BioTuring for doing genome assembly with read-cloud technology\n");
-	__VERBOSE("Please contact info@bioturing.com if you need further support.\n");
-	__VERBOSE("This is an academic version, which is free for academic labs\n");
-	__VERBOSE("No IP or commercial work can be derived from using this free academic version\n");
-	__VERBOSE("If you are using TuringAssembler for IP or commercial related work, please contact\n");
-	__VERBOSE("support@bioturing.com to obtain a license\n");
+	__VERBOSE("Please contact support@bioturing.com if you need further support.\n");
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler - A genome assembler for read-cloud technology\n");
 	if (argc == 2) {
@@ -104,11 +96,7 @@ void check_process_local_ass(int argc, struct opt_proc_t *opt)
 	int stop = 0;
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler is a program developed by BioTuring for doing genome assembly with read-cloud technology\n");
-	__VERBOSE("Please contact info@bioturing.com if you need further support.\n");
-	__VERBOSE("This is an academic version, which is free for academic labs\n");
-	__VERBOSE("No IP or commercial work can be derived from using this free academic version\n");
-	__VERBOSE("If you are using TuringAssembler for IP or commercial related work, please contact\n");
-	__VERBOSE("support@bioturing.com to obtain a license\n");
+	__VERBOSE("Please contact support@bioturing.com if you need further support.\n");
 	__VERBOSE("=====================================================================================================\n");
 	__VERBOSE("TuringAssembler - A genome assembler for read-cloud technology\n");
 	__VERBOSE("Suggested arguments for local_assembly:\n");
