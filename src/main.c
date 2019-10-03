@@ -130,7 +130,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-v")) {
 			opt->log_level = LOG_DEBUG;
-			pos += 2;
+			pos += 1;
 		} else if (!strcmp(argv[pos], "-k0")) {
 			opt->k0 = atoi(argv[pos + 1]);
 			pos += 2;
@@ -199,7 +199,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 				++opt->n_files;
 			}
 		} else if (!strcmp(argv[pos], "-lc")){
-			sprintf(opt->lc, "%s/scaffold.full.fasta", argv[pos + 1]);
+			opt->lc = argv[pos + 1];
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-lk")){
 			opt->lk = atoi(argv[pos + 1]);
