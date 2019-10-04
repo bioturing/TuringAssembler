@@ -1049,7 +1049,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 void cleanup(struct opt_proc_t *opt)
 {
-	if (opt->log_level > LOG_DEBUG_TECH){
+	if (opt->log_level <= LOG_DEBUG_TECH){
 		log_info("Currently in technical debug mode, nothing to be cleaned");
 		return;
 	}
