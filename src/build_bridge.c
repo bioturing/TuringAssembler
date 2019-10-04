@@ -932,10 +932,6 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	for (int i = 0; i < query_record.n_process; ++i)
 		free(bridges[i]);
 	free(bridges);
-	free(scaffold.path_lens);
-	for (int i = 0; i < scaffold.n_paths; ++i)
-		free(scaffold.paths[i]);
-	free(scaffold.paths);
 
 	log_info("Print remain sequences");
 	for (int i = 0; i < g0->n_e; ++i){
@@ -952,8 +948,15 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		}
 	}
 	free(mark);
+	free(scaffold.path_lens);
+	for (int i = 0; i < scaffold.n_paths; ++i)
+		free(scaffold.paths[i]);
+	free(scaffold.paths);
+
 	asm_graph_destroy(g0);
 	free(g0);
+
+	cleanup(opt);
 }
 
 void *build_bridge_iterator(void *data)
@@ -1041,4 +1044,19 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
+}
+
+void cleanup(struct opt_proc_t *opt)
+{
+	if (opt->log_level > LOG_DEBUG_TECH){
+		log_info("Currently in technical debug mode, nothing to be cleaned");
+		return;
+	}
+	log_info("Cleaning up all files in %s", opt->out_dir);
+	int flag = 0;
+	flag = remove(opt->out_dir);
+	if (flag)
+		log_info("Some files are not deleted, please check in %s",
+				opt->out_dir);
+	log_info("Done cleaning up");
 }

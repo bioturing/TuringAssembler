@@ -122,4 +122,5 @@ void build_bridge(struct opt_proc_t *opt, FILE *f);
 void *build_bridge_iterator(void *data);
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query);
+void cleanup(struct opt_proc_t *opt);
 #endif

@@ -41,26 +41,26 @@
 #define LOG_PADDING 30
 
 static struct {
-    void *udata;
-    log_LockFn lock;
-    FILE *fp;
-    int level;
-    int quiet;
-    struct rusage usage;
-    time_t start_time;
-    time_t last_time;
-    unsigned int mem_used;
-    char *stage;
+	void *udata;
+	log_LockFn lock;
+	FILE *fp;
+	int level;
+	int quiet;
+	struct rusage *usage;
+	time_t start_time;
+	time_t last_time;
+	unsigned int mem_used;
+	char *stage;
 } L;
 
 
 static const char *level_names[] = {
-	"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
+	"TRACE", "DEBUG_TECH", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
 };
 
 #ifdef LOG_USE_COLOR
 static const char *level_colors[] = {
-  "\x1b[94m", "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[35m"
+	"\x1b[94m", "\x1b[36m", "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[35m"
 };
 #endif
 
