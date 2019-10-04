@@ -1,7 +1,7 @@
-#include "helper.h"
-#include "utils.h"
 #include <fts.h>
 #include <errno.h>
+#include "helper.h"
+#include "utils.h"
 #include "log.h"
 char __base[5] = {'A', 'C', 'G', 'T', 'N'};
 

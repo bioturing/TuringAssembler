@@ -1909,7 +1909,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 	cand_len[id] = e1_len + sum_len + e2_len - g->ksize;
 }
 
-struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 					gint_t e1, gint_t e2, khash_t(bcpos) *dict)
 {
 	struct read_path_t read_sorted_path, local_read_path;
@@ -1930,7 +1930,6 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 		|| check_file_empty(local_read_path.R2_path)){
 		log_warn("Local read file is empty, please take a look at %s and %s",
 				local_read_path.R1_path, local_read_path.R2_path);
-		return *((struct asm_graph_t *) calloc(1, sizeof(struct asm_graph_t)));
 	} else {
 		struct asm_graph_t lg, lg1;
 		build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
@@ -1940,7 +1939,7 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 		build_local_0_1(&lg, &lg1);
 		save_graph_info(work_dir, &lg1, "local_lvl_1");
 		destroy_read_path(&local_read_path);
-		return lg1;
+		asm_graph_destroy(&lg1);
 	}
 }
 
