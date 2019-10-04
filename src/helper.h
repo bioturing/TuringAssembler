@@ -15,4 +15,5 @@ char flip(char base);
 float get_cov(struct asm_graph_t g, int edge);
 void swap(void *a, void *b, int size);
 void get_dump_N(char **N);
+int recursive_delete(char *dir);
 #endif

@@ -1,5 +1,8 @@
 #include "helper.h"
 #include "utils.h"
+#include <fts.h>
+#include <errno.h>
+#include "log.h"
 char __base[5] = {'A', 'C', 'G', 'T', 'N'};
 
 char int_to_base(int x)
@@ -78,3 +81,53 @@ int max(int a, int b)
 {
 	return a > b ? a : b;
 }
+
+// https://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
+int recursive_delete(char *dir)
+{
+	int ret = 0;
+	FTS *ftsp = NULL;
+	FTSENT *curr;
+
+	char *files[] = {dir, NULL};
+
+	ftsp = fts_open(files, FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, NULL);
+	if (!ftsp){
+		log_debug("%s: fts open failed: %s", curr->fts_accpath,
+				strerror(errno));
+		ret = -1;
+		goto finish;
+	}
+	while ((curr = fts_read(ftsp))){
+		switch(curr->fts_info){
+			case FTS_NS:
+			case FTS_DNR:
+			case FTS_ERR:
+				log_debug("%s fts_read error: %s",
+					curr->fts_accpath, strerror(errno));
+				break;
+			case FTS_DC:
+			case FTS_DOT:
+			case FTS_NSOK:
+				break;
+			case FTS_D:
+				break;
+			case FTS_DP:
+			case FTS_F:
+			case FTS_SL:
+			case FTS_SLNONE:
+			case FTS_DEFAULT:
+				if (remove(curr->fts_accpath) < 0){
+					log_debug("%s: Failed to remove %s",
+						curr->fts_path, strerror(errno));
+					ret = -1;
+				}
+				break;
+		}
+	}
+finish:
+	if (ftsp)
+		fts_close(ftsp);
+	return ret;
+}
+

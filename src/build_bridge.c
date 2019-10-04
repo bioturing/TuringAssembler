@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "log.h"
 #include "io_utils.h"
+#include <errno.h>
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
@@ -1054,7 +1055,7 @@ void cleanup(struct opt_proc_t *opt)
 	}
 	log_info("Cleaning up all files in %s", opt->out_dir);
 	int flag = 0;
-	flag = remove(opt->out_dir);
+	flag = recursive_delete(opt->out_dir);
 	if (flag)
 		log_info("Some files are not deleted, please check in %s",
 				opt->out_dir);
