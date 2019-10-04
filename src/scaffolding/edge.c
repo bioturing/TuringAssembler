@@ -192,3 +192,8 @@ void print_edge_score(struct edges_score_type *edges_score)
 	}
 }
 
+void destroy_edges_score_type(struct edges_score_type *edges_score)
+{
+	free(edges_score->list_edge);
+	free(edges_score);
+}

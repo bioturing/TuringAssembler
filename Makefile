@@ -63,6 +63,7 @@ SRC = src/assembly_graph.c 				\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
+      src/attribute.c 						\
       src/main.c \
       src/log.c
 

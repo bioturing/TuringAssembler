@@ -37,6 +37,8 @@ void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type 
 			largest_contig = sta.contig_length;
 		list_length[i] =  sta.contig_length;
 		free(list_contig);
+//		free(path->left_half);
+//		free(path->right_half);
 	}
 	qsort(list_length, scaffold->n_path, sizeof(int), greater_int);
 	int cur_sum_len = 0;
@@ -56,6 +58,7 @@ void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type 
 	log_info("N50 :%d", N50);
 	log_info("L50 :%d", L50);
 	log_info("");
+	free(list_length);
 }
 
 void append_i_contig(struct scaffold_path *path, int i_contig)
@@ -89,11 +92,19 @@ void add_path(struct scaffold_type *scaffold, struct scaffold_path *path)
 	scaffold->path[n-1].left_half = path->left_half;
 }
 
-void destroy_path(struct scaffold_path *path)
+void destroy_scaffold_path(struct scaffold_path *path)
 {
 	free(path->left_half);
 	free(path->right_half);
-	free(path);
+}
+
+void destroy_scaffold_type(struct scaffold_type *scaffold)
+{
+	for (int i = 0 ; i < scaffold->n_path; i++) {
+		destroy_scaffold_path(&scaffold->path[i]);
+	}
+	free(scaffold->path);
+	free(scaffold);
 }
 
 void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffold) 
@@ -105,7 +116,7 @@ void print_scaffold_contig(struct opt_proc_t *opt, struct scaffold_type *scaffol
 	char tmp_file[1024];
 	snprintf(tmp_file, 1024, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
 	FILE *f = fopen(tmp_file, "w");
-	log_debug("Number of scaffold paths: %d", n_paths);
+	log_info("Number of scaffold paths: %d", n_paths);
 	fprintf(f, "%d\n", n_paths);
 	for (int i = 0 ; i < scaffold->n_path; i++) {
 		struct scaffold_path *path = &scaffold->path[i];

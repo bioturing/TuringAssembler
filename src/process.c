@@ -111,6 +111,7 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	fclose(out_file);
 	asm_graph_destroy(g0);
 	free(g0);
+	free(log_file);
 	close_logger();
 }
 

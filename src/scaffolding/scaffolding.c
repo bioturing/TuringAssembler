@@ -127,7 +127,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 				sizeof(struct scaffold_edge));
 		struct scaffold_edge *new_candidate_edge = calloc(1, sizeof(struct scaffold_edge));
 		if ((i_contig == i_edge && g->edges[i_contig].seq_len < 50000)  || i_contig == get_rc_id(g, i_edge) ) {
-		    continue;
+			free(new_candidate_edge);
+			continue;
 		}
 		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = i_contig;
@@ -199,6 +200,7 @@ void *process_build_big_table(void *data)
 				if (k == kh_end(big_table)) {
 					int tmp = 1;
 					k = kh_put(big_table, big_table, barcode, &tmp);
+					kh_value(big_table, k) = NULL;
 					assert(tmp == 1);
 				}
 				struct list_position *pos = kh_value(big_table, k);
@@ -245,6 +247,7 @@ khash_t(big_table) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *op
 
 	khash_t(big_table) *big_table = params_build_table->big_table ;
 	free(params_build_table);
+	free(thr);
 
 	log_info("----- Build done -------");
 	return big_table;
@@ -320,6 +323,20 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 	}
 }
 
+void deep_kh_destroy(khash_t(big_table) *big_table)
+{
+	for (khiter_t it = kh_begin(big_table); it != kh_end(big_table); it++){
+		if (!(kh_exist(big_table, it))) {
+			continue;
+		}
+		struct list_position *pos = kh_value(big_table, it); 
+		free(pos->i_bin);
+		free(pos->i_contig);
+		free(pos);
+	}
+	kh_destroy(big_table, big_table);
+}
+
 void calc_score_pairwise(struct asm_graph_t *g, struct opt_proc_t* opt, struct edges_score_type **edges_score)
 {
 	log_info("----- Build candidate edge -----");
@@ -333,7 +350,7 @@ void calc_score_pairwise(struct asm_graph_t *g, struct opt_proc_t* opt, struct e
 	*edges_score = params_candidate->list_candidate_edges;
 
 	destroy_params_build_candidate(params_candidate);
-	kh_destroy(big_table, big_table);
+	deep_kh_destroy(big_table);
 }
 
 struct pair_contigs_score *get_score_edge(struct edges_score_type *edges_score, int src, int des)
@@ -377,13 +394,11 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
 	struct pair_contigs_score *second_score = calloc(1, sizeof(struct pair_contigs_score));
 	int des = edge->des;
-	struct pair_contigs_score *i_score; 
 	int last = get_last_n(path, is_left, 0);
 	if (is_left) last = get_rc_id(g, last);
-	i_score = get_score_edge(edges_score,last , des);
-	*score = *i_score;
-	i_score = get_score_edge(edges_score, last, g->edges[des].rc_id);
-	score->bc_score += i_score->bc_score/2;
+	score = get_score_edge(edges_score,last , des);
+	struct pair_contigs_score *tmp_score = get_score_edge(edges_score, last, g->edges[des].rc_id);
+	score->bc_score += tmp_score->bc_score/2;
 	int i = 0;
 	int distance = get_edge_len(&g->edges[last]);
 	log_trace("scascore %d %d %f", last, des, score->bc_score);
@@ -396,15 +411,17 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 			break;
 		if (is_left) 
 			src = get_rc_id(g, src);
-		i_score = get_score_edge(edges_score, src, des);
-		second_score->bc_score += i_score->bc_score;
+		struct pair_contigs_score *tmp_score= get_score_edge(edges_score, src, des);
+		second_score->bc_score += tmp_score->bc_score;
 		log_trace("more %d %f ", src, second_score->bc_score);
 		distance += get_edge_len(&g->edges[src]);
+		free(tmp_score);
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score/(i*3);
 	log_trace("donescascore %f %f %f", score->bc_score, score->m_score, score->m2_score);
 	free(second_score);
+	free(tmp_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
 	return score;
 }
@@ -456,6 +473,7 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	if (!better_edge(&res->score, thres_score))
 		res->i_contig = -1;
 	log_trace("res icontig %d thres score %f", res->i_contig, thres_score->bc_score);
+	free(max_score);
 	return res;
 }
 
@@ -524,11 +542,15 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	while (1) {
 		struct best_next_contig *next_l_contig, *next_r_contig, *next_contig;
-		next_l_contig = find_best_edge(g, edges_score, i_l_contig, path, mark, 1, divn(thres_score, 5*(*count)));
-		next_r_contig = find_best_edge(g, edges_score, i_r_contig, path, mark, 0, divn(thres_score, 5*(*count)));
+		struct pair_contigs_score *thres_score_d5  = divn(thres_score, 5*(*count));
+		next_l_contig = find_best_edge(g, edges_score, i_l_contig, path, mark, 1, thres_score_d5);
+		next_r_contig = find_best_edge(g, edges_score, i_r_contig, path, mark, 0, thres_score_d5);
 
 		log_trace("next l contig %d next r contig %d", next_l_contig->i_contig, next_r_contig->i_contig);
 		if (next_r_contig->i_contig == -1 && next_l_contig->i_contig == -1) {
+			free(next_l_contig);
+			free(next_r_contig);
+			free(thres_score_d5);
 			break;
 		}
 		if (next_r_contig->i_contig == -1 || better_edge(&next_l_contig->score, &next_r_contig->score)) {
@@ -544,6 +566,9 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		thres_score->bc_score = (thres_score->bc_score + next_contig->score.bc_score);
 		thres_score->m_score = (thres_score->m_score + next_contig->score.m_score);
 		thres_score->m2_score = (thres_score->m2_score + next_contig->score.m2_score);
+		free(next_l_contig);
+		free(next_r_contig);
+		free(thres_score_d5);
 		(*count)++;
 	}
 	return path;
@@ -583,6 +608,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
 		append_i_contig(path, i);
 		add_path(scaffold, path);
+		free(path);
 	}
 	free(mark);
 	free(thres_score);
@@ -623,6 +649,8 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 
 	print_scaffold_contig(opt, scaffold); /* print scaffold path into local_assembly_scaffold_path.txt */
 	print_scaffold(g, out_file, scaffold);
+	destroy_scaffold_type(scaffold);
+	destroy_edges_score_type(edges_score);
 }
 
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
