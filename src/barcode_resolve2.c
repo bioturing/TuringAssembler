@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "verbose.h" 
 #include "barcode_resolve2.h"
+#include "process.h"
 KHASH_SET_INIT_INT64(gint);
 #define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
@@ -1908,7 +1909,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 	cand_len[id] = e1_len + sum_len + e2_len - g->ksize;
 }
 
-struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 					gint_t e1, gint_t e2, khash_t(bcpos) *dict)
 {
 	struct read_path_t read_sorted_path, local_read_path;
@@ -1923,22 +1924,23 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
-	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g, e1, e2, work_dir);
-	struct asm_graph_t lg, lg1;
-	build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
-		&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
+	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
+			e1, e2, work_dir);
+	if (check_file_empty(local_read_path.R1_path)
+		|| check_file_empty(local_read_path.R2_path)){
+		log_warn("Local read file is empty, please take a look at %s and %s",
+				local_read_path.R1_path, local_read_path.R2_path);
+	} else {
+		struct asm_graph_t lg, lg1;
+		build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
+			&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
 		&lg, g, e1, e2);
-	save_graph_info(work_dir, &lg, "local_lvl_0");
-	build_local_0_1(&lg, &lg1);
-	save_graph_info(work_dir, &lg1, "local_lvl_1");
-	destroy_read_path(&local_read_path);
-	return lg1;
-	// uint32_t *ret_seq, ret_len;
-	// int ret = find_path_local(g, &lg1, e1, e2, &ret_seq, &ret_len);
-	// if (ret) {
-	// 	free(ret_seq);
-	// }
-	// resolve_local(opt, &local_read_path, &lg1, work_dir);
+		save_graph_info(work_dir, &lg, "local_lvl_0");
+		build_local_0_1(&lg, &lg1);
+		save_graph_info(work_dir, &lg1, "local_lvl_1");
+		destroy_read_path(&local_read_path);
+		asm_graph_destroy(&lg1);
+	}
 }
 
 struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,

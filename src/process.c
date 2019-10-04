@@ -433,6 +433,10 @@ void assembly3_process(struct opt_proc_t *opt)
 	 opt->files_I = malloc(sizeof(char *));
 	 opt->files_I[0] = read_sorted_path.idx_path;
 	 opt->lib_type = 0;
+	 char local_path[1024];
+	 sprintf(local_path, "%s/local", opt->out_dir);
+	 mkdir(local_path, 0755);
+	 opt->out_dir = local_path;
 	 build_bridge_process(opt);
 	 log_info("Done local assembly. Please see the file: %s", opt->lc);
 

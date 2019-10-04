@@ -178,6 +178,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-v")) {
 			opt->log_level = LOG_DEBUG;
 			pos += 1;
+		} else if (!strcmp(argv[pos], "-vv")) {
+			opt->log_level = LOG_DEBUG_TECH;
+			pos += 1;
 		} else if (!strcmp(argv[pos], "-k0")) {
 			opt->k0 = atoi(argv[pos + 1]);
 			pos += 2;

@@ -5,6 +5,8 @@ void graph_convert_process(struct opt_proc_t *opt);
 void clean_process(struct opt_proc_t *opt);
 void build_0_process(struct opt_proc_t *opt);
 void build_0_1_process(struct opt_proc_t *opt);
+void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g);
+void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g);
 void build_1_2_process(struct opt_proc_t *opt);
 void build_2_3_process(struct opt_proc_t *opt);
 void build_3_4_process(struct opt_proc_t *opt);

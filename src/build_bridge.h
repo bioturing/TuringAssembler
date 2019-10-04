@@ -76,8 +76,6 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_graph_t lg, int *path, int path_len,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq);
-void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int *path, int path_len, char **contig);
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int *scaffolds, int n_scaff,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
@@ -122,4 +120,5 @@ void build_bridge(struct opt_proc_t *opt, FILE *f);
 void *build_bridge_iterator(void *data);
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query);
+void cleanup(struct opt_proc_t *opt);
 #endif

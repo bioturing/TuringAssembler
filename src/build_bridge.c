@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "log.h"
 #include "io_utils.h"
+#include <errno.h>
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
@@ -555,69 +556,6 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 	free(tail_seq);
 }
 
-void get_contig_from_scaffold_path(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int *path, int path_len, char **contig)
-{
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		sort_read(opt, &read_sorted_path);
-	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-
-
-	*contig = (char *) calloc(1, sizeof(char));
-	char *tmp;
-	decode_seq(&tmp, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
-	join_seq(contig, tmp);
-	free(tmp);
-	int bridge_types[N_BRIDGE_TYPE] = {};
-	char gap_path[1024];
-	sprintf(gap_path, "%s/gap.txt", opt->out_dir);
-	FILE *f = fopen(gap_path, "w");
-	for (int i = 1; i < path_len; ++i){
-		int pre_u = i == 1 ? -1 : path[i - 2];
-		int u = path[i - 1];
-		int v = path[i];
-		int next_v = i + 1 == path_len ? -1 : path[i + 1];
-		struct asm_graph_t lg = get_local_assembly(opt, g,
-				g->edges[u].rc_id, v, dict);
-		log_info("Processing %d on %d bridges", i, path_len - 1);
-		log_info("Building bridge from %d to %d", u, v);
-		char *seq;
-		int leng;
-		int res = get_bridge(opt, g, &lg, u, v, path, path_len,
-				&seq, &leng);
-		join_seq(contig, seq + g->edges[path[i - 1]].seq_len);
-		int closed_gap = max(1, leng - g->edges[path[i - 1]].seq_len
-			- g->edges[path[i]].seq_len);
-
-		++bridge_types[res];
-		log_debug("Closed gap: %d", closed_gap);
-		fprintf(f, "Gap from %d to %d: %d\n", path[i],
-				path[i - 1], closed_gap);
-		fprintf(f, "%d %d %d\n", g->edges[path[i - 1]].seq_len,
-				g->edges[path[i]].seq_len, leng);
-		free(seq);
-		asm_graph_destroy(&lg);
-	}
-	fclose(f);
-	kh_destroy(bcpos, dict);
-	log_info("Path summary:");
-	log_debug("Number of trivial bridges: %d",
-			bridge_types[BRIDGE_TRIVIAL_BRIDGE]);
-	log_debug("Number of cases where local edges not found: %d",
-			bridge_types[BRIDGE_LOCAL_NOT_FOUND]);
-	log_debug("Number of multiple paths: %d",
-			bridge_types[BRIDGE_MULTIPLE_PATH]);
-	log_debug("Number of disconnected region: %d",
-			bridge_types[BRIDGE_PATH_NOT_FOUND]);
-}
-
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq)
 {
@@ -932,10 +870,6 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	for (int i = 0; i < query_record.n_process; ++i)
 		free(bridges[i]);
 	free(bridges);
-	free(scaffold.path_lens);
-	for (int i = 0; i < scaffold.n_paths; ++i)
-		free(scaffold.paths[i]);
-	free(scaffold.paths);
 
 	log_info("Print remain sequences");
 	for (int i = 0; i < g0->n_e; ++i){
@@ -952,8 +886,15 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		}
 	}
 	free(mark);
+	free(scaffold.path_lens);
+	for (int i = 0; i < scaffold.n_paths; ++i)
+		free(scaffold.paths[i]);
+	free(scaffold.paths);
+
 	asm_graph_destroy(g0);
 	free(g0);
+
+	cleanup(opt);
 }
 
 void *build_bridge_iterator(void *data)
@@ -979,20 +920,30 @@ void *build_bridge_iterator(void *data)
 		int seq_len;
 		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
 			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+			log_info("Graph is too complex, filling Ns");
 			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
 		} else {
 			char graph_bin_path[1024];
 			sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
-					bundle->opt->out_dir, bundle->g->edges[e1].rc_id, e2,
-					bundle->opt->lk);
-			struct asm_graph_t lg;
-			load_asm_graph(&lg, graph_bin_path);
-			local_asm_res = get_bridge(bundle->opt, bundle->g, &lg, e1, e2, scaffolds,
-					n_scaff, &seq, &seq_len);
-			asm_graph_destroy(&lg);
+					bundle->opt->out_dir,
+					bundle->g->edges[e1].rc_id,
+					e2, bundle->opt->lk);
+			if (access(graph_bin_path, F_OK) == -1){
+				log_info("Local graph not found, filling Ns");
+				join_bridge_dump(g->edges[e1], g->edges[e2],
+						&seq);
+			} else {
+				struct asm_graph_t lg;
+				load_asm_graph(&lg, graph_bin_path);
+				local_asm_res = get_bridge(bundle->opt, bundle->g, &lg,
+						e1, e2, scaffolds, n_scaff, &seq,
+						&seq_len);
+				asm_graph_destroy(&lg);
+			}
 		}
 		pthread_mutex_lock(bundle->bridge_lock);
-		log_debug("Local assembly status for edges %d and %d: %s", e1, e2, local_asm_result[local_asm_res]);
+		log_debug("Local assembly status for edges %d and %d: %s", e1, e2,
+				local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
 	}
@@ -1016,6 +967,7 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		log_info("Processing %d on %d local graphs", i, query->n_process);
 		int e1 = query->e1[i];
 		int e2 = query->e2[i];
+		log_debug("Bridge contigs: %d %d", e1, e2);
 		/*
 		 * Build the local assembly graph for two edges: e1.rev and e2
 		 */
@@ -1024,10 +976,23 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 			log_debug("Too complex region, continue");
 			continue;
 		}
-		struct asm_graph_t lg = get_local_assembly(opt, g, g->edges[e1].rc_id,
-				e2, dict);
-		asm_graph_destroy(&lg);
+		get_local_assembly(opt, g, g->edges[e1].rc_id, e2, dict);
 	}
 	log_info("All of the local assembly graph are constructed. Now trying to bridging each pair of edges");
 	kh_destroy(bcpos, dict);
+}
+
+void cleanup(struct opt_proc_t *opt)
+{
+	if (opt->log_level <= LOG_DEBUG_TECH){
+		log_info("Currently in technical debug mode, nothing to be cleaned");
+		return;
+	}
+	log_info("Cleaning up all files in %s", opt->out_dir);
+	int flag = 0;
+	flag = recursive_delete(opt->out_dir);
+	if (flag)
+		log_info("Some files are not deleted, please check in %s",
+				opt->out_dir);
+	log_info("Done cleaning up");
 }
