@@ -1928,7 +1928,8 @@ struct asm_graph_t get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t
 			e1, e2, work_dir);
 	if (check_file_empty(local_read_path.R1_path)
 		|| check_file_empty(local_read_path.R2_path)){
-		log_info("Local read file is empty, aborting building local graph");
+		log_warn("Local read file is empty, please take a look at %s and %s",
+				local_read_path.R1_path, local_read_path.R2_path);
 		return *((struct asm_graph_t *) calloc(1, sizeof(struct asm_graph_t)));
 	} else {
 		struct asm_graph_t lg, lg1;
