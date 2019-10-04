@@ -46,7 +46,7 @@ static struct {
     FILE *fp;
     int level;
     int quiet;
-    struct rusage *usage;
+    struct rusage usage;
     time_t start_time;
     time_t last_time;
     unsigned int mem_used;
@@ -108,7 +108,6 @@ void init_logger(int level, const char * file_path)
 	FILE *fp = fopen(file_path, "w");
 	log_set_fp(fp);
 	log_set_level(__min(level, LOG_INFO));
-	L.usage = malloc(sizeof(struct rusage));
 	L.start_time = time(NULL);
 	L.stage = "General";
 }
@@ -129,7 +128,6 @@ void log_change_file(const char *file_path)
 void close_logger()
 {
 	fclose(L.fp);
-	free(L.usage);
 }
 
 void log_set_quiet(int enable)
@@ -149,8 +147,8 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	struct tm *lt_real = localtime(&usr_time);
 	/* Get used time and memory */
 	if (level > LOG_TRACE) {
-		getrusage(RUSAGE_SELF, L.usage); /* Get resource usage, only available for UNIX */
-		ru_maxrss = L.usage->ru_maxrss;
+		getrusage(RUSAGE_SELF, &L.usage); /* Get resource usage, only available for UNIX */
+		ru_maxrss = L.usage.ru_maxrss;
 		L.mem_used = ru_maxrss;
 	} else{
 		ru_maxrss = L.mem_used;
