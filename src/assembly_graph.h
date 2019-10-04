@@ -68,6 +68,10 @@ struct asm_edge_t {
 	gint_t rc_id;		/* reverse complement link */
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
+	/* barcodes + 0: (CONTIG_LEVEL_1, CONTIG_LEVEL_2]
+	 * barcodes + 1: [0, CONTIG_LEVEL_1]
+	 * barcodes + 2: [0, CONTIG_LEVEL_2]
+	 */
 	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
 	struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;

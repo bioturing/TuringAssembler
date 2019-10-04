@@ -289,7 +289,8 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 }
 
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
-                        struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo) {
+		struct read_path_t *rpath, const char *fasta_path,
+		uint32_t aux_build, int mapper_algo) {
 	log_info("Construct aux info with aux_build: %d", aux_build);
 	if (aux_build | ASM_BUILD_BARCODE)
 		init_barcode_graph(g, mapper_algo);
@@ -333,7 +334,7 @@ void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_create(worker_threads + i, &attr, barcode_buffer_iterator,
-		               worker_bundles + i);
+				worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
 		pthread_join(producer_threads[i], NULL);
@@ -641,8 +642,8 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 				if (ref2.type != FASTA_REF_SEQ)
 					continue;
 				if (p1[i].pos + p2[k].pos < MAX_READ_FRAG_LEN &&
-				    ref1.e1 != ref2.e1 &&
-				    ref1.e1 != g->edges[ref2.e1].rc_id) {
+					ref1.e1 != ref2.e1 &&
+					ref1.e1 != g->edges[ref2.e1].rc_id) {
 					add_readpair_count_candidate(g, ref1.e1, ref2.e1);
 					add_readpair_count_candidate(g, ref2.e1, ref1.e1);
 				}
@@ -655,11 +656,9 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p1[i].pos <= CONTIG_LEVEL_0) {
+			if (p1[i].pos > CONTIG_LEVEL_1 && p1[i].pos <= CONTIG_LEVEL_2)
 				add_barcode_edge(g, ref.e1, 0, bc);
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
-			} else if (p1[i].pos <= CONTIG_LEVEL_1) {
+			if (p1[i].pos <= CONTIG_LEVEL_1) {
 				add_barcode_edge(g, ref.e1, 1, bc);
 				add_barcode_edge(g, ref.e1, 2, bc);
 			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
@@ -671,11 +670,9 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p2[i].pos <= CONTIG_LEVEL_0) {
+			if (p2[i].pos > CONTIG_LEVEL_1 && p2[i].pos <= CONTIG_LEVEL_2)
 				add_barcode_edge(g, ref.e1, 0, bc);
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
-			} else if (p2[i].pos <= CONTIG_LEVEL_1) {
+			if (p2[i].pos <= CONTIG_LEVEL_1) {
 				add_barcode_edge(g, ref.e1, 1, bc);
 				add_barcode_edge(g, ref.e1, 2, bc);
 			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
@@ -866,12 +863,12 @@ void *barcode_buffer_iterator(void *data) {
 
 		while (1) {
 			rc1 = input_format == TYPE_FASTQ ?
-			      get_read_from_fq(&read1, buf1, &pos1) :
-			      get_read_from_fa(&read1, buf1, &pos1);
+				get_read_from_fq(&read1, buf1, &pos1) :
+				get_read_from_fa(&read1, buf1, &pos1);
 
 			rc2 = input_format == TYPE_FASTQ ?
-			      get_read_from_fq(&read2, buf2, &pos2) :
-			      get_read_from_fa(&read2, buf2, &pos2);
+				get_read_from_fq(&read2, buf2, &pos2) :
+				get_read_from_fa(&read2, buf2, &pos2);
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
