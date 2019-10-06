@@ -4,38 +4,38 @@ CXX = clang++
 
 CPP = cpp
 
-LIBS = -pthread -O3 -std=c++11 \
+LIBS = -pthread -std=c++11 \
        -Wl -lpthread \
        ../../libs/bzip2/libbz2.a ../../libs/zlib/libz.a \
-       ../../libs/bwa/libbwa.a -lm 
+       ../../libs/bwa/libbwa.a -lm
 
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
          -I .. -g 
 
 EXEC = skiminizer
+SKIPPING_LIB = ../libskipping.a
 
 SRC =  \
 	   process.c \
 	   opt.c \
 	   count_barcodes.c \
-      ../buffer_file_wrapper.c 	\
-      ../buffer_file_wrapper.c 	\
-      ../dqueue.c 					\
-      ../fastq_producer.c 				\
-      ../get_buffer.c 					\
-      ../io_utils.c 					\
-      ../pthread_barrier.c 				\
-      ../semaphore_wrapper.c 				\
-      ../sort_read.c 						\
-      ../time_utils.c 					\
-      ../utils.c 					\
-      ../verbose.c 					\
+	   smart_load.c \
+	   ../dqueue.c \
+	   ../fastq_producer.c \
+	   ../utils.c \
+	   ../io_utils.c \
+	   ../get_buffer.c \
+	   ../time_utils.c \
+	   ../verbose.c \
+	   ../pthread_barrier.c \
+	   ../sort_read.c \
+	   ../buffer_file_wrapper.c \
 
 OBJ = $(SRC:.c=.o)
 
