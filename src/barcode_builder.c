@@ -565,6 +565,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
 	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
 	// fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
+	// 			STAGE 1 			
 	r1_seq = malloc(r1->len);
 	r2_seq = malloc(r2->len);
 	for (i = 0; i < r1->len; ++i)
@@ -604,7 +605,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 	}
 	if (ar1.n != 2 || ar2.n != 2|| ar1.a->score < 50 || ar2.a->score < 50)
-		return;
+		goto free_stage_1;
 	if (bundle->aux_build & ASM_BUILD_CANDIDATE) { /* read information */
 		for (i = 0; i < n1; ++i) {
 			struct fasta_ref_t ref;
@@ -702,6 +703,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			atomic_add_and_fetch32(&g->edges[g->edges[ref.e1].rc_id].count, added_count);
 		}
 	}
+free_stage_1:
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);

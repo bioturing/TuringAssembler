@@ -295,6 +295,7 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 	init_clock();
 	print_info(argc, argv);
 	build_process(opt);
+	free(opt);
 	//destroy_opt_proc_t(opt); /* No need */
 }
 

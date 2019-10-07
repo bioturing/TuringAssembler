@@ -745,5 +745,6 @@ void sort_read(struct opt_proc_t *opt, struct read_path_t *rpath)
 
 	free(producer_threads);
 	free(worker_threads);
+	free(read_dir);
 }
 

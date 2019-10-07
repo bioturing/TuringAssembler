@@ -214,6 +214,7 @@ void build_bridge_process(struct opt_proc_t *opt)
 	FILE *f = xfopen(opt->lc, "w");
 	build_bridge(opt, f);
 	fclose(f);
+	free(log_file);
 }
 
 void reduce_read_process(struct opt_proc_t *opt)
