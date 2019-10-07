@@ -733,8 +733,6 @@ void assign_count_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t
 					new_e_rc = g->edges[new_e].rc_id;
 					g->edges[new_e].count = g->edges[new_e_rc].count = (uint64_t)old_cov * (g->edges[new_e].seq_len - ksize + 1);
 				}
-			} else {
-				assert(0);
 			}
 		}
 	}
