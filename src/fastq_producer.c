@@ -304,5 +304,6 @@ void free_fastq_triple(struct producer_bundle_t *bundles, int n)
 	free(bundles->n_consumer);
 	free(bundles->lock);
 	free(bundles->barrier);
+	free(bundles->processed_size);
 	free(bundles);
 }
