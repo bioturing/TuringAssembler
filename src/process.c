@@ -245,10 +245,11 @@ void resolve_local_process(struct opt_proc_t *opt)
 	struct asm_graph_t g0;
 	load_asm_graph(&g0, opt->in_file);
 	if (!(g0.aux_flag & ASM_HAVE_BARCODE))
-		log_error("Graph must have barcode\n");
+		log_error("Graph must have barcode");
 	int resolved_loop = 0;
 	asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
+	do_some_resolve_bridge(&g0);
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_pro.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;

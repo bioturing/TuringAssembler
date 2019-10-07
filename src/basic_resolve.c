@@ -1065,9 +1065,9 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_info("%d-th iteration: %d loop(s) resolved\n", ite, resolved);
+		log_info("%d-th iteration: %d loop(s) resolved", ite, resolved);
 	} while(1);
-	log_info("%d dump loop(s) resolved after %d iterations\n", res, ite);
+	log_info("%d dump loop(s) resolved after %d iterations", res, ite);
 	return res;
 }
 
@@ -1101,7 +1101,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 				g->nodes[tg].adj[0] : g->nodes[tg].adj[1];
 			if (e1 == e2 || e == loop_e)
 				continue;
-			log_debug("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d\n",
+			log_debug("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d",
 					e1, e, loop_e, e2);
 			asm_append_seq(g->edges + loop_e, g->edges + e,
 					g->ksize);
@@ -1179,7 +1179,7 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_info("%d-th iteration: %d jungle(s) resolved\n", ite, resolved);
+		log_info("%d-th iteration: %d jungle(s) resolved", ite, resolved);
 		/*char graph[1024]; // Save graph for debugging
 		sprintf(graph, "level_pro_%d_ite", ite);
 		save_graph_info(opt->out_dir, g, graph);
@@ -1188,7 +1188,7 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 				g->ksize, ite);
 		save_asm_graph(g, graph);*/
 	} while(1);
-	log_info("%d dump jungle(s) resolved after %d iterations\n",
+	log_info("%d dump jungle(s) resolved after %d iterations",
 			res, ite);
 	return res;
 }
@@ -1304,7 +1304,7 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	}
 	if (e2 == -1)
 		goto free_stage_3;
-	log_debug("Dump jungle detected at %d and %d\n", e1, e2);
+	log_debug("Dump jungle detected at %d and %d", e1, e2);
 	*dump_edges = calloc(n_nb1 + n_nb2 - 2, sizeof(int));
 	for (int i = 1; i < n_nb1; ++i)
 		(*dump_edges)[(*n_dump)++] = nb1[i];
@@ -1330,7 +1330,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		read_sorted_path.R2_path = opt->files_2[0];
 		read_sorted_path.idx_path = opt->files_I[0];
 	} else {
-		log_error("Reads must be sorted\n");
+		log_error("Reads must be sorted");
 	}
 	khash_t(bcpos) *dict = kh_init(bcpos);
 	construct_read_index(&read_sorted_path, dict);
@@ -1354,13 +1354,13 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		emap1.lc_e = e1;
 		emap2.lc_e = e2;
 
-		log_debug("Get local reads\n");
+		log_debug("Get local reads");
 		struct read_path_t local_read_path;
 		get_union_barcode_reads(opt, g, e1, e2, dict, &read_sorted_path,
 				&local_read_path);
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 				local_read_path.R2_path, KSIZE_CHECK);
-		log_debug("Finding paths between %d and %d\n", e1, e2);
+		log_debug("Finding paths between %d and %dn", e1, e2);
 		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
 				kmer_count);
 		int longest_path = 0;
@@ -1371,7 +1371,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		int *path = pinfo.paths[longest_path];
 		int len = pinfo.path_lens[longest_path];
 		if (len <= 2){
-			log_debug("No reliable paths found, continue\n");
+			log_debug("No reliable paths found, continue");
 			goto ignore_stage_1;
 		}
 
