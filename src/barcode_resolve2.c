@@ -1417,7 +1417,7 @@ void do_some_resolve_bridge(struct asm_graph_t *g)
 	do {
 		cnt_local = 0;
 		cnt_local += resolve_2_2_bridge_high_strict(g);
-		cnt_local += resolve_2_2_bridge_med_strict(g);
+		//cnt_local += resolve_2_2_bridge_med_strict(g);
 		cnt += cnt_local;
 	} while (cnt_local);
 }

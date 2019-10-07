@@ -368,7 +368,7 @@ void resolve_local_opt_process(int argc, char *argv[])
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (opt == NULL){
 		print_usage();
-		__ERROR("Error parsing arguments");
+		log_error("Error parsing arguments");
 	}
 	resolve_local_process(opt);
 	free(opt);
