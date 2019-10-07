@@ -18,7 +18,7 @@
 	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
 	(uni_cov) + 0.499999999)
 #define JUNGLE_RADIUS 10
-#define MIN_NOTICE_ANCHOR 4000
+#define MIN_NOTICE_BRIDGE 4000
 #define MAX_DUMP_EDGE_LEN 200
 #define MIN_COVERAGE_RATIO 0.3
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
@@ -1065,17 +1065,14 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		__VERBOSE("%d-th iteration: %d loop(s) resolved\n", ite, resolved);
+		log_info("%d-th iteration: %d loop(s) resolved\n", ite, resolved);
 	} while(1);
-	__VERBOSE_LOG("RESOLVE", "%d dump loop(s) resolved after %d iterations\n",
-			res, ite);
+	log_info("%d dump loop(s) resolved after %d iterations\n", res, ite);
 	return res;
 }
 
 int asm_resolve_dump_loop(struct asm_graph_t *g)
 {
-	if (!(g->aux_flag & ASM_HAVE_BARCODE))
-		__ERROR("Graph must have barcode\n");
 	int res = 0;
 	int tmp_n_e = g->n_e;
 	for (int e = 0; e < tmp_n_e; ++e){
@@ -1104,7 +1101,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 				g->nodes[tg].adj[0] : g->nodes[tg].adj[1];
 			if (e1 == e2 || e == loop_e)
 				continue;
-			__VERBOSE("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d\n",
+			log_debug("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d\n",
 					e1, e, loop_e, e2);
 			asm_append_seq(g->edges + loop_e, g->edges + e,
 					g->ksize);
@@ -1127,14 +1124,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 			++res;
 		}
 	}
-	if (res){
-		struct asm_graph_t g1;
-		__VERBOSE("Condensing graph\n");
-		asm_condense_barcode(g, &g1);
-		asm_graph_destroy(g);
-		*g = g1;
-		test_asm_graph(g);
-	}
+	test_asm_graph(g);
 	return res;
 }
 
@@ -1189,16 +1179,16 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		__VERBOSE("%d-th iteration: %d jungle(s) resolved\n", ite, resolved);
-		char graph[1024];
-		sprintf(graph, "level_haha_%d_ite", ite);
+		log_info("%d-th iteration: %d jungle(s) resolved\n", ite, resolved);
+		/*char graph[1024]; // Save graph for debugging
+		sprintf(graph, "level_pro_%d_ite", ite);
 		save_graph_info(opt->out_dir, g, graph);
 		graph[0] = '\0';
-		sprintf(graph, "%s/graph_k_%d_level_haha_%d_ite.bin", opt->out_dir,
+		sprintf(graph, "%s/graph_k_%d_level_pro_%d_ite.bin", opt->out_dir,
 				g->ksize, ite);
-		save_asm_graph(g, graph);
+		save_asm_graph(g, graph);*/
 	} while(1);
-	__VERBOSE_LOG("RESOLVE", "%d dump jungle(s) resolved after %d iterations\n",
+	log_info("%d dump jungle(s) resolved after %d iterations\n",
 			res, ite);
 	return res;
 }
@@ -1220,7 +1210,7 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	for (int i = 0; i < n_nb; ++i){
 		if (nearby[i] == e || nearby[i] == g->edges[e].rc_id)
 			continue;
-		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_ANCHOR){
+		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_BRIDGE){
 			e2 = nearby[i];
 			break;
 		}
@@ -1314,16 +1304,12 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	}
 	if (e2 == -1)
 		goto free_stage_3;
-	__VERBOSE_LOG("", "Dump jungle detected at %d and %d\n", e1, e2);
+	log_debug("Dump jungle detected at %d and %d\n", e1, e2);
 	*dump_edges = calloc(n_nb1 + n_nb2 - 2, sizeof(int));
 	for (int i = 1; i < n_nb1; ++i)
 		(*dump_edges)[(*n_dump)++] = nb1[i];
 	for (int i = 1; i < n_nb2; ++i)
 		(*dump_edges)[(*n_dump)++] = g->edges[nb2[i]].rc_id;
-	__VERBOSE("Dump edges: ");
-	for (int i = 0; i < *n_dump; ++i)
-		__VERBOSE("%d ", (*dump_edges)[i]);
-	__VERBOSE("\n");
 
 free_stage_3:
 	free(mark);
@@ -1337,8 +1323,6 @@ free_stage_1:
 
 int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
-	if (!(g->aux_flag & ASM_HAVE_BARCODE))
-		__ERROR("Graph must have barcode\n");
 	int res = 0;
 	struct read_path_t read_sorted_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
@@ -1346,7 +1330,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		read_sorted_path.R2_path = opt->files_2[0];
 		read_sorted_path.idx_path = opt->files_I[0];
 	} else {
-		__ERROR("Reads must be sorted\n");
+		log_error("Reads must be sorted\n");
 	}
 	khash_t(bcpos) *dict = kh_init(bcpos);
 	construct_read_index(&read_sorted_path, dict);
@@ -1355,9 +1339,9 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 	for (int e1 = 0; e1 < tmp; ++e1){
 		if (g->edges[e1].target == -1)
 			continue;
-		if (g->edges[e1].seq_len < MIN_NOTICE_ANCHOR)
+		if (g->edges[e1].seq_len < MIN_NOTICE_BRIDGE)
 			continue;
-		//		STAGE 1 		//
+		//		STAGE 1 detect dump jungle and find path  		//
 		int *dump_edges;
 		int n_dump;
 		int e2 = detect_dump_jungle(g, e1, &dump_edges, &n_dump);
@@ -1370,13 +1354,13 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		emap1.lc_e = e1;
 		emap2.lc_e = e2;
 
-		__VERBOSE("Get local reads\n");
+		log_debug("Get local reads\n");
 		struct read_path_t local_read_path;
 		get_union_barcode_reads(opt, g, e1, e2, dict, &read_sorted_path,
 				&local_read_path);
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 				local_read_path.R2_path, KSIZE_CHECK);
-		__VERBOSE("Finding paths between %d and %d\n", e1, e2);
+		log_debug("Finding paths between %d and %d\n", e1, e2);
 		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
 				kmer_count);
 		int longest_path = 0;
@@ -1387,15 +1371,11 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		int *path = pinfo.paths[longest_path];
 		int len = pinfo.path_lens[longest_path];
 		if (len <= 2){
-			__VERBOSE_LOG("", "No reliable paths found, continue\n");
+			log_debug("No reliable paths found, continue\n");
 			goto ignore_stage_1;
 		}
-		__VERBOSE_LOG("", "Path: ");
-		for (int i = 0; i < len; ++i)
-			__VERBOSE_LOG("", "%d ", path[i]);
-		__VERBOSE_LOG("", "\n");
 
-		//		STAGE 2 		//
+		//		STAGE 2 condence the jungle 		//
 		if (g->n_e == m_e){
 			g->edges = (struct asm_edge_t *) realloc(g->edges,
 					sizeof(struct asm_edge_t) * (m_e << 1));
@@ -1459,16 +1439,7 @@ ignore_stage_1:
 		destroy_read_path(&local_read_path);
 		free(dump_edges);
 	}
-	if (res){
-		kh_destroy(bcpos, dict);
-		g->edges = realloc(g->edges, g->n_e * sizeof(struct asm_edge_t));
-		struct asm_graph_t g1;
-		__VERBOSE("Condesing graph\n");
-		asm_condense_barcode(g, &g1);
-		asm_graph_destroy(g);
-		*g = g1;
-		test_asm_graph(g);
-	}
+	test_asm_graph(g);
 	return res;
 }
 

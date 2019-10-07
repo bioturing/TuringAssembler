@@ -238,19 +238,25 @@ void reduce_read_process(struct opt_proc_t *opt)
 
 void resolve_local_process(struct opt_proc_t *opt)
 {
+	char log_file[1024];
+	sprintf(log_file, "%s/resolve.log", opt->out_dir);
+	init_logger(opt->log_level, log_file);
+	set_log_stage("Resolve local");
 	struct asm_graph_t g0;
 	load_asm_graph(&g0, opt->in_file);
+	if (!(g0.aux_flag & ASM_HAVE_BARCODE))
+		log_error("Graph must have barcode\n");
 	int resolved_loop = 0;
 	asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
 	char path[1024];
-	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
+	sprintf(path, "%s/graph_k_%d_level_pro.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;
 	asm_condense(&g0, &g1); // Remove barcode
 	asm_graph_destroy(&g0);
 	save_asm_graph(&g1, path);
 
-	save_graph_info(opt->out_dir, &g1, "level_haha");
+	save_graph_info(opt->out_dir, &g1, "level_pro");
 	asm_graph_destroy(&g1);
 }
 
