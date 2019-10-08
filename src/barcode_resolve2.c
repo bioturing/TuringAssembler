@@ -1659,8 +1659,8 @@ void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
 	struct barcode_hash_t *h1, *h2;
-	h1 = g->edges[e1].barcodes + 2;
-	h2 = g->edges[e2].barcodes + 2;
+	h1 = g->edges[e1].barcodes + 1;
+	h2 = g->edges[e2].barcodes + 1;
 	int n_shared, m_shared;
 	n_shared = 0;
 	m_shared = 0x100;

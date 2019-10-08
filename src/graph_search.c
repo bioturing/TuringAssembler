@@ -225,7 +225,7 @@ void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *em
 	int n_visited = 0;
 	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
 			&n_visited, ksize, h);
-	log_info("%d paths found", pinfo->n_paths);
+	log_debug("%d paths found", pinfo->n_paths);
 	graph_info_destroy(&ginfo);
 }
 

@@ -1065,7 +1065,7 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_info("%d-th iteration: %d loop(s) resolved", ite, resolved);
+		log_debug("%d-th iteration: %d loop(s) resolved", ite, resolved);
 	} while(1);
 	log_info("%d dump loop(s) resolved after %d iterations", res, ite);
 	return res;
@@ -1179,7 +1179,7 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_info("%d-th iteration: %d jungle(s) resolved", ite, resolved);
+		log_debug("%d-th iteration: %d jungle(s) resolved", ite, resolved);
 		/*char graph[1024]; // Save graph for debugging
 		sprintf(graph, "level_pro_%d_ite", ite);
 		save_graph_info(opt->out_dir, g, graph);
@@ -1360,7 +1360,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 				&local_read_path);
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 				local_read_path.R2_path, KSIZE_CHECK);
-		log_debug("Finding paths between %d and %dn", e1, e2);
+		log_debug("Finding paths between %d and %d", e1, e2);
 		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
 				kmer_count);
 		int longest_path = 0;
@@ -1432,13 +1432,14 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		asm_remove_edge(g, g->edges[e1].rc_id);
 		asm_remove_edge(g, e2);
 		asm_remove_edge(g, g->edges[e2].rc_id);
-		path_info_destroy(&pinfo);
 		++res;
 ignore_stage_1:
+		path_info_destroy(&pinfo);
 		kh_destroy(kmer_int, kmer_count);
 		destroy_read_path(&local_read_path);
 		free(dump_edges);
 	}
+	kh_destroy(bcpos, dict);
 	test_asm_graph(g);
 	return res;
 }
