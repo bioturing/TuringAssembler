@@ -5,13 +5,14 @@
 #include <zlib.h>
 
 #include "smart_load.h"
-#include "sort_read.h"
 #include "verbose.h"
 #include "radix_sort.h"
 #include "buffer_file_wrapper.h"
 #include "io_utils.h"
 #include "kseq.h"
 #include "utils.h"
+
+#include "sort_read.h"
 
 /**
  * Construct the dictionary index of

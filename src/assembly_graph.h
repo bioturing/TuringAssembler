@@ -6,6 +6,8 @@
 #include "attribute.h"
 #include "barcode_hash.h"
 #include "khash.h"
+#include "radix_sort.h"
+#include "sort_read.h"
 
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
@@ -20,13 +22,6 @@
 #define NOT_FOR_SCAFF 0x1
 #define FOR_SCAFFOLD 0x2
 
-struct read_index_t {
-	int64_t r1_offset;
-	int64_t r2_offset;
-	int64_t r1_len;
-	int64_t r2_len;
-};
-KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
 struct pair_contig_t {
 	gint_t e1;

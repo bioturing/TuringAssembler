@@ -1,11 +1,10 @@
-CC = clang
+CC = gcc
 
-CXX = clang++ 
+CXX = g++
 
 CPP = cpp
 
 LIBS = -pthread -std=c++11 \
-       -Wl -lpthread \
        ../../libs/bzip2/libbz2.a ../../libs/zlib/libz.a \
        ../../libs/bwa/libbwa.a -lm
 
@@ -34,8 +33,9 @@ SRC =  \
 	   ../time_utils.c \
 	   ../verbose.c \
 	   ../pthread_barrier.c \
-	   ../sort_read.c \
 	   ../buffer_file_wrapper.c \
+	   ../sort_read.c \
+	   ../log.c
 
 OBJ = $(SRC:.c=.o)
 

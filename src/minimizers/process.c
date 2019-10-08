@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "attribute.h"
 #include "verbose.h"
 #include "smart_load.h"
+#include "sort_read.h"
 
 void print_usage(const char *prog)
 {
