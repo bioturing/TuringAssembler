@@ -359,6 +359,9 @@ void assembly3_process(struct opt_proc_t *opt)
 	set_log_stage("GraphConstruction");
 	build_0_1(&g1, &g2); /* Simplify g1 to g2 */
 	save_graph_info(opt->out_dir, &g2, "level_1");
+	if (g2.n_e == 0) {
+		log_error("graph after lv1 have 0 edges");
+	}
 
 	/**
 	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
@@ -374,9 +377,7 @@ void assembly3_process(struct opt_proc_t *opt)
 		sort_read(opt, &read_sorted_path);
 	}
 
-	/**
-	 * Use bwa to align reads on two ends of each contigs, barcode awared.
-	 */
+
 	set_log_stage("BWAIndex");
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);

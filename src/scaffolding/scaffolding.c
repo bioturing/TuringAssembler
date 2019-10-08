@@ -599,7 +599,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	for (int i = 0; i < g->n_e; i++) if (mark[i] && is_long_contig(&g->edges[i])){
 		int start_contig = i;
 		log_trace("Start find scaffolds from %d", start_contig);
-		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig, 
+		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig,
 							thres_score, &count);
 		add_path(scaffold, path);
 		free(path);
@@ -623,6 +623,21 @@ void print_contig_info(struct asm_graph_t *g)
 		float edge_cov = __get_edge_cov(edge, g->ksize)/cvr;
 		log_debug("edge %d len:%d cov: %f count_bc %d",
 			     i_e , get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
+	}
+}
+
+void check_should_local_assembly(struct scaffold_type *scaffold)
+{
+	int lc = 0;
+	for (int i = 0 ; i < scaffold->n_path; i++) {
+		if (scaffold->path[i].n_left_half + scaffold->path[i].n_right_half > 1)  {
+			lc = 1;
+			break;
+		}
+	}
+	if (lc == 0) {
+		log_warn("Too many low quality contigs for scaffolding. Stop program.");
+		exit(0);
 	}
 }
 
@@ -651,6 +666,7 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	print_scaffold(g, out_file, scaffold);
 	destroy_scaffold_type(scaffold);
 	destroy_edges_score_type(edges_score);
+	check_should_local_assembly(scaffold);
 }
 
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
