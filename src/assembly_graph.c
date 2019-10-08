@@ -1158,36 +1158,36 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			//xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 
 			h = g->edges[e].barcodes + 1;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			//xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 
 			h = g->edges[e].barcodes + 2;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			//xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
 		for (e = 0; e < g->n_e; ++e) {
-		    if (g->edges[e].source == -1)
+			if (g->edges[e].source == -1)
 			continue;
-		    struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
-		    xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-		    xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-		    xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			//xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 
-		    h = &g->edges[e].barcodes_scaf2;
-		    xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-		    xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-		    xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+			h = &g->edges[e].barcodes_scaf2;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			//xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 		}
 	}
 	fclose(fp);
@@ -1256,27 +1256,27 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-			//h->cnts = NULL;
+			//h->cnts = malloc(h->size * sizeof(uint32_t));
+			//xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			h->cnts = NULL;
 
 			h = g->edges[e].barcodes + 1;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-			//h->cnts = NULL;
+			//h->cnts = malloc(h->size * sizeof(uint32_t));
+			//xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			h->cnts = NULL;
 
 			h = g->edges[e].barcodes + 2;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
 			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-			//h->cnts = NULL;
+			//h->cnts = malloc(h->size * sizeof(uint32_t));
+			//xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+			h->cnts = NULL;
 		}
 	}
 
@@ -1289,18 +1289,18 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 		    xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 		    h->keys = malloc(h->size * sizeof(uint64_t));
 		    xfread(h->keys, sizeof(uint64_t), h->size, fp);
-		    //h->cnts = NULL;
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+		    h->cnts = NULL;
+			//h->cnts = malloc(h->size * sizeof(uint32_t));
+			//xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 
 		    h = &g->edges[e].barcodes_scaf2;
 		    xfread(&h->size, sizeof(uint32_t), 1, fp);
 		    xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 		    h->keys = malloc(h->size * sizeof(uint64_t));
 		    xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-		    //h->cnts = NULL;
+			//h->cnts = malloc(h->size * sizeof(uint32_t));
+			//xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+		    h->cnts = NULL;
 		}
 	}
 	fclose(fp);

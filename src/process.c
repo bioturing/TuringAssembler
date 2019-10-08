@@ -254,6 +254,7 @@ void resolve_local_process(struct opt_proc_t *opt)
 	sprintf(path, "%s/graph_k_%d_level_pro.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;
 	asm_condense(&g0, &g1); // Remove barcode
+	//asm_condense_barcode(&g0, &g1);
 	asm_graph_destroy(&g0);
 	save_asm_graph(&g1, path);
 
