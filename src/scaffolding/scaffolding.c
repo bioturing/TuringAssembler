@@ -599,7 +599,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	for (int i = 0; i < g->n_e; i++) if (mark[i] && is_long_contig(&g->edges[i])){
 		int start_contig = i;
 		log_trace("Start find scaffolds from %d", start_contig);
-		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig, 
+		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig,
 							thres_score, &count);
 		add_path(scaffold, path);
 		free(path);

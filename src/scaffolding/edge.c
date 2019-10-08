@@ -146,6 +146,10 @@ struct scaffold_edge *find_lower_bound_from(struct edges_score_type *edges_score
 		int i_contig)
 {
 	int l = 0, r = edges_score->n_edge - 1;
+	if (r < l) {
+		log_error("r must greater or equal l");
+		return NULL;
+	}
 	while (l != r) {
 		int mid = (l + r)/2;
 		if (edges_score->list_edge[mid].src < i_contig) 
@@ -159,7 +163,12 @@ struct scaffold_edge *find_lower_bound_from(struct edges_score_type *edges_score
 struct scaffold_edge *find_upper_bound_from(struct edges_score_type *edges_score,
 		int i_contig)
 {
+	log_warn("binary search %d %d");
 	int l = 0, r = edges_score->n_edge - 1;
+	if (r < l) {
+		log_error("r must greater or equal l");
+		return NULL;
+	}
 	while (l != r) {
 		int mid = (l + r)/2;
 		if (edges_score->list_edge[mid].src > i_contig) 
@@ -173,6 +182,10 @@ struct scaffold_edge *find_upper_bound_from(struct edges_score_type *edges_score
 void find_edge_from(struct edges_score_type *edges_score, int i_contig, int *n_edge_adj, 
 		struct scaffold_edge **list_edge)
 {
+	if (edges_score->n_edge <= 0) {
+		*n_edge_adj = 0;
+		*list_edge = NULL;
+	}
 	struct scaffold_edge *start_pos = find_lower_bound_from(edges_score, i_contig);
 	struct scaffold_edge *end_pos = find_upper_bound_from(edges_score, i_contig);
 	*n_edge_adj = end_pos - start_pos;
