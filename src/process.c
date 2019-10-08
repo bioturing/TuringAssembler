@@ -248,14 +248,14 @@ void resolve_local_process(struct opt_proc_t *opt)
 	asm_resolve_dump_jungle_ite(opt, &g0);
 	do_some_resolve_bridge(&g0);
 	char path[1024];
-	sprintf(path, "%s/graph_k_%d_level_pro.bin", opt->out_dir, g0.ksize);
+	sprintf(path, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;
 	//asm_condense(&g0, &g1); // Remove barcode
 	asm_condense_barcode(&g0, &g1);
 	asm_graph_destroy(&g0);
 	save_asm_graph(&g1, path);
 
-	save_graph_info(opt->out_dir, &g1, "level_pro");
+	save_graph_info(opt->out_dir, &g1, "level_2");
 	asm_graph_destroy(&g1);
 }
 
@@ -419,11 +419,10 @@ void assembly3_process(struct opt_proc_t *opt)
 	 * Use bwa to align reads on two ends of each contigs, barcode awared.
 	 */
 	char resolved_path[1024];
-	sprintf(resolved_path, "%s/graph_k_%d_level_pro.bin", opt->out_dir,
+	sprintf(resolved_path, "%s/graph_k_%d_level_2.bin", opt->out_dir,
 			opt->k0);
 	struct asm_graph_t g_resolved;
 	load_asm_graph(&g_resolved, resolved_path);
->>>>>>> Add resolve_local to assembly3 process, adjust some parameter names
 	set_log_stage("BWAIndex");
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
