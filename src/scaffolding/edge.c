@@ -183,6 +183,7 @@ void find_edge_from(struct edges_score_type *edges_score, int i_contig, int *n_e
 		struct scaffold_edge **list_edge)
 {
 	if (edges_score->n_edge <= 0) {
+		log_warn("Contig %d have no candidate contig", i_contig);
 		*n_edge_adj = 0;
 		*list_edge = NULL;
 		return;
