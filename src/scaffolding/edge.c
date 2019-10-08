@@ -163,7 +163,6 @@ struct scaffold_edge *find_lower_bound_from(struct edges_score_type *edges_score
 struct scaffold_edge *find_upper_bound_from(struct edges_score_type *edges_score,
 		int i_contig)
 {
-	log_warn("binary search %d %d");
 	int l = 0, r = edges_score->n_edge - 1;
 	if (r < l) {
 		log_error("r must greater or equal l");
