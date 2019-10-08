@@ -197,8 +197,10 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		fflush(stderr);
 	}
 
-	if (level >= LOG_ERROR)
+	if (level >= LOG_ERROR) {
 		perror("Something went wrong, please check the log file or send it to tan@bioturing.com");
+		exit(1);
+	}
 
 	/* Release lock */
 	unlock();
