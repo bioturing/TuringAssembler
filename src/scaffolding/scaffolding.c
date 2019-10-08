@@ -636,7 +636,7 @@ void check_should_local_assembly(struct scaffold_type *scaffold)
 		}
 	}
 	if (lc == 0) {
-		log_warn("Can't scaffolding due to low quality contigs. Stop program.");
+		log_warn("Too many low quality contigs for scaffolding. Stop program.");
 		exit(0);
 	}
 }
