@@ -185,6 +185,7 @@ void find_edge_from(struct edges_score_type *edges_score, int i_contig, int *n_e
 	if (edges_score->n_edge <= 0) {
 		*n_edge_adj = 0;
 		*list_edge = NULL;
+		return;
 	}
 	struct scaffold_edge *start_pos = find_lower_bound_from(edges_score, i_contig);
 	struct scaffold_edge *end_pos = find_upper_bound_from(edges_score, i_contig);
