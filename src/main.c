@@ -144,7 +144,10 @@ struct opt_proc_t *init_opt_proc()
 	opt->files_1 = opt->files_2 = NULL;
 	opt->in_file = NULL;
 	opt->in_fasta = NULL;
-        opt->in_fastg = NULL;
+	opt->in_fastg = NULL;
+	opt->files_1 = NULL;
+	opt->files_2 = NULL;
+	opt->files_I = NULL;
 	opt->out_dir = "."; /* Default output folder */
 	opt->lib_type = -1;/* Default read library */
 	opt->mmem = 32; /*Default memory limit for reads sorting */

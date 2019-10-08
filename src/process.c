@@ -384,6 +384,10 @@ void assembly3_process(struct opt_proc_t *opt)
 		set_log_stage("SortReads");
 		sort_read(opt, &read_sorted_path);
 		opt->lib_type = LIB_TYPE_SORTED;
+		opt->n_files = 1;
+		opt->files_1 = alloca(sizeof(char *));
+		opt->files_2 = alloca(sizeof(char *));
+		opt->files_I = alloca(sizeof(char *));
 		opt->files_1[0] = read_sorted_path.R1_path;
 		opt->files_2[0] = read_sorted_path.R2_path;
 		opt->files_I[0] = read_sorted_path.idx_path;
