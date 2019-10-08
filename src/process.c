@@ -238,17 +238,25 @@ void reduce_read_process(struct opt_proc_t *opt)
 
 void resolve_local_process(struct opt_proc_t *opt)
 {
+	char log_file[1024];
 	struct asm_graph_t g0;
 	load_asm_graph(&g0, opt->in_file);
+	if (!(g0.aux_flag & ASM_HAVE_BARCODE))
+		log_error("Graph must have barcode");
 	int resolved_loop = 0;
 	asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
+	do_some_resolve_bridge(&g0);
 	char path[1024];
-	sprintf(path, "%s/graph_k_%d_level_haha.bin", opt->out_dir, g0.ksize);
-	save_asm_graph(&g0, path);
-
-	save_graph_info(opt->out_dir, &g0, "level_haha");
+	sprintf(path, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0.ksize);
+	struct asm_graph_t g1;
+	//asm_condense(&g0, &g1); // Remove barcode
+	asm_condense_barcode(&g0, &g1);
 	asm_graph_destroy(&g0);
+	save_asm_graph(&g1, path);
+
+	save_graph_info(opt->out_dir, &g1, "level_2");
+	asm_graph_destroy(&g1);
 }
 
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix)
@@ -351,15 +359,15 @@ void assembly3_process(struct opt_proc_t *opt)
 	/**
 	 * Build Assembly graph from scratch
 	 */
-	struct asm_graph_t g1, g2;
+	struct asm_graph_t g_lv0, g_lv1;
 	set_log_stage("KmerCounting");
-	build_0_KMC(opt, opt->k0, &g1); /* Do kmer counting using KMC */
-	save_graph_info(opt->out_dir, &g1, "level_0");
+	build_0_KMC(opt, opt->k0, &g_lv0); /* Do kmer counting using KMC */
+	save_graph_info(opt->out_dir, &g_lv0, "level_0");
 
 	set_log_stage("GraphConstruction");
-	build_0_1(&g1, &g2); /* Simplify g1 to g2 */
-	save_graph_info(opt->out_dir, &g2, "level_1");
-	if (g2.n_e == 0) {
+	build_0_1(&g_lv0, &g_lv1); /* Simplify graph level 0 to graph level 1 */
+	save_graph_info(opt->out_dir, &g_lv1, "level_1");
+	if (g_lv1.n_e == 0) {
 		log_error("graph after lv1 have 0 edges");
 	}
 
@@ -375,20 +383,61 @@ void assembly3_process(struct opt_proc_t *opt)
 		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
 		set_log_stage("SortReads");
 		sort_read(opt, &read_sorted_path);
+		opt->lib_type = LIB_TYPE_SORTED;
+		opt->n_files = 1;
+		opt->files_1 = alloca(sizeof(char *));
+		opt->files_2 = alloca(sizeof(char *));
+		opt->files_I = alloca(sizeof(char *));
+		opt->files_1[0] = read_sorted_path.R1_path;
+		opt->files_2[0] = read_sorted_path.R2_path;
+		opt->files_I[0] = read_sorted_path.idx_path;
 	}
 
+	/**
+	 * Build barcode for resolve process and local assembly
+	 */
+	set_log_stage("BWAIndex");
+	char asm_path[1024];
+	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g_lv1, fasta_path);
+	set_log_stage("MapReads");
+	construct_aux_info(opt, &g_lv1, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
+	save_graph_info(opt->out_dir, &g_lv1, "local_added_barcode");
+	asm_graph_destroy(&g_lv1);
 
+	/**
+	  * Resolve process
+	  */
+	
+	set_log_stage("ResolveProcess");
+	log_info("Start resolve process with kmer size %d", opt->lk);
+	char lv1_added[1024];
+	sprintf(lv1_added, "%s/graph_k_%d_local_added_barcode.bin", opt->out_dir, opt->k0);
+	opt->in_file = lv1_added;
+	resolve_local_process(opt);
+
+
+	/**
+	 * Use bwa to align reads on two ends of each contigs, barcode awared.
+	 */
+	char resolved_path[1024];
+	sprintf(resolved_path, "%s/graph_k_%d_level_2.bin", opt->out_dir,
+			opt->k0);
+	struct asm_graph_t g_resolved;
+	load_asm_graph(&g_resolved, resolved_path);
 	set_log_stage("BWAIndex");
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	log_info("Write down temporary contigs for indexing.");
-	write_fasta_seq(&g2, fasta_path);
+	write_fasta_seq(&g_resolved, fasta_path);
 	log_info("Aligning reads on two heads of each contigs using BWA");
 	set_log_stage("MapReads");
-	construct_aux_info(opt, &g2, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+	construct_aux_info(opt, &g_resolved, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	log_info("Done alignment. Serializing assembly graph to disk.");
-	save_graph_info(opt->out_dir, &g2, "added_barcode"); /* Barcode-added assembly graph */
+	save_graph_info(opt->out_dir, &g_resolved, "added_barcode"); /* Barcode-added assembly graph */
 
 	/**
 	* Scaffolding
@@ -398,47 +447,24 @@ void assembly3_process(struct opt_proc_t *opt)
 	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);
 	log_info("Construct the scaffolds using barcode information.");
 	FILE *out_file = fopen(out_name, "w");
-	scaffolding(out_file, &g2, opt);
+	scaffolding(out_file, &g_resolved, opt);
 	fclose(out_file);
 	log_info("Done scaffolding. Please see the file: %s/scaffolds.fasta", opt->out_dir);
-	asm_graph_destroy(&g2);
+	asm_graph_destroy(&g_resolved);
 
-	/**
-	 * Build barcode for local assembly
-	 */
-	set_log_stage("BWAIndex");
-	struct asm_graph_t g3;
-	char asm_path[1024];
-	sprintf(asm_path, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
-	load_asm_graph(&g3, asm_path);
-	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
-	mkdir(fasta_path, 0755);
-	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
-	write_fasta_seq(&g3, fasta_path);
-	set_log_stage("MapReads");
-	construct_aux_info(opt, &g3, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
-	save_graph_info(opt->out_dir, &g3, "local_added_barcode");
-	asm_graph_destroy(&g3);
 
 	/**
 	* Local assembly
 	*/
 	set_log_stage("LocalAssembly");
 	log_info("Start local assembly process with kmer size %d", opt->lk);
-	char in_file[1024];
 	char in_fasta[1024];
 	char local_fasta[1024];
-	opt->in_file = in_file;
+	sprintf(in_fasta, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
+	sprintf(local_fasta, "%s/scaffold.full.fasta", opt->out_dir);
+	opt->in_file = resolved_path;
 	opt->in_fasta = in_fasta;
 	opt->lc = local_fasta;
-	sprintf(opt->lc, "%s/scaffold.full.fasta", opt->out_dir);
-	sprintf(opt->in_file, "%s/graph_k_%d_local_added_barcode.bin", opt->out_dir, opt->k0);
-	sprintf(opt->in_fasta, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
-	opt->files_1[0] = read_sorted_path.R1_path;
-	opt->files_2[0] = read_sorted_path.R2_path;
-	opt->files_I = malloc(sizeof(char *));
-	opt->files_I[0] = read_sorted_path.idx_path;
-	opt->lib_type = 0;
 	char local_path[1024];
 	sprintf(local_path, "%s/local", opt->out_dir);
 	mkdir(local_path, 0755);
@@ -447,7 +473,6 @@ void assembly3_process(struct opt_proc_t *opt)
 	log_info("Done local assembly. Please see the file: %s", opt->lc);
 
 	close_logger();
-	free(opt->files_I);
 	free(log_file);
 }
 
