@@ -1410,6 +1410,7 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 
 void asm_graph_destroy(struct asm_graph_t *g)
 {
+	log_info("Destroying graph with flag %d", g->aux_flag);
 	gint_t u, e;
 	for (e = 0; e < g->n_e; ++e){
 		int u = g->edges[e].source;
