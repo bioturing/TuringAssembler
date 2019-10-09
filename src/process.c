@@ -209,12 +209,9 @@ void graph_query_process(struct opt_proc_t *opt)
 
 void build_bridge_process(struct opt_proc_t *opt)
 {
-	char *log_file = str_concate(opt->out_dir, "/build_bridge.log");
-	init_logger(opt->log_level, log_file);
 	FILE *f = xfopen(opt->lc, "w");
 	build_bridge(opt, f);
 	fclose(f);
-	free(log_file);
 }
 
 void reduce_read_process(struct opt_proc_t *opt)
