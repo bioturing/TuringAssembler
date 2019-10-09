@@ -692,7 +692,7 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	int check_should_do_local = check_should_local_assembly(scaffold) ;
 	destroy_scaffold_type(scaffold);
 	destroy_edges_score_type(edges_score);
-	if (check_should_do_local) {
+	if (!check_should_do_local) {
 		char *in_name = str_concate(opt->out_dir, "/scaffolds.fasta");
 		char *out_name = str_concate(opt->out_dir, "/scaffold.full.fasta");
 		copyfile(in_name, out_name);
