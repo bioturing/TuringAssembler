@@ -664,9 +664,9 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 
 	print_scaffold_contig(opt, scaffold); /* print scaffold path into local_assembly_scaffold_path.txt */
 	print_scaffold(g, out_file, scaffold);
+	check_should_local_assembly(scaffold);
 	destroy_scaffold_type(scaffold);
 	destroy_edges_score_type(edges_score);
-	check_should_local_assembly(scaffold);
 }
 
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
