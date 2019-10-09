@@ -14,6 +14,7 @@ struct scaffold_type {
 };
 void append_i_contig(struct scaffold_path *path, int i_contig);
 void prepend_i_contig(struct scaffold_path *path, int i_contig);
+void destroy_scaffold_type(struct scaffold_type *scaffold);
 
 struct scaffold_type *new_scaffold_type();
 void print_scaffold(struct asm_graph_t *g, FILE *out_file, struct scaffold_type *scaffold);

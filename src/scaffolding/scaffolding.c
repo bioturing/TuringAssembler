@@ -626,7 +626,7 @@ void print_contig_info(struct asm_graph_t *g)
 	}
 }
 
-void check_should_local_assembly(struct scaffold_type *scaffold)
+int check_should_local_assembly(struct scaffold_type *scaffold)
 {
 	int lc = 0;
 	for (int i = 0 ; i < scaffold->n_path; i++) {
@@ -637,8 +637,33 @@ void check_should_local_assembly(struct scaffold_type *scaffold)
 	}
 	if (lc == 0) {
 		log_warn("Too many low quality contigs for scaffolding. Stop program.");
-		exit(0);
+		return 0;
 	}
+	return 1;
+}
+
+void copyfile(char *in_name, char *out_name)
+{
+	FILE *in_file = fopen(in_name, "rb");
+	if (in_file == NULL) {
+		log_error("file open for reading");
+	}
+	FILE *out_file = fopen(out_name, "wb");
+	if (out_file == NULL) {
+		log_error("file open for writing");
+	}
+	size_t n, m;
+	unsigned char buff[8192];
+	do {
+		n = fread(buff, 1, sizeof buff, in_file);
+		if (n) m = fwrite(buff, 1, n, out_file);
+		else   m = 0;
+	} while ((n > 0) && (n == m));
+	if (m) {
+		log_error("copy");
+	}
+	if (fclose(out_file)) perror("close output file");
+	if (fclose(in_file)) perror("close input file");
 }
 
 void scaffolding(FILE *out_file, struct asm_graph_t *g,
@@ -664,9 +689,15 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 
 	print_scaffold_contig(opt, scaffold); /* print scaffold path into local_assembly_scaffold_path.txt */
 	print_scaffold(g, out_file, scaffold);
+	int check_should_do_local = check_should_local_assembly(scaffold) ;
 	destroy_scaffold_type(scaffold);
 	destroy_edges_score_type(edges_score);
-	check_should_local_assembly(scaffold);
+	if (!check_should_do_local) {
+		char *in_name = str_concate(opt->out_dir, "/scaffolds.fasta");
+		char *out_name = str_concate(opt->out_dir, "/scaffold.full.fasta");
+		copyfile(in_name, out_name);
+		exit(0);
+	}
 }
 
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)

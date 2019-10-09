@@ -35,5 +35,6 @@ void build_V_from_E(struct scaffold_edge *listE, int n_e, int **listV, int *n_v)
 uint32_t equal_scaffold_edge(struct scaffold_edge *e0,struct scaffold_edge *e1);
 uint32_t better_scaffold_edge(struct scaffold_edge *e0, struct scaffold_edge *e1);
 int less_scaffold_edge(const void *e0,const void *e1);
+void destroy_edges_score_type(struct edges_score_type *edges_score);
 #endif
 
