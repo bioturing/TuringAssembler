@@ -397,7 +397,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	log_debug("Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
 	/*for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-		log_debug("%d ", pinfo.paths[best_path][i]);*/
+		__VERBOSE("%d ", pinfo.paths[best_path][i]);
+	__VERBOSE("\n");*/
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
@@ -785,8 +786,6 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
-
-
 
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
 

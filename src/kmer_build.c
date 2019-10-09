@@ -816,8 +816,8 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	kmbuild_bundle_destroy(&kmbuild_bundle);
 
 	//TODO FIX ME
-	add_garbage(ksize, &kmer_table, g0, e1);
-	add_garbage(ksize, &kmer_table, g0, e2);
+	//add_garbage(ksize, &kmer_table, g0, e1);
+	//add_garbage(ksize, &kmer_table, g0, e2);
 	log_info("Number of kmer: %lu", kmer_table.n_item);
 
 	log_debug("|---- Building graph connection");
@@ -838,8 +838,8 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 			(void *)(&kmedge_bundle), assign_count_kedge_multi);
 	//TODO: FIX ME
-	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e1);
-	assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
+	//assign_count_garbage(ksize + 1, &kmer_table, g, g0, e1);
+	//assign_count_garbage(ksize + 1, &kmer_table, g, g0, e2);
 	kmhash_destroy(&kmer_table);
 	destroy_kmc_info(&kmc_inf);
 }

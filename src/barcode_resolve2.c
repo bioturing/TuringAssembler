@@ -1567,9 +1567,9 @@ void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
 	struct barcode_hash_t *bc1, *bc2;
-	bc1 = g->edges[e1].barcodes + 2;
+	// TODO: Which level to choose?
+	/*bc1 = g->edges[e1].barcodes + 2;
 	bc2 = g->edges[e2].barcodes + 2;
-
 
 	struct barcode_hash_t *bc_head;
 	struct barcode_hash_t *bc_tail;
@@ -1586,8 +1586,16 @@ void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
 		h_tail = barcode_hash_2_khash(bc_tail);
 	else
-		h_tail = kh_init(gint);
-	khash_t(gint) *include = get_shared_bc(h1, h2);
+		h_tail = kh_init(gint);*/
+	bc1 = g->edges[e1].barcodes + 1;
+	bc2 = g->edges[e2].barcodes + 1;
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_head = kh_init(gint);
+	khash_t(gint) *h_tail = kh_init(gint);
+
+	// TODO: fix me
+	khash_t(gint) *include = get_union_bc(h1, h2);
 	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
 	khash_t(gint) *h_shared = get_exclude_bc(include, exclude);
 	uint64_t *shared;
