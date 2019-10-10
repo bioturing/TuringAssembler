@@ -37,9 +37,9 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 			//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
 			//ginfo->edge_max_vst[i] = 1;
 		} else {
-			/*float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
-			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));*/
-			ginfo->edge_max_vst[i] = 1e9;
+			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
+			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
+			//ginfo->edge_max_vst[i] = 1e9;
 		}
 	}
 }
