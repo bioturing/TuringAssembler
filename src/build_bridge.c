@@ -591,10 +591,10 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	log_info("Filter by coverage");
 	log_debug("Before filter: %ld edges\n", lg->n_e);
 	int thresh = (int) (MIN_DEPTH_RATIO *
-			min(get_cov(*lg, emap1->lc_e),
-				get_cov(*lg, emap2->lc_e)));
+			min(__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize),
+			__get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)));
 	for (int i = 0; i < lg->n_e; ++i){
-		if (get_cov(*lg, i) < thresh)
+		if (__get_edge_cov(lg->edges + i, lg->ksize) < thresh)
 			asm_remove_edge(lg, i);
 	}
 	struct asm_graph_t lg1;

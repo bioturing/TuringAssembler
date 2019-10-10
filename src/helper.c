@@ -51,11 +51,6 @@ void encode_seq(uint32_t **dest, char *source)
 	}
 }
 
-float get_cov(struct asm_graph_t g, int edge)
-{
-	return (float) g.edges[edge].count / (g.edges[edge].seq_len - g.ksize);
-}
-
 void swap(void *a, void *b, int size)
 {
 	void *c = calloc(1, sizeof(size));

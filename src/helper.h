@@ -12,7 +12,6 @@ void flip_reverse(char *seq);
 void encode_seq(uint32_t **dest, char *source);
 void decode_seq(char **dest, uint32_t *source, int len);
 char flip(char base);
-float get_cov(struct asm_graph_t g, int edge);
 void swap(void *a, void *b, int size);
 void get_dump_N(char **N);
 int recursive_delete(char *dir);

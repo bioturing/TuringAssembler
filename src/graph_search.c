@@ -5,6 +5,7 @@
 #include "process.h"
 #define PATH_NOT_FOUND -1
 #define MAX_VISITED_EDGE 20000
+#define MIN_RELIABLE_COV_LEN 500
 
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 			int lc_e1, int lc_e2)
@@ -24,13 +25,22 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 	if (ginfo->edge_max_vst != NULL)
 		free(ginfo->edge_max_vst);
 	ginfo->edge_max_vst = (int *) calloc(ginfo->g->n_e, sizeof(int));
-	float init_cov = (float) (get_cov(*ginfo->g, ginfo->lc_e1) +
-			get_cov(*ginfo->g, ginfo->lc_e2)) / 2;
+	float cov1 = __get_edge_cov(ginfo->g->edges + ginfo->lc_e1,
+			ginfo->g->ksize);
+	float cov2 = __get_edge_cov(ginfo->g->edges + ginfo->lc_e2,
+			ginfo->g->ksize);
+	float init_cov = (cov1 + cov2) / 2;
 	for (int i = 0; i < ginfo->g->n_e; ++i){
-		int cov = get_cov(*(ginfo->g), i);
-		ginfo->edge_max_vst[i] = (int) max(1, round(1.0 * cov / init_cov));
-		//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
-		//ginfo->edge_max_vst[i] = 1;
+		if (ginfo->g->edges[i].seq_len >= MIN_RELIABLE_COV_LEN){
+			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
+			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
+			//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
+			//ginfo->edge_max_vst[i] = 1;
+		} else {
+			/*float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
+			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));*/
+			ginfo->edge_max_vst[i] = 1e9;
+		}
 	}
 }
 
