@@ -2581,67 +2581,6 @@ void get_rc_seq(uint32_t **seq, uint32_t *ref, uint32_t len)
 	}
 }
 
-//int join_n_m_complex_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
-//		khash_t(gint) *set_leg, khash_t(gint) *set_self,
-//		struct opt_local_t *opt, khash_t(used_pair) *assemblied_pair)
-//{
-//	int resolve;
-//	khint_t k;
-//	gint_t e1, e2, e2_rc, e1_rc, e2a, et, et_rc;
-//	resolve = 0;
-//	for (k = kh_begin(set_leg); k < kh_end(set_leg); ++k) {
-//		if (!kh_exist(set_leg, k))
-//			continue;
-//		e1 = kh_key(set_leg, k);
-//		int stat;
-//		e2 = barcode_find_pair_alter(g, set_leg, e1, -1, &stat);
-//		if (e2 < 0)
-//			continue;
-//		e2a = barcode_find_pair_alter(g, set_self, e1, e2, &stat);
-//		if (e2a >= 0) {
-//			if (e2a != e2 && stat == 0)
-//				continue;
-//			if (e2a != e2) {
-//				e2 = e2a;
-//				stat = 0;
-//			} else {
-//				stat = 1;
-//			}
-//		}
-//		struct pair_contig_t used_key1, used_key2;
-//		used_key1 = (struct pair_contig_t){e1, e2};
-//		used_key2 = (struct pair_contig_t){e2, e1};
-//		khint_t k1, k2;
-//		k1 = kh_get(used_pair, assemblied_pair, used_key1);
-//		if (k1 != kh_end(assemblied_pair))
-//			continue;
-//		k2 = kh_get(used_pair, assemblied_pair, used_key2);
-//		if (k2 != kh_end(assemblied_pair))
-//			continue;
-//		int hash_ret;
-//		kh_put(used_pair, assemblied_pair, used_key1, &hash_ret);
-//		struct result_local_t sret;
-//		int ret = local_assembly(opt, g, e1, e2, &sret);
-//		if (ret == 1) {
-//			e1_rc = g->edges[e1].rc_id;
-//			e2_rc = g->edges[e2].rc_id;
-//			asm_join_edge_with_fill(g, e1_rc, e1, e2, e2_rc,
-//				sret.seq, sret.len, sret.trim_e1, sret.trim_e2);
-//			free(sret.seq);
-//			kh_del(gint, set_leg, kh_get(gint, set_leg, e1));
-//			if (stat) {
-//				kh_del(gint, set_leg, kh_get(gint, set_leg, e2));
-//			} else {
-//				kh_del(gint, set_self, kh_get(gint, set_self, e2));
-//				kh_del(gint, set_self, kh_get(gint, set_self, e2_rc));
-//				kh_put(gint, set_leg, e2_rc, &stat);
-//			}
-//			++resolve;
-//		}
-//	}
-//	return resolve;
-//}
-
 void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	struct read_path_t read_sorted_path;
@@ -2714,19 +2653,6 @@ void do_something_local(struct opt_proc_t *opt, struct asm_graph_t *g)
 	kh_destroy(gint, set_v);
 	kh_destroy(gint, set_self);
 	log_debug("Number of joined pair(s) through jungle: %ld", ret);
-}
-
-
-void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
-				struct asm_graph_t *g0, struct asm_graph_t *g1)
-{
-	// char path[MAX_PATH];
-	// strcpy(path, opt->out_dir);
-	// strcat(path, "/level4_working/");
-	// mkdir(path, 0755);
-	// strcat(path, "ref.fasta");
-	// construct_fasta(g0, path);
-	// construct_aux_info(opt, g0, rpath, path, 0);
 }
 
 khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc)
