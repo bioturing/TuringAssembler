@@ -484,23 +484,6 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	close_logger();
 }
 
-void assembly_process(struct opt_proc_t *opt)
-{
-	struct asm_graph_t g1, g2;
-	struct read_path_t read_sorted_path;
-
-	load_asm_graph(&g1, opt->in_file);
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		sort_read(opt, &read_sorted_path);
-	}
-	resolve_n_m_local(opt, &read_sorted_path, &g1, &g2);
-	// save_graph_info(opt->out_dir, &g2, "level_2");
-}
-
 /**
  * @brief Main process for the assembly. Any step further please add into this.
  * Only add after a pull request acceptance

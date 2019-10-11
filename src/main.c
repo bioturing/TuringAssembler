@@ -423,9 +423,7 @@ int main(int argc, char *argv[])
 		print_usage();
 		return -1;
 	}
-	if (!strcmp(argv[1], "assembly"))
-		build_opt_process(argc, argv, &assembly_process);
-	else if (!strcmp(argv[1], "assembly3"))
+	if (!strcmp(argv[1], "assembly3"))
 		build_opt_process(argc, argv, &assembly3_process);
 	else if (!strcmp(argv[1], "build_0"))
 		build_0_opt_process(argc, argv);
@@ -451,8 +449,6 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_4_5_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
-	/*else if (!strcmp(argv[1], "query"))
-		graph_query_opt_process(argc, argv);*/
 	else if (!strcmp(argv[1], "build_bridge"))
 		build_bridge_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "local_assembly"))
