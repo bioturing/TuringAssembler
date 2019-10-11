@@ -837,7 +837,6 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		for (int j = 1; j < path_lens[i]; ++j){
 			fprintf(f, "%s", bridges[p] +
 					g0->edges[paths[i][j - 1]].seq_len);
-			//printf(">hao\n%s\n", bridges[p]);
 			++p;
 		}
 		free(seq);
@@ -925,6 +924,12 @@ void *build_bridge_iterator(void *data)
 	}
 }
 
+/**
+ * @Brief Get all the local graphs for local assembly
+ * @Param opt: options
+ * @Param g: the original graph (global graph)
+ * @Param query: a record for storing the scaffold path
+ */
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)
 {

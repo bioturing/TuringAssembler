@@ -393,7 +393,6 @@ void graph_convert_opt_process(int argc, char *argv[])
 }
 
 // ./skipping asm_graph0 -g <graph.bin> -o <output_folder>
-
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {

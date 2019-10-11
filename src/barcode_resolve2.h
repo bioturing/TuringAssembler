@@ -3,6 +3,21 @@
 #include "assembly_graph.h"
 KHASH_SET_INIT_INT64(gint);
 
+struct opt_local_t {
+	char *out_dir;
+	struct read_path_t *read_path;
+	khash_t(bcpos) *dict;
+	int ksize;
+	int n_threads;
+	int mmem;
+};
+
+struct result_local_t {
+	uint32_t *seq;
+	int len;
+	int trim_e1;
+	int trim_e2;
+};
 void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix);
@@ -22,4 +37,6 @@ khash_t(gint) *get_union_bc(khash_t(gint) *h1, khash_t(gint) *h2);
 khash_t(gint) *get_exclude_bc(khash_t(gint) *h_in, khash_t(gint) *h_ex);
 khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc);
 void khash_2_arr(khash_t(gint) *h, uint64_t **arr, int *n);
+int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, struct result_local_t *sret);
 #endif
