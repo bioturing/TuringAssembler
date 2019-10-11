@@ -1324,16 +1324,6 @@ free_stage_1:
 int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int res = 0;
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		log_error("Reads must be sorted");
-	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
 	int tmp = g->n_e;
 	int m_e = g->n_e;
 	for (int e1 = 0; e1 < tmp; ++e1){
@@ -1356,8 +1346,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 		log_debug("Get local reads");
 		struct read_path_t local_read_path;
-		get_union_barcode_reads(opt, g, e1, e2, dict, &read_sorted_path,
-				&local_read_path);
+		get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 				local_read_path.R2_path, KSIZE_CHECK);
 		log_debug("Finding paths between %d and %d", e1, e2);
@@ -1439,7 +1428,6 @@ ignore_stage_1:
 		destroy_read_path(&local_read_path);
 		free(dump_edges);
 	}
-	kh_destroy(bcpos, dict);
 	test_asm_graph(g);
 	return res;
 }

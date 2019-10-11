@@ -341,17 +341,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int lc_e2 = emap2->lc_e;
 	struct asm_edge_t edge_pre_e1;
 	struct asm_edge_t edge_next_e2;
-	/*if (pre_e1 == -1)
-		edge_pre_e1.source = -1;
-	else
-		edge_pre_e1 = g->edges[pre_e1];
-	if (next_e2 == -1)
-		edge_next_e2.source = -1;
-	else
-		edge_next_e2 = g->edges[next_e2];*/
 
 	struct read_path_t local_read_path;
-	get_shared_barcode_reads(opt, g, e1, e2, &local_read_path);
+	get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
 
 	unrelated_filter(g, emap1, emap2, scaffolds, n_scaff, lg);
 	//cov_filter(g, lg, emap1, emap2);
@@ -374,7 +366,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	path_info_init(&pinfo);
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 			local_read_path.R2_path, KSIZE_CHECK);
-	destroy_read_path(&local_read_path);
 	get_all_paths_kmer_check(lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
 	kh_destroy(kmer_int, kmer_count);
@@ -384,7 +375,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	log_debug("Found %d paths, finding the best one", pinfo.n_paths);
 	float *scores;
 	float *error;
-	get_path_scores(opt, g, lg, &pinfo, e1, e2, &scores, &error);
+	get_path_scores(opt, &local_read_path, g, lg, &pinfo, e1, e2, &scores,
+			&error);
 	float best_score = 0;
 	int best_path = 0;
 	int min_score = 1e9;
@@ -405,19 +397,22 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	log_debug("Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
 	/*for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-		log_debug("%d ", pinfo.paths[best_path][i]);*/
+		__VERBOSE("%d ", pinfo.paths[best_path][i]);
+	__VERBOSE("\n");*/
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
 	free(scores);
 	free(error);
 end_function:
+	destroy_read_path(&local_read_path);
 	path_info_destroy(&pinfo);
 }
 
-void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct asm_graph_t *lg, struct path_info_t *pinfo,
-		int e1, int e2, float **scores, float **error)
+void get_path_scores(struct opt_proc_t *opt, struct read_path_t *local_read_path,
+		struct asm_graph_t *g, struct asm_graph_t *lg,
+		struct path_info_t *pinfo, int e1, int e2, float **scores,
+		float **error)
 {
 	char cand_path[1024];
 	sprintf(cand_path, "%s/%d_%d_all.fasta", opt->out_dir, e1, e2);
@@ -442,24 +437,7 @@ void get_path_scores(struct opt_proc_t *opt, struct asm_graph_t *g,
 		kh_val(count_err, it) = 0;
 	}
 
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		log_error("Reads must be sorted\n");
-	}
-	char r1_path[1024], r2_path[1024];
-	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
-			e1, e2);
-	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
-			e1, e2);
-	struct read_path_t local_read_path;
-	local_read_path.R1_path = r1_path;
-	local_read_path.R2_path = r2_path;
-
-	count_readpair_err_path(opt->n_threads, &local_read_path, cand_path,
+	count_readpair_err_path(opt->n_threads, local_read_path, cand_path,
 			ctg_cnt, count_err);
 	*scores = (float *) calloc(pinfo->n_paths, sizeof(float));
 	for (khiter_t it = kh_begin(ctg_cnt); it != kh_end(ctg_cnt); ++it){
@@ -613,10 +591,10 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	log_info("Filter by coverage");
 	log_debug("Before filter: %ld edges\n", lg->n_e);
 	int thresh = (int) (MIN_DEPTH_RATIO *
-			min(get_cov(*lg, emap1->lc_e),
-				get_cov(*lg, emap2->lc_e)));
+			min(__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize),
+			__get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)));
 	for (int i = 0; i < lg->n_e; ++i){
-		if (get_cov(*lg, i) < thresh)
+		if (__get_edge_cov(lg->edges + i, lg->ksize) < thresh)
 			asm_remove_edge(lg, i);
 	}
 	struct asm_graph_t lg1;
@@ -808,8 +786,6 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	log_info("Getting all local graphs");
 	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
-
-
 
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
 

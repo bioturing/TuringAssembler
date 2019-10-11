@@ -955,7 +955,7 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 				continue;
 			c2 = atoi(idx->bns->anns[p2[k].rid].name);
 			if (c1 == c2 && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
-			    && p1[i].strand != p2[k].strand) {
+				&& p1[i].strand != p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_cand, c1);
 				if (it != kh_end(count_cand)) {
 					atomic_add_and_fetch32(&kh_value(count_cand, it), 1);
@@ -963,21 +963,17 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 				}
 			}
 			if (count_err != NULL && c1 == c2
-			    && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
-			    && p1[i].strand == p2[k].strand) {
+				&& __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
+				&& p1[i].strand == p2[k].strand) {
 				khiter_t it = kh_get(contig_count, count_err, c1);
-				if (it != kh_end(count_err)) {
+				if (it != kh_end(count_err))
 					atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-					//fprintf(f, "%d 1 %d %d\n", c1, p1[i].pos, p1[i].aligned);
-				}
 			}
 		}
 		if (count_err != NULL && !paired_map) {
 			khiter_t it = kh_get(contig_count, count_err, c1);
-			if (it != kh_end(count_err)) {
+			if (it != kh_end(count_err))
 				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-				//fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
-			}
 		}
 	}
 	for (int i = 0; i < n2; ++i) {
@@ -998,51 +994,10 @@ void path_mapper(struct read_t *r1, struct read_t *r2, struct pathcount_bundle_t
 		}
 		if (count_err != NULL && !paired_map) {
 			khiter_t it = kh_get(contig_count, count_err, c2);
-			if (it != kh_end(count_err)) {
+			if (it != kh_end(count_err))
 				atomic_add_and_fetch32(&kh_value(count_err, it), 1);
-				//fprintf(f, "%d 2 %d %d\n", c2, p2[i].pos, p2[i].aligned);
-			}
 		}
 	}
-	//fclose(f);
-	//f = fopen("read_map.txt", "a");
-	/*for (int i = 0; i < n1; ++i){
-		if (p1[i].aligned < r1->len)
-			continue;
-		int c;
-		c = atoi(idx->bns->anns[p1[i].rid].name);
-		if (count_err != NULL){
-			fprintf(f, "%d 2 %d %d\n", c, p1[i].pos, p1[i].aligned);
-		}
-	}
-	for (int i = 0; i < n2; ++i){
-		if (p2[i].aligned < r2->len)
-			continue;
-		int c;
-		c = atoi(idx->bns->anns[p2[i].rid].name);
-		if (count_err != NULL){
-			fprintf(f, "%d 2 %d %d\n", c, p2[i].pos, p2[i].aligned);
-		}
-	}*/
-	/*for (i = 0; i < n1; ++i) {
-		if (p1[i].aligned < r1->len)
-			continue;
-		int c1, c2;
-		c1 = atoi(idx->bns->anns[p1[i].rid].name);
-		int paired_map = 0;
-		for (k = 0; k < n2; ++k) {
-			if (p2[k].aligned < r2->len)
-				continue;
-			c2 = atoi(idx->bns->anns[p2[k].rid].name);
-			if (count_err != NULL && c1 == c2
-			    && __abs(p2[k].pos - p1[i].pos) < MAX_READ_FRAG_LEN
-			    && p1[i].strand != p2[k].strand) {
-				fprintf(f, "%d 2 %d %d\n", c1, p1[i].pos, p1[i].aligned);
-				fprintf(f, "%d 2 %d %d\n", c2, p2[k].pos, p2[k].aligned);
-			}
-		}
-	}
-	fclose(f);*/
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);

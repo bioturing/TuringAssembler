@@ -25,8 +25,5 @@ void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, struct read_path_t *local_read_path);
 int asm_resolve_dump_loop_ite(struct asm_graph_t *g);
 int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
-void get_union_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int e1, int e2, khash_t(bcpos) *dict, struct read_path_t *read_sorted_path,
-		struct read_path_t *local_read_path);
 void destroy_read_path(struct read_path_t *reads);
 #endif /* __RESOLVE_H__ */

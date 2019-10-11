@@ -18,7 +18,6 @@
 #include "verbose.h" 
 #include "barcode_resolve2.h"
 #include "process.h"
-KHASH_SET_INIT_INT64(gint);
 #define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
 #define __positive_ratio_unique(r)	((r) + EPS >= 0.08)
@@ -1557,7 +1556,7 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
-void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rpath,
+void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix)
 {
@@ -1567,128 +1566,134 @@ void get_local_reads_intersect(struct read_path_t *reads, struct read_path_t *rp
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
-	struct barcode_hash_t *h1, *h2;
-	h1 = g->edges[e1].barcodes + 2;
-	h2 = g->edges[e2].barcodes + 2;
-	struct barcode_hash_t *h_head;
-	/*if (g->edges[e1].seq_len >= CONTIG_LEVEL_2)
-		h_head = g->edges[g->edges[e1].rc_id].barcodes + 2;
-	else if(g->edges[e1].seq_len >= CONTIG_LEVEL_1)
-		h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
-	else
-		h_head = g->edges[g->edges[e1].rc_id].barcodes;*/
-	struct barcode_hash_t *h_tail;
-	/*if (g->edges[e2].seq_len >= CONTIG_LEVEL_2)
-		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 2;
-	else if(g->edges[e2].seq_len >= CONTIG_LEVEL_1)
-		h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
-	else
-		h_tail = g->edges[g->edges[e2].rc_id].barcodes;*/
+	struct barcode_hash_t *bc1, *bc2;
+	// TODO: Which level to choose?
+	/*bc1 = g->edges[e1].barcodes + 2;
+	bc2 = g->edges[e2].barcodes + 2;
 
-	h_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
-	h_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
-	kmint_t i, k;
-	khash_t(gint) *h1_key = kh_init(gint);
-	khash_t(gint) *h2_key = kh_init(gint);
-	khash_t(gint) *h_exclude = kh_init(gint);
-	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] != (uint64_t)-1) {
-			int ret;
-			kh_put(gint, h1_key, h1->keys[i], &ret);
-		}
-	}
-	for (i = 0; i < h2->size; ++i) {
-		if (h2->keys[i] != (uint64_t)-1) {
-			int ret;
-			kh_put(gint, h2_key, h2->keys[i], &ret);
-		}
-	}
-	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
-		for (int i = 0; i < h_head->size; ++i){
-			if (h_head->keys[i] != (uint64_t) -1){
-				int ret;
-				kh_put(gint, h_exclude, h_head->keys[i], &ret);
-			}
-		}
-	}
-	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN){
-		for (int i = 0; i < h_tail->size; ++i){
-			if (h_tail->keys[i] != (uint64_t) -1){
-				int ret;
-				kh_put(gint, h_exclude, h_tail->keys[i], &ret);
-			}
-		}
-	}
-	int n_shared = 0;
-	int m_shared = 1;
-	uint64_t *shared = (uint64_t *) calloc(1, sizeof(uint64_t));
-	int total = 0;
-	for (khiter_t it = kh_begin(h1_key); it != kh_end(h1_key); ++it){
-		if (!kh_exist(h1_key, it))
-			continue;
-		uint64_t key = kh_key(h1_key, it);
-		khiter_t it2 = kh_get(gint, h2_key, key);
-		if (it2 == kh_end(h2_key))
-			continue;
-		++total;
-		it2 = kh_get(gint, h_exclude, key);
-		if (it2 != kh_end(h_exclude))
-			continue;
-		if (n_shared == m_shared){
-			m_shared <<= 1;
-			shared = (uint64_t *) realloc(shared, m_shared * sizeof(uint64_t));
-		}
-		shared[n_shared++] = key;
-	}
-	log_debug("Keep %d barcodes in %d total", n_shared, total);
-	filter_read(reads, dict, rpath, shared, n_shared);
+	struct barcode_hash_t *bc_head;
+	struct barcode_hash_t *bc_tail;
+	bc_head = g->edges[g->edges[e1].rc_id].barcodes + 1;
+	bc_tail = g->edges[g->edges[e2].rc_id].barcodes + 1;
+
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_head, *h_tail;
+	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
+		h_head = barcode_hash_2_khash(bc_head);
+	else
+		h_head = kh_init(gint);
+	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
+		h_tail = barcode_hash_2_khash(bc_tail);
+	else
+		h_tail = kh_init(gint);*/
+	bc1 = g->edges[e1].barcodes + 1;
+	bc2 = g->edges[e2].barcodes + 1;
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_head = kh_init(gint);
+	khash_t(gint) *h_tail = kh_init(gint);
+
+	// TODO: fix me
+	khash_t(gint) *include = get_union_bc(h1, h2);
+	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
+	khash_t(gint) *h_shared = get_exclude_bc(include, exclude);
+	uint64_t *shared;
+	int n;
+	khash_2_arr(h_shared, &shared, &n);
+	log_debug("Keep %d barcodes in %d total", n, kh_size(include));
+	filter_read(reads, dict, rpath, shared, n);
 	free(shared);
-	kh_destroy(gint, h1_key);
-	kh_destroy(gint, h2_key);
-	kh_destroy(gint, h_exclude);
+	kh_destroy(gint, h1);
+	kh_destroy(gint, h2);
+	kh_destroy(gint, h_head);
+	kh_destroy(gint, h_tail);
+	kh_destroy(gint, h_shared);
 }
 
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix)
 {
+	const int contig_level = 1;
+	get_union_reads(reads, rpath, dict, g, e1, e2, prefix, contig_level);
+}
+
+void get_shared_reads(struct read_path_t *reads, struct read_path_t *rpath,
+		khash_t(bcpos) *dict, struct asm_graph_t *g, gint_t e1,
+		gint_t e2, const char *prefix, int contig_level)
+{
 	char path[MAX_PATH];
 	sprintf(path, "%s/R1.sub.fq", prefix);
 	rpath->R1_path = strdup(path);
 	sprintf(path, "%s/R2.sub.fq", prefix);
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
-	struct barcode_hash_t *h1, *h2;
-	h1 = g->edges[e1].barcodes + 1;
-	h2 = g->edges[e2].barcodes + 1;
-	int n_shared, m_shared;
-	n_shared = 0;
-	m_shared = 0x100;
-	uint64_t *shared = malloc(m_shared * sizeof(uint64_t));
-	kmint_t i, k;
-	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] != (uint64_t)-1) {
-			if (n_shared == m_shared) {
-				m_shared <<= 1;
-				shared = realloc(shared, m_shared * sizeof(uint64_t));
-			}
-			shared[n_shared++] = h1->keys[i];
-		}
-	}
-	for (i = 0; i < h2->size; ++i) {
-		if (h2->keys[i] == (uint64_t)-1)
-			continue;
-		k = barcode_hash_get(h1, h2->keys[i]);
-		if (k == BARCODE_HASH_END(h1)) {
-			if (n_shared == m_shared) {
-				m_shared <<= 1;
-				shared = realloc(shared, m_shared * sizeof(uint64_t));
-			}
-			shared[n_shared++] = h2->keys[i];
-		}
-	}
-	filter_read(reads, dict, rpath, shared, n_shared);
+	struct barcode_hash_t *bc1, *bc2;
+	bc1 = g->edges[e1].barcodes + contig_level;
+	bc2 = g->edges[e2].barcodes + contig_level;
+
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_shared = get_shared_bc(h1, h2);
+	uint64_t *shared;
+	int n;
+	khash_2_arr(h_shared, &shared, &n);
+	filter_read(reads, dict, rpath, shared, n);
 	free(shared);
+	kh_destroy(gint, h1);
+	kh_destroy(gint, h2);
+	kh_destroy(gint, h_shared);
+}
+
+void get_union_reads(struct read_path_t *reads, struct read_path_t *rpath,
+		khash_t(bcpos) *dict, struct asm_graph_t *g, gint_t e1,
+		gint_t e2, const char *prefix, int contig_level)
+{
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath->R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
+	struct barcode_hash_t *bc1, *bc2;
+	bc1 = g->edges[e1].barcodes + contig_level;
+	bc2 = g->edges[e2].barcodes + contig_level;
+
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_union = get_union_bc(h1, h2);
+	uint64_t *res;
+	int n;
+	khash_2_arr(h_union, &res, &n);
+	filter_read(reads, dict, rpath, res, n);
+	free(res);
+	kh_destroy(gint, h1);
+	kh_destroy(gint, h2);
+	kh_destroy(gint, h_union);
+}
+
+void get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
+		int e1, int e2, struct read_path_t *local_read_path)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+        	log_error("Reads must be sorted\n");
+	}
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	char work_dir[MAX_PATH];
+	sprintf(work_dir, "%s/kmer_check_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir, 0755);
+	const int contig_level = 1;
+	get_shared_reads(&read_sorted_path, local_read_path, dict, g,
+			g->edges[e1].rc_id, e2, work_dir, contig_level);
+	kh_destroy(bcpos, dict);
 }
 
 int mark_visit(struct asm_graph_t *g, gint_t u, gint_t t, uint8_t *flag, uint8_t mask)
@@ -1924,7 +1929,7 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
-	get_local_reads_intersect(&read_sorted_path, &local_read_path, dict, g,
+	get_reads_local_graph(&read_sorted_path, &local_read_path, dict, g,
 			e1, e2, work_dir);
 	if (check_file_empty(local_read_path.R1_path)
 		|| check_file_empty(local_read_path.R2_path)){
@@ -1934,7 +1939,7 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t lg, lg1;
 		build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
 			&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
-		&lg, g, e1, e2);
+			&lg, g, e1, e2);
 		save_graph_info(work_dir, &lg, "local_lvl_0");
 		build_local_0_1(&lg, &lg1);
 		save_graph_info(work_dir, &lg1, "local_lvl_1");
@@ -2690,35 +2695,77 @@ void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 	// construct_aux_info(opt, g0, rpath, path, 0);
 }
 
-void get_shared_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int e1, int e2, struct read_path_t *local_read_path)
+khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc)
 {
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		__ERROR("Reads must be sorted\n");
+	khash_t(gint) *res = kh_init(gint);
+	for (int i = 0; i < bc->size; ++i) {
+		if (bc->keys[i] != (uint64_t)-1){
+			int ret;
+			kh_put(gint, res, bc->keys[i], &ret);
+		}
 	}
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_shared_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	get_local_reads_intersect(&read_sorted_path, local_read_path, dict, g,
-			g->edges[e1].rc_id, e2, work_dir);
-	kh_destroy(bcpos, dict);
+	return res;
 }
 
-void get_union_barcode_reads(struct opt_proc_t *opt, struct asm_graph_t *g,
-		int e1, int e2, khash_t(bcpos) *dict, struct read_path_t *read_sorted_path,
-		struct read_path_t *local_read_path)
+khash_t(gint) *get_shared_bc(khash_t(gint) *h1, khash_t(gint) *h2)
 {
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	get_local_reads(read_sorted_path, local_read_path, dict, g,
-			g->edges[e1].rc_id, e2, work_dir);
+	khash_t(gint) *res = kh_init(gint);
+	for (khiter_t it = kh_begin(h1); it != kh_end(h1); ++it){
+		if (!kh_exist(h1, it))
+			continue;
+		gint_t key = kh_key(h1, it);
+		khiter_t it2 = kh_get(gint, h2, key);
+		if (it2 != kh_end(h2)){
+			int ret;
+			kh_put(gint, res, key, &ret);
+		}
+	}
+	return res;
 }
 
+khash_t(gint) *get_union_bc(khash_t(gint) *h1, khash_t(gint) *h2)
+{
+	khash_t(gint) *res = kh_init(gint);
+	for (khiter_t it = kh_begin(h1); it != kh_end(h1); ++it){
+		if (!kh_exist(h1, it))
+			continue;
+		int ret;
+		kh_put(gint, res, kh_key(h1, it), &ret);
+	}
+	for (khiter_t it = kh_begin(h2); it != kh_end(h2); ++it){
+		if (!kh_exist(h2, it))
+			continue;
+		khiter_t it2 = kh_get(gint, h1, kh_key(h2, it));
+		if (it2 == kh_end(h1)){
+			int ret;
+			kh_put(gint, res, kh_key(h2, it), &ret);
+		}
+	}
+	return res;
+}
+
+khash_t(gint) *get_exclude_bc(khash_t(gint) *h_in, khash_t(gint) *h_ex)
+{
+	khash_t(gint) *res = kh_init(gint);
+	for (khiter_t it = kh_begin(h_in); it != kh_end(h_in); ++it){
+		if (!kh_exist(h_in, it))
+			continue;
+		khiter_t it2 = kh_get(gint, h_ex, kh_key(h_in, it));
+		if (it2 == kh_end(h_ex)){
+			int ret;
+			kh_put(gint, res, kh_key(h_in, it), &ret);
+		}
+	}
+	return res;
+}
+
+void khash_2_arr(khash_t(gint) *h, uint64_t **arr, int *n)
+{
+	*n = 0;
+	*arr = calloc(kh_size(h), sizeof(uint64_t));
+	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
+		if (!kh_exist(h, it))
+			continue;
+		(*arr)[(*n)++] = kh_key(h, it);
+	}
+}
