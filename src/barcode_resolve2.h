@@ -18,10 +18,10 @@ struct result_local_t {
 	int trim_e1;
 	int trim_e2;
 };
-void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
+int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix);
-void get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
+int get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, struct read_path_t *local_read_path);
 void get_shared_reads(struct read_path_t *reads, struct read_path_t *rpath,
 		khash_t(bcpos) *dict, struct asm_graph_t *g, gint_t e1,

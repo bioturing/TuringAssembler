@@ -373,6 +373,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
 		int **path, int *path_len)
 {
+	//		 STAGE 1 getting local reads 			//
 	*path = NULL;
 	*path_len = 0;
 	int e1 = emap1->gl_e;
@@ -383,8 +384,14 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct asm_edge_t edge_next_e2;
 
 	struct read_path_t local_read_path;
-	get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
+	int ret = get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
+	if (!ret){
+		log_warn("Something supicious happens, probably that read files are empty, please check at %s and %s",
+				local_read_path.R1_path, local_read_path.R2_path);
+		goto ignore_stage_1;
+	}
 
+	//		 STAGE 2 filtering local graph 			//
 	unrelated_filter(g, emap1, emap2, scaffolds, n_scaff, lg);
 	connection_filter(g, lg, emap1, emap2);
 
@@ -399,6 +406,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//link_filter(opt, g, lg, emap1, emap2);
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
+	// 		 STAGE 3 finding paths 			//
 	log_info("Start finding paths");
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
@@ -409,7 +417,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	kh_destroy(kmer_int, kmer_count);
 
 	if (pinfo.n_paths == 0)
-		goto end_function;
+		goto ignore_stage_2;
 	log_debug("Found %d paths, finding the best one", pinfo.n_paths);
 	float *scores;
 	float *error;
@@ -436,9 +444,10 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
 	free(scores);
 	free(error);
-end_function:
-	destroy_read_path(&local_read_path);
+ignore_stage_2:
 	path_info_destroy(&pinfo);
+ignore_stage_1:
+	destroy_read_path(&local_read_path);
 }
 
 void get_path_scores(struct opt_proc_t *opt, struct read_path_t *local_read_path,

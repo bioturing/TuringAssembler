@@ -1552,15 +1552,16 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 }
 
 /**
- * @Brief: gets reads to build the local assembly graph
- * @Param reads: path to the original read files
- * @Param rpath: path to the local reads after being constructed
- * @Param dict: barcodes offset in file
- * @Param g: the global graph
- * @Param e1, e2: the two bridge contigs
- * @Param prefix: prefix of the paths to the local reads
+ * @brief: gets reads to build the local assembly graph
+ * @param reads: path to the original read files
+ * @param rpath: path to the local reads after being constructed
+ * @param dict: barcodes offset in file
+ * @param g: the global graph
+ * @param e1, e2: the two bridge contigs
+ * @param prefix: prefix of the paths to the local reads
+ * @return: 1 if everything runs smoothly, 0 if something supicious happens
  */
-void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
+int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix)
 {
@@ -1613,6 +1614,11 @@ void get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	kh_destroy(gint, h_head);
 	kh_destroy(gint, h_tail);
 	kh_destroy(gint, h_shared);
+
+	int res = 1;
+	if (check_file_empty(rpath->R1_path) || check_file_empty(rpath->R2_path))
+		res = 0;
+	return res;
 }
 
 void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
@@ -1624,14 +1630,14 @@ void get_local_reads(struct read_path_t *reads, struct read_path_t *rpath,
 }
 
 /**
- * @Brief: gets the shared reads of two contigs
- * @Param reads: path to the original read files
- * @Param rpath: path to the local reads after being constructed
- * @Param dict: barcodes offset in file
- * @Param g: the global graph
- * @Param e1, e2: the two bridge contigs
- * @Param prefix: prefix of the paths to the local reads
- * @Param contig_level: the level of the barcodes that are being retrived,
+ * @brief: gets the shared reads of two contigs
+ * @param reads: path to the original read files
+ * @param rpath: path to the local reads after being constructed
+ * @param dict: barcodes offset in file
+ * @param g: the global graph
+ * @param e1, e2: the two bridge contigs
+ * @param prefix: prefix of the paths to the local reads
+ * @param contig_level: the level of the barcodes that are being retrived,
  * 	based on CONTIG_LEVEL_0, CONTIG_LEVEL_1, CONTIG_LEVEL_2
  */
 void get_shared_reads(struct read_path_t *reads, struct read_path_t *rpath,
@@ -1662,14 +1668,14 @@ void get_shared_reads(struct read_path_t *reads, struct read_path_t *rpath,
 }
 
 /**
- * @Brief: gets the union reads of two contigs
- * @Param reads: path to the original read files
- * @Param rpath: path to the local reads after being constructed
- * @Param dict: barcodes offset in file
- * @Param g: the global graph
- * @Param e1, e2: the two bridge contigs
- * @Param prefix: prefix of the paths to the local reads
- * @Param contig_level: the level of the barcodes that are being retrived,
+ * @brief: gets the union reads of two contigs
+ * @param reads: path to the original read files
+ * @param rpath: path to the local reads after being constructed
+ * @param dict: barcodes offset in file
+ * @param g: the global graph
+ * @param e1, e2: the two bridge contigs
+ * @param prefix: prefix of the paths to the local reads
+ * @param contig_level: the level of the barcodes that are being retrived,
  * 	based on CONTIG_LEVEL_0, CONTIG_LEVEL_1, CONTIG_LEVEL_2
  */
 void get_union_reads(struct read_path_t *reads, struct read_path_t *rpath,
@@ -1700,15 +1706,15 @@ void get_union_reads(struct read_path_t *reads, struct read_path_t *rpath,
 }
 
 /**
- * @Brief: gets reads to check when finding paths
- * @Param reads: path to the original read files
- * @Param rpath: path to the local reads after being constructed
- * @Param dict: barcodes offset in file
- * @Param g: the global graph
- * @Param e1, e2: the two bridge contigs
- * @Param prefix: prefix of the paths to the local reads
+ * @brief: gets reads to check when finding paths
+ * @param reads: path to the original read files
+ * @param rpath: path to the local reads after being constructed
+ * @param dict: barcodes offset in file
+ * @param g: the global graph
+ * @param e1, e2: the two bridge contigs
+ * @param prefix: prefix of the paths to the local reads
  */
-void get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
+int get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int e1, int e2, struct read_path_t *local_read_path)
 {
 	struct read_path_t read_sorted_path;
@@ -1729,6 +1735,11 @@ void get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
 	get_shared_reads(&read_sorted_path, local_read_path, dict, g,
 			g->edges[e1].rc_id, e2, work_dir, contig_level);
 	kh_destroy(bcpos, dict);
+	int res = 1;
+	if (check_file_empty(local_read_path->R1_path) ||
+		check_file_empty(local_read_path->R2_path))
+		res = 0;
+	return res;
 }
 
 int mark_visit(struct asm_graph_t *g, gint_t u, gint_t t, uint8_t *flag, uint8_t mask)
@@ -1950,11 +1961,11 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 }
 
 /**
- * @Brief: get the local assembly graph between two contigs
- * @Param opt: application options
- * @Param g: the glbal graph
- * @Param e1, e2: the two bridge contigs
- * @Param dict: barcode posittions
+ * @brief: get the local assembly graph between two contigs
+ * @param opt: application options
+ * @param g: the glbal graph
+ * @param e1, e2: the two bridge contigs
+ * @param dict: barcode posittions
  */
 void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 					gint_t e1, gint_t e2, khash_t(bcpos) *dict)
@@ -1971,11 +1982,10 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	char work_dir[MAX_PATH];
 	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
-	get_reads_local_graph(&read_sorted_path, &local_read_path, dict, g,
-			e1, e2, work_dir);
-	if (check_file_empty(local_read_path.R1_path)
-		|| check_file_empty(local_read_path.R2_path)){
-		log_warn("Local read file is empty, please take a look at %s and %s",
+	int ret = get_reads_local_graph(&read_sorted_path, &local_read_path, dict,
+			g, e1, e2, work_dir);
+	if (!ret){
+		log_warn("Something supicious happends, probably the read files are empty, please check at %s and %s",
 				local_read_path.R1_path, local_read_path.R2_path);
 	} else {
 		struct asm_graph_t lg, lg1;
