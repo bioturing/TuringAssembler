@@ -243,9 +243,9 @@ void resolve_local_process(struct opt_proc_t *opt)
 	if (!(g0.aux_flag & ASM_HAVE_BARCODE))
 		log_error("Graph must have barcode");
 	int resolved_loop = 0;
-	asm_resolve_dump_loop_ite(&g0);
+	/*asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
-	do_some_resolve_bridge(&g0);
+	do_some_resolve_bridge(&g0);*/
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;
@@ -407,7 +407,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g_lv1);
 
 	/**
-	  * Resolve process
+	  * Resolve process (dump function, not use yet)
 	  */
 	
 	set_log_stage("ResolveProcess");
