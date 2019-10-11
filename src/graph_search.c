@@ -7,6 +7,13 @@
 #define MAX_VISITED_EDGE 20000
 #define MIN_RELIABLE_COV_LEN 500
 
+/**
+ * @brief: initializes ginfo, a structure for storing stuffs when finding paths
+ * 	in the graph
+ * @param lg: the local graph
+ * @param ginfo: the structure for storing information
+ * @param lc_e1, lc_e2: the local edges
+ */
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 			int lc_e1, int lc_e2)
 {
