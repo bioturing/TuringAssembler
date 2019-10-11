@@ -233,6 +233,10 @@ void reduce_read_process(struct opt_proc_t *opt)
 	fastq_reducer(opt, &org_rpath, &reduced_rpath);
 }
 
+/*
+ * @brief: main function for resolving graph before scaffolding
+ * @param opt: application options
+ */
 void resolve_local_process(struct opt_proc_t *opt)
 {
 	char log_file[1024];

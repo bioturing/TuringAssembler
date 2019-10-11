@@ -26,6 +26,14 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 	}
 }
 
+/**
+ * Brief: finds the id of the original contig e1 in the local graph
+ * @param g: the global graph
+ * @param lg: the local graph
+ * @param e_id: the original contig id
+ * @param emap: the mapping between the original edge and its counterpart
+ * 	in the local graph
+ */
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
@@ -52,6 +60,14 @@ no_local_edge_found:
 	map_contig_destroy(&mct);
 }
 
+/**
+ * Brief: finds the id of the original contig e2 in the local graph
+ * @param g: the global graph
+ * @param lg: the local graph
+ * @param e_id: the original contig id
+ * @param emap: the mapping between the original edge and its counterpart
+ * 	in the local graph
+ */
 void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
@@ -199,6 +215,19 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	map_contig_destroy(&mct_2);
 }
 
+/**
+ * @brief: trys to fill the gap between the two bridge contigs by doing
+ * 	local assembly
+ * @param opt: application options
+ * @param g: the global graph
+ * @param lg: the local graph
+ * @param e1, e2: the two bridge contigs
+ * @param scaffolds: list of contigs that are in the same scaffold path of e1 and e2
+ * @param n_scaff: size of scaffolds
+ * @param res_seq, seq_len: the result sequence and its length
+ * @return: the result of the local assembly (BRIDGE_LOCAL_NOT_FOUND,
+ * 	BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND, BRIDGE_MULTIPLE_PATHS_FOUND)
+ */
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
 		int n_scaff, char **res_seq, int *seq_len)
@@ -328,6 +357,17 @@ end_function:
 	return bridge_type;
 }
 
+/**
+ * Finds the best path from the first local edge to the second one
+ * @param opt: application options
+ * @param g, lg: the global and local graph
+ * @param emap1, emap2: mapping betwwen the global edges and local edges
+ * @param scaffolds: the list of contigs that are on the same scaffold
+ * 	path of e1 and e2
+ * @param n_scaff: the size of scaffolds
+ * @param path: the path that is found
+ * @param path_len: the size of path
+ */
 void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
@@ -346,9 +386,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
 
 	unrelated_filter(g, emap1, emap2, scaffolds, n_scaff, lg);
-	//cov_filter(g, lg, emap1, emap2);
 	connection_filter(g, lg, emap1, emap2);
-
 
 
 	// BUGGY CODE
@@ -386,9 +424,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		max_err = max(max_err, error[i]);
 	}
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		/*log_trace("%d %d %d", i, (int) scores[i], (int) error[i]);
-		log_trace("Path %d: scores %.3f, err %.3f", i,
-				scores[i], error[i]);*/
 		if (scores[i] - min_score + max_err - error[i]  > best_score){
 			best_path = i;
 			best_score = scores[i] - min_score + max_err - error[i];
@@ -396,9 +431,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	log_debug("Found best path id: %d, scores: %.3f\n",
 			best_path, best_score);
-	/*for (int i = 0; i < pinfo.path_lens[best_path]; ++i)
-		__VERBOSE("%d ", pinfo.paths[best_path][i]);
-	__VERBOSE("\n");*/
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
@@ -468,6 +500,13 @@ void join_seq(char **dest, char *source)
 	strcpy(*dest + old_len, source);
 }
 
+/**
+ * @brief: joins the two bridge contigs by the local assembly result
+ * @param e1, e2: the two bridge contigs
+ * @param lg: the local graph
+ * @param emap1, emap2: mapping between the original edges and the local edges
+ * @param res_seq: the result seq
+ */
 void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_graph_t lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2, char **res_seq)
@@ -503,6 +542,15 @@ void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 	free(local_seq);
 }
 
+/**
+ * @brief: join the two bridge edges by the path that is found from one edge
+ * 	to another
+ * @param e1, e2: the two bridge edges
+ * @param lg: the local graph
+ * @param path, path_len: the found path and its length
+ * @param emap1, emap2: the mapping between the global and local edges
+ * @param res-seq: the result sequence
+ */
 void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 		struct asm_graph_t lg, int *path, int path_len,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
@@ -571,6 +619,11 @@ void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 	free(dump_N);
 }
 
+/**
+ * @brief: simply joins the two contigs by filling Ns in the gap
+ * @param e1, e2: the two contigs in the order that will be joined
+ * @param res_seq: the result sequence
+ */
 void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 		char **res_seq)
 {
@@ -872,6 +925,10 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	cleanup(opt);
 }
 
+/**
+ * @brief: a worker funtion for local assembly
+ * @param data: a bundle to store all the stuffs needed for local assembly
+ */
 void *build_bridge_iterator(void *data)
 {
 	int local_asm_res;
@@ -925,10 +982,10 @@ void *build_bridge_iterator(void *data)
 }
 
 /**
- * @Brief Get all the local graphs for local assembly
- * @Param opt: options
- * @Param g: the original graph (global graph)
- * @Param query: a record for storing the scaffold path
+ * @brief Get all the local graphs for local assembly
+ * @param opt: options
+ * @param g: the original graph (global graph)
+ * @param query: a record for storing the scaffold paths
  */
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)

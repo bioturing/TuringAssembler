@@ -1055,6 +1055,10 @@ int resolve_loop(struct asm_graph_t *g0)
 	return count;
 }
 
+/**
+ * @brief: iteratively resolves dump loops
+ * @param g: the graph
+ */
 int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 {
 	int ite = 0;
@@ -1071,6 +1075,14 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 	return res;
 }
 
+/**
+ *        O=======O
+ *       /         \
+ *  e1   \         /   e2
+ * =======O=======O========
+ * @brief: resolves dump loops
+ * @param g: the graph
+ */
 int asm_resolve_dump_loop(struct asm_graph_t *g)
 {
 	int res = 0;
@@ -1169,6 +1181,11 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 	return res;
 }
 
+/**
+ * @brief: iteratively resolves dump jungles
+ * @param opt: application options
+ * @param g: the graph
+ */
 int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int ite = 0;
@@ -1180,19 +1197,21 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d jungle(s) resolved", ite, resolved);
-		/*char graph[1024]; // Save graph for debugging
-		sprintf(graph, "level_pro_%d_ite", ite);
-		save_graph_info(opt->out_dir, g, graph);
-		graph[0] = '\0';
-		sprintf(graph, "%s/graph_k_%d_level_pro_%d_ite.bin", opt->out_dir,
-				g->ksize, ite);
-		save_asm_graph(g, graph);*/
 	} while(1);
 	log_info("%d dump jungle(s) resolved after %d iterations",
 			res, ite);
 	return res;
 }
 
+/**
+ * @brief: checks if e is in any dump jungle and finds the other edge that,
+ * 	together with e, marks the dump jungle (if there is any)
+ * @param g: the graph
+ * @param e: the first edge
+ * @param dump_edges: the edges in the dump jungle
+ * @param n_dump: the size of dump_edges
+ * @return: the second edge
+ */
 int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_dump)
 {
 	*dump_edges = NULL;
@@ -1321,6 +1340,17 @@ free_stage_1:
 	return e2;
 }
 
+/**
+ *               _____** * *    ____
+ *              /     * * *  * *    \
+ *     e1      /     *   * * *       \     e2
+ * ===========O     *  *** * * *      O===========
+ *             \     *  *  *  * *    /
+ *              \______ * * * *_____/
+ * @brief: resolves dump jungles
+ * @param opt: application options
+ * @param g: the graph
+ */
 int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int res = 0;
