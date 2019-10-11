@@ -9,7 +9,7 @@ at least for simple genome.
 We have developed **TuringAssembler**, the read-cloud assembler which can use only one read-cloud 
 data to produce high-quality assembly for a bacterial genome. 
 
-Using a TELL-Seq dataset of the model organism **E.coliK12 MG1655**, Skipping assembled a gapless assembly with **NGA50 4632444**, mis-match rate **5.65/100kbp**, and indel rate **0.47/100kbp**
+Using a TELL-Seq dataset of the model organism **E.coliK12 MG1655**, TuringAssembler assembled a gapless assembly with **NGA50 4632444**, mis-match rate **5.65/100kbp**, and indel rate **0.47/100kbp**
 ## Usage
 ```
 
