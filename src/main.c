@@ -318,20 +318,20 @@ void build_0_opt_process(int argc, char *argv[])
 	build_0_process(opt);
 }
 
-void graph_query_opt_process(int argc, char *argv[])
-{
-	struct opt_proc_t *opt;
-	opt = parse_proc_option(argc - 2, argv + 2);
-	if (opt == NULL) {
-		print_usage();
-		__ERROR("Error parsing arguments");
-	}
-	char tmp_dir[1024];
-	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/query.log");
-	init_log(tmp_dir);
-	init_clock();
-	graph_query_process(opt);
-}
+//void graph_query_opt_process(int argc, char *argv[])
+//{
+//	struct opt_proc_t *opt;
+//	opt = parse_proc_option(argc - 2, argv + 2);
+//	if (opt == NULL) {
+//		print_usage();
+//		__ERROR("Error parsing arguments");
+//	}
+//	char tmp_dir[1024];
+//	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/query.log");
+//	init_log(tmp_dir);
+//	init_clock();
+//	graph_query_process(opt);
+//}
 
 void build_bridge_opt_process(int argc, char *argv[])
 {
@@ -393,7 +393,6 @@ void graph_convert_opt_process(int argc, char *argv[])
 }
 
 // ./skipping asm_graph0 -g <graph.bin> -o <output_folder>
-
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -428,8 +427,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_4_5_process);
 	else if (!strcmp(argv[1], "bin2text"))
 		graph_convert_opt_process(argc, argv);
-	else if (!strcmp(argv[1], "query"))
-		graph_query_opt_process(argc, argv);
+	/*else if (!strcmp(argv[1], "query"))
+		graph_query_opt_process(argc, argv);*/
 	else if (!strcmp(argv[1], "build_bridge"))
 		build_bridge_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "local_assembly"))

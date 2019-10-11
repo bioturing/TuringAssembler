@@ -174,44 +174,42 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 	log_info("Build barcode information time: %.3f", sec_from_prev_time());
 }
 
-void graph_query_process(struct opt_proc_t *opt)
-{
-	struct asm_graph_t *g0;
-	g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
-	fprintf(stderr, "bin size = %d\n", g0->bin_size);
-	test_asm_graph(g0);
-	log_info("Graph query kmer size: %d", g0->ksize);
-	log_info("Querying pair-edge barcode information");
-	gint_t u, v, v2;
-	FILE *fp;
-	fp = xfopen(opt->in_fasta, "r");
-	while (1) {
-		char c;
-		int ret = fscanf(fp, "%c %ld", &c, &u);
-		if (ret == EOF || ret == 0)
-			break;
-		if (c == 'L') {
-			fscanf(fp, "%ld\n", &v);
-			print_test_barcode_edge(g0, u, v);
-		} else if (c == 'P') {
-			log_info("Building local graph");
-			fscanf(fp, "%ld\n", &v);
-			struct asm_graph_t lg = test_local_assembly(opt, g0,
-							g0->edges[u].rc_id, v);
-			asm_graph_destroy(&lg);
-		} else if (c == 'S') {
-			fscanf(fp, "%ld %ld\n", &v, &v2);
-			print_test_barcode_superior(g0, u, v, v2);
-		}
-	}
-}
+//void graph_query_process(struct opt_proc_t *opt)
+//{
+//	struct asm_graph_t *g0;
+//	g0 = calloc(1, sizeof(struct asm_graph_t));
+//	load_asm_graph(g0, opt->in_file);
+//	fprintf(stderr, "bin size = %d\n", g0->bin_size);
+//	test_asm_graph(g0);
+//	log_info("Graph query kmer size: %d", g0->ksize);
+//	log_info("Querying pair-edge barcode information");
+//	gint_t u, v, v2;
+//	FILE *fp;
+//	fp = xfopen(opt->in_fasta, "r");
+//	while (1) {
+//		char c;
+//		int ret = fscanf(fp, "%c %ld", &c, &u);
+//		if (ret == EOF || ret == 0)
+//			break;
+//		if (c == 'L') {
+//			fscanf(fp, "%ld\n", &v);
+//			print_test_barcode_edge(g0, u, v);
+//		} else if (c == 'P') {
+//			log_info("Building local graph");
+//			fscanf(fp, "%ld\n", &v);
+//			struct asm_graph_t lg = test_local_assembly(opt, g0,
+//							g0->edges[u].rc_id, v);
+//			asm_graph_destroy(&lg);
+//		} else if (c == 'S') {
+//			fscanf(fp, "%ld %ld\n", &v, &v2);
+//			print_test_barcode_superior(g0, u, v, v2);
+//		}
+//	}
+//}
 
 void build_bridge_process(struct opt_proc_t *opt)
 {
-	FILE *f = xfopen(opt->lc, "w");
-	build_bridge(opt, f);
-	fclose(f);
+	build_bridge(opt);
 }
 
 void reduce_read_process(struct opt_proc_t *opt)
@@ -233,6 +231,10 @@ void reduce_read_process(struct opt_proc_t *opt)
 	fastq_reducer(opt, &org_rpath, &reduced_rpath);
 }
 
+/*
+ * @brief: main function for resolving graph before scaffolding
+ * @param opt: application options
+ */
 void resolve_local_process(struct opt_proc_t *opt)
 {
 	char log_file[1024];
@@ -241,9 +243,9 @@ void resolve_local_process(struct opt_proc_t *opt)
 	if (!(g0.aux_flag & ASM_HAVE_BARCODE))
 		log_error("Graph must have barcode");
 	int resolved_loop = 0;
-	asm_resolve_dump_loop_ite(&g0);
+	/*asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
-	do_some_resolve_bridge(&g0);
+	do_some_resolve_bridge(&g0);*/
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;
@@ -405,7 +407,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g_lv1);
 
 	/**
-	  * Resolve process
+	  * Resolve process (dump function, not use yet)
 	  */
 	
 	set_log_stage("ResolveProcess");

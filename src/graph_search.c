@@ -7,6 +7,13 @@
 #define MAX_VISITED_EDGE 20000
 #define MIN_RELIABLE_COV_LEN 500
 
+/**
+ * @brief: initializes ginfo, a structure for storing stuffs when finding paths
+ * 	in the graph
+ * @param lg: the local graph
+ * @param ginfo: the structure for storing information
+ * @param lc_e1, lc_e2: the local edges
+ */
 void graph_info_init(struct asm_graph_t *lg, struct graph_info_t *ginfo,
 			int lc_e1, int lc_e2)
 {
@@ -222,6 +229,15 @@ void get_all_paths(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 	graph_info_destroy(&ginfo);
 }
 
+/**
+ * @brief: gets all the paths between e1 and e2, using kmer to check if a path
+ * 	is reliable
+ * @param lg: the local graph
+ * @param emap1, emap2: the mapping between global and local edges
+ * @param pinfo: a structure to store all the paths that are found
+ * @param ksize: the kmer size that is used
+ * @param h: kmer counting
+ */
 void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2, struct path_info_t *pinfo,
 		int ksize, khash_t(kmer_int) *h)

@@ -117,9 +117,14 @@ void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e1, int e2);
-void build_bridge(struct opt_proc_t *opt, FILE *f);
+void build_bridge(struct opt_proc_t *opt);
 void *build_bridge_iterator(void *data);
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query);
 void cleanup(struct opt_proc_t *opt);
+void get_scaffolds_info(struct opt_proc_t *opt, struct scaffold_record_t *scaffolds);
+void get_local_assembly_query(struct scaffold_record_t *scaffolds,
+		struct query_record_t *query);
+void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *scaffolds,
+		char **bridges);
 #endif

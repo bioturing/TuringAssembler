@@ -1055,6 +1055,10 @@ int resolve_loop(struct asm_graph_t *g0)
 	return count;
 }
 
+/**
+ * @brief: iteratively resolves dump loops
+ * @param g: the graph
+ */
 int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 {
 	int ite = 0;
@@ -1071,6 +1075,14 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 	return res;
 }
 
+/**
+ *        O=======O
+ *       /         \
+ *  e1   \         /   e2
+ * =======O=======O========
+ * @brief: resolves dump loops
+ * @param g: the graph
+ */
 int asm_resolve_dump_loop(struct asm_graph_t *g)
 {
 	int res = 0;
@@ -1169,6 +1181,11 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 	return res;
 }
 
+/**
+ * @brief: iteratively resolves dump jungles
+ * @param opt: application options
+ * @param g: the graph
+ */
 int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int ite = 0;
@@ -1180,19 +1197,21 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d jungle(s) resolved", ite, resolved);
-		/*char graph[1024]; // Save graph for debugging
-		sprintf(graph, "level_pro_%d_ite", ite);
-		save_graph_info(opt->out_dir, g, graph);
-		graph[0] = '\0';
-		sprintf(graph, "%s/graph_k_%d_level_pro_%d_ite.bin", opt->out_dir,
-				g->ksize, ite);
-		save_asm_graph(g, graph);*/
 	} while(1);
 	log_info("%d dump jungle(s) resolved after %d iterations",
 			res, ite);
 	return res;
 }
 
+/**
+ * @brief: checks if e is in any dump jungle and finds the other edge that,
+ * 	together with e, marks the dump jungle (if there is any)
+ * @param g: the graph
+ * @param e: the first edge
+ * @param dump_edges: the edges in the dump jungle
+ * @param n_dump: the size of dump_edges
+ * @return: the second edge
+ */
 int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_dump)
 {
 	*dump_edges = NULL;
@@ -1321,6 +1340,17 @@ free_stage_1:
 	return e2;
 }
 
+/**
+ *               _____** * *    ____
+ *              /     * * *  * *    \
+ *     e1      /     *   * * *       \     e2
+ * ===========O     *  *** * * *      O===========
+ *             \     *  *  *  * *    /
+ *              \______ * * * *_____/
+ * @brief: resolves dump jungles
+ * @param opt: application options
+ * @param g: the graph
+ */
 int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int res = 0;
@@ -1331,14 +1361,12 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 			continue;
 		if (g->edges[e1].seq_len < MIN_NOTICE_BRIDGE)
 			continue;
-		//		STAGE 1 detect dump jungle and find path  		//
+		//		STAGE 1 get local read for kmer checking  		//
 		int *dump_edges;
 		int n_dump;
 		int e2 = detect_dump_jungle(g, e1, &dump_edges, &n_dump);
 		if (e2 == -1)
 			continue;
-		struct path_info_t pinfo;
-		path_info_init(&pinfo);
 		struct edge_map_info_t emap1;
 		struct edge_map_info_t emap2;
 		emap1.lc_e = e1;
@@ -1346,10 +1374,18 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 		log_debug("Get local reads");
 		struct read_path_t local_read_path;
-		get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
+		int ret = get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
+		if (!ret){
+			log_warn("Something supicious happens, probably that read files are empty, please check at %s and %s",
+					local_read_path.R1_path, local_read_path.R2_path);
+			goto ignore_stage_1;
+		}
+		//		STAGE 2 detect dump jungle and find path  		//
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
 				local_read_path.R2_path, KSIZE_CHECK);
 		log_debug("Finding paths between %d and %d", e1, e2);
+		struct path_info_t pinfo;
+		path_info_init(&pinfo);
 		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
 				kmer_count);
 		int longest_path = 0;
@@ -1361,7 +1397,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		int len = pinfo.path_lens[longest_path];
 		if (len <= 2){
 			log_debug("No reliable paths found, continue");
-			goto ignore_stage_1;
+			goto ignore_stage_2;
 		}
 
 		//		STAGE 2 condence the jungle 		//
@@ -1422,9 +1458,10 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		asm_remove_edge(g, e2);
 		asm_remove_edge(g, g->edges[e2].rc_id);
 		++res;
-ignore_stage_1:
+ignore_stage_2:
 		path_info_destroy(&pinfo);
 		kh_destroy(kmer_int, kmer_count);
+ignore_stage_1:
 		destroy_read_path(&local_read_path);
 		free(dump_edges);
 	}
