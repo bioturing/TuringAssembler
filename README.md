@@ -11,7 +11,7 @@ data to produce high-quality assembly for a bacterial genome.
 
 For the model organism **E.coliK12 MG1655**, Skipping assembled a gapless assembly with **NGA50 4632444**, mis-match rate **5.65/100kbp**, and indel rate **0.47/100kbp**
 ## Usage
-```bash
+```
 
 =====================================================================================================
 TuringAssembler is a program developed by BioTuring for doing genome assembly with read-cloud technology
@@ -41,8 +41,8 @@ Optional parameters:
           -v            Verbose mode. Print log trace and log debug [no]
 ```
 
-##Authors
--   Hao Tran 
+## Authors
+-   Hao Tran
 -   Huu Che (huu@bioturing.com)
 -   Tan Phan (tan@bioturing.com)
 -   Thang Tran
