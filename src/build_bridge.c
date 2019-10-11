@@ -783,57 +783,28 @@ int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
  * @param opt main options struct
  * @param f the final scaffolds file with gap closed.
  */
-void build_bridge(struct opt_proc_t *opt, FILE *f)
+void build_bridge(struct opt_proc_t *opt)
 {
+	FILE *f = fopen(opt->lc, "w");
 	struct asm_graph_t *g0;
 	g0 = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g0, opt->in_file); /* The global assembly graph */
 	test_asm_graph(g0);
-	int *mark = (int *) calloc(g0->n_e, sizeof(int));
 
-	struct scaffold_record_t scaffold;
+	struct scaffold_record_t scaffolds;
 	struct query_record_t query_record;
-	FILE *fp = xfopen(opt->in_fasta, "r");
-	int n_paths;
-	fscanf(fp, "%d\n", &n_paths); /* Total number of paths in the scaffolds */
-	scaffold.n_paths = n_paths;
-	scaffold.path_lens = calloc(n_paths, sizeof(int));
-	scaffold.paths = calloc(n_paths, sizeof(int *));
-	query_record.e1 = NULL;
-	query_record.e2 = NULL;
-	query_record.path_id = NULL;
-	query_record.process_pos = 0;
-	query_record.n_process = 0;
-	/*
-	 * Prepare the bundle structs for local assembly
-	 * One local assembly process needs an e1, e2, pre e1, next e2
-	 */
-	for (int i = 0; i < n_paths; ++i){
-		int path_len;
-		fscanf(fp, "%d\n", &path_len);
-		scaffold.path_lens[i] = path_len;
-		scaffold.paths[i] = calloc(path_len, sizeof(int));
-		query_record.n_process += path_len - 1;
-		query_record.e1 = realloc(query_record.e1, query_record.n_process
-				* sizeof(int));
-		query_record.e2 = realloc(query_record.e2, query_record.n_process
-				* sizeof(int));
-		query_record.path_id = realloc(query_record.path_id, query_record.n_process
-				* sizeof(int));
+	get_scaffolds_info(opt, &scaffolds);
+	get_local_assembly_query(&scaffolds, &query_record);
+
+	int *mark = (int *) calloc(g0->n_e, sizeof(int));
+	for (int i = 0; i < scaffolds.n_paths; ++i){
+		int path_len = scaffolds.path_lens[i];
 		for (int j = 0; j < path_len; ++j){
-			fscanf(fp, "%d", scaffold.paths[i] + j);
-			mark[scaffold.paths[i][j]] = 1;
-			mark[g0->edges[scaffold.paths[i][j]].rc_id] = 1;
-		}
-		for (int j = 1; j < path_len; ++j){
-			query_record.e1[query_record.process_pos] = scaffold.paths[i][j - 1];
-			query_record.e2[query_record.process_pos] = scaffold.paths[i][j];
-			query_record.path_id[query_record.process_pos] = i;
-			++query_record.process_pos;
+			mark[scaffolds.paths[i][j]] = 1;
+			mark[g0->edges[scaffolds.paths[i][j]].rc_id] = 1;
 		}
 	}
-	query_record.process_pos = 0;
-	fclose(fp);
+
 	log_info("Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
@@ -860,7 +831,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		worker_bundles[i].query_lock = &query_lock;
 		worker_bundles[i].bridge_lock = &bridge_lock;
 		worker_bundles[i].bridges = bridges;
-		worker_bundles[i].scaffold_record = &scaffold;
+		worker_bundles[i].scaffold_record = &scaffolds;
 	}
 	log_info("Building bridges on scaffold");
 	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
@@ -878,23 +849,7 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 	free(worker_threads);
 
 	log_info("Done local assembly. Now print all the bridged sequences");
-	int p = 0;
-	int **paths = scaffold.paths;
-	int *path_lens = scaffold.path_lens;
-	for (int i = 0; i < scaffold.n_paths; ++i){
-		fprintf(f, ">contig_%d\n", i);
-		char *seq;
-		decode_seq(&seq, g0->edges[paths[i][0]].seq,
-				g0->edges[paths[i][0]].seq_len);
-		fprintf(f, "%s", seq);
-		for (int j = 1; j < path_lens[i]; ++j){
-			fprintf(f, "%s", bridges[p] +
-					g0->edges[paths[i][j - 1]].seq_len);
-			++p;
-		}
-		free(seq);
-		fprintf(f, "\n");
-	}
+	print_bridges(f, g0, &scaffolds, bridges);
 	for (int i = 0; i < query_record.n_process; ++i)
 		free(bridges[i]);
 	free(bridges);
@@ -914,15 +869,16 @@ void build_bridge(struct opt_proc_t *opt, FILE *f)
 		}
 	}
 	free(mark);
-	free(scaffold.path_lens);
-	for (int i = 0; i < scaffold.n_paths; ++i)
-		free(scaffold.paths[i]);
-	free(scaffold.paths);
+	free(scaffolds.path_lens);
+	for (int i = 0; i < scaffolds.n_paths; ++i)
+		free(scaffolds.paths[i]);
+	free(scaffolds.paths);
 
 	asm_graph_destroy(g0);
 	free(g0);
 
 	cleanup(opt);
+	fclose(f);
 }
 
 /**
@@ -1033,4 +989,81 @@ void cleanup(struct opt_proc_t *opt)
 		log_info("Some files are not deleted, please check in %s",
 				opt->out_dir);
 	log_info("Done cleaning up");
+}
+
+/**
+ * @brief: gets the scaffolds paths info
+ * @param opt: application options
+ * @param scaffolds: a structure to store the scaffolds paths
+ */
+void get_scaffolds_info(struct opt_proc_t *opt, struct scaffold_record_t *scaffolds)
+{
+	FILE *fp = xfopen(opt->in_fasta, "r");
+	int n_paths;
+	fscanf(fp, "%d\n", &n_paths); /* Total number of paths in the scaffolds */
+	scaffolds->n_paths = n_paths;
+	scaffolds->path_lens = calloc(n_paths, sizeof(int));
+	scaffolds->paths = calloc(n_paths, sizeof(int *));
+	/*
+	 * Prepare the bundle structs for local assembly
+	 * One local assembly process needs an e1, e2, pre e1, next e2
+	 */
+	for (int i = 0; i < n_paths; ++i){
+		int path_len;
+		fscanf(fp, "%d\n", &path_len);
+		scaffolds->path_lens[i] = path_len;
+		scaffolds->paths[i] = calloc(path_len, sizeof(int));
+		for (int j = 0; j < path_len; ++j)
+			fscanf(fp, "%d", scaffolds->paths[i] + j);
+	}
+	fclose(fp);
+}
+
+void get_local_assembly_query(struct scaffold_record_t *scaffolds,
+		struct query_record_t *query)
+{
+	query->e1 = NULL;
+	query->e2 = NULL;
+	query->path_id = NULL;
+	query->process_pos = 0;
+	query->n_process = 0;
+	for (int i = 0; i < scaffolds->n_paths; ++i){
+		int path_len = scaffolds->path_lens[i];
+		query->n_process += path_len - 1;
+		query->e1 = realloc(query->e1, query->n_process
+				* sizeof(int));
+		query->e2 = realloc(query->e2, query->n_process
+				* sizeof(int));
+		query->path_id = realloc(query->path_id, query->n_process
+				* sizeof(int));
+		for (int j = 1; j < path_len; ++j){
+			query->e1[query->process_pos] = scaffolds->paths[i][j - 1];
+			query->e2[query->process_pos] = scaffolds->paths[i][j];
+			query->path_id[query->process_pos] = i;
+			++query->process_pos;
+		}
+	}
+	query->process_pos = 0;
+}
+
+void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *scaffolds,
+		char **bridges)
+{
+	int p = 0;
+	int **paths = scaffolds->paths;
+	int *path_lens = scaffolds->path_lens;
+	for (int i = 0; i < scaffolds->n_paths; ++i){
+		fprintf(f, ">contig_%d\n", i);
+		char *seq;
+		decode_seq(&seq, g->edges[paths[i][0]].seq,
+				g->edges[paths[i][0]].seq_len);
+		fprintf(f, "%s", seq);
+		for (int j = 1; j < path_lens[i]; ++j){
+			fprintf(f, "%s", bridges[p] +
+					g->edges[paths[i][j - 1]].seq_len);
+			++p;
+		}
+		free(seq);
+		fprintf(f, "\n");
+	}
 }
