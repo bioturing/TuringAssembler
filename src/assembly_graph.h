@@ -11,9 +11,6 @@
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
 #define ASM_HAVE_CANDIDATE		0x8
-#define ASM_HAVE_BARCODE_SCAF		0x10
-#define ASM_HAVE_BARCODE_COV 		0x20
-#define ASM_HAVE_ALL_BARCODE 		(ASM_HAVE_BARCODE | ASM_HAVE_BARCODE_SCAF | ASM_HAVE_BARCODE_COV)
 
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
@@ -29,6 +26,13 @@
 #define NOT_LONG_ENOUGH 2
 #define NOT_HAVE_SPAN_KMER 3
 #define ASEQ "CTGTCGAGATGAAAATTGTTTTGAAAAATGACGTTCCAGCTTATCAGCATCCCAGGCGACTGTCGTATAGTGACCAAAACTTTGTAGATGAGCAGATGCGGGAATGGTTAAAAGAAGGTATAATACAGCCCGTAGTCCTGGTGGCTAAGA"
+struct read_index_t {
+	int64_t r1_offset;
+	int64_t r2_offset;
+	int64_t r1_len;
+	int64_t r2_len;
+};
+KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
 
 struct pair_contig_t {
 	gint_t e1;
@@ -71,7 +75,6 @@ struct asm_edge_t {
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
 	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
-	struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -147,7 +150,7 @@ double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
-    struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
+    struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build);
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
 				const char *fasta_path, khash_t(contig_count) *count_cand);
 void count_readpair_err_path(int n_threads, struct read_path_t *rpath,

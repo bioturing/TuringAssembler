@@ -143,7 +143,6 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf.n_item;
 			int cnt1 = g->edges[i_contig].barcodes_scaf.n_item;
 			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash, i_edge, i_contig);
-			new_candidate_edge->score.m2_score = value;
 			(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 			++*n_local_edges;
 		}
@@ -386,9 +385,7 @@ struct pair_contigs_score *divn(struct pair_contigs_score *score, int n)
 	if (n == 0) {
 		return res;
 	}
-	res->bc_score = score->bc_score / n;
-	res->m_score = score->m_score / n;
-	res->m2_score = score->m2_score / n;
+	res->bc_score = score->bc_score/n;
 	return res;
 }
 
@@ -428,8 +425,8 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 			break;
 	}
 	if (i != 0)
-		score->bc_score += second_score->bc_score / (i * 3);
-	log_trace("donescascore %f %f %f", score->bc_score, score->m_score, score->m2_score);
+		score->bc_score += second_score->bc_score/(i*3);
+	log_trace("donescascore %f", score->bc_score);
 	free(second_score);
 	free(tmp_score);
 	//todo @huu MAX(i/2, 1) because far contig have less score
@@ -500,8 +497,6 @@ struct pair_contigs_score *get_score_tripple(struct edges_score_type *edges_scor
 	struct pair_contigs_score *score1 = get_score_edge(edges_score, m, r);
 	struct pair_contigs_score *res = calloc(1, sizeof(struct pair_contigs_score));
 	res->bc_score = score0->bc_score + score1->bc_score;
-	res->m_score = score0->m_score + score1->m_score;
-	res->m2_score = score0->m2_score + score1->m2_score;
 	free(score0);
 	free(score1);
 	return res;
@@ -549,8 +544,6 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int i_r_contig = start_contig, i_l_contig = get_rc_id(g, start_contig);
 	if (opt->metagenomics) {
 		thres_score->bc_score = 0;
-		thres_score->m_score = 0;
-		thres_score->m2_score = 0;
 		*count = 0;
 	}
 	while (1) {
@@ -577,8 +570,6 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		}
 		mark_contig(g, mark, next_contig->i_contig);
 		thres_score->bc_score = (thres_score->bc_score + next_contig->score.bc_score);
-		thres_score->m_score = (thres_score->m_score + next_contig->score.m_score);
-		thres_score->m2_score = (thres_score->m2_score + next_contig->score.m2_score);
 		free(next_l_contig);
 		free(next_r_contig);
 		free(thres_score_d5);
