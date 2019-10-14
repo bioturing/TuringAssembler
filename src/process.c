@@ -508,7 +508,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	}
 
 	/**
-	 * Build barcode for resolve process and local assembly
+	 * Build barcodes
 	 */
 	set_log_stage("BWAIndex");
 	char asm_path[1024];

@@ -14,6 +14,7 @@
 #include "scaffolding/global_params.h"
 #include "include/kmc_skipping.h"
 #include "resolve.h"
+#include "basic_resolve.h"
 
 KSEQ_INIT(gzFile, gzread);
 #define read_index_get_key(p) ((p).r1_offset)
@@ -1233,7 +1234,13 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
-		}
+
+			h = &g->edges[e].barcodes_cov;
+			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
+			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
+			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
+			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
+	}
 	}
 	fclose(fp);
 }
@@ -1324,6 +1331,15 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 
 			h = &g->edges[e].barcodes_scaf;
+			xfread(&h->size, sizeof(uint32_t), 1, fp);
+			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
+			h->keys = malloc(h->size * sizeof(uint64_t));
+			xfread(h->keys, sizeof(uint64_t), h->size, fp);
+			h->cnts = NULL;
+			h->cnts = malloc(h->size * sizeof(uint32_t));
+			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
+
+			h = &g->edges[e].barcodes_cov;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));

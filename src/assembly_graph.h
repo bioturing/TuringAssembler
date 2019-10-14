@@ -75,6 +75,7 @@ struct asm_edge_t {
 	pthread_mutex_t lock;	/* lock for build/mapping process */
 	struct barcode_hash_t *barcodes;		/* mapped barcode */
 	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+	struct barcode_hash_t barcodes_cov; /* Barcodes for build coverage */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
