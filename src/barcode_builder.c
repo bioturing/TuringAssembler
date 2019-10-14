@@ -176,6 +176,7 @@ void init_barcode_graph(struct asm_graph_t *g){
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
 		barcode_hash_init(g->edges[e].barcodes + 2, 4);
 		barcode_hash_init(&g->edges[e].barcodes_scaf, 4);
+		barcode_hash_init(&g->edges[e].barcodes_cov, 4);
 	}
 }
 
@@ -520,6 +521,12 @@ static inline void add_barcode_scaffold(struct asm_graph_t *g, gint_t e, uint64_
 	pthread_mutex_unlock(&g->edges[e].lock);
 }
 
+static inline void add_barcode_cov(struct asm_graph_t *g, gint_t e, uint64_t bc) {
+	pthread_mutex_lock(&g->edges[e].lock);
+	barcode_hash_add(&g->edges[e].barcodes_cov, bc);
+	pthread_mutex_unlock(&g->edges[e].lock);
+}
+
 static inline void add_read_count_candidate(struct asm_graph_t *g, gint_t e1, gint_t e2) {
 	struct pair_contig_t key = (struct pair_contig_t) {e1, e2};
 	khint_t k = kh_get(pair_contig_count, g->candidates, key);
@@ -651,6 +658,8 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
 				add_barcode_edge(g, ref.e1, 2, bc);
 			}
+			if (p1[i].pos > CONTIG_LEVEL_1 && p1[i].pos <= CONTIG_LEVEL_2)
+				add_barcode_cov(g, ref.e1, bc);
 		}
 		for (i = 0; i < n2; ++i) {
 			struct fasta_ref_t ref;
@@ -667,6 +676,8 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
 				add_barcode_edge(g, ref.e1, 2, bc);
 			}
+			if (p2[i].pos > CONTIG_LEVEL_1 && p2[i].pos <= CONTIG_LEVEL_2)
+				add_barcode_cov(g, ref.e1, bc);
 		}
 		// TODO verify if n1<2 is best
 		if (ar1.n <= 2) {
@@ -713,133 +724,6 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 	}
 free_stage_1:
-	free(ar1.a);
-	free(ar2.a);
-	free(r1_seq);
-	free(r2_seq);
-}
-
-void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
-                          struct bccount_bundle_t *bundle) {
-	struct asm_graph_t *g = bundle->g;
-	bwaidx_t *idx = bundle->bwa_idx;
-	mem_opt_t *opt = bundle->bwa_opt;
-	mem_alnreg_v ar1, ar2;
-	uint8_t *r1_seq, *r2_seq;
-	int i, k, n1, n2, count, best_score_1, best_score_2;
-	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
-	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
-	// fprintf(stderr, "found alignments: n1 = %lu; n2 = %lu\n", ar1.n, ar2.n);
-	r1_seq = malloc(r1->len);
-	r2_seq = malloc(r2->len);
-	for (i = 0; i < r1->len; ++i)
-		r1_seq[i] = nst_nt4_table[(int) r1->seq[i]];
-	for (i = 0; i < r2->len; ++i)
-		r2_seq[i] = nst_nt4_table[(int) r2->seq[i]];
-	struct asm_align_t *p1, *p2;
-	p1 = alloca(ar1.n * sizeof(struct asm_align_t));
-	p2 = alloca(ar2.n * sizeof(struct asm_align_t));
-	n1 = n2 = 0;
-	best_score_1 = best_score_2 = -(1 << 30);
-	for (i = 0; i < (int) ar1.n; ++i) {
-		struct asm_align_t a;
-		a = asm_reg2aln(opt, idx->bns, idx->pac, r1->len, r1_seq, ar1.a + i);
-		if (a.rid == -1)
-			continue;
-		if (a.score > best_score_1) {
-			best_score_1 = a.score;
-			p1[0] = a;
-			n1 = 1;
-		} else if (a.score == best_score_1) {
-			p1[n1++] = a;
-		}
-	}
-	for (i = 0; i < (int) ar2.n; ++i) {
-		struct asm_align_t a;
-		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
-		if (a.rid == -1)
-			continue;
-		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
-		if (a.score > best_score_2) {
-			best_score_2 = a.score;
-			p2[0] = a;
-			n2 = 1;
-		} else if (a.score == best_score_2) {
-			p2[n2++] = a;
-		}
-	}
-
-	//Something Thang need but I don't know what is it.
-	for (i = 0; i < n1; ++i) {
-		struct fasta_ref_t ref;
-		ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
-		if (ref.type != FASTA_REF_SEQ)
-			continue;
-		if (p1[i].pos <= CONTIG_LEVEL_2) {
-			add_barcode_edge(g, ref.e1, 2, bc);
-		}
-	}
-	for (i = 0; i < n2; ++i) {
-		struct fasta_ref_t ref;
-		ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
-		if (ref.type != FASTA_REF_SEQ)
-			continue;
-		if (p2[i].pos <= CONTIG_LEVEL_2) {
-			add_barcode_edge(g, ref.e1, 2, bc);
-		}
-	}
-
-	//-----------------build barcode scaffold -----------------------
-	// TODO verify if n1<2 is best
-	if (ar1.n <= 2) {
-		for (int i = 0; i < n1; i++) {
-			struct fasta_ref_t ref;
-			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
-			if (ref.type != FASTA_REF_SEQ)
-				continue;
-			if ((uint32_t) p1[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
-				add_barcode_scaffold(g, ref.e1, bc);
-			}
-//            if (p1[i].pos < MIN_CONTIG_BARCODE2) {
-//                add_barcode_scaffold2(g, ref.e1, bc);
-//            }
-		}
-	}
-	if (ar2.n <= 2) {
-		for (int i = 0; i < n2; i++) {
-			struct fasta_ref_t ref;
-			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
-			if (ref.type != FASTA_REF_SEQ)
-				continue;
-			if ((uint32_t) p2[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
-				add_barcode_scaffold(g, ref.e1, bc);
-			}
-//            if (p2[i].pos < MIN_CONTIG_BARCODE2) {
-//                add_barcode_scaffold2(g, ref.e1, bc);
-//            }
-		}
-	}
-
-	if (bundle->aux_build & ASM_BUILD_COVERAGE) {
-		for (i = 0; i < n1; ++i) {
-			struct fasta_ref_t ref;
-			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
-			if (ref.type != FASTA_REF_SEQ)
-				continue;
-			int added_count = __max(p1[i].aligned - g->ksize, 1);
-			atomic_add_and_fetch32(&g->edges[ref.e1].count, added_count);
-			atomic_add_and_fetch32(&g->edges[g->edges[ref.e1].rc_id].count, added_count);
-		}
-		for (i = 0; i < n2; ++i) {
-			struct fasta_ref_t ref;
-			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
-			if (ref.type != FASTA_REF_SEQ)
-				continue;
-			int added_count = __max(p1[i].aligned - g->ksize, 1);
-			atomic_add_and_fetch32(&g->edges[ref.e1].count, added_count);
-			atomic_add_and_fetch32(&g->edges[g->edges[ref.e1].rc_id].count, added_count);
-		}
-	}
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);
