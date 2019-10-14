@@ -11,27 +11,6 @@
 #include "scaffolding/score.h"
 #include "utils.h"
 
-//struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1,
-// 			float avg_bin_hash, struct opt_proc_t *opt)
-//{
-//	int rev_i0 = g->edges[i0].rc_id;
-//	assert(rev_i0 < g->n_e);
-//	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
-//	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
-//	log_trace("len e0, e1: %d %d " , e0_len, e1_len);
-//
-//	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
-//	float cov_e1 = __get_edge_cov(e1, g->ksize);
-//
-//	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
-//	score->bc_score = get_share_barcode(&rev_e0->barcodes_scaf, &e1->barcodes_scaf, cov_rev_e0, cov_e1, avg_bin_hash);
-//	//todo @huu not hardcode
-////	if (score->bc_score < 0.3){
-////		return score;
-////	}
-//	score->m_score = get_share_mate(g, i0, i1);
-//	return score;
-//}
 
 int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_hash) 
 {
@@ -202,7 +181,7 @@ void print_edge_score(struct edges_score_type *edges_score)
 {
 	for (int i = 0; i < edges_score->n_edge; i++) {
 		struct scaffold_edge *edge = &edges_score->list_edge[i];
-		log_debug("edges score %d %d %f %f share_bc %f", edge->src, edge->des, edge->score.bc_score, edge->score.m_score, edge->score.m2_score);
+		log_debug("edges score %d %d %f", edge->src, edge->des, edge->score.bc_score);
 	}
 }
 
