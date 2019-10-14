@@ -23,4 +23,7 @@ void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g);
 void kmbuild_bundle_init(struct kmbuild_bundle_t *b, struct kmhash_t *h,
 						 int ksize);
 void kmbuild_bundle_destroy(struct kmbuild_bundle_t *b);
+
+void build_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g, int ksize,
+		char *work_dir, char *R1_path, char *R2_path);
 #endif /* __KMER_BUILD_H__ */

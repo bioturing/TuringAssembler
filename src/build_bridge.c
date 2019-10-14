@@ -11,6 +11,7 @@
 #include "io_utils.h"
 #include "unit_test.h"
 #include "barcode_builder.h"
+#include "kmer_build.h"
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
@@ -706,43 +707,6 @@ void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 	join_seq(res_seq, first);
 	join_seq(res_seq, dump_N);
 	join_seq(res_seq, second);
-}
-
-void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
-{
-	log_local_info("Filter by coverage", emap1->gl_e, emap2->gl_e);
-	log_local_debug("Before filter: %ld edges\n", emap1->gl_e, emap2->gl_e,
-			lg->n_e);
-	int thresh = (int) (MIN_DEPTH_RATIO *
-			min(__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize),
-			__get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)));
-	for (int i = 0; i < lg->n_e; ++i){
-		if (__get_edge_cov(lg->edges + i, lg->ksize) < thresh)
-			asm_remove_edge(lg, i);
-	}
-	struct asm_graph_t lg1;
-	struct asm_graph_t g_bak;
-	char tmp_name[1024];
-	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
-	asm_clone_graph(lg, &g_bak, tmp_name);
-	asm_condense(lg, &lg1);
-	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_local_debug("Condensed graph degenerated, aborting filtering!\n",
-				emap1->gl_e, emap2->gl_e);
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&lg1);
-		*lg = g_bak;
-	} else {
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&g_bak);
-		*lg = lg1;
-		log_local_debug("After filter: %d edges\n", emap1->gl_e, emap2->gl_e,
-				lg1.n_e);
-		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-		print_log_edge_map(emap1, emap2);
-	}
 }
 
 /*

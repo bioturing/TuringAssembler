@@ -22,6 +22,7 @@
 #include "resolve_big.h"
 #include "build_hash_table.h"
 
+#include "kmer_build.h"
 #define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
 #define __positive_ratio_unique(r)	((r) + EPS >= 0.08)
@@ -1667,16 +1668,16 @@ int get_reads_build_cov(struct read_path_t *reads, struct read_path_t *rpath,
 	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
 	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
 	khash_t(gint) *h_head, *h_tail;
-	/*if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
+	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
 		h_head = barcode_hash_2_khash(bc_head);
 	else
 		h_head = kh_init(gint);
 	if (g->edges[e2].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
 		h_tail = barcode_hash_2_khash(bc_tail);
 	else
-		h_tail = kh_init(gint);*/
-	h_head = kh_init(gint);
-	h_tail = kh_init(gint);
+		h_tail = kh_init(gint);
+	/*h_head = kh_init(gint);
+	h_tail = kh_init(gint);*/
 
 	khash_t(gint) *include = get_shared_bc(h1, h2);
 	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
@@ -2099,6 +2100,8 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 			work_dir_build_graph, &lg, g, e1, e2);
 		save_graph_info(work_dir_build_graph, &lg, "local_lvl_0");
 		build_local_0_1(&lg, &lg1);
+		build_graph_cov(opt, &lg1, opt->lk, work_dir_build_cov,
+				read_build_cov.R1_path, read_build_cov.R2_path);
 		save_graph_info(work_dir_build_graph, &lg1, "local_lvl_1");
 		destroy_read_path(&read_build_graph);
 		asm_graph_destroy(&lg1);

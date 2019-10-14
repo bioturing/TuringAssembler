@@ -783,6 +783,39 @@ void assign_count_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t
 	}
 }
 
+void build_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g, int ksize,
+		char *work_dir, char *R1_path, char *R2_path)
+{
+	char *tmp_files[2] = {R1_path, R2_path};
+	log_debug("|---- Counting kmer");
+	KMC_build_kmer_database(ksize + 1, work_dir, opt->n_threads, opt->mmem,
+			2, tmp_files);
+	log_debug("|---- Retrieving kmer from KMC database");
+	struct kmhash_t kmer_table;
+	struct kmc_info_t kmc_inf;
+	char *kmc_pre = alloca(strlen(work_dir) + 50);
+	char *kmc_suf = alloca(strlen(work_dir) + 50);
+	sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", work_dir, ksize + 1);
+	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
+	KMC_read_prefix(kmc_pre, &kmc_inf);
+
+	log_debug("|---- Assigning edge count");
+	kmhash_init(&kmer_table, SIZE_1MB, (ksize + 4) >> 2,
+						KM_AUX_IDX, opt->n_threads);
+	build_edge_kmer_index_multi(opt->n_threads, &kmer_table, g);
+	log_info("Number of (k+1)-mer on edge: %lu", kmer_table.n_item);
+
+	struct kmedge_bundle_t kmedge_bundle;
+	kmedge_bundle.h = &kmer_table;
+	kmedge_bundle.g = g;
+	for (int i = 0; i < g->n_e; ++i)
+		g->edges[i].count = 0;
+	KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf,
+			(void *)(&kmedge_bundle), assign_count_kedge_multi);
+	kmhash_destroy(&kmer_table);
+	destroy_kmc_info(&kmc_inf);
+}
+
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2)
