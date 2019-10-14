@@ -1607,8 +1607,56 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
 	struct barcode_hash_t *bc1, *bc2;
-	// TODO: Which level to choose?
-	/*bc1 = g->edges[e1].barcodes + 2;
+	bc1 = g->edges[e1].barcodes + 1;
+	bc2 = g->edges[e2].barcodes + 1;
+	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
+	khash_t(gint) *h_head = kh_init(gint);
+	khash_t(gint) *h_tail = kh_init(gint);
+
+	khash_t(gint) *include = get_union_bc(h1, h2);
+	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
+	khash_t(gint) *h_shared = get_exclude_bc(include, exclude);
+	uint64_t *shared;
+	int n;
+	khash_2_arr(h_shared, &shared, &n);
+	log_debug("Keep %d barcodes in %d total", n, kh_size(include));
+	filter_read(reads, dict, rpath, shared, n);
+	free(shared);
+	kh_destroy(gint, h1);
+	kh_destroy(gint, h2);
+	kh_destroy(gint, h_head);
+	kh_destroy(gint, h_tail);
+	kh_destroy(gint, h_shared);
+
+	int res = 1;
+	if (check_file_empty(rpath->R1_path) || check_file_empty(rpath->R2_path))
+		res = 0;
+	return res;
+}
+
+/**
+ * @brief: gets reads to build the estimated coverage for each edge in the local graph
+ * @param reads: path to the original read files
+ * @param rpath: path to the local reads after being constructed
+ * @param dict: barcodes offset in file
+ * @param g: the global graph
+ * @param e1, e2: the two bridge contigs
+ * @param prefix: prefix of the paths to the local reads
+ * @return: 1 if everything runs smoothly, 0 if something supicious happens
+ */
+int get_reads_build_cov(struct read_path_t *reads, struct read_path_t *rpath,
+			khash_t(bcpos) *dict, struct asm_graph_t *g,
+			gint_t e1, gint_t e2, const char *prefix)
+{
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath->R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
+	struct barcode_hash_t *bc1, *bc2;
+	bc1 = g->edges[e1].barcodes + 2;
 	bc2 = g->edges[e2].barcodes + 2;
 
 	struct barcode_hash_t *bc_head;
@@ -1619,7 +1667,7 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
 	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
 	khash_t(gint) *h_head, *h_tail;
-	if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
+	/*if (g->edges[e1].seq_len >= MIN_EXCLUDE_BARCODE_CONTIG_LEN)
 		h_head = barcode_hash_2_khash(bc_head);
 	else
 		h_head = kh_init(gint);
@@ -1627,16 +1675,10 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 		h_tail = barcode_hash_2_khash(bc_tail);
 	else
 		h_tail = kh_init(gint);*/
-	bc1 = g->edges[e1].barcodes + 1;
-	bc2 = g->edges[e2].barcodes + 1;
+	h_head = kh_init(gint);
+	h_tail = kh_init(gint);
 
-	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
-	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
-	khash_t(gint) *h_head = kh_init(gint);
-	khash_t(gint) *h_tail = kh_init(gint);
-
-	// TODO: fix me
-	khash_t(gint) *include = get_union_bc(h1, h2);
+	khash_t(gint) *include = get_shared_bc(h1, h2);
 	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
 	khash_t(gint) *h_shared = get_exclude_bc(include, exclude);
 	uint64_t *shared;
@@ -2032,25 +2074,33 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t read_sorted_path = parse_read_path_from_opt(opt);
 
 	struct read_path_t local_read_path;
-	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/local_assembly_%ld_%ld", opt->out_dir, e1, e2);
-	mkdir(work_dir, 0755);
-	int ret = get_reads_local_graph(&read_sorted_path, &local_read_path, dict,
-			g, e1, e2, work_dir);
-	if (!ret){
-		log_warn("Something supicious happends, probably the read files are empty, please check at %s and %s",
-				local_read_path.R1_path, local_read_path.R2_path);
+	char work_dir_build_graph[MAX_PATH];
+	sprintf(work_dir_build_graph, "%s/local_assembly_%ld_%ld", opt->out_dir,
+			e1, e2);
+	mkdir(work_dir_build_graph, 0755);
+
+	char work_dir_build_cov[MAX_PATH];
+	sprintf(work_dir_build_cov, "%s/build_cov_%ld_%ld", opt->out_dir, e1, e2);
+	mkdir(work_dir_build_cov, 0755);
+
+	struct read_path_t read_build_graph, read_build_cov;
+	int ret_graph = get_reads_local_graph(&read_sorted_path, &read_build_graph,
+			dict, g, e1, e2, work_dir_build_graph);
+	int ret_cov = get_reads_build_cov(&read_sorted_path, &read_build_cov,
+			dict, g, e1, e2, work_dir_build_cov);
+	if (!ret_graph || !ret_cov){
+		log_warn("Something supicious happends, probably the read files are empty, please check these files: %s %s %s %s",
+				read_build_graph.R1_path, read_build_graph.R2_path,
+				read_build_cov.R1_path, read_build_cov.R2_path);
 	} else {
 		struct asm_graph_t lg, lg1;
 		build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
-			&(local_read_path.R1_path), &(local_read_path.R2_path), work_dir,
-			&lg, g, e1, e2);
-		save_graph_info(work_dir, &lg, "local_lvl_0");
+			&(read_build_graph.R1_path), &(read_build_graph.R2_path),
+			work_dir_build_graph, &lg, g, e1, e2);
+		save_graph_info(work_dir_build_graph, &lg, "local_lvl_0");
 		build_local_0_1(&lg, &lg1);
-		save_graph_info(work_dir, &lg1, "local_lvl_1");
-		delete_file(local_read_path.R1_path);
-		delete_file(local_read_path.R2_path);
-		destroy_read_path(&local_read_path);
+		save_graph_info(work_dir_build_graph, &lg1, "local_lvl_1");
+		destroy_read_path(&read_build_graph);
 		asm_graph_destroy(&lg1);
 
 	}
