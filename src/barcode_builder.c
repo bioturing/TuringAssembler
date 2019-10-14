@@ -290,7 +290,7 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
                         struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo) {
 	log_info("Construct aux info with aux_build: %d", aux_build);
-	if (aux_build | ASM_BUILD_BARCODE)
+	if (aux_build & ASM_BUILD_BARCODE)
 		init_barcode_graph(g, mapper_algo);
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
