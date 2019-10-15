@@ -1492,7 +1492,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	load_asm_graph(g1, tmp_name);
 	int status = remove(tmp_name);
 	if (status != 0)
-		__ERROR("Unable to remove %s\n", tmp_name);
+		log_error("Unable to remove %s\n", tmp_name);
 	return;
 	g1->ksize = g0->ksize;
 	g1->bin_size = g0->bin_size;

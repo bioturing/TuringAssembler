@@ -131,9 +131,9 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
-void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
-		struct asm_graph_t *lg)
+void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
+		int *scaffolds, int n_scaff, struct asm_graph_t *lg)
 {
 	log_debug("Filter irrelevant edges");
 	log_debug("Before filter: %d edges", lg->n_e);
@@ -158,32 +158,6 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 	init_map_contig(&mct_2, g->edges[e2], *lg);
 	int lc_e2 = find_match(&mct_2);
 
-	/*for (int i = 0; i < lg->n_e; ++i){
-		int rc_id = lg->edges[i].rc_id;
-		bad[i] |= mct_1.is_match[i] || mct_1.is_match[rc_id]
-			|| mct_2.is_match[i] || mct_2.is_match[rc_id];
-	}
-	if (pre_e1.source != -1){
-		struct map_contig_t mct_3;
-		init_map_contig(&mct_3, pre_e1, *lg);
-		find_match(&mct_3);
-		for (int i = 0; i < lg->n_e; ++i){
-			int rc_id = lg->edges[i].rc_id;
-			bad[i] |= mct_3.is_match[i] || mct_3.is_match[rc_id];
-		}
-		map_contig_destroy(&mct_3);
-	}
-	if (next_e2.source != -1){
-		struct map_contig_t mct_4;
-		init_map_contig(&mct_4, next_e2, *lg);
-		find_match(&mct_4);
-		
-		for (int i = 0; i < lg->n_e; ++i){
-			int rc_id = lg->edges[i].rc_id;
-			bad[i] |= mct_4.is_match[i] || mct_4.is_match[rc_id];
-		}
-		map_contig_destroy(&mct_4);
-	}*/
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
 		= bad[lg->edges[lc_e2].rc_id] = 0;
 	for (int i = 0; i < lg->n_e; ++i){
@@ -191,7 +165,8 @@ void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
 			asm_remove_edge(lg, i);
 	}
 	char tmp_name[1024];
-	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
+	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
+			emap2->gl_e);
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
 	asm_clone_graph(lg, &g_bak, tmp_name);
@@ -392,8 +367,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 
 	//		 STAGE 2 filtering local graph 			//
-	unrelated_filter(g, emap1, emap2, scaffolds, n_scaff, lg);
-	connection_filter(g, lg, emap1, emap2);
+	unrelated_filter(opt, g, emap1, emap2, scaffolds, n_scaff, lg);
+	connection_filter(opt, g, lg, emap1, emap2);
 
 
 	// BUGGY CODE
@@ -681,8 +656,9 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	}
 }
 
-void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
+void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2)
 {
 	log_info("Filter by connections");
 	log_debug("Before filter: %d edges", lg->n_e);
@@ -713,7 +689,8 @@ void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	struct asm_graph_t lg1;
 	struct asm_graph_t g_bak;
 	char tmp_name[1024];
-	sprintf(tmp_name, "tmp_graph_%d_%d.bin", emap1->gl_e, emap2->gl_e);
+	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
+			emap2->gl_e);
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
@@ -830,6 +807,10 @@ void build_bridge(struct opt_proc_t *opt)
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	pthread_mutex_t *bridge_process_locks = calloc(query_record.n_process,
+			sizeof(pthread_mutex_t));
+	for (int i = 0; i < query_record.n_process; ++i)
+		pthread_mutex_init(bridge_process_locks + i, NULL);
 	//opt->n_threads = 1; /* Edit to 1 thread */
 	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
 			sizeof(struct build_bridge_bundle_t));
@@ -841,6 +822,7 @@ void build_bridge(struct opt_proc_t *opt)
 		worker_bundles[i].bridge_lock = &bridge_lock;
 		worker_bundles[i].bridges = bridges;
 		worker_bundles[i].scaffold_record = &scaffolds;
+		worker_bundles[i].bridge_process_locks = bridge_process_locks;
 	}
 	log_info("Building bridges on scaffold");
 	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
@@ -854,6 +836,9 @@ void build_bridge(struct opt_proc_t *opt)
 	free(query_record.path_id);
 	pthread_mutex_destroy(&query_lock);
 	pthread_mutex_destroy(&bridge_lock);
+	for (int i = 0; i < query_record.n_process; ++i)
+		pthread_mutex_destroy(bridge_process_locks + i);
+	free(bridge_process_locks);
 	free(worker_bundles);
 	free(worker_threads);
 
@@ -909,6 +894,18 @@ void *build_bridge_iterator(void *data)
 
 		int e1 = bundle->query_record->e1[process_pos];
 		int e2 = bundle->query_record->e2[process_pos];
+		int scaf_id = -1;
+		for (int i = 0; i < bundle->query_record->n_process; ++i){
+			if (bundle->query_record->e1[i] == e1 &&
+				bundle->query_record->e2[i] == e2){
+				scaf_id = i;
+				break;
+			}
+		}
+		if (scaf_id == -1)
+			log_error("Cannot find the index of the bridge in the scaffold path, probably something went wrong");
+		pthread_mutex_lock(bundle->bridge_process_locks + scaf_id);
+
 		int path_id = bundle->query_record->path_id[process_pos];
 		int *scaffolds = bundle->scaffold_record->paths[path_id];
 		int n_scaff = bundle->scaffold_record->path_lens[path_id];
@@ -943,6 +940,8 @@ void *build_bridge_iterator(void *data)
 				local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
+
+		pthread_mutex_unlock(bundle->bridge_process_locks + scaf_id);
 	}
 }
 

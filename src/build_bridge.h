@@ -52,6 +52,7 @@ struct build_bridge_bundle_t{
 	pthread_mutex_t *query_lock;
 	char **bridges;
 	pthread_mutex_t *bridge_lock;
+	pthread_mutex_t *bridge_process_locks;
 };
 
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
@@ -96,9 +97,9 @@ void get_path_scores(struct opt_proc_t *opt, struct read_path_t *local_read_path
 		float **error);
 void join_bridge_center_by_path(struct asm_graph_t *lg, int *path, int path_len,
 		char **seq);
-void unrelated_filter(struct asm_graph_t *g, struct edge_map_info_t *emap1,
-		struct edge_map_info_t *emap2, int *scaffolds, int n_scaff,
-		struct asm_graph_t *lg);
+void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
+		int *scaffolds, int n_scaff, struct asm_graph_t *lg);
 void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 		char **res_seq);
 void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
@@ -110,8 +111,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int **path, int *path_len);
 void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
-void connection_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
+void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2);
 void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
