@@ -34,9 +34,10 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
  * @param emap: the mapping between the original edge and its counterpart
  * 	in the local graph
  */
-void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
+int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
+	int res;
 	emap->gl_e = e_id;
 	int *edge_id = &(emap->lc_e);
 	struct subseq_pos_t *gpos = &(emap->gpos);
@@ -45,9 +46,11 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	struct map_contig_t mct;
 	init_map_contig(&mct, g.edges[e.rc_id], lg);
 	*edge_id = find_match(&mct);
-	if (*edge_id == -1)
+	if (*edge_id == -1 || lg.edges[*edge_id].seq_len < WINDOW_SIZE)
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);
+	if (gpos->start > gpos->end || lpos->start > lpos->end)
+		goto no_local_edge_found;
 	*edge_id = lg.edges[*edge_id].rc_id;
 	gpos->start = e.seq_len - gpos->start - WINDOW_SIZE;
 	gpos->end = e.seq_len - gpos->end - WINDOW_SIZE;
@@ -56,8 +59,15 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - WINDOW_SIZE;
 	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - WINDOW_SIZE;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
+	res = 1;
+	goto end_function;
 no_local_edge_found:
+	log_debug("Mapping failed");
+	res = 0;
+	emap->gl_e = emap->lc_e = -1;
+end_function:
 	map_contig_destroy(&mct);
+	return res;
 }
 
 /**
@@ -68,9 +78,10 @@ no_local_edge_found:
  * @param emap: the mapping between the original edge and its counterpart
  * 	in the local graph
  */
-void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
+int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
+	int res;
 	emap->gl_e = e_id;
 	int *edge_id = &(emap->lc_e);
 	struct subseq_pos_t *gpos = &(emap->gpos);
@@ -79,11 +90,20 @@ void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 	struct map_contig_t mct;
 	init_map_contig(&mct, e, lg);
 	*edge_id = find_match(&mct);
-	if (*edge_id == -1)
+	if (*edge_id == -1 || lg.edges[*edge_id].seq_len < WINDOW_SIZE)
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);
+	if (gpos->start > gpos->end || lpos->start > lpos->end)
+		goto no_local_edge_found;
+	res = 1;
+	goto end_function;
 no_local_edge_found:
+	log_debug("Mapping failed");
+	res = 0;
+	emap->gl_e = emap->lc_e = -1;
+end_function:
 	map_contig_destroy(&mct);
+	return res;
 }
 
 void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
@@ -208,11 +228,11 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int n_scaff, char **res_seq, int *seq_len)
 {
 	struct edge_map_info_t emap1;
-	get_local_edge_head(*g, *lg, e1, &emap1);
+	int res_head = get_local_edge_head(*g, *lg, e1, &emap1);
 
 
 	struct edge_map_info_t emap2;
-	get_local_edge_tail(*g, *lg, e2, &emap2);
+	int res_tail = get_local_edge_tail(*g, *lg, e2, &emap2);
 
 	print_log_edge_map(&emap1, &emap2);
 	int res = try_bridging(opt, g, lg, scaffolds, n_scaff, &emap1, &emap2,

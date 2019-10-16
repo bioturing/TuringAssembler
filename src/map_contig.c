@@ -163,8 +163,6 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 
 	char *local_seq;
 	struct asm_edge_t best_match = mct->local_graph.edges[mct->best_match];
-	if (best_match.seq_len < WINDOW_SIZE)
-		__ERROR("Local contig is too short!\n");
 	decode_seq(&local_seq, best_match.seq, best_match.seq_len);
 
 	khash_t(kmer_int) *local_kmers;
@@ -242,14 +240,6 @@ void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 		if (end_point[i] > end_point[local->end])
 			local->end = i;
 	}
-	/*int diff = global->end - global->start;
-	for (int i = 0; i < (int) best_match.seq_len; ++i){
-		int p = local->start + diff;
-		if (end_point[i] > end_point[local->end] ||
-			(end_point[i] == end_point[local->end] &&
-			 	abs(i - p) < abs(local->end - p)))
-			local->end = i;
-	}*/
 	free(local_seq);
 	kh_destroy(kmer_int, global_start);
 	kh_destroy(kmer_int, global_end);
