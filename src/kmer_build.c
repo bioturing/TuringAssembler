@@ -577,7 +577,7 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 							  char **files_1, char **files_2, char *work_dir,
 							  struct asm_graph_t *g)
 {
-	log_debug("|---- Counting kmer");
+	log_debug("|---- Build graph from scratch");
 	// n_files < 0 mean we have one contig file at end of files_2
 	char **tmp_files;
 	char *count_kmer_dir = alloca(strlen(work_dir) + 50);
@@ -651,7 +651,7 @@ void build_graph_from_scratch_without_count(int ksize, int n_threads, int mmem, 
 				char **files_1, char **files_2, char *work_dir,
 						struct asm_graph_t *g)
 {
-	log_debug("|---- Counting kmer");
+	log_debug("|---- Build graph from scratch without count");
 	// n_files < 0 mean we have one contig file at end of files_2
     char **tmp_files;
     char *count_kmer_dir = alloca(strlen(work_dir) + 50);
@@ -661,19 +661,17 @@ void build_graph_from_scratch_without_count(int ksize, int n_threads, int mmem, 
         memcpy(tmp_files + abs(n_files), files_2, (abs(n_files)+1) * sizeof(char *));
         KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
                                 abs(n_files)* 2 + 1, tmp_files);
-        sprintf(count_kmer_dir, "%s/count_kmer", work_dir);
-        mkdir(count_kmer_dir, 0777);
-        printf("count kmer dir is %s %s\n", count_kmer_dir, files_2[abs(n_files)+1]);
-        KMC_build_kmer_database(ksize + 1, count_kmer_dir, n_threads, mmem, abs(n_files)*2, &files_2[abs(n_files)+1]);
+        log_info("build kmer database done");
 	} else {
         tmp_files = alloca(abs(n_files) * 2 * sizeof(char *));
         memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
         memcpy(tmp_files + abs(n_files), files_2, abs(n_files) * sizeof(char *));
         KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
                                 abs(n_files) * 2, tmp_files);
+		log_info("build kmer database done");
 	}
 
-	log_debug("|---- Retrieving kmer from KMC database");
+	log_info("|---- Retrieving kmer from KMC database");
 	struct kmhash_t kmer_table;
 	struct kmc_info_t kmc_inf;
 
