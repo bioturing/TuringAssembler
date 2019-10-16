@@ -353,6 +353,8 @@ void assembly3_process(struct opt_proc_t *opt)
 {
 	char *log_file = str_concate(opt->out_dir, "/assembly3.log");
 	init_logger(opt->log_level, log_file);
+	set_log_stage("General");
+	log_info("Version: %s\n", GIT_SHA);
 	struct read_path_t read_sorted_path; /* To sort fastq file if needed */
 
 	/**
