@@ -167,6 +167,14 @@ int opt_count_list(int argc, char *argv[])
 	return n;
 }
 
+void check_proc_opt(struct opt_proc_t *opt)
+{
+	if (opt->k0 < 17)
+		log_error("Kmer size (k0) must be greater than or equal to 17");
+	if (opt->lk < 17)
+		log_error("Local kmer size (lk) must be greater than or equal to 17");
+}
+
 struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 {
 	int pos = 0, n;
@@ -261,6 +269,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			__ERROR("Unknown option %s", argv[pos]);
 		}
 	}
+	check_proc_opt(opt);
 	mkdir(opt->out_dir, 0755);
 	return opt;
 }
