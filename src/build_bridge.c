@@ -993,9 +993,6 @@ void *build_bridge_iterator(void *data)
  *
  * @preconditions:
  * 	Original read files must be sorted
- *
- * @potential bugs:
- * 		+ Reads file are empty
  */
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)

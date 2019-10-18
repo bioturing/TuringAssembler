@@ -3,6 +3,7 @@
 #include "helper.h"
 #include "utils.h"
 #include "log.h"
+#include "unistd.h"
 char __base[5] = {'A', 'C', 'G', 'T', 'N'};
 
 char int_to_base(int x)
@@ -126,3 +127,7 @@ finish:
 	return ret;
 }
 
+int check_file_exist(char *path)
+{
+	return access(path, F_OK) != -1;
+}
