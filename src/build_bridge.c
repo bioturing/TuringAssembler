@@ -59,12 +59,14 @@ int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - WINDOW_SIZE;
 	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - WINDOW_SIZE;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
+	if (gpos->start > gpos->end || lpos->start > lpos->end)
+		goto no_local_edge_found;
 	res = 1;
 	goto end_function;
 no_local_edge_found:
 	log_debug("Mapping failed");
 	res = 0;
-	emap->gl_e = emap->lc_e = -1;
+	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
 	return res;
@@ -100,7 +102,7 @@ int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 no_local_edge_found:
 	log_debug("Mapping failed");
 	res = 0;
-	emap->gl_e = emap->lc_e = -1;
+	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
 	return res;

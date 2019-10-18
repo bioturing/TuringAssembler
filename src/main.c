@@ -350,6 +350,10 @@ void build_bridge_opt_process(int argc, char *argv[])
 		print_usage();
 		__ERROR("Error parsing arguments");
 	}
+	char path[1024];
+	sprintf(path, "%s/build_bridge.log", opt->out_dir);
+	init_logger(LOG_DEBUG_TECH, path);
+	set_log_stage("Local assembly");
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/build_bridge.log");
 	init_log(tmp_dir);
