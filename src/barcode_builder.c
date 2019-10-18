@@ -1053,3 +1053,11 @@ void *pathcount_buffer_iterator(void *data) {
 	pthread_exit(NULL);
 }
 
+struct read_path_t parse_read_path_from_opt(struct opt_proc_t *opt)
+{
+	struct read_path_t res;
+	res.R1_path = opt->files_1[0];
+	res.R2_path = opt->files_2[0];
+	res.idx_path = opt->files_I[0];
+	return res;
+}

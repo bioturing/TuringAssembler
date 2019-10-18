@@ -64,7 +64,8 @@ SRC = src/assembly_graph.c 				\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
       src/main.c \
-      src/log.c
+      src/log.c 					\
+      src/unit_test.c
 
 OBJ = $(SRC:.c=.o)
 
