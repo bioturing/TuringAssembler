@@ -234,6 +234,21 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
  * @param res_seq, seq_len: the result sequence and its length
  * @return: the result of the local assembly (BRIDGE_LOCAL_NOT_FOUND,
  * 	BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND, BRIDGE_MULTIPLE_PATHS_FOUND)
+ * @description:
+ * 	Given the global graph, the local graph, the bridge edges, the function
+ * 	needs to find a sequence that bridge from one edge to the other
+ * 		+ First, it needs to map the bridge edges in the global graph
+ * 			to the local graph
+ * 		+ Then, it tries to find a path between the mapped edges
+ * 			in the local graph
+ *
+ * @potential bugs:
+ * 	Uncorrect mapping might cause errors
+ *
+ * @post-conditions:
+ * 	+ the function needs to always output a sequence
+ * 	+ res must be either BRIDGE_LOCAL_NOT_FOUND, BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND
+ * 	or BRIDGE_MULTIPLE_PATHS_FOUND
  */
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
@@ -249,6 +264,7 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_log_edge_map(&emap1, &emap2);
 	int res = try_bridging(opt, g, lg, scaffolds, n_scaff, &emap1, &emap2,
 			res_seq, seq_len);
+	post_test(get_bridge, *res_seq, *seq_len, res);
 	return res;
 }
 
