@@ -12,7 +12,7 @@
 #include "utils.h"
 #include "verbose.h"
 #include "io_utils.h"
-#include "../include/kmc_skipping.h"
+#include "include/kmc_skipping.h"
 
 #define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
 

@@ -1,14 +1,16 @@
+#include <errno.h>
+#include <sys/stat.h>
 #include "build_bridge.h"
 #include "helper.h"
 #include "sort_read.h"
 #include "barcode_resolve2.h"
-#include <sys/stat.h>
 #include "kmer_hash.h"
 #include "resolve.h"
 #include "utils.h"
 #include "log.h"
 #include "io_utils.h"
-#include <errno.h>
+#include "unit_test.h"
+#include "barcode_builder.h"
 #define MIN_PROCESS_COV 500
 #define SYNC_KEEP_GLOBAL 0
 #define SYNC_KEEP_LOCAL 1
@@ -59,12 +61,18 @@ int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - WINDOW_SIZE;
 	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - WINDOW_SIZE;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
+	if (gpos->start > gpos->end || lpos->start > lpos->end)
+		goto no_local_edge_found;
+	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+		goto no_local_edge_found;
+	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
+		goto no_local_edge_found;
 	res = 1;
 	goto end_function;
 no_local_edge_found:
 	log_debug("Mapping failed");
 	res = 0;
-	emap->gl_e = emap->lc_e = -1;
+	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
 	return res;
@@ -95,12 +103,16 @@ int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 	get_match_pos(&mct, gpos, lpos);
 	if (gpos->start > gpos->end || lpos->start > lpos->end)
 		goto no_local_edge_found;
+	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+		goto no_local_edge_found;
+	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
+		goto no_local_edge_found;
 	res = 1;
 	goto end_function;
 no_local_edge_found:
 	log_debug("Mapping failed");
 	res = 0;
-	emap->gl_e = emap->lc_e = -1;
+	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
 	return res;
@@ -222,6 +234,21 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
  * @param res_seq, seq_len: the result sequence and its length
  * @return: the result of the local assembly (BRIDGE_LOCAL_NOT_FOUND,
  * 	BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND, BRIDGE_MULTIPLE_PATHS_FOUND)
+ * @description:
+ * 	Given the global graph, the local graph, the bridge edges, the function
+ * 	needs to find a sequence that bridge from one edge to the other
+ * 		+ First, it needs to map the bridge edges in the global graph
+ * 			to the local graph
+ * 		+ Then, it tries to find a path between the mapped edges
+ * 			in the local graph
+ *
+ * @potential bugs:
+ * 	Uncorrect mapping might cause errors
+ *
+ * @post-conditions:
+ * 	+ the function needs to always output a sequence
+ * 	+ res must be either BRIDGE_LOCAL_NOT_FOUND, BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND
+ * 	or BRIDGE_MULTIPLE_PATHS_FOUND
  */
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
@@ -237,6 +264,7 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_log_edge_map(&emap1, &emap2);
 	int res = try_bridging(opt, g, lg, scaffolds, n_scaff, &emap1, &emap2,
 			res_seq, seq_len);
+	post_test(get_bridge, *res_seq, *seq_len, res);
 	return res;
 }
 
@@ -969,19 +997,24 @@ void *build_bridge_iterator(void *data)
  * @brief Get all the local graphs for local assembly
  * @param opt: options
  * @param g: the original graph (global graph)
- * @param query: a record for storing the scaffold paths
+ * @param query: a list of bridges pairs
+ * @description:
+ * 	Given a list of bridges pairs, the function needs to build all the local graphs
+ * 	on those pairs.
+ * 	For each pairs, it needs to:
+ * 		+ Get the reads in that region
+ * 		+ Use KMC to get kmer table
+ * 		+ Build graph level 0 from the kmer table
+ * 		+ Resolve 0-1
+ *
+ * @preconditions:
+ * 	Original read files must be sorted
  */
 void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct query_record_t *query)
 {
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		sort_read(opt, &read_sorted_path);
-	}
+	pre_test(get_all_local_graphs, opt);
+	struct read_path_t read_sorted_path = parse_read_path_from_opt(opt);
 	khash_t(bcpos) *dict = kh_init(bcpos);
 	construct_read_index(&read_sorted_path, dict);
 
