@@ -61,6 +61,10 @@ int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
 	if (gpos->start > gpos->end || lpos->start > lpos->end)
 		goto no_local_edge_found;
+	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+		goto no_local_edge_found;
+	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
+		goto no_local_edge_found;
 	res = 1;
 	goto end_function;
 no_local_edge_found:
@@ -96,6 +100,10 @@ int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		goto no_local_edge_found;
 	get_match_pos(&mct, gpos, lpos);
 	if (gpos->start > gpos->end || lpos->start > lpos->end)
+		goto no_local_edge_found;
+	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+		goto no_local_edge_found;
+	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
 		goto no_local_edge_found;
 	res = 1;
 	goto end_function;
