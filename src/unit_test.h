@@ -1,6 +1,8 @@
 #ifndef __UNIT_TEST__
 #define __UNIT_TEST__
 #include "attribute.h"
+#include "assembly_graph.h"
+#include "map_contig.h"
 #define pre_test(test_function, ...) do{\
 	log_info("Testing pre-conditions for " #test_function);\
 	precon_##test_function(__VA_ARGS__);\
@@ -19,4 +21,17 @@ void postcon_get_local_assembly(int lksize, char *work_dir, int is_reads_exist);
 void test_original_reads_sorted(struct opt_proc_t *opt);
 
 void postcon_get_bridge(char *bridge_seq, int seq_len, int bridge_type);
+
+void precon_get_local_edge_head(struct asm_graph_t *g, int e);
+void postcon_get_local_edge_head(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int e, struct edge_map_info_t *emap);
+void test_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e);
+
+void precon_get_local_edge_tail(struct asm_graph_t *g, int e);
+void postcon_get_local_edge_tail(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int e, struct edge_map_info_t *emap);
+
+void precon_get_local_edge(struct asm_graph_t *g, int e);
+void postcon_get_local_edge(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int e, struct edge_map_info_t *emap);
 #endif

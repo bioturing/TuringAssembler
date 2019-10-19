@@ -35,11 +35,25 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
  * @param e_id: the original contig id
  * @param emap: the mapping between the original edge and its counterpart
  * 	in the local graph
+ * @description:
+ * 	Given the global graph, the local graph and an edge in the global graph,
+ * 	the function needs to map that edge to a local one, as well as finding out
+ * 	the overlap part.
+ *
+ * @pre-conditions:
+ * 	The edge must exist in the global graph
+ * @post-conditions:
+ * 	The output - emap must sastisfy all conditions:
+ * 		+ emap->gl_e = e_id
+ * 		+ emap->lc_e in [-1, lg->n_e)
+ * 		+ if emap->lc_e != -1 then:
+ * 			0 <= emap->lpos.start <= emap->lpos.end < length
+ * 			0 <= emap->gpos.start <= emap->gpos.end < length
  */
-int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
+void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
-	int res;
+	pre_test(get_local_edge_head, &g, e_id);
 	emap->gl_e = e_id;
 	int *edge_id = &(emap->lc_e);
 	struct subseq_pos_t *gpos = &(emap->gpos);
@@ -67,15 +81,13 @@ int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		goto no_local_edge_found;
 	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
 		goto no_local_edge_found;
-	res = 1;
 	goto end_function;
 no_local_edge_found:
 	log_debug("Mapping failed");
-	res = 0;
 	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
-	return res;
+	post_test(get_local_edge_head, &g, &lg, e_id, emap);
 }
 
 /**
@@ -85,11 +97,25 @@ end_function:
  * @param e_id: the original contig id
  * @param emap: the mapping between the original edge and its counterpart
  * 	in the local graph
+ * @description:
+ * 	Given the global graph, the local graph and an edge in the global graph,
+ * 	the function needs to map that edge to a local one, as well as finding out
+ * 	the overlap part.
+ *
+ * @pre-conditions:
+ * 	The edge must exist in the global graph
+ * @post-conditions:
+ * 	The output - emap must sastisfy all conditions:
+ * 		+ emap->gl_e = e_id
+ * 		+ emap->lc_e in [-1, lg->n_e)
+ * 		+ if emap->lc_e != -1 then:
+ * 			0 <= emap->lpos.start <= emap->lpos.end < length
+ * 			0 <= emap->gpos.start <= emap->gpos.end < length
  */
-int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
+void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
-	int res;
+	pre_test(get_local_edge_tail, &g, e_id);
 	emap->gl_e = e_id;
 	int *edge_id = &(emap->lc_e);
 	struct subseq_pos_t *gpos = &(emap->gpos);
@@ -107,15 +133,13 @@ int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		goto no_local_edge_found;
 	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
 		goto no_local_edge_found;
-	res = 1;
 	goto end_function;
 no_local_edge_found:
 	log_debug("Mapping failed");
-	res = 0;
 	emap->lc_e = -1;
 end_function:
 	map_contig_destroy(&mct);
-	return res;
+	post_test(get_local_edge_head, &g, &lg, e_id, emap);
 }
 
 void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
@@ -255,11 +279,11 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int n_scaff, char **res_seq, int *seq_len)
 {
 	struct edge_map_info_t emap1;
-	int res_head = get_local_edge_head(*g, *lg, e1, &emap1);
+	get_local_edge_head(*g, *lg, e1, &emap1);
 
 
 	struct edge_map_info_t emap2;
-	int res_tail = get_local_edge_tail(*g, *lg, e2, &emap2);
+	get_local_edge_tail(*g, *lg, e2, &emap2);
 
 	print_log_edge_map(&emap1, &emap2);
 	int res = try_bridging(opt, g, lg, scaffolds, n_scaff, &emap1, &emap2,

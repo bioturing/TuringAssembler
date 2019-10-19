@@ -55,9 +55,9 @@ struct build_bridge_bundle_t{
 	pthread_mutex_t *bridge_process_locks;
 };
 
-int get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
+void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e, struct edge_map_info_t *emap);
-int get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
+void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e, struct edge_map_info_t *emap);
 int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, int *scaffolds,
