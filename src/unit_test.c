@@ -40,7 +40,7 @@ void postcon_get_bridge(char *bridge_seq, int seq_len, int bridge_type)
 		log_error("The length of the sequence is not correct: %d vs %d",
 				strlen(bridge_seq), seq_len);
 	if (bridge_type != BRIDGE_LOCAL_NOT_FOUND && bridge_type != BRIDGE_TRIVIAL_BRIDGE
-		&& bridge_type != BRIDGE_LOCAL_NOT_FOUND && bridge_type != BRIDGE_MULTIPLE_PATH)
+		&& bridge_type != BRIDGE_PATH_NOT_FOUND && bridge_type != BRIDGE_MULTIPLE_PATH)
 		log_error("Bridge type is not in the expected list");
 	// TODO: test if the seq contains any N character, then the number of them
 	// must be either 0 or 100
