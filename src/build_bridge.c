@@ -355,11 +355,37 @@ void join_middle_edge(struct asm_edge_t e1, struct asm_edge_t e2,
 
 }
 
+/*
+ * @description:
+ * 	Given the global graph, the local graph, the mapping of the two bridges
+ * 	and the scaffold path that contains those bridges, the function needs to
+ * 	produce a sequence that connect the given bridges, using provided information
+ * @param opt: the program options
+ * @param g: the global graph
+ * @param lg: the local graph
+ * @param scaffolds: the described scaffold path
+ * @param n_scaff length of scaffolds
+ * @param emap1, emap2: the edge mappings
+ * @output res_seq: the result sequence
+ * @output seq_len: the sequence length
+ *
+ * pre-conditions:
+ * 	+ The edges in the scaffold path must exist in the global graph
+ * 	+ Id if mapped edges must be correct (not out of bound)
+ * 	+ If emap1 and emap2 are mapped (lc_e != -1), their positions must be
+ * 		in the correct range, based on where they are mapped
+ *
+ * @post-conditions:
+ * 	+ the function needs to always output a sequence
+ * 	+ res must be either BRIDGE_LOCAL_NOT_FOUND, BRIDGE_TRIVIAL_BRIDGE, BRIDGE_PATH_NOT_FOUND
+ * 	or BRIDGE_MULTIPLE_PATHS_FOUND
+ */
 int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int *scaffolds, int n_scaff,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		char **res_seq, int *seq_len)
 {
+	pre_test(try_bridging, g, lg, scaffolds, n_scaff, emap1, emap2);
 	int bridge_type;
 	char *bridge_seq;
 	int e1 = emap1->gl_e;
@@ -401,6 +427,7 @@ int try_bridging(struct opt_proc_t *opt, struct asm_graph_t *g,
 end_function:
 	*seq_len = strlen(bridge_seq);
 	*res_seq = bridge_seq;
+	post_test(try_bridging, *res_seq, *seq_len, bridge_type);
 	return bridge_type;
 }
 

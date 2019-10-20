@@ -20,11 +20,16 @@ void precon_get_local_assembly(struct opt_proc_t *opt);
 void postcon_get_local_assembly(int lksize, char *work_dir, int is_reads_exist);
 void test_original_reads_sorted(struct opt_proc_t *opt);
 
+void test_bridge_result(char *bridge_seq, int seq_len, int bridge_type);
 void postcon_get_bridge(char *bridge_seq, int seq_len, int bridge_type);
 
 void precon_get_local_edge_head(struct asm_graph_t *g, int e);
 void postcon_get_local_edge_head(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e, struct edge_map_info_t *emap);
+
+void test_edge_in_graph(int e, struct asm_graph_t *g);
+void test_edge_map(struct edge_map_info_t *emap, struct asm_graph_t *g,
+		struct asm_graph_t *lg);
 void test_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e);
 
 void precon_get_local_edge_tail(struct asm_graph_t *g, int e);
@@ -34,4 +39,9 @@ void postcon_get_local_edge_tail(struct asm_graph_t *g, struct asm_graph_t *lg,
 void precon_get_local_edge(struct asm_graph_t *g, int e);
 void postcon_get_local_edge(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e, struct edge_map_info_t *emap);
+
+void precon_try_bridging(struct asm_graph_t *g, struct asm_graph_t *lg,
+		int *scaffolds, int n_scaff, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2);
+void postcon_try_bridging(char *bridge_seq, int seq_len, int bridge_type);
 #endif
