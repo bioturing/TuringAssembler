@@ -36,7 +36,7 @@ void test_bridge_result(char *bridge_seq, int seq_len, int bridge_type)
 {
 	if (seq_len == 0)
 		log_error("The result bridge is empty");
-	if (strlen(bridge_seq) != seq_len)
+	if ((int) strlen(bridge_seq) != seq_len)
 		log_error("The length of the sequence is not correct: %d vs %d",
 				strlen(bridge_seq), seq_len);
 	if (bridge_type != BRIDGE_LOCAL_NOT_FOUND && bridge_type != BRIDGE_TRIVIAL_BRIDGE
