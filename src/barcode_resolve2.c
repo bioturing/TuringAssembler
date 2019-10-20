@@ -1615,6 +1615,8 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	kh_destroy(gint, h2);
 	kh_destroy(gint, h_head);
 	kh_destroy(gint, h_tail);
+	kh_destroy(gint, include);
+	kh_destroy(gint, exclude);
 	kh_destroy(gint, h_shared);
 
 	int res = 1;
