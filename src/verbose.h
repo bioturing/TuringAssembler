@@ -45,11 +45,6 @@
 	fflush(stderr);							       \
 } while (0) /* VERBOSE_INFO */
 
-//#define __VERBOSE_LOG(tag, fmt, args...) do {				       \
-//	fprintf(stderr, "[" tag "] " fmt, ##args);				       \
-//	log_write("[" tag "] " fmt, ##args);					       \
-//} while (0) /* VERBOSE_AND_LOG */
-
 #define __VERBOSE_LOG(tag, fmt, args...)
 
 #define __LOG(tag, fmt, args...) do {				       \

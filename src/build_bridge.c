@@ -77,9 +77,9 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
 	if (gpos->start > gpos->end || lpos->start > lpos->end)
 		goto no_local_edge_found;
-	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+	if (gpos->start < 0 || (uint32_t) gpos->end >= g.edges[emap->gl_e].seq_len)
 		goto no_local_edge_found;
-	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
+	if (lpos->start < 0 || (uint32_t) lpos->end >= lg.edges[emap->lc_e].seq_len)
 		goto no_local_edge_found;
 	goto end_function;
 no_local_edge_found:
@@ -129,9 +129,9 @@ void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 	get_match_pos(&mct, gpos, lpos);
 	if (gpos->start > gpos->end || lpos->start > lpos->end)
 		goto no_local_edge_found;
-	if (gpos->start < 0 || gpos->end >= g.edges[emap->gl_e].seq_len)
+	if (gpos->start < 0 || (uint32_t) gpos->end >= g.edges[emap->gl_e].seq_len)
 		goto no_local_edge_found;
-	if (lpos->start < 0 || lpos->end >= lg.edges[emap->lc_e].seq_len)
+	if (lpos->start < 0 || (uint32_t) lpos->end >= lg.edges[emap->lc_e].seq_len)
 		goto no_local_edge_found;
 	goto end_function;
 no_local_edge_found:
@@ -1028,7 +1028,7 @@ void *build_bridge_iterator(void *data)
 			char graph_bin_path[1024];
 			sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
 					bundle->opt->out_dir,
-					bundle->g->edges[e1].rc_id,
+					(int) bundle->g->edges[e1].rc_id,
 					e2, bundle->opt->lk);
 			if (access(graph_bin_path, F_OK) == -1){
 				log_local_info("Graph is too complex, filling Ns", e1, e2);
@@ -1051,6 +1051,7 @@ void *build_bridge_iterator(void *data)
 
 		pthread_mutex_unlock(bundle->bridge_process_locks + scaf_id);
 	}
+	return NULL;
 }
 
 /**

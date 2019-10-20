@@ -13,6 +13,7 @@
 #include "verbose.h"
 #include "scaffolding/global_params.h"
 #include "include/kmc_skipping.h"
+#include "resolve.h"
 
 KSEQ_INIT(gzFile, gzread);
 
@@ -393,12 +394,12 @@ void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
 			__binseq_set(dst->seq, k, c);
 		}
 
-		for (i = trim_src, k = dst->seq_len - trim_dst + len; i < src->seq_len; ++i, ++k) {
+		for (i = trim_src, k = dst->seq_len - trim_dst + len; (uint32_t) i < src->seq_len; ++i, ++k) {
 			c = __binseq_get(src->seq, i);
 			__binseq_set(dst->seq, k, c);
 		}
 	} else {
-		for (i = trim_src - len, k = dst->seq_len - trim_dst; i < src->seq_len; ++i, ++k) {
+		for (i = trim_src - len, k = dst->seq_len - trim_dst; (uint32_t) i < src->seq_len; ++i, ++k) {
 			c = __binseq_get(src->seq, i);
 			__binseq_set(dst->seq, k, c);
 		}
@@ -430,12 +431,12 @@ void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t 
 			__binseq_set(dst->seq, k, c);
 		}
 
-		for (i = trim_src, k = dst->seq_len - trim_dst + len; i < src->seq_len; ++i, ++k) {
+		for (i = trim_src, k = dst->seq_len - trim_dst + len; (uint32_t) i < src->seq_len; ++i, ++k) {
 			c = __binseq_get(src->seq, i);
 			__binseq_set(dst->seq, k, c);
 		}
 	} else {
-		for (i = trim_src - len, k = dst->seq_len - trim_dst; i < src->seq_len; ++i, ++k) {
+		for (i = trim_src - len, k = dst->seq_len - trim_dst; (uint32_t) i < src->seq_len; ++i, ++k) {
 			c = __binseq_get(src->seq, i);
 			__binseq_set(dst->seq, k, c);
 		}
@@ -1535,7 +1536,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		log_debug("g0->edges[i].seq == NULL or not: %d", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
 				sizeof(uint32_t));
-		for (int j = 0; j < g0->edges[i].seq_len; ++j)
+		for (int j = 0; (uint32_t) j < g0->edges[i].seq_len; ++j)
 			log_debug("%d", __binseq_get(g0->edges[i].seq, j));
 		memcpy(g1->edges[i].seq, g0->edges[i].seq,
 				sizeof(uint32_t) * ((g1->edges[i].seq_len + 3) / 4));
