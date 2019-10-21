@@ -443,6 +443,11 @@ end_function:
  * @param n_scaff: the size of scaffolds
  * @param path: the path that is found
  * @param path_len: the size of path
+ * @description:
+ * 	Given the global graph, the local graph, the mappign between the
+ * 	global and local edges, the scaffold path that contains the edges,
+ * 	the function needs to find the path that best describes the genome
+ * 	between the given edges
  */
 void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
@@ -456,8 +461,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int e2 = emap2->gl_e;
 	int lc_e1 = emap1->lc_e;
 	int lc_e2 = emap2->lc_e;
-	struct asm_edge_t edge_pre_e1;
-	struct asm_edge_t edge_next_e2;
 
 	struct read_path_t local_read_path;
 	int ret = get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
@@ -472,15 +475,6 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	unrelated_filter(opt, g, emap1, emap2, scaffolds, n_scaff, lg);
 	connection_filter(opt, g, lg, emap1, emap2);
 
-
-	// BUGGY CODE
-	/*__VERBOSE("resolve local loop\n");
-	asm_resolve_local_loop(lg);
-	get_local_edge_head(*g, *lg, emap1->gl_e, emap1);
-	get_local_edge_tail(*g, *lg, emap2->gl_e, emap2);
-	print_log_edge_map(emap1, emap2);
-	__VERBOSE("DONE\n");*/
-	//link_filter(opt, g, lg, emap1, emap2);
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
 	// 		 STAGE 3 finding paths 			//
