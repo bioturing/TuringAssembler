@@ -989,7 +989,6 @@ void build_bridge(struct opt_proc_t *opt)
  */
 void *build_bridge_iterator(void *data)
 {
-	int local_asm_res;
 	struct build_bridge_bundle_t *bundle = (struct build_bridge_bundle_t *)
 			data;
 	while (1){
@@ -1020,6 +1019,7 @@ void *build_bridge_iterator(void *data)
 		struct asm_graph_t *g = bundle->g;
 		char *seq;
 		int seq_len;
+		int local_asm_res = BRIDGE_LOCAL_NOT_FOUND;
 		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
 			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
 			log_local_info("Graph is too complex, filling Ns", e1, e2);
