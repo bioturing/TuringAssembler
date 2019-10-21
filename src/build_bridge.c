@@ -187,10 +187,44 @@ void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
 	free(local_seq);
 }
 
+/*                           gl_e1                      gl_e2
+ *    ============    ==================        ===================    ===============
+ *
+ *                                  lc_e1       lc_e2
+ * ==  == === === == ====  ======= ====== ===  ===== ==== ===  ===== = == =======
+ *      ^  ^   ^       ^      ^                        ^   ^    ^       ^   ^
+ *      |  |   |       |      |                        |   |    |       |   |
+ *      ---------------------------------------------------------------------
+ *                                       |
+ *                                       |
+ *                                unwanted edges
+ * @description
+ * 	Given the mapping between the global and local edges, the function needs to
+ * 		filter out all the unwanted edges. An edge is unwanted if it is
+ * 		any other edge than lc_e1 and lc_e2 that can be mapped
+ * 		onto any global edge in the scaffold path
+ * 	First, the function finds all unwanted local edges by mapping each of them
+ * 		to the edges on the scaffolds path. Then, it removes them from
+ * 		the graph and then calls asm_condense to condense the graph.
+ * 		Therefore, the local edge ids might not stay the same.
+ *
+ *
+ * @pre-conditions:
+ * 	+ All edges in the scaffolds path must exist in the global graph
+ * 	+ Unmapped local edges are not allowed
+ * 	+ The index of the global edges and local edges, as well as the mapping
+ * 		positions must be correct
+ * @post-conditions:
+ * 	+ Unmapped local edges are not allowed
+ * 	+ The index of the global edges and local edges, as well as the mapping
+ * 		positions must be correct
+ * 	+ The local graph afterward must pass test_asm_graph
+ */
 void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		int *scaffolds, int n_scaff, struct asm_graph_t *lg)
 {
+	pre_test(unrelated_filter, g, lg, scaffolds, n_scaff, emap1, emap2);
 	log_local_debug("Filter irrelevant edges", emap1->gl_e, emap2->gl_e);
 	log_local_debug("Before filter: %d edges", emap1->gl_e, emap2->gl_e, lg->n_e);
 	int e1 = emap1->gl_e;
@@ -239,6 +273,7 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		print_log_edge_map(emap1, emap2);
 	}
 	free(bad);
+	post_test(unrelated_filter, g, lg, emap1, emap2);
 }
 
 /**
@@ -749,10 +784,32 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	}
 }
 
+/*
+ * @description
+ * 	Given the mapping between the global and local edges, the function needs to
+ * 		filter out all the tips. An edge w is considered as a tip if
+ * 		there is no path from u to w nor from w to v
+ * 	First, the function finds all unwanted local edges by performing graph
+ * 		search operations. Then, it removes them from
+ * 		the graph and then calls asm_condense to condense the graph.
+ * 		Therefore, the local edge ids might not stay the same.
+ *
+ *
+ * @pre-conditions:
+ * 	+ Unmapped local edges are not allowed
+ * 	+ The index of the global edges and local edges, as well as the mapping
+ * 		positions must be correct
+ * @post-conditions:
+ * 	+ Unmapped local edges are not allowed
+ * 	+ The index of the global edges and local edges, as well as the mapping
+ * 		positions must be correct
+ * 	+ The local graph afterward must pass test_asm_graph
+ */
 void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2)
 {
+	pre_test(connection_filter, g, lg, emap1, emap2);
 	log_local_info("Filter by connections", emap1->gl_e, emap2->gl_e);
 	log_local_debug("Before filter: %d edges", emap1->gl_e, emap2->gl_e, lg->n_e);
 	int *forward_len, *backward_len;
@@ -804,46 +861,7 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	}
 	free(forward_len);
 	free(backward_len);
-}
-
-void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
-{
-	char r1_path[1024], r2_path[1024];
-	sprintf(r1_path, "%s/local_assembly_shared_%d_%d/R1.sub.fq", opt->out_dir,
-			emap1->gl_e, emap2->gl_e);
-	sprintf(r2_path, "%s/local_assembly_shared_%d_%d/R2.sub.fq", opt->out_dir,
-			emap1->gl_e, emap2->gl_e);
-	khash_t(kmer_int) *kmer_count = get_kmer_hash(r1_path, r2_path, KSIZE_CHECK);
-	int watch = 32;
-	for (int e1 = 0; e1 < lg->n_e; ++e1){
-		int tg = lg->edges[e1].target;
-		float max_score = 0;
-		printf("edge %d\n", e1);
-		for (int i = 0; i < lg->nodes[tg].deg; ++i){
-			int e2 = lg->nodes[tg].adj[i];
-			char *first, *second;
-			decode_seq(&first, lg->edges[e1].seq, lg->edges[e1].seq_len);
-			decode_seq(&second, lg->edges[e2].seq, lg->edges[e2].seq_len);
-			int len1 = strlen(first);
-			int len2 = strlen(second);
-			int m = min(len1, KSIZE_CHECK);
-			int pos = len1 - m;
-			char *join = (char *) calloc(m + len2 - lg->ksize + 1, sizeof(char));
-			strcpy(join, first + pos);
-			strncpy(join + m, second + lg->ksize,
-					min(len2, KSIZE_CHECK) - lg->ksize);
-			float score = count_kmer_on_seq(kmer_count, join, KSIZE_CHECK);
-
-			max_score = max(max_score, score);
-			printf("e2 %d m %d score %.3f\n", e2, m, score);
-			print_kmer_count_on_seq(kmer_count, join, KSIZE_CHECK);
-			free(first);
-			free(second);
-			free(join);
-		}
-	}
-	kh_destroy(kmer_int, kmer_count);
+	post_test(connection_filter, g, lg, emap1, emap2);
 }
 
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
