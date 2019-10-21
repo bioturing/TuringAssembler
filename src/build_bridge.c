@@ -249,29 +249,7 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		if (bad[i])
 			asm_remove_edge(lg, i);
 	}
-	char tmp_name[1024];
-	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
-			emap2->gl_e);
-	struct asm_graph_t lg1;
-	struct asm_graph_t g_bak;
-	asm_clone_graph(lg, &g_bak, tmp_name);
-	asm_condense(lg, &lg1);
-	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_local_debug("Condensed graph degenerated, aborting filtering!",
-				emap1->gl_e, emap2->gl_e);
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&lg1);
-		*lg = g_bak;
-	} else {
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&g_bak);
-		*lg = lg1;
-		log_local_debug("After filter: %d edges", emap1->gl_e, emap2->gl_e,
-				lg1.n_e);
-		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-		print_log_edge_map(emap1, emap2);
-	}
+	condense_check_degenerate(opt, g, lg, emap1, emap2);
 	free(bad);
 	post_test(unrelated_filter, g, lg, emap1, emap2);
 }
@@ -505,8 +483,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
-	// 		 STAGE 3 finding paths 			//
 	log_local_info("Start finding paths", emap1->gl_e, emap2->gl_e);
+
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
@@ -836,29 +814,7 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 			asm_remove_edge(lg, i);
 	}
 	free(bad);
-	struct asm_graph_t lg1;
-	struct asm_graph_t g_bak;
-	char tmp_name[1024];
-	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
-			emap2->gl_e);
-	asm_clone_graph(lg, &g_bak, tmp_name);
-	asm_condense(lg, &lg1);
-	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_local_debug("Condensed graph degenerated, aborting filtering!",
-				emap1->gl_e, emap2->gl_e);
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&lg1);
-		*lg = g_bak;
-	} else {
-		asm_graph_destroy(lg);
-		asm_graph_destroy(&g_bak);
-		*lg = lg1;
-		log_local_debug("After filter: %d edges", emap1->gl_e, emap2->gl_e,
-				lg1.n_e);
-		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
-		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
-		print_log_edge_map(emap1, emap2);
-	}
+	condense_check_degenerate(opt, g, lg, emap1, emap2);
 	free(forward_len);
 	free(backward_len);
 	post_test(connection_filter, g, lg, emap1, emap2);
@@ -1192,5 +1148,38 @@ void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *sca
 		}
 		free(seq);
 		fprintf(f, "\n");
+	}
+}
+
+/*
+ * @description:
+ * 	The function will condense the graph if it won't degenerate. The graph
+ * 		is considered to be degenerated if the two global edges are mapped
+ * 		onto a same local edge.
+ */
+void condense_check_degenerate(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2)
+{
+	struct asm_graph_t lg1;
+	struct asm_graph_t g_bak;
+	char tmp_name[1024];
+	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
+			emap2->gl_e);
+	asm_clone_graph(lg, &g_bak, tmp_name);
+	asm_condense(lg, &lg1);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		log_debug("Condensed graph degenerated, aborting filtering!");
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&lg1);
+		*lg = g_bak;
+	} else {
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&g_bak);
+		*lg = lg1;
+		log_debug("After filter: %d edges", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
 	}
 }
