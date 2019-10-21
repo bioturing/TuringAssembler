@@ -1106,7 +1106,7 @@ void cleanup(struct opt_proc_t *opt)
 	}
 	log_info("Cleaning up all files in %s", opt->out_dir);
 	int flag = 0;
-	flag = recursive_delete(opt->out_dir);
+	flag = recursive_delete_files(opt->out_dir);
 	if (flag)
 		log_info("Some files are not deleted, please check in %s",
 				opt->out_dir);

@@ -13,12 +13,12 @@ char int_to_base(int x)
 
 int base_to_int(char ch)
 {
-	return nt4_table[ch];
+	return nt4_table[(int) ch];
 }
 
 char flip(char ch)
 {
-	return rev_nt4_char[nt4_table[ch]];
+	return rev_nt4_char[nt4_table[(int) ch]];
 }
 
 void flip_reverse(char *seq)
@@ -79,7 +79,7 @@ int max(int a, int b)
 }
 
 // https://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
-int recursive_delete(char *dir)
+int recursive_delete_files(char *dir)
 {
 	int ret = 0;
 	FTS *ftsp = NULL;
@@ -89,8 +89,7 @@ int recursive_delete(char *dir)
 
 	ftsp = fts_open(files, FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, NULL);
 	if (!ftsp){
-		log_debug("%s: fts open failed: %s", curr->fts_accpath,
-				strerror(errno));
+		log_debug("%s: fts open failed: %s", dir, strerror(errno));
 		ret = -1;
 		goto finish;
 	}

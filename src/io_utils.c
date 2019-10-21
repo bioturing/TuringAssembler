@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <stdint.h>
 #include "io_utils.h"
 #include "verbose.h"
 
@@ -32,8 +32,8 @@ size_t xfread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t ret = fread(ptr, size, nmemb, stream);
 	if (ret != nmemb)
-		__ERROR("fread, wrong file or file is corrupted nmem expected %d found %d\n",
-				(int) nmemb, (int) ret);
+		__ERROR("fread, wrong file or file is corrupted nmem expected %u found %u\n",
+				(uint32_t) nmemb, (uint32_t) ret);
 	return ret;
 }
 
