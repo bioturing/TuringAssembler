@@ -195,6 +195,8 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	log_local_debug("Before filter: %d edges", emap1->gl_e, emap2->gl_e, lg->n_e);
 	int e1 = emap1->gl_e;
 	int e2 = emap2->gl_e;
+	int lc_e1 = emap1->lc_e;
+	int lc_e2 = emap2->lc_e;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	for (int i = 0; i < n_scaff; ++i){
 		struct map_contig_t mct;
@@ -206,13 +208,6 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		}
 		map_contig_destroy(&mct);
 	}
-	struct map_contig_t mct_1;
-	init_map_contig(&mct_1, g->edges[g->edges[e1].rc_id], *lg);
-	int lc_e1 = lg->edges[find_match(&mct_1)].rc_id;
-
-	struct map_contig_t mct_2;
-	init_map_contig(&mct_2, g->edges[e2], *lg);
-	int lc_e2 = find_match(&mct_2);
 
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
 		= bad[lg->edges[lc_e2].rc_id] = 0;
@@ -244,8 +239,6 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		print_log_edge_map(emap1, emap2);
 	}
 	free(bad);
-	map_contig_destroy(&mct_1);
-	map_contig_destroy(&mct_2);
 }
 
 /**
