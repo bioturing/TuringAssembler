@@ -4,13 +4,13 @@
 #include "assembly_graph.h"
 #include "map_contig.h"
 #define pre_test(test_function, ...) do{\
-	log_info("Testing pre-conditions for " #test_function);\
+	log_debug("Testing pre-conditions for " #test_function);\
 	precon_##test_function(__VA_ARGS__);\
 	log_debug("Test passed");\
 	} while(0)\
 
 #define post_test(test_function, ...) do{\
-	log_info("Testing post-conditions for " #test_function);\
+	log_debug("Testing post-conditions for " #test_function);\
 	postcon_##test_function(__VA_ARGS__);\
 	log_debug("Test passed");\
 	} while(0)\
