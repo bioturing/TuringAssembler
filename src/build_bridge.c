@@ -191,8 +191,8 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2,
 		int *scaffolds, int n_scaff, struct asm_graph_t *lg)
 {
-	log_debug("Filter irrelevant edges");
-	log_debug("Before filter: %d edges", lg->n_e);
+	log_local_debug("Filter irrelevant edges", emap1->gl_e, emap2->gl_e);
+	log_local_debug("Before filter: %d edges", emap1->gl_e, emap2->gl_e, lg->n_e);
 	int e1 = emap1->gl_e;
 	int e2 = emap2->gl_e;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
@@ -228,7 +228,8 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_debug("Condensed graph degenerated, aborting filtering!");
+		log_local_debug("Condensed graph degenerated, aborting filtering!",
+				emap1->gl_e, emap2->gl_e);
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -236,7 +237,8 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		log_debug("After filter: %d edges", lg1.n_e);
+		log_local_debug("After filter: %d edges", emap1->gl_e, emap2->gl_e,
+				lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -294,16 +296,16 @@ int get_bridge(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
 {
-	log_trace("Local edge 1: %d", emap1->lc_e);
-	log_trace("Global edge starts from: %d, ends at: %d",
-			emap1->gpos.start, emap1->gpos.end);
-	log_trace("Local edge starts from: %d, ends at: %d",
-			emap1->lpos.start, emap1->lpos.end);
-	log_trace("Local edge 2: %d", emap2->lc_e);
-	log_trace("Global edge starts from: %d, ends at: %d",
-			emap2->gpos.start, emap2->gpos.end);
-	log_trace("Local edge starts from: %d, ends at: %d",
-			emap2->lpos.start, emap2->lpos.end);
+	log_local_trace("Local edge 1: %d", emap1->gl_e, emap2->gl_e, emap1->lc_e);
+	log_local_trace("Global edge starts from: %d, ends at: %d", emap1->gl_e,
+			emap2->gl_e, emap1->gpos.start, emap1->gpos.end);
+	log_local_trace("Local edge starts from: %d, ends at: %d", emap1->gl_e,
+			emap2->gl_e, emap1->lpos.start, emap1->lpos.end);
+	log_local_trace("Local edge 2: %d", emap1->gl_e, emap2->gl_e, emap2->lc_e);
+	log_local_trace("Global edge starts from: %d, ends at: %d", emap1->gl_e,
+			emap2->gl_e, emap2->gpos.start, emap2->gpos.end);
+	log_local_trace("Local edge starts from: %d, ends at: %d", emap1->gl_e,
+			emap2->gl_e, emap2->lpos.start, emap2->lpos.end);
 }
 
 void join_complex_path(struct asm_edge_t e1, struct asm_edge_t e2,
@@ -460,8 +462,9 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t local_read_path;
 	int ret = get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
 	if (!ret){
-		log_warn("Something supicious happens, probably that read files are empty, please check at %s and %s",
-				local_read_path.R1_path, local_read_path.R2_path);
+		log_local_warn("Something supicious happens, probably that read files are empty, please check at %s and %s",
+				emap1->gl_e, emap2->gl_e, local_read_path.R1_path,
+				local_read_path.R2_path);
 		goto ignore_stage_1;
 	}
 
@@ -481,7 +484,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
 	// 		 STAGE 3 finding paths 			//
-	log_info("Start finding paths");
+	log_local_info("Start finding paths", emap1->gl_e, emap2->gl_e);
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
 	khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
@@ -492,7 +495,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	if (pinfo.n_paths == 0)
 		goto ignore_stage_2;
-	log_debug("Found %d paths, finding the best one", pinfo.n_paths);
+	log_local_debug("Found %d paths, finding the best one", emap1->gl_e, emap2->gl_e,
+			pinfo.n_paths);
 	float *scores;
 	float *error;
 	get_path_scores(opt, &local_read_path, g, lg, &pinfo, e1, e2, &scores,
@@ -511,8 +515,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 			best_score = scores[i] - min_score + max_err - error[i];
 		}
 	}
-	log_debug("Found best path id: %d, scores: %.3f\n",
-			best_path, best_score);
+	log_local_debug("Found best path id: %d, scores: %.3f\n", emap1->gl_e,
+			emap2->gl_e, best_path, best_score);
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
@@ -646,7 +650,7 @@ void join_bridge_by_path(struct asm_edge_t e1, struct asm_edge_t e2,
 	char *head_seq, *tail_seq;
 	int lc_e1 = path[0];
 	int lc_e2 = path[path_len - 1];
-	log_debug("Joining from %d to %d", lc_e1, lc_e2);
+	log_local_debug("Joining from %d to %d", emap1->gl_e, emap2->gl_e, lc_e1, lc_e2);
 	sync_global_local_edge(e1, lg.edges[lc_e1], gpos1, lpos1,
 			SYNC_KEEP_GLOBAL, &head_seq);
 	sync_global_local_edge(e2, lg.edges[lc_e2], gpos2, lpos2,
@@ -724,8 +728,9 @@ void join_bridge_dump(struct asm_edge_t e1, struct asm_edge_t e2,
 void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2)
 {
-	log_info("Filter by coverage");
-	log_debug("Before filter: %ld edges\n", lg->n_e);
+	log_local_info("Filter by coverage", emap1->gl_e, emap2->gl_e);
+	log_local_debug("Before filter: %ld edges\n", emap1->gl_e, emap2->gl_e,
+			lg->n_e);
 	int thresh = (int) (MIN_DEPTH_RATIO *
 			min(__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize),
 			__get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)));
@@ -740,7 +745,8 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_debug("Condensed graph degenerated, aborting filtering!\n");
+		log_local_debug("Condensed graph degenerated, aborting filtering!\n",
+				emap1->gl_e, emap2->gl_e);
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -748,7 +754,8 @@ void cov_filter(struct asm_graph_t *g, struct asm_graph_t *lg,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		log_debug("After filter: %d edges\n", lg1.n_e);
+		log_local_debug("After filter: %d edges\n", emap1->gl_e, emap2->gl_e,
+				lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -759,8 +766,8 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2)
 {
-	log_info("Filter by connections");
-	log_debug("Before filter: %d edges", lg->n_e);
+	log_local_info("Filter by connections", emap1->gl_e, emap2->gl_e);
+	log_local_debug("Before filter: %d edges", emap1->gl_e, emap2->gl_e, lg->n_e);
 	int *forward_len, *backward_len;
 	struct graph_info_t ginfo;
 	graph_info_init(lg, &ginfo, emap1->lc_e, emap2->lc_e);
@@ -793,7 +800,8 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	asm_clone_graph(lg, &g_bak, tmp_name);
 	asm_condense(lg, &lg1);
 	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
-		log_debug("Condensed graph degenerated, aborting filtering!");
+		log_local_debug("Condensed graph degenerated, aborting filtering!",
+				emap1->gl_e, emap2->gl_e);
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&lg1);
 		*lg = g_bak;
@@ -801,7 +809,8 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		asm_graph_destroy(lg);
 		asm_graph_destroy(&g_bak);
 		*lg = lg1;
-		log_debug("After filter: %d edges", lg1.n_e);
+		log_local_debug("After filter: %d edges", emap1->gl_e, emap2->gl_e,
+				lg1.n_e);
 		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
 		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
 		print_log_edge_map(emap1, emap2);
@@ -1002,9 +1011,9 @@ void *build_bridge_iterator(void *data)
 			}
 		}
 		if (scaf_id == -1)
-			log_error("Cannot find the index of the bridge in the scaffold path, probably something went wrong");
+			log_local_error("Cannot find the index of the bridge in the scaffold path, probably something went wrong",
+					e1, e2);
 		pthread_mutex_lock(bundle->bridge_process_locks + scaf_id);
-
 		int path_id = bundle->query_record->path_id[process_pos];
 		int *scaffolds = bundle->scaffold_record->paths[path_id];
 		int n_scaff = bundle->scaffold_record->path_lens[path_id];
@@ -1013,7 +1022,7 @@ void *build_bridge_iterator(void *data)
 		int seq_len;
 		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
 			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
-			log_info("Graph is too complex, filling Ns");
+			log_local_info("Graph is too complex, filling Ns", e1, e2);
 			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
 		} else {
 			char graph_bin_path[1024];
@@ -1022,7 +1031,7 @@ void *build_bridge_iterator(void *data)
 					bundle->g->edges[e1].rc_id,
 					e2, bundle->opt->lk);
 			if (access(graph_bin_path, F_OK) == -1){
-				log_info("Local graph not found, filling Ns");
+				log_local_info("Graph is too complex, filling Ns", e1, e2);
 				join_bridge_dump(g->edges[e1], g->edges[e2],
 						&seq);
 			} else {
@@ -1035,8 +1044,8 @@ void *build_bridge_iterator(void *data)
 			}
 		}
 		pthread_mutex_lock(bundle->bridge_lock);
-		log_debug("Local assembly status for edges %d and %d: %s", e1, e2,
-				local_asm_result[local_asm_res]);
+		log_local_debug("Local assembly status for edges %d and %d: %s", e1, e2,
+				e1, e2, local_asm_result[local_asm_res]);
 		bundle->bridges[process_pos] = seq;
 		pthread_mutex_unlock(bundle->bridge_lock);
 
