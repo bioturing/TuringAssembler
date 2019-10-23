@@ -1004,7 +1004,6 @@ void *build_bridge_iterator(void *data)
 		if (scaf_id == -1)
 			log_error("Cannot find the index of the bridge in the scaffold path, probably something went wrong");
 		pthread_mutex_lock(bundle->bridge_process_locks + scaf_id);
-
 		int path_id = bundle->query_record->path_id[process_pos];
 		int *scaffolds = bundle->scaffold_record->paths[path_id];
 		int n_scaff = bundle->scaffold_record->path_lens[path_id];
