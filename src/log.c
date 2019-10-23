@@ -168,9 +168,9 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 		sprintf(file_buf, "%s %-5s %-40s\t%-20s\t%.2f GB\t", buf, level_names[level], src_code,
 			L.stage, (double)ru_maxrss/(1<<20));
 		va_start(args, fmt);
-		vsprintf(file_buf, fmt, args);
+		vsprintf(file_buf + strlen(file_buf), fmt, args);
 		va_end(args);
-		sprintf(file_buf, "\n");
+		sprintf(file_buf + strlen(file_buf), "\n");
 		struct iovec iov;
 		iov.iov_base = file_buf;
 		iov.iov_len = strlen(file_buf);
