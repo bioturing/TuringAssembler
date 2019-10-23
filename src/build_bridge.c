@@ -911,9 +911,10 @@ void build_bridge(struct opt_proc_t *opt)
 	for (int i = 0; i < query_record.n_process; ++i)
 		pthread_mutex_init(bridge_process_locks + i, NULL);
 	//opt->n_threads = 1; /* Edit to 1 thread */
-	struct build_bridge_bundle_t *worker_bundles = calloc(opt->n_threads,
+	int n_threads = 1;
+	struct build_bridge_bundle_t *worker_bundles = calloc(n_threads,
 			sizeof(struct build_bridge_bundle_t));
-	for (int i = 0; i < opt->n_threads; ++i){
+	for (int i = 0; i < n_threads; ++i){
 		worker_bundles[i].opt = opt;
 		worker_bundles[i].g = g0;
 		worker_bundles[i].query_record = &query_record;
@@ -924,11 +925,11 @@ void build_bridge(struct opt_proc_t *opt)
 		worker_bundles[i].bridge_process_locks = bridge_process_locks;
 	}
 	log_info("Building bridges on scaffold");
-	pthread_t *worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-	for (int i = 0; i < opt->n_threads; ++i)
+	pthread_t *worker_threads = calloc(n_threads, sizeof(pthread_t));
+	for (int i = 0; i < n_threads; ++i)
 		pthread_create(worker_threads + i, &attr, build_bridge_iterator,
 				worker_bundles + i);
-	for (int i = 0; i < opt->n_threads; ++i)
+	for (int i = 0; i < n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 	free(query_record.e1);
 	free(query_record.e2);
@@ -993,6 +994,7 @@ void *build_bridge_iterator(void *data)
 
 		int e1 = bundle->query_record->e1[process_pos];
 		int e2 = bundle->query_record->e2[process_pos];
+		log_info("Doing local assembly for %d and %d", e1, e2);
 		int scaf_id = -1;
 		for (int i = 0; i < bundle->query_record->n_process; ++i){
 			if (bundle->query_record->e1[i] == e1 &&
@@ -1028,6 +1030,7 @@ void *build_bridge_iterator(void *data)
 			} else {
 				struct asm_graph_t lg;
 				load_asm_graph(&lg, graph_bin_path);
+				struct opt_proc_t opt = *bundle->opt;
 				local_asm_res = get_bridge(bundle->opt, bundle->g, &lg,
 						e1, e2, scaffolds, n_scaff, &seq,
 						&seq_len);
