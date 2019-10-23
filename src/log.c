@@ -26,6 +26,7 @@
 
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/uio.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ static struct {
 	time_t last_time;
 	unsigned int mem_used;
 	char *stage;
+	int fd;
 } L;
 
 
@@ -110,6 +112,7 @@ void init_logger(int level, const char * file_path)
 	log_set_level(__min(level, LOG_INFO));
 	L.start_time = time(NULL);
 	L.stage = "General";
+	L.fd = fileno(L.fp);
 }
 
 void set_log_stage(char *stage)
@@ -158,16 +161,20 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 	sprintf(src_code, "%s:%d", file, line);
 	/* Log to file . Always log to file*/
 	if (L.fp) {
+		char file_buf[8192];
 		va_list args;
 		char buf[32];
 		buf[strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", lt)] = '\0';
-		fprintf(L.fp, "%s %-5s %-40s\t%-20s\t%.2f GB\t", buf, level_names[level], src_code,
+		sprintf(file_buf, "%s %-5s %-40s\t%-20s\t%.2f GB\t", buf, level_names[level], src_code,
 			L.stage, (double)ru_maxrss/(1<<20));
 		va_start(args, fmt);
-		vfprintf(L.fp, fmt, args);
+		vsprintf(file_buf, fmt, args);
 		va_end(args);
-		fprintf(L.fp, "\n");
-		fflush(L.fp);
+		sprintf(file_buf, "\n");
+		struct iovec iov;
+		iov.iov_base = file_buf;
+		iov.iov_len = strlen(file_buf);
+		writev(L.fd, &iov, 1);
 	}
 
 	if (level < L.level) {
