@@ -788,7 +788,7 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p1[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
+			if ((uint32_t) p1[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
 				add_barcode_scaffold(g, ref.e1, bc);
 			}
 //            if (p1[i].pos < MIN_CONTIG_BARCODE2) {
@@ -802,7 +802,7 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
-			if (p2[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
+			if ((uint32_t) p2[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
 				add_barcode_scaffold(g, ref.e1, bc);
 			}
 //            if (p2[i].pos < MIN_CONTIG_BARCODE2) {
@@ -878,7 +878,7 @@ void *barcode_buffer_iterator(void *data) {
 				__ERROR("\nWrong format file when build barcode scaffold\n");
 
 			barcode = get_barcode(&read1);
-			if (barcode == -1) {
+			if (barcode == (uint64_t) -1) {
 				continue;
 			}
 			if (mapper_algo == FOR_SCAFFOLD)

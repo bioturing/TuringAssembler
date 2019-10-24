@@ -1733,7 +1733,7 @@ int get_reads_kmer_check(struct opt_proc_t *opt, struct asm_graph_t *g,
 	construct_read_index(&read_sorted_path, dict);
 
 	char work_dir[MAX_PATH];
-	sprintf(work_dir, "%s/kmer_check_%ld_%ld", opt->out_dir, e1, e2);
+	sprintf(work_dir, "%s/kmer_check_%d_%d", opt->out_dir, e1, e2);
 	mkdir(work_dir, 0755);
 	const int contig_level = 1;
 	get_shared_reads(&read_sorted_path, local_read_path, dict, g,
@@ -1937,10 +1937,10 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 			buf_len = 0;
 		}
 	}
-	for (i = 0; i < n_e; ++i) {
+	for (i = 0; (uint32_t) i < n_e; ++i) {
 		e = list_e[i];
 		sum_len += (g->edges[e].seq_len - g->ksize);
-		for (k = g->ksize; k < g->edges[e].seq_len; ++k) {
+		for (k = g->ksize; (uint32_t) k < g->edges[e].seq_len; ++k) {
 			buf[buf_len++] = nt4_char[__binseq_get(g->edges[e].seq, k)];
 			if (buf_len == 80) {
 				fprintf(fp, "%s\n", buf);
@@ -2159,7 +2159,7 @@ void reconstruct_path(struct asm_graph_t *g, gint_t *list_e, uint32_t n_e,
 	}
 	sret->len = len;
 	sret->seq = calloc((len + 15) >> 4, sizeof(uint32_t));
-	for (k = 0; k < g->ksize; ++k) {
+	for (k = 0; k < (uint32_t) g->ksize; ++k) {
 		c = __binseq_get(g->edges[list_e[0]].seq, k);
 		__binseq_set(sret->seq, k, c);
 	}
@@ -2261,7 +2261,7 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 		goto resolve_failed;
 	}
 	khash_t(contig_count) *ctg_cnt = kh_init(contig_count);
-	for (i = 0; i < dfs_opt.cnt; ++i) {
+	for (i = 0; (uint32_t) i < dfs_opt.cnt; ++i) {
 		k = kh_put(contig_count, ctg_cnt, i, &hash_ret);
 		kh_value(ctg_cnt, k) = 0;
 	}
@@ -2280,7 +2280,7 @@ int find_best_local_path(struct opt_local_t *opt, struct asm_graph_t *g,
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		} else if (kh_value(ctg_cnt, k) == best_cnt &&
-			dfs_opt.cand_len[kh_key(ctg_cnt, k)] > best_len) {
+			dfs_opt.cand_len[kh_key(ctg_cnt, k)] > (uint32_t) best_len) {
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		}
@@ -2452,7 +2452,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 		goto resolve_failed;
 	}
 	khash_t(contig_count) *ctg_cnt = kh_init(contig_count);
-	for (i = 0; i < dfs_opt.cnt; ++i) {
+	for (i = 0; (uint32_t) i < dfs_opt.cnt; ++i) {
 		k = kh_put(contig_count, ctg_cnt, i, &hash_ret);
 		kh_value(ctg_cnt, k) = 0;
 	}
@@ -2472,7 +2472,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		} else if (kh_value(ctg_cnt, k) == best_cnt &&
-			dfs_opt.cand_len[kh_key(ctg_cnt, k)] > best_len) {
+			dfs_opt.cand_len[kh_key(ctg_cnt, k)] > (uint32_t) best_len) {
 			best_len = dfs_opt.cand_len[kh_key(ctg_cnt, k)];
 			best_cand = kh_key(ctg_cnt, k);
 		}
@@ -2695,7 +2695,7 @@ void resolve_n_m_local(struct opt_proc_t *opt, struct read_path_t *rpath,
 khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc)
 {
 	khash_t(gint) *res = kh_init(gint);
-	for (int i = 0; i < bc->size; ++i) {
+	for (uint32_t i = 0; i < bc->size; ++i) {
 		if (bc->keys[i] != (uint64_t)-1){
 			int ret;
 			kh_put(gint, res, bc->keys[i], &ret);

@@ -109,7 +109,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	khash_t(btable_sig) *big_table = params->big_table;
 
 	struct barcode_hash_t *buck = &rev_e->barcodes_scaf;
-	for (int j = 0; j < buck->size; j++){
+	for (int j = 0; (uint32_t) j < buck->size; j++){
 		if (buck->keys[j] != (uint64_t)(-1)) {
 			uint64_t barcode = buck->keys[j];
 			khint_t k = kh_get(btable_sig, big_table, barcode);
@@ -191,7 +191,7 @@ void *process_build_big_table(void *data)
         if (!is_long_contig(e))
             continue;
 		struct barcode_hash_t *buck = &e->barcodes_scaf;
-		for (int l = 0; l < buck->size; l++){
+		for (int l = 0; (uint32_t) l < buck->size; l++){
 			if (buck->keys[l] != (uint64_t)(-1))
 			{
 				uint64_t barcode = buck->keys[l];
@@ -224,6 +224,7 @@ void *process_build_big_table(void *data)
 			}
 		}
 	} while (1);
+	return NULL;
 }
 
 khash_t(btable_sig) *build_big_table(struct asm_graph_t *g, struct opt_proc_t *opt)

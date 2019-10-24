@@ -115,8 +115,6 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2);
 void print_log_edge_map(struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
-void link_filter(struct opt_proc_t *opt, struct asm_graph_t *g, struct asm_graph_t *lg,
-		struct edge_map_info_t *emap1, struct edge_map_info_t *emap2);
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,
 		int e1, int e2);
 void build_bridge(struct opt_proc_t *opt);
@@ -129,4 +127,7 @@ void get_local_assembly_query(struct scaffold_record_t *scaffolds,
 		struct query_record_t *query);
 void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *scaffolds,
 		char **bridges);
+void condense_check_degenerate(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2);
 #endif

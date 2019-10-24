@@ -32,7 +32,7 @@ khash_t(kmer_int) *get_kmer_hash(char *r1_path, char *r2_path, int ksize)
 
 void count_hash_from_seq(char *seq, int ksize, khash_t(kmer_int) *h)
 {
-	if (strlen(seq) < ksize)
+	if (strlen(seq) < (uint32_t) ksize)
 		return;
 	uint64_t power = 1;
 	for (int i = 0; i < ksize - 1; ++i)
