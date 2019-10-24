@@ -63,6 +63,7 @@ struct opt_proc_t {
 	char *lc;
 	int lk;
 	int log_level;
+	char *local_graphs;
 };
 
 struct read_path_t {

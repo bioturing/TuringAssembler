@@ -844,7 +844,7 @@ void build_bridge(struct opt_proc_t *opt)
 	log_info("Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
-	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
+	//get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
 
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
@@ -969,8 +969,8 @@ void *build_bridge_iterator(void *data)
 		} else {
 			char graph_bin_path[1024];
 			sprintf(graph_bin_path, "%s/local_assembly_%d_%d/graph_k_%d_local_lvl_1.bin",
-					bundle->opt->out_dir,
-					(int) bundle->g->edges[e1].rc_id,
+					bundle->opt->local_graphs,
+					bundle->g->edges[e1].rc_id,
 					e2, bundle->opt->lk);
 			if (access(graph_bin_path, F_OK) == -1){
 				log_local_info("Graph is too complex, filling Ns", e1, e2);
