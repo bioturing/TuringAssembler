@@ -122,6 +122,7 @@ void advance_pos(struct map_contig_t *mct)
 void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 {
 	pos->start = mct->pos;
+	pos->end = mct->pos;
 	int cur_best_match = mct->best_match;
 	while (check_stop(mct) == 0){
 		int tmp = find_match_from_pos(mct);
@@ -135,7 +136,7 @@ void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 	}
 	mct->best_match = cur_best_match;
 
-	int len = mct->local_graph.edges[cur_best_match].seq_len;
+	int len = mct->global_edge.seq_len;
 	while (pos->end - pos->start + WINDOW_SIZE > len)
 		pos->end -= WINDOW_SIZE;
 	pos->end = max(pos->end, pos->start);
