@@ -50,9 +50,9 @@ void test_edge_map(struct edge_map_info_t *emap, struct asm_graph_t *g,
 		struct asm_graph_t *lg)
 {
 	test_edge_in_graph(emap->gl_e, g);
+	test_mapping_range(&(emap->gpos), g->edges + emap->gl_e);
 	if (emap->lc_e != -1){
 		test_edge_in_graph(emap->lc_e, lg);
-		test_mapping_range(&(emap->gpos), g->edges + emap->gl_e);
 		test_mapping_range(&(emap->lpos), lg->edges + emap->lc_e);
 	}
 }

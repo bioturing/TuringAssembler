@@ -45,10 +45,10 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
  * @post-conditions:
  * 	The output - emap must sastisfy all conditions:
  * 		+ emap->gl_e = e_id
+ * 		+ 0 <= emap->gpos.start <= emap->gpos.end < length
  * 		+ emap->lc_e in [-1, lg->n_e)
  * 		+ if emap->lc_e != -1 then:
  * 			0 <= emap->lpos.start <= emap->lpos.end < length
- * 			0 <= emap->gpos.start <= emap->gpos.end < length
  */
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
@@ -107,10 +107,10 @@ end_function:
  * @post-conditions:
  * 	The output - emap must sastisfy all conditions:
  * 		+ emap->gl_e = e_id
+ * 		+ 0 <= emap->gpos.start <= emap->gpos.end < length
  * 		+ emap->lc_e in [-1, lg->n_e)
  * 		+ if emap->lc_e != -1 then:
  * 			0 <= emap->lpos.start <= emap->lpos.end < length
- * 			0 <= emap->gpos.start <= emap->gpos.end < length
  */
 void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
