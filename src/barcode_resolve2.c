@@ -1657,8 +1657,8 @@ int get_reads_build_cov(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
 	struct barcode_hash_t *bc1, *bc2;
-	bc1 = g->edges[e1].barcodes + 2;
-	bc2 = g->edges[e2].barcodes + 2;
+	bc1 = &(g->edges[e1].barcodes_cov);
+	bc2 = &(g->edges[e2].barcodes_cov);
 
 	struct barcode_hash_t *bc_head;
 	struct barcode_hash_t *bc_tail;
@@ -1676,8 +1676,6 @@ int get_reads_build_cov(struct read_path_t *reads, struct read_path_t *rpath,
 		h_tail = barcode_hash_2_khash(bc_tail);
 	else
 		h_tail = kh_init(gint);
-	/*h_head = kh_init(gint);
-	h_tail = kh_init(gint);*/
 
 	khash_t(gint) *include = get_shared_bc(h1, h2);
 	khash_t(gint) *exclude = get_union_bc(h_head, h_tail);
@@ -2090,9 +2088,8 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	int ret_cov = get_reads_build_cov(&read_sorted_path, &read_build_cov,
 			dict, g, e1, e2, work_dir_build_cov);
 	if (!ret_graph || !ret_cov){
-		log_warn("Something supicious happends, probably the read files are empty, please check these files: %s %s %s %s",
-				read_build_graph.R1_path, read_build_graph.R2_path,
-				read_build_cov.R1_path, read_build_cov.R2_path);
+		log_warn("Something supicious happends, probably the read files are empty, please check these files: %s %s",
+				read_build_graph.R1_path, read_build_graph.R2_path);
 	} else {
 		struct asm_graph_t lg, lg1;
 		build_local_assembly_graph(opt->lk, opt->n_threads, opt->mmem, 1,
@@ -2100,14 +2097,14 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 			work_dir_build_graph, &lg, g, e1, e2);
 		save_graph_info(work_dir_build_graph, &lg, "local_lvl_0");
 		build_local_0_1(&lg, &lg1);
-		build_graph_cov(opt, &lg1, opt->lk, work_dir_build_cov,
+		build_local_graph_cov(opt, g, &lg1, e1, e2, work_dir_build_cov,
 				read_build_cov.R1_path, read_build_cov.R2_path);
 		save_graph_info(work_dir_build_graph, &lg1, "local_lvl_1");
 		destroy_read_path(&read_build_graph);
 		asm_graph_destroy(&lg1);
 
 	}
-	post_test(get_local_assembly, opt->lk, work_dir, ret);
+	post_test(get_local_assembly, opt->lk, work_dir_build_graph, ret_graph && ret_cov);
 }
 
 KHASH_INIT(used_pair, struct pair_contig_t, char, 0, __mix_2_64, __cmp_2_64);
