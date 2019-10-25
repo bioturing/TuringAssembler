@@ -152,13 +152,13 @@ void get_match_pos(struct map_contig_t *mct, struct edge_map_info_t *emap)
 	} else {
 		get_global_match_pos(mct, &global);
 		get_local_match_pos(mct, &global, &local);
-	}
-	int ok = check_mapping_range(&global, &mct->global_edge)
-		&& check_mapping_range(&local, mct->local_graph.edges + emap->lc_e);
-	if (!ok){
-		emap->lc_e = -1;
-		global.start = global.end = -1;
-		local.start = local.end = -1;
+		int ok = check_mapping_range(&global, &mct->global_edge)
+			&& check_mapping_range(&local, mct->local_graph.edges + emap->lc_e);
+		if (!ok){
+			emap->lc_e = -1;
+			global.start = global.end = -1;
+			local.start = local.end = -1;
+		}
 	}
 	emap->gpos = global;
 	emap->lpos = local;
