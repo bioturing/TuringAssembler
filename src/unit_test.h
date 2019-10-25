@@ -17,7 +17,7 @@
 
 #define test_number_equal(val, c) do{\
 	if ((val) != (c))\
-		log_error("#val (%d) is different from test constant %d", (val), (c));\
+		log_error("Variable \""#val"\" (%d) is different from test number (%d)", (val), (c));\
 	} while(0)\
 
 int check_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e);
