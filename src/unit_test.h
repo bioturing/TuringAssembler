@@ -15,6 +15,12 @@
 	log_debug("Test passed");\
 	} while(0)\
 
+#define test_number_equal(val, c) do{\
+	if ((val) != (c))\
+		log_error("#val (%d) is different from test constant %d", (val), (c));\
+	} while(0)\
+
+int check_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e);
 void test_scaffolds(struct asm_graph_t *g, int *scaffolds, int n_scaff);
 void test_bridge_result(char *bridge_seq, int seq_len, int bridge_type);
 void test_edge_in_graph(int e, struct asm_graph_t *g);

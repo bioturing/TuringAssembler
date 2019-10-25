@@ -41,8 +41,7 @@ int count_match_kmer(khash_t(kmer_int) *first, khash_t(kmer_int) *second);
 int find_match(struct map_contig_t *mct);
 void map_contig_destroy(struct map_contig_t *mct);
 void advance_pos(struct map_contig_t *mct);
-void get_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
-		struct subseq_pos_t *local);
+void get_match_pos(struct map_contig_t *mct, struct edge_map_info_t *emap);
 void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos);
 void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
 		struct subseq_pos_t *local);
