@@ -607,6 +607,7 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 	}
 	for (int i = 0; i < g->n_e; i++) if (is_short_contig(&g->edges[i]) && mark[i]) {
 		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
+		mark_contig(g, mark, i);
 		append_i_contig(path, i);
 		add_path(scaffold, path);
 		free(path);
