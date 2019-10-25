@@ -275,12 +275,15 @@ static void kmhash_resize(struct kmhash_t *h)
 	if (aux_flag & KM_AUX_POS) {
 		h->pos = realloc(h->pos, h->size * sizeof(struct edge_data_t));
 		memset(h->pos + old_size, 0, (size - old_size) * sizeof(struct edge_data_t));
+		h->kmer_pos = realloc(h->kmer_pos, h->size * sizeof(gint_t));
+		memset(h->kmer_pos + old_size, 0, (size - old_size) * sizeof(gint_t));
 	}
 
 	uint8_t *keys = h->keys;
 	uint8_t *adjs = h->adjs;
 	uint8_t *flag = h->flag;
 	gint_t *idx = h->idx;
+	gint_t *kmer_pos = h->kmer_pos;
 	struct edge_data_t *pos = h->pos;
 
 	for (i = 0; i < old_size; ++i) {
@@ -293,7 +296,8 @@ static void kmhash_resize(struct kmhash_t *h)
 	xt = alloca(word_size);
 	uint8_t a = 0, at;
 	gint_t id = 0, idt;
-	struct edge_data_t p = (struct edge_data_t){NULL, 0}, pt;
+	gint_t kp = 0, kpt;
+	struct edge_data_t p = (struct edge_data_t){NULL, 0, 0}, pt;
 	for (i = 0; i < old_size; ++i) {
 		if (flag[i] == KMFLAG_OLD) {
 			memcpy(x, keys + i * word_size, word_size);
@@ -305,7 +309,8 @@ static void kmhash_resize(struct kmhash_t *h)
 				id = idx[i];
 			if (aux_flag & KM_AUX_POS) {
 				p = pos[i];
-				pos[i] = (struct edge_data_t){(void *)NULL, (gint_t)0};
+				pos[i] = (struct edge_data_t){(void *)NULL, (gint_t)0, (gint_t)0};
+				kp = kmer_pos[i];
 			}
 			flag[i] = KMFLAG_EMPTY;
 			while (1) {
@@ -332,8 +337,10 @@ static void kmhash_resize(struct kmhash_t *h)
 						adjs[j] = a;
 					if (aux_flag & KM_AUX_IDX)
 						idx[j] = id;
-					if (aux_flag & KM_AUX_POS)
+					if (aux_flag & KM_AUX_POS){
 						pos[j] = p;
+						kmer_pos[j] = kp;
+					}
 					break;
 				} else if (flag[j] == KMFLAG_OLD) {
 					flag[j] = KMFLAG_NEW;
@@ -354,6 +361,9 @@ static void kmhash_resize(struct kmhash_t *h)
 						pt = pos[j];
 						pos[j] = p;
 						p = pt;
+						kpt = kmer_pos[j];
+						kmer_pos[j] = kp;
+						kp = kpt;
 					}
 				} else {
 					__ERROR("Resize kmhash failed");
@@ -446,6 +456,35 @@ void kmhash_set_idx_multi(struct kmhash_t *h, const uint8_t *key, gint_t id, pth
 	}
 }
 
+void kmhash_set_pos_multi(struct kmhash_t *h, const uint8_t *key, int kmer_pos, gint_t id,
+		pthread_mutex_t *lock)
+{
+	kmint_t k;
+
+	pthread_mutex_lock(lock);
+	k = internal_kmhash_put_multi(h, key);
+	if (k != KMHASH_END(h)){
+		h->idx[k] = id;
+		h->kmer_pos[k] = kmer_pos;
+	}
+	pthread_mutex_unlock(lock);
+
+	while (k == KMHASH_END(h)) {
+		if (atomic_bool_CAS8(&(h->status), KMHASH_IDLE, KMHASH_BUSY)) {
+			kmhash_resize_multi(h);
+			atomic_val_CAS8(&(h->status), KMHASH_BUSY, KMHASH_IDLE);
+		}
+
+		pthread_mutex_lock(lock);
+		k = internal_kmhash_put_multi(h, key);
+		if (k != KMHASH_END(h)){
+			h->idx[k] = id;
+			h->kmer_pos[k] = kmer_pos;
+		}
+		pthread_mutex_unlock(lock);
+	}
+}
+
 kmint_t kmhash_put(struct kmhash_t *h, const uint8_t *key)
 {
 	// if (h->n_item >= h->upper_bound)
@@ -478,9 +517,12 @@ void kmhash_alloc_aux(struct kmhash_t *h, uint32_t aux_flag)
 		h->aux_flag |= KM_AUX_IDX;
 	}
 	if (aux_flag & KM_AUX_POS) {
-		if (h->aux_flag & KM_AUX_POS)
+		if (h->aux_flag & KM_AUX_POS){
 			free(h->pos);
+			free(h->kmer_pos);
+		}
 		h->pos = calloc(h->size, sizeof(struct edge_data_t));
+		h->kmer_pos = malloc(h->size * sizeof(gint_t));
 		h->aux_flag |= KM_AUX_POS;
 	}
 }
@@ -505,10 +547,13 @@ void kmhash_init(struct kmhash_t *h, kmint_t pre_alloc, int word_size, uint32_t 
 		h->idx = malloc(h->size * sizeof(gint_t));
 	else
 		h->idx = NULL;
-	if (aux_flag & KM_AUX_POS)
+	if (aux_flag & KM_AUX_POS){
 		h->pos = calloc(h->size, sizeof(struct edge_data_t));
-	else
+		h->kmer_pos = calloc(h->size, sizeof(gint_t));
+	} else {
 		h->pos = NULL;
+		h->kmer_pos = NULL;
+	}
 	h->status = KMHASH_IDLE;
 	h->n_worker = n_threads;
 	h->locks = calloc(n_threads, sizeof(pthread_mutex_t));
@@ -523,12 +568,18 @@ void kmhash_destroy(struct kmhash_t *h)
 	free(h->flag);
 	free(h->adjs);
 	free(h->idx);
+	free(h->kmer_pos);
+	if (h->aux_flag & KM_AUX_POS){
+		for (int i = 0; i < (int) h->size; ++i)
+			free(h->pos[i].e);
+	}
 	free(h->pos);
 	h->keys = NULL;
 	h->flag = NULL;
 	h->adjs = NULL;
 	h->idx = NULL;
 	h->pos = NULL;
+	h->kmer_pos = NULL;
 	int i;
 	for (i = 0; i < h->n_worker; ++i)
 		pthread_mutex_destroy(h->locks + i);

@@ -17,6 +17,9 @@
 #define SYNC_KEEP_LOCAL 1
 #define SYNC_MAX_GLOBAL 2
 #define SYNC_MAX_LOCAL 3
+#define COV_FILTER_STRICT_LEN 1000
+#define COV_FILTER_STRICT_THRESH 0.6
+#define COV_FILTER_MEDIUM_THRESH 0.1
 
 void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
 {
@@ -462,6 +465,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//		 STAGE 2 filtering local graph 			//
 	unrelated_filter(opt, g, emap1, emap2, scaffolds, n_scaff, lg);
 	connection_filter(opt, g, lg, emap1, emap2);
+	coverage_filter(opt, g, lg, emap1, emap2);
 
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
@@ -765,6 +769,56 @@ void connection_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	free(forward_len);
 	free(backward_len);
 	post_test(connection_filter, g, lg, emap1, emap2);
+}
+
+void coverage_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
+		struct edge_map_info_t *emap2)
+{
+	log_info("Filter by coverage");
+	log_debug("Before filter: %d edges", lg->n_e);
+
+	float avg_cov = (__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize)
+			+ __get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)) / 2;
+	int *bad = (int *) calloc(lg->n_e, sizeof(int));
+	for (int i = 0; i < lg->n_e; ++i){
+		float ratio = __get_edge_cov(lg->edges + i, lg->ksize) / avg_cov;
+		if (lg->edges[i].seq_len >= COV_FILTER_STRICT_LEN){
+			if (ratio < COV_FILTER_STRICT_THRESH)
+				bad[i] = 1;
+		} else {
+			if (ratio < COV_FILTER_MEDIUM_THRESH)
+				bad[i] = 1;
+		}
+	}
+	bad[emap1->lc_e] = bad[lg->edges[emap1->lc_e].rc_id]
+		= bad[emap2->lc_e] = bad[lg->edges[emap2->lc_e].rc_id] = 0;
+	for (int i = 0; i < lg->n_e; ++i){
+		if (bad[i])
+			asm_remove_edge(lg, i);
+	}
+	free(bad);
+	struct asm_graph_t lg1;
+	struct asm_graph_t g_bak;
+	char tmp_name[1024];
+	sprintf(tmp_name, "%s/tmp_graph_%d_%d.bin", opt->out_dir, emap1->gl_e,
+			emap2->gl_e);
+	asm_clone_graph(lg, &g_bak, tmp_name);
+	asm_condense(lg, &lg1);
+	if (check_degenerate_graph(g, &lg1, emap1->gl_e, emap2->gl_e)){
+		log_debug("Condensed graph degenerated, aborting filtering!");
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&lg1);
+		*lg = g_bak;
+	} else {
+		asm_graph_destroy(lg);
+		asm_graph_destroy(&g_bak);
+		*lg = lg1;
+		log_debug("After filter: %d edges", lg1.n_e);
+		get_local_edge_head(*g, lg1, emap1->gl_e, emap1);
+		get_local_edge_tail(*g, lg1, emap2->gl_e, emap2);
+		print_log_edge_map(emap1, emap2);
+	}
 }
 
 int check_degenerate_graph(struct asm_graph_t *g, struct asm_graph_t *lg,

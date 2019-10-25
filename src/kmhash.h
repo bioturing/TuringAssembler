@@ -42,6 +42,7 @@ struct kmhash_t {
 
 	uint8_t *adjs;
 	gint_t  *idx;
+	gint_t *kmer_pos;
 	struct edge_data_t *pos;
 
 	int word_size;
@@ -68,6 +69,9 @@ void kmhash_put_multi(struct kmhash_t *h, const uint8_t *key, pthread_mutex_t *l
 void kmhash_set_adj_multi(struct kmhash_t *h, const uint8_t *key, int c, pthread_mutex_t *lock);
 
 void kmhash_set_idx_multi(struct kmhash_t *h, const uint8_t *key, gint_t id, pthread_mutex_t *lock);
+
+void kmhash_set_pos_multi(struct kmhash_t *h, const uint8_t *key, int pos, gint_t id,
+		pthread_mutex_t *lock);
 
 void kmhash_destroy(struct kmhash_t *h);
 
