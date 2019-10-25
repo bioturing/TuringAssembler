@@ -1,5 +1,6 @@
-#include "map_contig.h"
 #include <assert.h>
+#include "map_contig.h"
+#include "unit_test.h"
 
 void init_map_contig(struct map_contig_t *mct, struct asm_edge_t global_edge,
 		struct asm_graph_t local_graph)
@@ -122,6 +123,7 @@ void advance_pos(struct map_contig_t *mct)
 void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 {
 	pos->start = mct->pos;
+	pos->end = mct->pos;
 	int cur_best_match = mct->best_match;
 	while (check_stop(mct) == 0){
 		int tmp = find_match_from_pos(mct);
@@ -141,11 +143,25 @@ void get_global_match_pos(struct map_contig_t *mct, struct subseq_pos_t *pos)
 	pos->end = max(pos->end, pos->start);
 }
 
-void get_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,
-		struct subseq_pos_t *local)
+void get_match_pos(struct map_contig_t *mct, struct edge_map_info_t *emap)
 {
-	get_global_match_pos(mct, global);
-	get_local_match_pos(mct, global, local);
+	struct subseq_pos_t global, local;
+	if (emap->lc_e == -1){
+		global.start = global.end = -1;
+		local.start = local.end = -1;
+	} else {
+		get_global_match_pos(mct, &global);
+		get_local_match_pos(mct, &global, &local);
+		int ok = check_mapping_range(&global, &mct->global_edge)
+			&& check_mapping_range(&local, mct->local_graph.edges + emap->lc_e);
+		if (!ok){
+			emap->lc_e = -1;
+			global.start = global.end = -1;
+			local.start = local.end = -1;
+		}
+	}
+	emap->gpos = global;
+	emap->lpos = local;
 }
 
 void get_local_match_pos(struct map_contig_t *mct, struct subseq_pos_t *global,

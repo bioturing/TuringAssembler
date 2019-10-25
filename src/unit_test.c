@@ -4,6 +4,13 @@
 #include "io_utils.h"
 #include "build_bridge.h"
 
+int check_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e)
+{
+	int ok = (0 <= ss_pos->start) && (ss_pos->start <= ss_pos->end)
+		&& (ss_pos->end < (int) e->seq_len);
+	return ok;
+}
+
 void test_scaffolds(struct asm_graph_t *g, int *scaffolds, int n_scaff)
 {
 	for (int i = 0; i < n_scaff; ++i){
@@ -33,8 +40,7 @@ void test_bridge_result(char *bridge_seq, int seq_len, int bridge_type)
 
 void test_mapping_range(struct subseq_pos_t *ss_pos, struct asm_edge_t *e)
 {
-	int ok = (0 <= ss_pos->start) && (ss_pos->start <= ss_pos->end)
-		&& (ss_pos->end < (int) e->seq_len);
+	int ok = check_mapping_range(ss_pos, e);
 	if (!ok)
 		log_error("Edge mapping error");
 }
@@ -54,6 +60,11 @@ void test_edge_map(struct edge_map_info_t *emap, struct asm_graph_t *g,
 		test_edge_in_graph(emap->lc_e, lg);
 		test_mapping_range(&(emap->gpos), g->edges + emap->gl_e);
 		test_mapping_range(&(emap->lpos), lg->edges + emap->lc_e);
+	} else {
+		test_number_equal(emap->gpos.start, -1);
+		test_number_equal(emap->gpos.end, -1);
+		test_number_equal(emap->lpos.start, -1);
+		test_number_equal(emap->lpos.end, -1);
 	}
 }
 
