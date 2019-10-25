@@ -45,46 +45,38 @@ void combine_edges(struct asm_graph_t lg, int *path, int path_len, char **seq)
  * @post-conditions:
  * 	The output - emap must sastisfy all conditions:
  * 		+ emap->gl_e = e_id
- * 		+ 0 <= emap->gpos.start <= emap->gpos.end < length
  * 		+ emap->lc_e in [-1, lg->n_e)
  * 		+ if emap->lc_e != -1 then:
  * 			0 <= emap->lpos.start <= emap->lpos.end < length
+ * 			0 <= emap->gpos.start <= emap->gpos.end < length
+ * 		+ else:
+ * 			gpos.start = gpos.end = lpos.start = lpos.end = -1
  */
 void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
 {
 	pre_test(get_local_edge_head, &g, e_id);
 	emap->gl_e = e_id;
-	int *edge_id = &(emap->lc_e);
-	struct subseq_pos_t *gpos = &(emap->gpos);
-	struct subseq_pos_t *lpos = &(emap->lpos);
 	struct asm_edge_t e = g.edges[e_id];
 	struct map_contig_t mct;
 	init_map_contig(&mct, g.edges[e.rc_id], lg);
-	*edge_id = find_match(&mct);
-	if (*edge_id == -1 || lg.edges[*edge_id].seq_len < WINDOW_SIZE)
-		goto no_local_edge_found;
-	get_match_pos(&mct, gpos, lpos);
-	if (gpos->start > gpos->end || lpos->start > lpos->end)
-		goto no_local_edge_found;
-	*edge_id = lg.edges[*edge_id].rc_id;
+	emap->lc_e = find_match(&mct);
+	get_match_pos(&mct, emap);
+	test_edge_map(emap, &g, &lg);
+	if(emap->lc_e == -1)
+		goto end_function;
+
+	struct subseq_pos_t *gpos = &emap->gpos;
+	struct subseq_pos_t *lpos = &emap->lpos;
+	emap->lc_e = lg.edges[emap->lc_e].rc_id;
 	gpos->start = e.seq_len - gpos->start - WINDOW_SIZE;
 	gpos->end = e.seq_len - gpos->end - WINDOW_SIZE;
 	swap(&gpos->start, &gpos->end, sizeof(khint32_t));
 
-	lpos->start = lg.edges[*edge_id].seq_len - lpos->start - WINDOW_SIZE;
-	lpos->end = lg.edges[*edge_id].seq_len - lpos->end - WINDOW_SIZE;
+	lpos->start = lg.edges[emap->lc_e].seq_len - lpos->start - WINDOW_SIZE;
+	lpos->end = lg.edges[emap->lc_e].seq_len - lpos->end - WINDOW_SIZE;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
-	if (gpos->start > gpos->end || lpos->start > lpos->end)
-		goto no_local_edge_found;
-	if (gpos->start < 0 || (uint32_t) gpos->end >= g.edges[emap->gl_e].seq_len)
-		goto no_local_edge_found;
-	if (lpos->start < 0 || (uint32_t) lpos->end >= lg.edges[emap->lc_e].seq_len)
-		goto no_local_edge_found;
-	goto end_function;
-no_local_edge_found:
-	log_debug("Mapping failed");
-	emap->lc_e = -1;
+
 end_function:
 	map_contig_destroy(&mct);
 	post_test(get_local_edge_head, &g, &lg, e_id, emap);
@@ -107,10 +99,12 @@ end_function:
  * @post-conditions:
  * 	The output - emap must sastisfy all conditions:
  * 		+ emap->gl_e = e_id
- * 		+ 0 <= emap->gpos.start <= emap->gpos.end < length
  * 		+ emap->lc_e in [-1, lg->n_e)
  * 		+ if emap->lc_e != -1 then:
  * 			0 <= emap->lpos.start <= emap->lpos.end < length
+ * 			0 <= emap->gpos.start <= emap->gpos.end < length
+ * 		+ else:
+ * 			gpos.start = gpos.end = lpos.start = lpos.end = -1
  */
 void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 		int e_id, struct edge_map_info_t *emap)
@@ -118,28 +112,15 @@ void get_local_edge_tail(struct asm_graph_t g, struct asm_graph_t lg,
 	pre_test(get_local_edge_tail, &g, e_id);
 	emap->gl_e = e_id;
 	int *edge_id = &(emap->lc_e);
-	struct subseq_pos_t *gpos = &(emap->gpos);
-	struct subseq_pos_t *lpos = &(emap->lpos);
 	struct asm_edge_t e = g.edges[e_id];
 	struct map_contig_t mct;
 	init_map_contig(&mct, e, lg);
-	*edge_id = find_match(&mct);
-	if (*edge_id == -1 || lg.edges[*edge_id].seq_len < WINDOW_SIZE)
-		goto no_local_edge_found;
-	get_match_pos(&mct, gpos, lpos);
-	if (gpos->start > gpos->end || lpos->start > lpos->end)
-		goto no_local_edge_found;
-	if (gpos->start < 0 || (uint32_t) gpos->end >= g.edges[emap->gl_e].seq_len)
-		goto no_local_edge_found;
-	if (lpos->start < 0 || (uint32_t) lpos->end >= lg.edges[emap->lc_e].seq_len)
-		goto no_local_edge_found;
-	goto end_function;
-no_local_edge_found:
-	log_debug("Mapping failed");
-	emap->lc_e = -1;
-end_function:
+	emap->lc_e = find_match(&mct);
+	get_match_pos(&mct, emap);
+	test_edge_map(emap, &g, &lg);
+
 	map_contig_destroy(&mct);
-	post_test(get_local_edge_head, &g, &lg, e_id, emap);
+	post_test(get_local_edge_tail, &g, &lg, e_id, emap);
 }
 
 void sync_global_local_edge(struct asm_edge_t global, struct asm_edge_t local,
