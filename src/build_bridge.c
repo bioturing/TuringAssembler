@@ -863,7 +863,7 @@ void build_bridge(struct opt_proc_t *opt)
 	log_info("Done initializing scaffold paths\n");
 
 	log_info("Getting all local graphs");
-	get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
+	//get_all_local_graphs(opt, g0, &query_record); /* Iteratively build the local assembly graph */
 	log_info("Done getting all local graphs");
 
 	char **bridges = calloc(query_record.n_process, sizeof(char *));
