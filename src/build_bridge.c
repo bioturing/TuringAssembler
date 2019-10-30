@@ -465,7 +465,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//		 STAGE 2 filtering local graph 			//
 	unrelated_filter(opt, g, emap1, emap2, scaffolds, n_scaff, lg);
 	connection_filter(opt, g, lg, emap1, emap2);
-	coverage_filter(opt, g, lg, emap1, emap2);
+	//coverage_filter(opt, g, lg, emap1, emap2);
 
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
@@ -478,36 +478,55 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	get_all_paths_kmer_check(lg, emap1, emap2, &pinfo, KSIZE_CHECK,
 			kmer_count);
 	kh_destroy(kmer_int, kmer_count);
-
+	char cand_path[1024];
+	sprintf(cand_path, "%s/%d_%d_all.fasta", opt->out_dir, e1, e2);
+	FILE *f_all = fopen(cand_path, "w");
+	for (int i = 0; i < pinfo.n_paths; ++i){
+		fprintf(f_all, ">%d\n", i);
+		char *seq;
+		join_bridge_center_by_path(lg, pinfo.paths[i],
+				pinfo.path_lens[i], &seq);
+		fprintf(f_all, "%s\n", seq);
+		free(seq);
+	}
+	fclose(f_all);
 	if (pinfo.n_paths == 0)
 		goto ignore_stage_2;
 	log_local_debug("Found %d paths, finding the best one", emap1->gl_e, emap2->gl_e,
 			pinfo.n_paths);
-	float *scores;
-	float *error;
-	get_path_scores(opt, &local_read_path, g, lg, &pinfo, e1, e2, &scores,
-			&error);
-	float best_score = 0;
+	float min_err = 1e9;
 	int best_path = 0;
-	int min_score = 1e9;
-	int max_err = 0;
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		min_score = min(min_score, scores[i]);
-		max_err = max(max_err, error[i]);
-	}
-	for (int i = 0; i < pinfo.n_paths; ++i){
-		if (scores[i] - min_score + max_err - error[i]  > best_score){
-			best_path = i;
-			best_score = scores[i] - min_score + max_err - error[i];
+		float avg_cov = (__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize)
+				+ __get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)) / 2;
+		float err = 0;
+		int *count = calloc(lg->n_e, sizeof(int));
+		for (int j = 0; j < pinfo.path_lens[i]; ++j)
+			++count[pinfo.paths[i][j]];
+		int sum_len = 0;
+		for (int j = 0; j < lg->n_e; ++j){
+			if (count[j] == 0 && count[lg->edges[j].rc_id] != 0)
+				continue;
+			err += abs(avg_cov * count[j] - __get_edge_cov(lg->edges + j, lg->ksize))
+				* (lg->edges[j].seq_len - lg->ksize + 1);
+			sum_len += lg->edges[j].seq_len - lg->ksize + 1;
 		}
+		err /= sum_len;
+		if (min_err > err){
+			best_path = i;
+			min_err = err;
+		}
+		/*__VERBOSE("%d %f\n", i, err);
+		for (int j = 0; j < pinfo.path_lens[i]; ++j)
+			__VERBOSE("%d ", pinfo.paths[i][j]);
+		__VERBOSE("\n");*/
+		free(count);
 	}
 	log_local_debug("Found best path id: %d, scores: %.3f\n", emap1->gl_e,
-			emap2->gl_e, best_path, best_score);
+			emap2->gl_e, best_path, min_err);
 	*path_len = pinfo.path_lens[best_path];
 	*path = (int *) calloc(*path_len, sizeof(int));
 	memcpy(*path, pinfo.paths[best_path], sizeof(int) * *path_len);
-	free(scores);
-	free(error);
 ignore_stage_2:
 	path_info_destroy(&pinfo);
 	delete_file(local_read_path.R1_path);
