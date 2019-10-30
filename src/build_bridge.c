@@ -497,8 +497,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	float min_err = 1e9;
 	int best_path = 0;
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		float avg_cov = (__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize)
-				+ __get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)) / 2;
+		float unit_cov = get_unit_cov(lg->edges + emap1->lc_e,
+				lg->edges + emap2->lc_e, lg->ksize);
 		float err = 0;
 		int *count = calloc(lg->n_e, sizeof(int));
 		for (int j = 0; j < pinfo.path_lens[i]; ++j)
@@ -507,7 +507,7 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		for (int j = 0; j < lg->n_e; ++j){
 			if (count[j] == 0 && count[lg->edges[j].rc_id] != 0)
 				continue;
-			err += abs(avg_cov * count[j] - __get_edge_cov(lg->edges + j, lg->ksize))
+			err += abs(unit_cov * count[j] - __get_edge_cov(lg->edges + j, lg->ksize))
 				* (lg->edges[j].seq_len - lg->ksize + 1);
 			sum_len += lg->edges[j].seq_len - lg->ksize + 1;
 		}

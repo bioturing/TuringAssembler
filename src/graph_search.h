@@ -82,4 +82,5 @@ void path_info_destroy(struct path_info_t *pinfo);
 
 void get_nearby_edges(struct asm_graph_t *g, int e, struct graph_info_t *ginfo,
 		int radius, int **res, int *n_nb);
+float get_unit_cov(struct asm_edge_t *e1, struct asm_edge_t *e2, int ksize);
 #endif

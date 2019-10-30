@@ -32,21 +32,18 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 	if (ginfo->edge_max_vst != NULL)
 		free(ginfo->edge_max_vst);
 	ginfo->edge_max_vst = (int *) calloc(ginfo->g->n_e, sizeof(int));
-	float cov1 = __get_edge_cov(ginfo->g->edges + ginfo->lc_e1,
-			ginfo->g->ksize);
-	float cov2 = __get_edge_cov(ginfo->g->edges + ginfo->lc_e2,
-			ginfo->g->ksize);
-	float init_cov = (cov1 + cov2) / 2;
+	float unit_cov = get_unit_cov(ginfo->g->edges + ginfo->lc_e1,
+			ginfo->g->edges + ginfo->lc_e2, ginfo->g->ksize);
 	for (int i = 0; i < ginfo->g->n_e; ++i){
 		if (ginfo->g->edges[i].seq_len >= MIN_RELIABLE_COV_LEN){
 			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
-			ginfo->edge_max_vst[i] = (int) (cov / init_cov + 0.5) + 1;
+			ginfo->edge_max_vst[i] = (int) (cov / unit_cov + 0.5) + 1;
 			//ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
 			//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
 			//ginfo->edge_max_vst[i] = 1;
 		} else {
 			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
-			ginfo->edge_max_vst[i] = (int) (cov / init_cov + 0.5) + 1;
+			ginfo->edge_max_vst[i] = (int) (cov / unit_cov + 0.5) + 1;
 			//ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
 			//ginfo->edge_max_vst[i] = 1e9;
 		}
@@ -572,3 +569,11 @@ void get_nearby_edges(struct asm_graph_t *g, int e, struct graph_info_t *ginfo,
 	*res = (int *) realloc(*res, *n_nb * sizeof(int));
 }
 
+float get_unit_cov(struct asm_edge_t *e1, struct asm_edge_t *e2, int ksize)
+{
+	float cov1 = __get_edge_cov(e1, ksize);
+	float cov2 = __get_edge_cov(e2, ksize);
+	int len1 = e1->seq_len - ksize + 1;
+	int len2 = e2->seq_len - ksize + 1;
+	return (cov1 * len1 + cov2 * len2) / (len1 + len2);
+}
