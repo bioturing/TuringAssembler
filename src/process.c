@@ -179,6 +179,16 @@ void build_bridge_process(struct opt_proc_t *opt)
 	build_bridge(opt);
 }
 
+void resolve_bulges_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	asm_resolve_simple_bulges_ite(opt, &g);
+
+	save_graph_info(opt->out_dir, &g, "level_2");
+	asm_graph_destroy(&g);
+}
+
 void reduce_read_process(struct opt_proc_t *opt)
 {
 	struct read_path_t org_rpath;

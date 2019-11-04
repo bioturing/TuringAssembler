@@ -1469,3 +1469,85 @@ ignore_stage_1:
 	return res;
 }
 
+int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
+		int *visited, int cur_u, int cur_len)
+{
+	if (visited[cur_u])
+		return 0;
+	if (cur_len > 1.2 * len)
+		return 0;
+	if (cur_u == v && cur_len >= 0.8 * len)
+		return 1;
+	visited[cur_u] = 1;
+	for (int i = 0; i < g->nodes[cur_u].deg; ++i){
+		int next_e = g->nodes[cur_u].adj[i];
+		if (next_e == e)
+			continue;
+		int next_v = g->edges[next_e].target;
+		if (find_alternative_path_dfs(g, v, e, len, visited, next_v,
+				cur_len + g->edges[next_e].seq_len - g->ksize))
+			return 1;
+	}
+	visited[cur_u] = 0;
+	return 0;
+}
+
+int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
+{
+	int *visited = calloc(g->n_v, sizeof(int));
+	int res = find_alternative_path_dfs(g, v, e, len, visited, u, g->ksize);
+	free(visited);
+	return res;
+}
+
+int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	int res = 0;
+	for (int i = 0; i < g->n_e; ++i){
+		int e = i;
+		int rc = g->edges[e].rc_id;
+		int u = g->edges[e].source;
+		int v = g->edges[e].target;
+		if (u == -1)
+			continue;
+		if (e > rc)
+			continue;
+		if (g->edges[e].seq_len >= 1000)
+			continue;
+		if (find_alternative_path(g, u, v, e, g->edges[e].seq_len)){
+			log_debug("Simple bulge detected: %d->%d, edge id: %d",
+					u, v, e);
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, rc);
+			++res;
+		}
+	}
+	return res;
+}
+
+/**
+ * @brief: iteratively resolves simple bulges
+ * @param opt: application options
+ * @param g: the graph
+ */
+int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	int ite = 0;
+	int res = 0;
+	do{
+		int resolved = asm_resolve_simple_bulges(opt, g);
+		if (!resolved)
+			break;
+		struct asm_graph_t g1;
+		asm_condense(g, &g1);
+		asm_graph_destroy(g);
+		*g = g1;
+		res += resolved;
+		++ite;
+		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite, resolved);
+	} while(1);
+	log_info("%d simple bulge(s) resolved after %d iterations",
+			res, ite);
+	return res;
+}
+
