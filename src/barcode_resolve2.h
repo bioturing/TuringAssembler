@@ -39,4 +39,5 @@ khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc);
 void khash_2_arr(khash_t(gint) *h, uint64_t **arr, int *n);
 int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, struct result_local_t *sret);
+void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt);
 #endif

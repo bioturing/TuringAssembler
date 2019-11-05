@@ -28,4 +28,5 @@ void build_bridge_process(struct opt_proc_t *opt);
 void resolve_local_process(struct opt_proc_t *opt);
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix);
 void reduce_read_process(struct opt_proc_t *opt);
+void resolve_1_2_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

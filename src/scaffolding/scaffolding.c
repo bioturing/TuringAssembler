@@ -69,7 +69,7 @@ struct list_position{
 	pthread_mutex_t lock_entry ;
 } ;
 
-KHASH_MAP_INIT_INT64(btable_sig, struct list_position*)
+KHASH_MAP_INIT_INT64(btable_sig, struct list_position*);
 
 struct params_build_candidate_edges{
 	struct asm_graph_t *g;

@@ -18,13 +18,6 @@
 #include "utils.h"
 #include "verbose.h"
 
-struct readbc_t {
-	uint64_t barcode;
-	int64_t offset;
-	int len1;
-	int len2;
-};
-
 #define read_sort_get_key(p) ((p).barcode)
 RS_IMPL(read_sort, struct readbc_t, 64, 8, read_sort_get_key);
 
