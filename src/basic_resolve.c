@@ -1470,22 +1470,25 @@ ignore_stage_1:
 }
 
 int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
-		int *visited, int cur_u, int cur_len)
+		int *visited, int *total_visited, int cur_u, int cur_len)
 {
+	if (*total_visited > 100000)
+		return 0;
 	if (visited[cur_u])
 		return 0;
 	if (cur_len > 1.2 * len)
 		return 0;
 	if (cur_u == v && cur_len >= 0.8 * len)
 		return 1;
+	++(*total_visited);
 	visited[cur_u] = 1;
 	for (int i = 0; i < g->nodes[cur_u].deg; ++i){
 		int next_e = g->nodes[cur_u].adj[i];
 		if (next_e == e)
 			continue;
 		int next_v = g->edges[next_e].target;
-		if (find_alternative_path_dfs(g, v, e, len, visited, next_v,
-				cur_len + g->edges[next_e].seq_len - g->ksize))
+		if (find_alternative_path_dfs(g, v, e, len, visited, total_visited,
+				next_v, cur_len + g->edges[next_e].seq_len - g->ksize))
 			return 1;
 	}
 	visited[cur_u] = 0;
@@ -1494,8 +1497,10 @@ int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
 
 int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
 {
+	int total_visited = 0;
 	int *visited = calloc(g->n_v, sizeof(int));
-	int res = find_alternative_path_dfs(g, v, e, len, visited, u, g->ksize);
+	int res = find_alternative_path_dfs(g, v, e, len, visited, &total_visited,
+			u, g->ksize);
 	free(visited);
 	return res;
 }
@@ -1538,13 +1543,13 @@ int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 		int resolved = asm_resolve_simple_bulges(opt, g);
 		if (!resolved)
 			break;
+		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite, resolved);
 		struct asm_graph_t g1;
 		asm_condense(g, &g1);
 		asm_graph_destroy(g);
 		*g = g1;
 		res += resolved;
 		++ite;
-		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite, resolved);
 	} while(1);
 	log_info("%d simple bulge(s) resolved after %d iterations",
 			res, ite);
