@@ -21,6 +21,9 @@
 #define MIN_NOTICE_BRIDGE 4000
 #define MAX_DUMP_EDGE_LEN 200
 #define MIN_COVERAGE_RATIO 0.3
+#define MAX_VISITED 100000
+#define MAX_ALTERNATIVE_LEN_RATIO 1.2
+#define MIN_ALTERNATIVE_LEN_RATIO 0.8
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -1472,13 +1475,13 @@ ignore_stage_1:
 int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
 		int *visited, int *total_visited, int cur_u, int cur_len)
 {
-	if (*total_visited > 100000)
+	if (*total_visited > MAX_VISITED)
 		return 0;
 	if (visited[cur_u])
 		return 0;
-	if (cur_len > 1.2 * len)
+	if (cur_len > MAX_ALTERNATIVE_LEN_RATIO * len)
 		return 0;
-	if (cur_u == v && cur_len >= 0.8 * len)
+	if (cur_u == v && cur_len >= MIN_ALTERNATIVE_LEN_RATIO * len)
 		return 1;
 	++(*total_visited);
 	visited[cur_u] = 1;
