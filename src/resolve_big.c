@@ -104,7 +104,7 @@ int get_new_seq_count(struct asm_edge_t *a, struct asm_edge_t *b, struct asm_edg
 	return value;
 }
 
-void append_barcode_contig(struct barcode_hash_t *bc, khash_t(union_barcode) **uni_bar)
+void append_barcode_contig(struct barcode_hash_t *bc, khash_t(union_barcode) *uni_bar)
 {
 	int count = 0;
 	for (uint32_t i = 0; i < bc->size; i++) {
@@ -113,13 +113,13 @@ void append_barcode_contig(struct barcode_hash_t *bc, khash_t(union_barcode) **u
 		}
 		count++;
 		int ret = 0;
-		kh_put(union_barcode, *uni_bar, bc->keys[i], &ret);
+		kh_put(union_barcode, uni_bar, bc->keys[i], &ret);
 		assert(ret != -1);
 	}
 	assert(count == bc->n_item);
 }
 
-int dfs_partition(struct asm_graph_t *g, int *partition, int x, int index_par, khash_t(union_barcode) **uni_bar)
+int dfs_partition(struct asm_graph_t *g, int *partition, int x, int index_par, khash_t(union_barcode) *uni_bar)
 {
 //	log_warn("dfs from %d", x);
 	if (g->edges[x].seq_len >= CONTIG_PARTITION_LEN)
@@ -159,7 +159,9 @@ void get_pos(khash_t(bcpos) *dict, khash_t(union_barcode) *bc, struct read_index
 		if (!(kh_exist(bc, it))) {
 			continue;
 		}
+
 		gint_t key = kh_value(bc, it);
+		log_warn("key %lld", key);
 		khiter_t k = kh_get(bcpos, dict, key);
 		pos = realloc(pos, (count +1) * sizeof(struct read_index_t));
 		pos[count] = kh_value(dict, k);
@@ -358,7 +360,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 			khash_t(union_barcode) *bc = kh_init(union_barcode);
 			int tmp;
 			khash_t(big_kmer_count) *kmer_count_table = kh_init(big_kmer_count);
-			int n_edges= dfs_partition(g, partition, i, count, &bc);
+			int n_edges= dfs_partition(g, partition, i, count, bc);
 			log_warn("n edges %d", n_edges);
 			if (n_edges > 10)
 				filter_read_build_kmer(ori_read, dict, bc, kmer_count_table, 60, 131, n_threads,
