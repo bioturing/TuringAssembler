@@ -243,9 +243,11 @@ void mini_inc(uint64_t data, int len)
 	}
 }
 
-void mini_print(size_t bx_size)
+void mini_print(size_t bx_size, char *out_dir)
 {
-	FILE *fp = fopen("barcode_frequencies.txt", "w");
+	char count_file[1024];
+	sprintf(count_file, "%s/barcode_frequencies.txt", out_dir);
+	FILE *fp = fopen(count_file, "w");
 	int i, j, c;
 	char bx[bx_size + 1];
 	char nt5[5] = "ACGTN";
@@ -280,9 +282,6 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 
 	void *(*buffer_iterator)(void *) = biot_buffer_iterator_simple;
 	struct producer_bundle_t *producer_bundles = NULL;
-	if (opt->lib_type != LIB_TYPE_BIOT) {
-		__ERROR("Only accept 'bioturing' library, e.g barcode size 18bp, at this stage, Sorry!");
-	}
 	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 		                                   opt->files_1, opt->files_2);
 	buffer_iterator = biot_buffer_iterator_simple;
@@ -314,7 +313,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	mini_print(18);
+	mini_print(18, opt->out_dir);
 	destroy_mini_hash(h_table);
 }
 
