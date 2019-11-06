@@ -28,6 +28,7 @@ SRC =  \
       ../buffer_file_wrapper.c 	\
       ../dqueue.c 					\
       ../fastq_producer.c 				\
+      ../log.c 						\
       ../get_buffer.c 					\
       ../io_utils.c 					\
       ../pthread_barrier.c 				\
