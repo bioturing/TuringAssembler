@@ -679,7 +679,7 @@ gint_t remove_tips(struct asm_graph_t *g)
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize);
 			if (g->nodes[v].deg == 0 && cov < max_cov &&
-				((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right && cov < 30) ||
+				((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right) ||
 				 (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
 				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
 				e_rc = g->edges[e].rc_id;
@@ -1089,8 +1089,8 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			cnt_loop = cnt_collapse = 0;
 
 			cnt_loop = unroll_simple_loop(g0);
-			cnt_collapse = resolve_simple_bubble(g0);
-			cnt_collapse += resolve_align_bubble(g0);
+			//cnt_collapse = resolve_simple_bubble(g0);
+			//cnt_collapse += resolve_align_bubble(g0);
 			cnt_loop += resolve_loop(g0);
 			asm_lazy_condense(g0);
 		} while (cnt_loop + cnt_collapse);
