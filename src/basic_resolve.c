@@ -22,7 +22,8 @@
 #define MAX_DUMP_EDGE_LEN 200
 #define MIN_COVERAGE_RATIO 0.3
 #define MAX_VISITED 100000
-#define MAX_BULGE_LEN 1000
+#define MAX_BULGE_LEN 5001
+#define MIN_BULGE_LEN 1000
 #define MAX_ALTERNATIVE_LEN_RATIO 1.2
 #define MIN_ALTERNATIVE_LEN_RATIO 0.8
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
@@ -1640,7 +1641,7 @@ int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
 }
 
 int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
-		khash_t(int64_alterp) *h, int *map)
+		khash_t(int64_alterp) *h, int *map, int max_bulge_len)
 {
 	int res = 0;
 	for (int i = 0; i < g->n_e; ++i){
@@ -1650,7 +1651,7 @@ int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int v = g->edges[e].target;
 		if (u == -1)
 			continue;
-		if (g->edges[e].seq_len > MAX_BULGE_LEN)
+		if (g->edges[e].seq_len > max_bulge_len)
 			continue;
 		if (e > rc)
 			continue;
@@ -1702,26 +1703,32 @@ int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 	int *map = calloc(g->n_v, sizeof(int));
 	for (int i = 0; i < g->n_v; ++i)
 		map[i] = i;
+
+	int max_bulge_len = MIN_BULGE_LEN;
 	do{
-		int resolved = asm_resolve_simple_bulges(opt, g, h, map);
-		if (!resolved)
-			break;
-		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
-				resolved);
-		struct asm_graph_t g1;
-		int *map_cur_prev;
-		asm_condense_map(g, &g1, &map_cur_prev);
-		int *map_prev_0 = map;
-		map = calloc(g1.n_v, sizeof(int));
-		for (int i = 0; i < g1.n_v; ++i)
-			map[i] = map_prev_0[map_cur_prev[i]];
-		free(map_cur_prev);
-		free(map_prev_0);
-		asm_graph_destroy(g);
-		*g = g1;
-		res += resolved;
-		++ite;
-	} while(1);
+		do{
+			int resolved = asm_resolve_simple_bulges(opt, g, h, map, max_bulge_len);
+			if (!resolved)
+				break;
+			log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
+			          resolved);
+			struct asm_graph_t g1;
+			int *map_cur_prev;
+			asm_condense_map(g, &g1, &map_cur_prev);
+			int *map_prev_0 = map;
+			map = calloc(g1.n_v, sizeof(int));
+			for (int i = 0; i < g1.n_v; ++i)
+				map[i] = map_prev_0[map_cur_prev[i]];
+			free(map_cur_prev);
+			free(map_prev_0);
+			asm_graph_destroy(g);
+			*g = g1;
+			res += resolved;
+			++ite;
+		} while(1);
+		max_bulge_len += 1000;
+	} while(max_bulge_len < MAX_BULGE_LEN);
+
 	free(map);
 	log_info("%d simple bulge(s) resolved after %d iterations",
 			res, ite);

@@ -35,6 +35,6 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g);
 int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
 void destroy_read_path(struct read_path_t *reads);
 int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
-		khash_t(int64_alterp) *h, int *map);
+		khash_t(int64_alterp) *h, int *map, int max_bulge_len);
 int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
 #endif /* __RESOLVE_H__ */
