@@ -1652,7 +1652,7 @@ int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
 			continue;
 		if (g->edges[e].seq_len > MAX_BULGE_LEN)
 			continue;
-		if (e == rc)
+		if (e > rc)
 			continue;
 		int already_checked = 0;
 		int64_t code = get_edge_code(map[u], map[v]);
