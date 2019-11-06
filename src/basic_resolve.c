@@ -21,6 +21,10 @@
 #define MIN_NOTICE_BRIDGE 4000
 #define MAX_DUMP_EDGE_LEN 200
 #define MIN_COVERAGE_RATIO 0.3
+#define MAX_VISITED 100000
+#define MAX_BULGE_LEN 1000
+#define MAX_ALTERNATIVE_LEN_RATIO 1.2
+#define MIN_ALTERNATIVE_LEN_RATIO 0.8
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -282,6 +286,136 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			continue;
 		node_id[u] = n_v++;
 	}
+	struct asm_node_t *nodes = calloc(n_v, sizeof(struct asm_node_t));
+	/* set reverse complement link between nodes */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, x_rc, u_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		u_rc = g0->nodes[u].rc_id;
+		x_rc = node_id[u_rc];
+		assert(x_rc != -1);
+		nodes[x].rc_id = x_rc;
+		nodes[x_rc].rc_id = x;
+		nodes[x].adj = NULL;
+		nodes[x].deg = 0;
+	}
+	n_e = 0;
+	m_e = 0x10000;
+	struct asm_edge_t *edges = calloc(m_e, sizeof(struct asm_edge_t));
+	/* construct new edges */
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t x, y_rc;
+		x = node_id[u];
+		if (x == -1)
+			continue;
+		gint_t c;
+		for (c = 0; c < g0->nodes[u].deg; ++c) {
+			if (n_e + 2 > m_e) {
+				edges = realloc(edges, (m_e << 1) * sizeof(struct asm_edge_t));
+				memset(edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
+				m_e <<= 1;
+			}
+			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
+			if (e == -1)
+				continue;
+			p = n_e; q = n_e + 1;
+			edges[p].rc_id = q;
+			edges[q].rc_id = p;
+			asm_clone_seq(edges + p, g0->edges + e);
+			do {
+				v = g0->edges[e].target;
+				if (node_id[v] == -1) { /* middle node */
+					if (g0->nodes[v].deg != 1) {
+						fprintf(stderr, "Node %ld, deg = %ld\n",
+							v, g0->nodes[v].deg);
+						log_debug("Middle node degree is not equal to 1");
+						assert(0 && "Middle node degree is not equal to 1");
+					}
+					e = g0->nodes[v].adj[0];
+					assert(e != -1);
+					asm_append_seq(edges + p,
+						g0->edges + e, g0->ksize);
+					edges[p].count += g0->edges[e].count;
+				} else {
+					break;
+				}
+			} while (1);
+			edges[p].source = x;
+			edges[p].target = node_id[v];
+			asm_clone_seq_reverse(edges + q, edges + p);
+			v_rc = g0->nodes[v].rc_id;
+			e_rc = g0->edges[e].rc_id;
+			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
+						g0->nodes[v_rc].deg, e_rc);
+			assert(j >= 0);
+			g0->nodes[v_rc].adj[j] = -1;
+			y_rc = node_id[v_rc];
+			edges[q].source = y_rc;
+			edges[q].target = nodes[x].rc_id;
+
+			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
+			nodes[x].adj[nodes[x].deg++] = p;
+			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
+					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
+			n_e += 2;
+		}
+	}
+	free(node_id);
+	edges = realloc(edges, n_e * sizeof(struct asm_edge_t));
+	g->ksize = g0->ksize;
+	g->aux_flag = 0;
+	g->n_v = n_v;
+	g->n_e = n_e;
+	g->nodes = nodes;
+	g->edges = edges;
+}
+
+void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
+{
+	gint_t *node_id;
+	gint_t n_v, n_e, m_e;
+	node_id = malloc(g0->n_v * sizeof(gint_t));
+	memset(node_id, 255, g0->n_v * sizeof(gint_t));
+
+	/* remove unused links */
+	gint_t u;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t c, deg;
+		deg = g0->nodes[u].deg;
+		g0->nodes[u].deg = 0;
+		for (c = 0; c < deg; ++c) {
+			gint_t e_id = g0->nodes[u].adj[c];
+			if (e_id != -1)
+				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
+		}
+		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
+					g0->nodes[u].deg * sizeof(gint_t));
+	}
+	/* nodes on new graph only consist of branching nodes on old graph */
+	n_v = 0;
+	for (u = 0; u < g0->n_v; ++u) {
+		gint_t deg_fw = g0->nodes[u].deg;
+		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
+		/* non-branching node */
+		int is_single_loop = 0;
+		if (deg_fw == 1 && deg_rv == 1){
+			int fw_e = g0->nodes[u].adj[0];
+			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
+			if (fw_e == rv_e)
+				is_single_loop = 1;
+		}
+		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
+				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
+			continue;
+		node_id[u] = n_v++;
+	}
+	*map = calloc(n_v, sizeof(int));
+	for (int i = 0; i < g0->n_v; ++i)
+		if (node_id[i] != -1)
+			(*map)[node_id[i]] = i;
 	struct asm_node_t *nodes = calloc(n_v, sizeof(struct asm_node_t));
 	/* set reverse complement link between nodes */
 	for (u = 0; u < g0->n_v; ++u) {
@@ -1466,6 +1600,139 @@ ignore_stage_1:
 		free(dump_edges);
 	}
 	test_asm_graph(g);
+	return res;
+}
+
+int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
+		int *visited, int *total_visited, int cur_u, int cur_len)
+{
+	if (*total_visited > MAX_VISITED)
+		return 0;
+	if (visited[cur_u])
+		return 0;
+	if (cur_len > MAX_ALTERNATIVE_LEN_RATIO * len)
+		return 0;
+	if (cur_u == v && cur_len >= MIN_ALTERNATIVE_LEN_RATIO * len)
+		return 1;
+	++(*total_visited);
+	visited[cur_u] = 1;
+	for (int i = 0; i < g->nodes[cur_u].deg; ++i){
+		int next_e = g->nodes[cur_u].adj[i];
+		if (next_e == e)
+			continue;
+		int next_v = g->edges[next_e].target;
+		if (find_alternative_path_dfs(g, v, e, len, visited, total_visited,
+				next_v, cur_len + g->edges[next_e].seq_len - g->ksize))
+			return 1;
+	}
+	visited[cur_u] = 0;
+	return 0;
+}
+
+int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
+{
+	int total_visited = 0;
+	int *visited = calloc(g->n_v, sizeof(int));
+	int res = find_alternative_path_dfs(g, v, e, len, visited, &total_visited,
+			u, g->ksize);
+	free(visited);
+	return res;
+}
+
+int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
+		khash_t(int64_alterp) *h, int *map)
+{
+	int res = 0;
+	for (int i = 0; i < g->n_e; ++i){
+		int e = i;
+		int rc = g->edges[e].rc_id;
+		int u = g->edges[e].source;
+		int v = g->edges[e].target;
+		if (u == -1)
+			continue;
+		if (g->edges[e].seq_len > MAX_BULGE_LEN)
+			continue;
+		if (e > rc)
+			continue;
+		int already_checked = 0;
+		int64_t code = get_edge_code(map[u], map[v]);
+		khiter_t it = kh_get(int64_alterp, h, code);
+		if (it == kh_end(h)){
+			int ret;
+			struct alter_path_info_t *alterp = calloc(1,
+					sizeof(struct alter_path_info_t));
+			it = kh_put(int64_alterp, h, code, &ret);
+			kh_val(h, it) = alterp;
+		}
+		struct alter_path_info_t *alterp = kh_val(h, it);
+		for (int j = 0; j < alterp->n; ++j){
+			float minl = MIN_ALTERNATIVE_LEN_RATIO * g->edges[e].seq_len;
+			float maxl = MAX_ALTERNATIVE_LEN_RATIO * g->edges[e].seq_len;
+			if (alterp->lens[j] >= minl && alterp->lens[j] <= maxl){
+				already_checked = 1;
+				break;
+			}
+		}
+		if (already_checked)
+			continue;
+		if (find_alternative_path(g, u, v, e, g->edges[e].seq_len)){
+			log_debug("Simple bulge detected: %d->%d, edge id: %d",
+					u, v, e);
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, rc);
+			++res;
+		} else {
+			alterp->lens = realloc(alterp->lens, (alterp->n + 1) * sizeof(int));
+			alterp->lens[(alterp->n)++] = g->edges[e].seq_len;
+		}
+	}
+	return res;
+}
+
+/**
+ * @brief: iteratively resolves simple bulges
+ * @param opt: application options
+ * @param g: the graph
+ */
+int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	int ite = 0;
+	int res = 0;
+	khash_t(int64_alterp) *h = kh_init(int64_alterp);
+	int *map = calloc(g->n_v, sizeof(int));
+	for (int i = 0; i < g->n_v; ++i)
+		map[i] = i;
+	do{
+		int resolved = asm_resolve_simple_bulges(opt, g, h, map);
+		if (!resolved)
+			break;
+		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
+				resolved);
+		struct asm_graph_t g1;
+		int *map_cur_prev;
+		asm_condense_map(g, &g1, &map_cur_prev);
+		int *map_prev_0 = map;
+		map = calloc(g1.n_v, sizeof(int));
+		for (int i = 0; i < g1.n_v; ++i)
+			map[i] = map_prev_0[map_cur_prev[i]];
+		free(map_cur_prev);
+		free(map_prev_0);
+		asm_graph_destroy(g);
+		*g = g1;
+		res += resolved;
+		++ite;
+	} while(1);
+	free(map);
+	log_info("%d simple bulge(s) resolved after %d iterations",
+			res, ite);
+	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
+		if (!kh_exist(h, it))
+			continue;
+		struct alter_path_info_t *alterp = kh_val(h, it);
+		free(alterp->lens);
+		free(alterp);
+	}
+	kh_destroy(int64_alterp, h);
 	return res;
 }
 

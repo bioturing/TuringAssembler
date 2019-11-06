@@ -446,6 +446,8 @@ int main(int argc, char *argv[])
 		build_bridge_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "local_assembly"))
 		build_opt_process(argc, argv, &build_bridge_process);
+	else if (!strcmp(argv[1], "resolve_bulges"))
+		build_opt_process(argc, argv, &resolve_bulges_process);
 	else if (!strcmp(argv[1], "reduce_reads"))
 		reduce_read_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "resolve_local"))
