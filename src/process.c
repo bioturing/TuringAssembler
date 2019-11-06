@@ -181,6 +181,10 @@ void build_bridge_process(struct opt_proc_t *opt)
 
 void resolve_bulges_process(struct opt_proc_t *opt)
 {
+	char path[1024];
+	sprintf(path, "%s/resolve_bulges.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Resolve bulges");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 	asm_resolve_simple_bulges_ite(opt, &g);
