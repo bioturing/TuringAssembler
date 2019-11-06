@@ -227,6 +227,9 @@ void mini_inc(uint64_t data, int len)
 		int i;
 		for (i = slot + 1; i < h_table->size && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
 			prev = atomic_val_CAS64(h_table->h + i, 0, 1);
+			if (prev == 0) {
+				break;
+			}
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
@@ -257,6 +260,7 @@ void mini_print(size_t bx_size, char *out_dir)
 		if (h_table->h[i] != 0) {
 			j = bx_size;
 			uint64_t ret = h_table->key[i];
+			assert(ret != 0);
 			while (j) {
 				c = ret % 5;
 				bx[--j] = nt5[c];
