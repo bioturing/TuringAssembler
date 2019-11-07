@@ -85,15 +85,15 @@ struct asm_graph_t {
 #define MIN_NOTICE_LEN			100
 #define MIN_CONNECT_SIZE		500
 
-#define TIPS_RATIO_THRES		0.05
-#define TIPS_COV_THRES		        5
+#define TIPS_RATIO_THRES		0.1
+#define TIPS_COV_THRES		        10
 #define TIPS_LEN_THRES			150
 #define MIN_TIPS_LEG			200
 #define TIPS_HARD_THRESHOLD             30
 
-#define CHIMERIC_RATIO_THRES		0.05
+#define CHIMERIC_RATIO_THRES		0.1
 #define CHIMERIC_COV_THRES		100
-#define CHIMERIC_LEN_THRES		100
+#define CHIMERIC_LEN_THRES		200
 
 #define CONTIG_USE_BARCODE		200
 #define CONTIG_LEVEL_0			500
