@@ -108,14 +108,18 @@ int skipline(char *ptr)
 	return count;
 }
 
-int64_t check_data(const void *ptr, int64_t sz, int64_t bc)
+int64_t check_data(const void *ptr, int64_t sz)
 {
+	int64_t last_bc=-1;
 	do {
 		sz -= skipBXZ(ptr);
 		int64_t this_bc;
 		sz -= getBX(ptr, &this_bc);
-		printf("bc: %ld %ld",  this_bc, bc);
-		assert(this_bc == bc);
+		printf("bc: %ld",  this_bc);
+		if (last_bc = -1) {
+			last_bc = this_bc;
+		};
+		assert(this_bc == last_bc);
 		sz -= skipline(ptr );
 		sz -= skipline(ptr );
 		sz -= skipline(ptr );

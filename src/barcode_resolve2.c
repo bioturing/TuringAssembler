@@ -1578,10 +1578,10 @@ void test_sort_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 		}
 		fseek(fi1, pos[i].r1_offset, SEEK_SET);
 		xfread(buf, 1, pos[i].r1_len, fi1);
-		check_data(buf, pos[i].r1_len, shared[i]);
+		check_data(buf, pos[i].r1_len);
 		fseek(fi2, pos[i].r2_offset, SEEK_SET);
 		xfread(buf, 1, pos[i].r2_len, fi2);
-		check_data(buf, pos[i].r2_len, shared[i]);
+		check_data(buf, pos[i].r2_len);
 	}
 	fclose(fi1);
 	fclose(fi2);

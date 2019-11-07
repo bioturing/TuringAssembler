@@ -18,6 +18,6 @@ void bf_close(struct buffered_file_t *bfp);
 
 int64_t bf_read(struct buffered_file_t *bfp, void *ptr, int64_t sz);
 int64_t bf_write(struct buffered_file_t *bfp, const void *ptr, int64_t sz);
-int64_t check_data(const void *ptr, int64_t sz, int64_t bc);
+int64_t check_data(const void *ptr, int64_t sz);
 
 #endif /* __BUFFER_FILE_WRAPPER__ */
