@@ -9,7 +9,6 @@
 #include "io_utils.h"
 #include "khash.h"
 #include "kmer.h"
-#include "sort_read.h"
 #include "radix_sort.h"
 #include "resolve.h"
 #include "time_utils.h"
@@ -26,11 +25,6 @@
 #define MAX_EDGE_COUNT			10000
 
 #define __is_hang_edge(g, set_e, e) (kh_get(gint, set_e, (g)->edges[e].rc_id) == kh_end(set_e))
-
-#define read_index_get_key(p) ((p).r1_offset)
-RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
-
-
 
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {

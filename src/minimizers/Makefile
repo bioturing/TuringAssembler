@@ -1,11 +1,11 @@
-CC = clang
+CC = gcc 
 
-CXX = clang++ 
+CXX = g++ 
 
 CPP = cpp
 
 LIBS = -pthread -O3 -std=c++11 \
-       -Wl -lpthread \
+       -lpthread \
        ../../libs/bzip2/libbz2.a ../../libs/zlib/libz.a \
        ../../libs/bwa/libbwa.a -lm 
 
@@ -35,6 +35,7 @@ SRC =  \
       ../semaphore_wrapper.c 				\
       ../sort_read.c 						\
       ../time_utils.c 					\
+      smart_load.c 					\
       ../utils.c 					\
       ../verbose.c 					\
 
