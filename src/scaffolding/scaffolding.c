@@ -316,12 +316,15 @@ void run_parallel_build_candidate_edges(struct params_build_candidate_edges *par
 void remove_lov_high_cov(struct asm_graph_t *g)
 {
 	float cvr = global_genome_coverage;
+	int64_t total_len = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
-		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize) / cvr;
-		if (edge_cov >= 3 || edge_cov <= 0.25) {
+		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize)/cvr;
+		if (edge_cov <= 0.25) {
 			g->edges[i_e].seq_len = 0;
+			total_len += g->edges[i_e].seq_len;
 		}
 	}
+	log_info("remove %ld bp because have lower than 0.25 cov", total_len);
 }
 
 void deep_kh_destroy(khash_t(btable_sig) *big_table)
