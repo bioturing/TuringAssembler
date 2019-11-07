@@ -20,14 +20,6 @@
 #define NOT_FOR_SCAFF 0x1
 #define FOR_SCAFFOLD 0x2
 
-struct read_index_t {
-	int64_t r1_offset;
-	int64_t r2_offset;
-	int64_t r1_len;
-	int64_t r2_len;
-};
-KHASH_MAP_INIT_INT64(bcpos, struct read_index_t);
-
 struct pair_contig_t {
 	gint_t e1;
 	gint_t e2;
@@ -151,8 +143,6 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 				struct asm_graph_t *g0, gint_t e1, gint_t e2);
 struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 							gint_t e1, gint_t e2);
-void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
-					gint_t e1, gint_t e2, khash_t(bcpos) *dict);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
 

@@ -17,16 +17,13 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "verbose.h"
-
-struct readbc_t {
-	uint64_t barcode;
-	int64_t offset;
-	int len1;
-	int len2;
-};
+#include "khash.h"
 
 #define read_sort_get_key(p) ((p).barcode)
 RS_IMPL(read_sort, struct readbc_t, 64, 8, read_sort_get_key);
+
+#define read_index_get_key(p) ((p).r1_offset)
+RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
 struct readsort_bundle_t {
 	struct dqueue_t *q;

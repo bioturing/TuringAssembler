@@ -1,6 +1,8 @@
 #ifndef __BARCODE_RESOLVE2_H__
 #define __BARCODE_RESOLVE2_H__
 #include "assembly_graph.h"
+#include "sort_read.h"
+
 KHASH_SET_INIT_INT64(gint);
 
 struct opt_local_t {
@@ -18,6 +20,9 @@ struct result_local_t {
 	int trim_e1;
 	int trim_e2;
 };
+
+void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
+                        gint_t e1, gint_t e2, khash_t(bcpos) *dict);
 int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			khash_t(bcpos) *dict, struct asm_graph_t *g,
 			gint_t e1, gint_t e2, const char *prefix);
