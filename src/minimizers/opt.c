@@ -106,6 +106,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-fg")) {
 			opt->in_fastg = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-bx")) {
+			opt->bx_str = argv[pos + 1];
+			pos += 2;
 		} else if (!strcmp(argv[pos], "-cf")) {
 			opt->in_contig_file = argv[pos + 1];
 			pos += 2;

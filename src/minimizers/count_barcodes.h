@@ -6,5 +6,6 @@
 #define SKIPPING_COUNT_BARCODES_H
 
 
+void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path);
 
 #endif //SKIPPING_COUNT_BARCODES_H
