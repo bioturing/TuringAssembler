@@ -89,6 +89,7 @@ struct asm_graph_t {
 #define TIPS_COV_THRES		        5
 #define TIPS_LEN_THRES			150
 #define MIN_TIPS_LEG			200
+#define TIPS_HARD_THRESHOLD             30
 
 #define CHIMERIC_RATIO_THRES		0.05
 #define CHIMERIC_COV_THRES		100
