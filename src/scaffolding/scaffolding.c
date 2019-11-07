@@ -605,13 +605,20 @@ void find_scaffolds(struct asm_graph_t *g,struct opt_proc_t *opt, struct edges_s
 		add_path(scaffold, path);
 		free(path);
 	}
-	for (int i = 0; i < g->n_e; i++) if (is_short_contig(&g->edges[i]) && mark[i]) {
-		struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
-		mark_contig(g, mark, i);
-		append_i_contig(path, i);
-		add_path(scaffold, path);
-		free(path);
+	int64_t total_very_short = 0;
+	for (int i = 0; i < g->n_e; i++) {
+		if (is_short_contig(&g->edges[i]) && mark[i]) {
+			struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
+			mark_contig(g, mark, i);
+			append_i_contig(path, i);
+			add_path(scaffold, path);
+			free(path);
+		} else if (is_very_short_contig(&g->edges[i])) {
+			int len = g->edges[i].seq_len;
+			total_very_short += len;
+		}
 	}
+	log_info("contig shorter than %d have total length: %d", global_thres_short_len, total_very_short);
 	free(mark);
 	free(thres_score);
 	log_info("----- Find scaffold done ------");
