@@ -160,18 +160,30 @@ void get_dominated_vertices(struct virtual_graph_t *vg, int v,
 }
 
 void add_vertex_to_B_dfs(struct virtual_graph_t *vg, int v, struct virtual_graph_t *B,
-		int *in_queue, struct fixed_size_queue_t *interested)
+		int *in_queue, struct fixed_size_queue_t *interested, int depth)
 {
-	if (!in_queue[v]){
+	int int_vertex = 0;
+	if (depth == 0){
+		for (int i = 0; i < vg->vertices[v].deg_out; ++i){
+			int u = vg->vertices[v].child[i];
+			if (B->f[u] != -1)
+				int_vertex = 1;
+		}
+	} else {
+		int_vertex = 1;
+	}
+	if (int_vertex && !in_queue[v]){
 		in_queue[v] = 1;
 		push_queue(interested, v);
+		__VERBOSE("queue in %d\n", v);
 	}
 	if (B->f[v] != -1)
 		return;
 	B->f[v] = v;
-	for (int i = 0; i < vg->vertices[i].deg_in; ++i){
+	__VERBOSE("add %d\n", v);
+	for (int i = 0; i < vg->vertices[v].deg_in; ++i){
 		int p = vg->vertices[v].parent[i];
-		add_vertex_to_B_dfs(vg, p, B, in_queue, interested);
+		add_vertex_to_B_dfs(vg, p, B, in_queue, interested, depth + 1);
 	}
 }
 
@@ -185,11 +197,14 @@ int get_closure(struct virtual_graph_t *vg, int s, struct virtual_graph_t *B)
 	for (int i = 0; i < vg->n_v; ++i){
 		if (B->f[i] == -1)
 			continue;
+		//__VERBOSE("%d %d\n", i, vg->vertices[i].deg_out);
 		for (int j = 0; j < vg->vertices[i].deg_out; ++j){
 			int v = vg->vertices[i].child[j];
+			//__VERBOSE("%d %d\n", i, v);
 			if (B->f[v] != -1){
 				in_queue[i] = 1;
 				push_queue(&interested, i);
+				__VERBOSE("queue in %d\n", i);
 				break;
 			}
 		}
@@ -201,13 +216,14 @@ int get_closure(struct virtual_graph_t *vg, int s, struct virtual_graph_t *B)
 	while (is_queue_empty(&interested) == 0){
 		int v = get_queue(&interested);
 		pop_queue(&interested);
+		__VERBOSE("queue out %d\n", v);
 		for (int i = 0; i < vg->vertices[v].deg_out; ++i){
 			int u = vg->vertices[v].child[i];
 			if (dom.f[u] == -1){
 				res = 0;
 				goto end_function;
 			}
-			add_vertex_to_B_dfs(vg, u, B, in_queue, &interested);
+			add_vertex_to_B_dfs(vg, u, B, in_queue, &interested, 0);
 		}
 	}
 	res = 1;
@@ -218,7 +234,7 @@ end_function:
 	return res;
 }
 
-void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+void print_dom_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	struct virtual_graph_t vg;
 	asm_graph_to_virtual(g, &vg);
@@ -226,19 +242,13 @@ void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *
 	struct virtual_graph_t dom;
 	int v = opt->lk;
 	get_dominated_vertices(&vg, v, &dom);
-	int *mark = calloc(g->n_v, sizeof(int));
-	for (int i = 0; i < dom.n_v; ++i){
-		if (dom.f[i] != -1){
-			mark[i] = 1;
-		}
-	}
 	int *keep = calloc(g->n_e, sizeof(int));
 	for (int i = 0; i < g->n_e; ++i){
 		int u = g->edges[i].source;
 		int v = g->edges[i].target;
 		if (u == -1)
 			continue;
-		if (mark[u] && mark[v])
+		if (dom.f[u] != -1 && dom.f[v] != -1)
 			keep[i] = keep[g->edges[i].rc_id] = 1;
 	}
 	for (int i = 0; i < g->n_e; ++i){
@@ -251,7 +261,53 @@ void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *
 		}
 	}
 	free(keep);
-	free(mark);
 	virtual_graph_destroy(&dom);
+	virtual_graph_destroy(&vg);
+}
+
+void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	struct virtual_graph_t vg;
+	asm_graph_to_virtual(g, &vg);
+	struct virtual_graph_t B;
+	clone_virtual_graph(&vg, &B);
+	for (int i = 0; i < B.n_v; ++i)
+		B.f[i] = -1;
+
+	FILE *f = fopen(opt->in_fasta, "r");
+	int n;
+	fscanf(f, "%d\n", &n);
+	for (int i = 0; i < n; ++i){
+		int v;
+		fscanf(f, "%d", &v);
+		B.f[v] = v;
+	}
+	fclose(f);
+
+	int s = opt->lk;
+	get_closure(&vg, s, &B);
+	for (int i = 0; i < B.n_v; ++i)
+		if (B.f[i] != -1)
+			__VERBOSE("%d ", i);
+	int *keep = calloc(g->n_e, sizeof(int));
+	for (int i = 0; i < g->n_e; ++i){
+		int u = g->edges[i].source;
+		int v = g->edges[i].target;
+		if (u == -1)
+			continue;
+		if (B.f[u] != -1 && B.f[v] != -1)
+			keep[i] = keep[g->edges[i].rc_id] = 1;
+	}
+	for (int i = 0; i < g->n_e; ++i){
+		int rc = g->edges[i].rc_id;
+		if (i > rc)
+			continue;
+		if (!keep[i]){
+			asm_remove_edge(g, i);
+			asm_remove_edge(g, rc);
+		}
+	}
+	free(keep);
+	virtual_graph_destroy(&B);
 	virtual_graph_destroy(&vg);
 }
