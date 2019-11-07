@@ -638,8 +638,6 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file,
 			__ERROR("[large merge] Corrupted temporary files");
 		bf_write(&fo1, buf, reads[idx].len1);
 		bf_write(&fo2, buf + reads[idx].len1, reads[idx].len2);
-		offset_R1 += reads[idx].len1;
-		offset_R2 += reads[idx].len2;
 		if (cur_bc != pbarcode && pbarcode != (uint64_t)-1) {
 			pack_int64((uint8_t *)tmp_buf, pbarcode);
 			pack_int64((uint8_t *)tmp_buf + 8, poffset_R1);
@@ -650,6 +648,8 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file,
 			poffset_R1 = offset_R1;
 			poffset_R2 = offset_R2;
 		}
+		offset_R1 += reads[idx].len1;
+		offset_R2 += reads[idx].len2;
 		pbarcode = cur_bc;
 		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}

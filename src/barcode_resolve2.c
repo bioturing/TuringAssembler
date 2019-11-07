@@ -1553,6 +1553,42 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
+void test_same_barcode(struct read_path_t *ref, khash_t(bcpos) *dict,
+					   uint64_t *shared, int n_shared)
+{
+	struct read_index_t *pos;
+	pos = malloc(n_shared * sizeof(struct read_index_t));
+	int i;
+	khiter_t k;
+	for (i = 0; i < n_shared; ++i) {
+		k = kh_get(bcpos, dict, shared[i]);
+		pos[i] = kh_value(dict, k);
+	}
+	rs_sort(read_index, pos, pos + n_shared);
+	FILE *fi1 = xfopen(ref->R1_path, "rb");
+	FILE *fi2 = xfopen(ref->R2_path, "rb");
+	int64_t m_buf, len;
+	m_buf = 0x100;
+	char *buf = malloc(m_buf);
+	for (i = 0; i < n_shared; ++i) {
+		len = __max(pos[i].r1_len, pos[i].r2_len);
+		if (len > m_buf) {
+			m_buf = len;
+			buf = realloc(buf, m_buf);
+		}
+		fseek(fi1, pos[i].r1_offset, SEEK_SET);
+		xfread(buf, 1, pos[i].r1_len, fi1);
+		check_data(buf, pos[i].r1_len);
+		fseek(fi2, pos[i].r2_offset, SEEK_SET);
+		xfread(buf, 1, pos[i].r2_len, fi2);
+		check_data(buf, pos[i].r2_len);
+	}
+	fclose(fi1);
+	fclose(fi2);
+	free(buf);
+	free(pos);
+}
+
 /**
  * @brief: gets reads to build the local assembly graph
  * @param reads: path to the original read files

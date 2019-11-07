@@ -72,6 +72,68 @@ int64_t bf_write(struct buffered_file_t *bfp, const void *ptr, int64_t sz)
 	return sz;
 }
 
+int skipBXZ(char **ptr)
+{
+	int count = 0;
+	while (!((*ptr)[0] =='B' && (*ptr)[1] == 'X')) {
+		(*ptr)++;
+		count++;
+	}
+	(*ptr)+=5;
+	count+=5;
+	return count;
+}
+
+int getBX(char **ptr, int64_t *bc)
+{
+	int64_t res = 0;
+	int count = 0;
+	int64_t t = 1;
+	while ((*ptr)[0] != ' ' && (*ptr)[0] != '\n') {
+//		printf("%c", (*ptr)[0]);
+		res = res*5 + nt4_table[(*ptr)[0]];
+		(*ptr)++;
+		count++;
+		t*=4;
+	}
+//	printf("\n");
+	*bc = res;
+	return count;
+}
+
+int skipline(char **ptr)
+{
+	int count  = 0;
+	while ((*ptr)[0] != '\n') {
+//		printf("%c", (*ptr)[0]);
+		count++;
+		(*ptr)++;
+	}
+//	printf("\n");
+	count++;
+	(*ptr)++;
+	return count;
+}
+
+int64_t check_data(const void *ptr, int64_t sz)
+{
+	int64_t last_bc=-1;
+	do {
+		sz -= skipBXZ(&ptr);
+		int64_t this_bc;
+		sz -= getBX(&ptr, &this_bc);
+		if (last_bc = -1) {
+			last_bc = this_bc;
+		};
+		assert(this_bc == last_bc);
+		sz -= skipline(&ptr );
+		sz -= skipline(&ptr );
+		sz -= skipline(&ptr );
+		sz -= skipline(&ptr );
+	} while (sz);
+}
+
+
 void bf_close(struct buffered_file_t *bfp)
 {
 	if (bfp->mode == BF_WRITE)
