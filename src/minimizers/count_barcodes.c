@@ -120,10 +120,10 @@ void destroy_mini_hash(struct mini_hash_t *h_table)
 
 static struct mini_hash_t *h_table;
 
-uint64_t hash_barcode(char *s)
+uint64_t barcode_hash_mini(char *s)
 {
 	uint64_t ret = 0;
-	for (int i = 0; i < strlen(s); ++i) {
+	for (int i = 0; i < 18; ++i) {
 		ret = ret * 5 + nt4_table[(int)s[i]];
 	}
 	return ret;

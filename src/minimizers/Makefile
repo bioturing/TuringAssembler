@@ -44,10 +44,10 @@ OBJ = $(SRC:.c=.o)
 DEP = $(OBJ:.o=.d)
 
 $(EXEC): $(OBJ)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(EXEC_RELEASE): $(OBJ)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 -include $(DEP)
 
