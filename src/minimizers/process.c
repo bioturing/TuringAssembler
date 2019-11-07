@@ -4,6 +4,8 @@
 
 #include "attribute.h"
 #include "verbose.h"
+#include "smart_load.h"
+#include "count_barcodes.h"
 
 void print_usage(const char *prog)
 {
@@ -11,6 +13,7 @@ void print_usage(const char *prog)
 	__VERBOSE("Usage: %s\n", prog);
 	__VERBOSE("          sort [options] -1 read_1.fq -2 read_2.fq -I index.fq -l ust -o out_dir\n");
 	__VERBOSE("          count_bx [options] -1 read_1_added.fq -2 read_2_added.fq -l bioturing -o out_dir\n");
+	__VERBOSE("          search_bx [options] -1 read_1_added.fq -2 read_2_added.fq -l sorted -I barcode.idx -bx AAAAAA\n");
 }
 
 void sort_read_process(struct opt_proc_t *opt)
@@ -29,6 +32,14 @@ void count_bx_process(struct opt_proc_t *opt)
 	__VERBOSE("Done counting\n");
 }
 
+void search_bx_process(struct opt_proc_t *opt)
+{
+	struct read_path_t read_path;
+	__VERBOSE("Searching reads from a barcode\n");
+	smart_load_barcode(opt);
+	__VERBOSE("Done searching\n");
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -39,6 +50,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &sort_read_process);
 	else if (!strcmp(argv[1], "count_bx"))
 		build_opt_process(argc, argv, &count_bx_process);
+	else if (!strcmp(argv[1], "search_bx"))
+		build_opt_process(argc, argv, &search_bx_process);
 	else
 		return -1;
 	return 0;
