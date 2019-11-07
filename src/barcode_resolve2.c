@@ -1553,8 +1553,8 @@ void filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	free(pos);
 }
 
-void test_sort_read(struct read_path_t *ref, khash_t(bcpos) *dict,
-		uint64_t *shared, int n_shared)
+void test_same_barcode(struct read_path_t *ref, khash_t(bcpos) *dict,
+					   uint64_t *shared, int n_shared)
 {
 	struct read_index_t *pos;
 	pos = malloc(n_shared * sizeof(struct read_index_t));

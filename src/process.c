@@ -424,6 +424,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	/**
 	* Scaffolding
 	*/
+	test_sort_read(&read_sorted_path, &g_resolved);
 	set_log_stage("Scaffolding");
 	char out_name[MAX_PATH];
 	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);

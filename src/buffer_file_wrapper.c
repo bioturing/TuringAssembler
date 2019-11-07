@@ -115,7 +115,7 @@ int64_t check_data(const void *ptr, int64_t sz)
 		sz -= skipBXZ(ptr);
 		int64_t this_bc;
 		sz -= getBX(ptr, &this_bc);
-		printf("bc: %ld",  this_bc);
+//		printf("bc: %ld",  this_bc);
 		if (last_bc = -1) {
 			last_bc = this_bc;
 		};

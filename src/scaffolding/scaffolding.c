@@ -734,6 +734,27 @@ void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 			}
 			break;
 		}
-	test_sort_read(&read_sorted_path, dict,
-				   bc, n_bc);
+	test_same_barcode(&read_sorted_path, dict,
+					  bc, n_bc);
+}
+
+void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
+{
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(read_sorted_path, dict);
+	uint64_t *bc = calloc(5000, sizeof(uint64_t));
+	int n_bc = 0;
+	for (int i = 0; i < g->n_e; i++)
+		if (g->edges[i].barcodes[2].n_item > 3000) {
+			struct barcode_hash_t *buck = &g->edges[i].barcodes[2];
+			for (int l = 0; (uint32_t) l < buck->size; l++) {
+				if (buck->keys[l] != (uint64_t) (-1)) {
+					uint64_t barcode = buck->keys[l];
+					bc[n_bc++] = barcode;
+				}
+			}
+			break;
+		}
+	test_same_barcode(read_sorted_path, dict,
+					  bc, n_bc);
 }
