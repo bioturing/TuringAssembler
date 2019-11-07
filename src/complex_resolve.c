@@ -6,6 +6,38 @@
 
 KHASH_SET_INIT_INT(set_int);
 
+void init_queue(struct fixed_size_queue_t *fq, int size)
+{
+	fq->q = calloc(size, sizeof(int));
+	fq->front = 0;
+	fq->back = 0;
+}
+
+void push_queue(struct fixed_size_queue_t *fq, int v)
+{
+	fq->q[fq->back++] = v;
+}
+
+int get_queue(struct fixed_size_queue_t *fq)
+{
+	return fq->q[fq->front];
+}
+
+void pop_queue(struct fixed_size_queue_t *fq)
+{
+	fq->front++;
+}
+
+int is_queue_empty(struct fixed_size_queue_t *fq)
+{
+	return fq->front >= fq->back;
+}
+
+void destroy_queue(struct fixed_size_queue_t *fq)
+{
+	free(fq->q);
+}
+
 void asm_graph_to_virtual(struct asm_graph_t *g, struct virtual_graph_t *vg)
 {
 	vg->n_v = g->n_v;
@@ -68,97 +100,88 @@ void virtual_graph_destroy(struct virtual_graph_t *vg)
 //	}
 //	free(q);
 //}
-//
-//void get_dominated_vertices(struct virtual_graph_t *vg, int v, int **dom, int *n_dom)
-//{
-//	int *deg_in = calloc(vg->n_v, sizeof(int));
-//	int *is_v_parents = calloc(vg->n_v, sizeof(int));
-//	for (int i = 0; i < vg->n_v; ++i){
-//		for (int j = 0; j < vg->vertices[i].deg; ++j){
-//			int u = vg->vertices[i].adj[j];
-//			++deg_in[u];
-//			if (u == v)
-//				is_v_parents[i] = 1;
-//		}
-//	}
-//
-//	khash_t(set_int) *h = kh_init(set_int);
-//	int ret;
-//	kh_put(set_int, h, v, &ret);
-//	*dom = calloc(vg->n_v, sizeof(int));
-//	*n_dom = 0;
-//	while (kh_size(h) > 0){
-//		int v = -1;
-//		for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
-//			if (kh_exist(h, it)){
-//				v = kh_key(h, it);
-//				kh_del(set_int, h, it);
-//				break;
-//			}
-//		}
-//		if (v == -1)
-//			log_error("Something went wrong");
-//		(*dom)[(*n_dom)++] = v;
-//		for (int i = 0; i < vg->vertices[v].deg; ++i){
-//			int u = vg->vertices[v].adj[i];
-//			--deg_in[u];
-//			if (deg_in[u] == 0 && is_v_parents[u] == 0)
-//				kh_put(set_int, h, u, &ret);
-//		}
-//	}
-//	*dom = realloc(*dom, *n_dom * sizeof(int));
-//	kh_destroy(set_int, h);
-//	free(is_v_parents);
-//	free(deg_in);
-//}
-//
+
+void get_dominated_vertices(struct virtual_graph_t *vg, int v, int **dom, int *n_dom)
+{
+	int *deg_in = calloc(vg->n_v, sizeof(int));
+	for (int i = 0; i < vg->n_v; ++i)
+		deg_in[i] = vg->vertices[i].deg_in;
+
+	int *is_v_parents = calloc(vg->n_v, sizeof(int));
+	for (int i = 0; i < vg->vertices[v].deg_in; ++i){
+		int p = vg->vertices[v].parent[i];
+		is_v_parents[p] = 1;
+	}
+
+	struct fixed_size_queue_t *queue = calloc(1, sizeof(struct fixed_size_queue_t));
+	init_queue(queue, vg->n_v);
+	push_queue(queue, v);
+	*dom = calloc(vg->n_v, sizeof(int));
+	*n_dom = 0;
+	while (is_queue_empty(queue) == 0){
+		int v = get_queue(queue);
+		pop_queue(queue);
+		(*dom)[(*n_dom)++] = v;
+		for (int i = 0; i < vg->vertices[v].deg_out; ++i){
+			int u = vg->vertices[v].children[i];
+			--deg_in[u];
+			if (deg_in[u] == 0 && is_v_parents[u] == 0)
+				push_queue(queue, u);
+		}
+	}
+	*dom = realloc(*dom, *n_dom * sizeof(int));
+	destroy_queue(queue);
+	free(is_v_parents);
+	free(deg_in);
+} //
 //void get_closure(struct asm_graph_t *g, int *B_cand, int n_cand, int **B, int *n_B)
 //{
 //}
-//
-//void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
-//{
-//	struct virtual_graph_t vg;
-//	asm_graph_to_virtual(g, &vg);
-//	int *dom;
-//	int n_dom;
-//	int v = opt->lk;
-//	get_dominated_vertices(&vg, v, &dom, &n_dom);
-//	/*for (int i = 0; i < n_dom; ++i)
-//		__VERBOSE("%d ", dom[i]);
-//	__VERBOSE("\n");*/
-//	int *mark = calloc(g->n_v, sizeof(int));
-//	for (int i = 0; i < n_dom; ++i){
-//		/*__VERBOSE("node %d deg %d\n", dom[i], g->nodes[dom[i]].deg);
-//		for (int j = 0; j < g->nodes[dom[i]].deg; ++j)
-//			__VERBOSE("%d->%d\n", g->nodes[dom[i]].adj[j],
-//					g->edges[g->nodes[dom[i]].adj[j]].target);*/
-//		mark[dom[i]] = 1;
-//	}
-//	/*__VERBOSE("\n%d\n", g->edges[266711].target);
-//	for (int i = 0; i < g->nodes[v].deg; ++i){
-//		__VERBOSE("%d ", g->nodes[v].adj[i]);
-//	}
-//	__VERBOSE("\n");*/
-//	int *keep = calloc(g->n_e, sizeof(int));
-//	for (int i = 0; i < g->n_e; ++i){
-//		int u = g->edges[i].source;
-//		int v = g->edges[i].target;
-//		if (u == -1)
-//			continue;
-//		if (mark[u] && mark[v])
-//			keep[i] = keep[g->edges[i].rc_id] = 1;
-//	}
-//	for (int i = 0; i < g->n_e; ++i){
-//		int rc = g->edges[i].rc_id;
-//		if (i > rc)
-//			continue;
-//		if (!keep[i]){
-//			asm_remove_edge(g, i);
-//			asm_remove_edge(g, rc);
-//		}
-//	}
-//	free(dom);
-//	free(mark);
-//	free(keep);
-//}
+
+void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	struct virtual_graph_t vg;
+	asm_graph_to_virtual(g, &vg);
+	int *dom;
+	int n_dom;
+	int v = opt->lk;
+	get_dominated_vertices(&vg, v, &dom, &n_dom);
+	//for (int i = 0; i < n_dom; ++i)
+	//	__VERBOSE("%d ", dom[i]);
+	//__VERBOSE("\n");
+	int *mark = calloc(g->n_v, sizeof(int));
+	for (int i = 0; i < n_dom; ++i){
+		//__VERBOSE("node %d deg %d\n", dom[i], g->nodes[dom[i]].deg);
+		//for (int j = 0; j < g->nodes[dom[i]].deg; ++j)
+		//	__VERBOSE("%d->%d\n", g->nodes[dom[i]].adj[j],
+		//			g->edges[g->nodes[dom[i]].adj[j]].target);
+		mark[dom[i]] = 1;
+	}
+	//__VERBOSE("\n%d\n", g->edges[266711].target);
+	//for (int i = 0; i < g->nodes[v].deg; ++i){
+	//	__VERBOSE("%d ", g->nodes[v].adj[i]);
+	//}
+	//__VERBOSE("\n");
+	int *keep = calloc(g->n_e, sizeof(int));
+	for (int i = 0; i < g->n_e; ++i){
+		int u = g->edges[i].source;
+		int v = g->edges[i].target;
+		if (u == -1)
+			continue;
+		if (mark[u] && mark[v])
+			keep[i] = keep[g->edges[i].rc_id] = 1;
+	}
+	for (int i = 0; i < g->n_e; ++i){
+		int rc = g->edges[i].rc_id;
+		if (i > rc)
+			continue;
+		if (!keep[i]){
+			asm_remove_edge(g, i);
+			asm_remove_edge(g, rc);
+		}
+	}
+	free(keep);
+	free(mark);
+	free(dom);
+	virtual_graph_destroy(&vg);
+}
