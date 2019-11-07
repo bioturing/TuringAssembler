@@ -49,6 +49,7 @@ SRC = src/assembly_graph.c 				\
       src/graph_search.c 				\
       src/helper.c 					\
       src/fastg.c 					\
+      src/complex_resolve.c 				\
       src/scaffolding/bin_hash.c 						\
       src/scaffolding/algorithm.c 						\
       src/scaffolding/compare.c 						\

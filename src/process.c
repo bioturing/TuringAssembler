@@ -17,6 +17,7 @@
 #include "fastg.h"
 #include "fastq_reducer.h"
 #include "resolve_big.h"
+#include "complex_resolve.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -178,6 +179,20 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 void build_bridge_process(struct opt_proc_t *opt)
 {
 	build_bridge(opt);
+}
+
+void resolve_complex_bulges_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/resolve_bulges.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Resolve bulges");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	asm_resolve_complex_bulges_ite(opt, &g);
+
+	save_graph_info(opt->out_dir, &g, "level_2");
+	asm_graph_destroy(&g);
 }
 
 void resolve_bulges_process(struct opt_proc_t *opt)

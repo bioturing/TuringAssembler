@@ -30,4 +30,5 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 void reduce_read_process(struct opt_proc_t *opt);
 void resolve_bulges_process(struct opt_proc_t *opt);
 void resolve_1_2_process(struct opt_proc_t *opt);
+void resolve_complex_bulges_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */
