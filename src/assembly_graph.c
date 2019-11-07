@@ -849,8 +849,10 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
 		/* print fake count for correct coverage display on Bandage */
-		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
-			(long long)e_rc, seq, (long long unsigned)fake_count);
+		fprintf(fp, "S\t%lld_%d->%d_%lld_%d->%d\t%s\tKC:i:%llu\n", (long long)e,
+			g->edges[e].source, g->edges[e].target,
+			(long long)e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			seq, (long long unsigned)fake_count);
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1)
@@ -885,9 +887,12 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 				next_pe_rc = next_e_rc;
 				next_ce = '+';
 			}
-			fprintf(fp, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
-				(long long)pe, (long long)pe_rc, ce,
-				(long long)next_pe, (long long)next_pe_rc,
+			fprintf(fp, "L\t%lld_%d->%d_%lld_%d->%d\t%c\t%lld_%d->%d_%lld_%d->%d\t%c\t%dM\n",
+				(long long)pe, g->edges[pe].source, g->edges[pe].target,
+				(long long)pe_rc, g->edges[pe_rc].source, g->edges[pe_rc].target,
+				ce, (long long)next_pe, g->edges[next_pe].source,
+				g->edges[next_pe].target, (long long)next_pe_rc,
+				g->edges[next_pe_rc].source, g->edges[next_pe_rc].target,
 				next_ce, g->ksize);
 		}
 	}

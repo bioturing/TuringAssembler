@@ -34,6 +34,8 @@ void virtual_graph_destroy(struct virtual_graph_t *vg);
 //void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len);
 void get_dominated_vertices(struct virtual_graph_t *vg, int v,
 		struct virtual_graph_t *dom);
-//void get_closure(struct asm_graph_t *g, int *B_cand, int n_cand, int **B, int *n_B);
+int get_closure(struct virtual_graph_t *vg, int s, struct virtual_graph_t *B);
 void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
+void add_vertex_to_B_dfs(struct virtual_graph_t *vg, int v, struct virtual_graph_t *B,
+		int *in_queue, struct fixed_size_queue_t *interested);
 #endif

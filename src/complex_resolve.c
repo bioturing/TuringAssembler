@@ -157,10 +157,66 @@ void get_dominated_vertices(struct virtual_graph_t *vg, int v,
 	free(queue);
 	free(is_v_parents);
 	free(deg_in);
-} //
-//void get_closure(struct asm_graph_t *g, int *B_cand, int n_cand, int **B, int *n_B)
-//{
-//}
+}
+
+void add_vertex_to_B_dfs(struct virtual_graph_t *vg, int v, struct virtual_graph_t *B,
+		int *in_queue, struct fixed_size_queue_t *interested)
+{
+	if (!in_queue[v]){
+		in_queue[v] = 1;
+		push_queue(interested, v);
+	}
+	if (B->f[v] != -1)
+		return;
+	B->f[v] = v;
+	for (int i = 0; i < vg->vertices[i].deg_in; ++i){
+		int p = vg->vertices[v].parent[i];
+		add_vertex_to_B_dfs(vg, p, B, in_queue, interested);
+	}
+}
+
+int get_closure(struct virtual_graph_t *vg, int s, struct virtual_graph_t *B)
+{
+	int res = 0;
+	struct fixed_size_queue_t interested;
+	init_queue(&interested, vg->n_v);
+	
+	int *in_queue = calloc(vg->n_v, sizeof(int));
+	for (int i = 0; i < vg->n_v; ++i){
+		if (B->f[i] == -1)
+			continue;
+		for (int j = 0; j < vg->vertices[i].deg_out; ++j){
+			int v = vg->vertices[i].child[j];
+			if (B->f[v] != -1){
+				in_queue[i] = 1;
+				push_queue(&interested, i);
+				break;
+			}
+		}
+	}
+
+	struct virtual_graph_t dom;
+	get_dominated_vertices(vg, s, &dom);
+
+	while (is_queue_empty(&interested) == 0){
+		int v = get_queue(&interested);
+		pop_queue(&interested);
+		for (int i = 0; i < vg->vertices[v].deg_out; ++i){
+			int u = vg->vertices[v].child[i];
+			if (dom.f[u] == -1){
+				res = 0;
+				goto end_function;
+			}
+			add_vertex_to_B_dfs(vg, u, B, in_queue, &interested);
+		}
+	}
+	res = 1;
+end_function:
+	virtual_graph_destroy(&dom);
+	free(in_queue);
+	destroy_queue(&interested);
+	return res;
+}
 
 void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
@@ -170,23 +226,12 @@ void asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *
 	struct virtual_graph_t dom;
 	int v = opt->lk;
 	get_dominated_vertices(&vg, v, &dom);
-	//for (int i = 0; i < n_dom; ++i)
-	//	__VERBOSE("%d ", dom[i]);
-	//__VERBOSE("\n");
 	int *mark = calloc(g->n_v, sizeof(int));
 	for (int i = 0; i < dom.n_v; ++i){
-		//__VERBOSE("node %d deg %d\n", dom[i], g->nodes[dom[i]].deg);
-		//for (int j = 0; j < g->nodes[dom[i]].deg; ++j)
-		//	__VERBOSE("%d->%d\n", g->nodes[dom[i]].adj[j],
-		//			g->edges[g->nodes[dom[i]].adj[j]].target);
-		if (dom.f[i] != -1)
+		if (dom.f[i] != -1){
 			mark[i] = 1;
+		}
 	}
-	//__VERBOSE("\n%d\n", g->edges[266711].target);
-	//for (int i = 0; i < g->nodes[v].deg; ++i){
-	//	__VERBOSE("%d ", g->nodes[v].adj[i]);
-	//}
-	//__VERBOSE("\n");
 	int *keep = calloc(g->n_e, sizeof(int));
 	for (int i = 0; i < g->n_e; ++i){
 		int u = g->edges[i].source;
