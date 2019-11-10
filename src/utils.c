@@ -160,11 +160,12 @@ int is_exist_stats(const char *path)
 	return 0;
 }
 
-uint32_t *seq2uint32t(char *seq, int l, int *bin_l)
+uint32_t *seq2uint32t(char *seq, int l)
 {
 	uint32_t i, k, m_seq;
-	m_seq = 0x100;
 	uint32_t *bseq;
+	m_seq = 0x100;
+	bseq = calloc(m_seq, sizeof(uint32_t));
 	char c;
 	for (i = k = 0; i < l; ++i) {
 		c = nt4_table[(int)seq[i]];
@@ -178,7 +179,6 @@ uint32_t *seq2uint32t(char *seq, int l, int *bin_l)
 		__binseq_set(bseq, k, c);
 		++k;
 	}
-	bin_l = (l + 15 ) >> 4;
 	return bseq;
 }
 

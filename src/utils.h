@@ -148,7 +148,7 @@ char *num2seq(int64_t num, int len);
 int *binary_search(int *list, int n, int value);
 
 /* string to bin seq */
-uint32_t *seq2uint32t(char *seq, int l, int *bin_l);
+uint32_t *seq2uint32t(char *seq, int l);
 
 /* unique list */
 void unique(int *listV, int *n_v);
