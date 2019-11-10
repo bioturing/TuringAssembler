@@ -15,6 +15,8 @@
 #endif /* _MSC_VER */
 
 #include "utils.h"
+#include "assembly_graph.h"
+#include "string.h"
 
 /* no use of verbse/log/error here, using stderr if necessary */
 
@@ -156,5 +158,27 @@ int is_exist_stats(const char *path)
 		return 1;
 
 	return 0;
+}
+
+uint32_t *seq2uint32t(char *seq, int l, int *bin_l)
+{
+	uint32_t i, k, m_seq;
+	m_seq = 0x100;
+	uint32_t *bseq;
+	char c;
+	for (i = k = 0; i < l; ++i) {
+		c = nt4_table[(int)seq[i]];
+		/* append new char */
+		if (((k + 15) >> 4) >= m_seq) {
+			uint32_t new_m = m_seq << 1;
+			bseq = realloc(bseq, new_m * sizeof(uint32_t));
+			memset(bseq + m_seq, 0, m_seq * sizeof(uint32_t));
+			m_seq = new_m;
+		}
+		__binseq_set(bseq, k, c);
+		++k;
+	}
+	bin_l = (l + 15 ) >> 4;
+	return bseq;
 }
 
