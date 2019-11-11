@@ -48,7 +48,7 @@ void index_mm_process(struct opt_proc_t *opt)
 	__VERBOSE("Index minimizers for an example string\n");
 	uint32_t *s;
 	s = seq2uint32t(opt->bx_str, 16);
-	mm_index_str(s, 5, 4, 16);
+	mm_index_str(s, 3, 4, 16);
 	__VERBOSE("Done indexing\n");
 }
 
