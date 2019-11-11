@@ -3,8 +3,8 @@
 #include "log.h"
 #include "resolve.h"
 #include "verbose.h"
-
-KHASH_SET_INIT_INT(set_int);
+#include "helper.h"
+#include "dqueue.h"
 
 void init_queue(struct fixed_size_q_t *fq, int size)
 {
@@ -109,6 +109,7 @@ void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *
 	bundle->T = calloc(g->n_v, sizeof(int));
 	bundle->g = calloc(g->n_v, sizeof(int));
 	bundle->j = calloc(g->n_v, sizeof(int));
+	bundle->height = calloc(g->n_v, sizeof(int));
 }
 
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s)
@@ -120,6 +121,7 @@ void reset_source(struct resolve_bulges_bundle_t *bundle, int s)
 	memset(bundle->T, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->g, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->j, 0, sizeof(int) * bundle->graph->n_v);
+	memset(bundle->height, 0, sizeof(int) * bundle->graph->n_v);
 }
 
 //void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len)
@@ -333,10 +335,39 @@ end_function:
 //	virtual_graph_destroy(&B);
 //	virtual_graph_destroy(&vg);
 //}
-
-int get_skeleton(struct virtual_graph_t *B, int s, struct virtual_graph_t *S)
+//
+void get_height_dfs(struct resolve_bulges_bundle_t *bundle, int v)
 {
+	struct virtual_graph_t *graph = bundle->graph;
+	int *height = bundle->height;
+	height[v] = 0;
+	for (int i = 0; i < graph->vertices[v].deg_out; ++i){
+		int u = graph->vertices[v].child[i];
+		if (bundle->B[u] == 0)
+			continue;
+		if(height[u] == -1)
+			get_height_dfs(bundle, u);
+		height[v] = max(height[v], height[u] + 1);
+	}
+}
 
+void get_height(struct resolve_bulges_bundle_t *bundle)
+{
+	memset(bundle->height, -1, sizeof(int) * bundle->graph->n_v);
+	get_height_dfs(bundle, bundle->source);
+}
+
+int get_skeleton(struct resolve_bulges_bundle_t *bundle)
+{
+	get_height(bundle);
+	struct virtual_graph_t *graph = bundle->graph;
+	struct dqueue_t *q = init_dqueue(bundle->graph->n_v);
+	for (int i = 0; i < graph->n_v; ++i)
+		if (bundle->height[i] == 0){
+			struct vertex_height_t *pair = calloc(1,
+					sizeof(struct vertex_height_t));
+			d_enqueue_in(q, pair);
+		}
 }
 
 void resolve_bulges(struct asm_graph_t *g)

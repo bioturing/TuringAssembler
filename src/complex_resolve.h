@@ -28,6 +28,11 @@ struct virtual_graph_t {
 	int *exist;
 };
 
+struct vertex_height_t{
+	int v;
+	int height;
+};
+
 struct resolve_bulges_bundle_t{
 	struct virtual_graph_t *graph;
 	int source;
@@ -37,6 +42,7 @@ struct resolve_bulges_bundle_t{
 	int *T;
 	int *g;
 	int *j;
+	int *height;
 };
 
 void asm_graph_to_virtual(struct asm_graph_t *g, struct virtual_graph_t *vg);
@@ -47,7 +53,10 @@ void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 //void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len);
 void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
 int get_closure(struct resolve_bulges_bundle_t *bundle);
-int get_skeleton(struct virtual_graph_t *B, int s, struct virtual_graph_t *S);
+
+void get_height_dfs(struct resolve_bulges_bundle_t *bundle, int v);
+void get_height(struct resolve_bulges_bundle_t *bundle);
+int get_skeleton(struct resolve_bulges_bundle_t *bundle);
 void print_dom_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
 void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
