@@ -119,13 +119,8 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 		buf[len++] = ' ';
 		memcpy(buf + len, "QB:Z:", 5);
 		len += 5;
-		if (input_format == TYPE_FASTQ && rI->qual != NULL) {
-			memcpy(buf + len, rI->qual, rI->len);
-			len += rI->len;
-		} else {
-			for (i = 0; i < rI->len; ++i) {
-				buf[len++] = nt4_table[(int)rI->seq[i]] < 4 ? 'F' : '#';
-			}
+		for (i = 0; i < rI->len; ++i) {
+			buf[len++] = nt4_table[(int)rI->seq[i]] < 4 ? 'F' : '#';
 		}
 	}
 	buf[len++] = '\n';
