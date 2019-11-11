@@ -213,47 +213,57 @@ static inline uint64_t get_km_i(uint32_t *s, int i, int k)
 	return km;
 }
 
+#define HASH64(k) MurmurHash3_x64_64((uint8_t *)&k, sizeof(uint64_t)/sizeof(uint8_t))
+#define DEBUG_PRINT printf
+
 struct mm_db_t * mm_index_str(uint32_t *s, int k, int w, int l)
 {
 	struct mm_db_t *db = mm_db_init();
 	db->k = k;
 
-	int i, j, w_cnt = 0, p = -1;
-	uint64_t km, mm, c, km1, mm1;
+	int i, j, p = -1;
+	uint64_t km, mm, c;
 	uint64_t km_h, mm_h;
 	int pad = (32 - k - 1)*2;
 
-	km_h = MurmurHash3_x64_64((uint8_t *)&km, sizeof(uint64_t)/sizeof(uint8_t));
-	mm_h = km_h;
-	mm = km;
+	mm_h = km_h = HASH64(k);
 	for (i = 0; i < l - w + 1; ++i) {
-		printf("[i = %d]\n", i);
+		DEBUG_PRINT("[i = %d]\n", i);
 		if (i + w + k - 1 >= l)
 			break;
 		if (p < i) {
-			km1 = mm = get_km_i(s, i, k);
+			km = mm = get_km_i(s, i, k);
+			mm_h = km_h = HASH64(mm);
 			p = i;
 			for (j = 0; j < w; ++j) {
 				c = (uint64_t) __binseq_get(s, i + j + k - 1);
-				km1 |= ((uint64_t) c << (pad + 2));
-				if (km1 < mm) {
-					mm = km1;
+				km |= ((uint64_t) c << (pad + 2));
+				km_h = HASH64(km);
+				if (km_h < mm_h) {
+					mm = km;
+					mm_h = km_h;
 					p = i + j;
+					mm_db_insert(db, km);
 				}
-				km1 <<= 2;
+				km <<= 2;
 			}
-			printf("[1]minimizers at window %d: %d\n", i, p);
+			DEBUG_PRINT("[1]minimizers at window %d: %d\n", i, p);
+
 			continue;
 		} else {
 			c = (uint64_t) __binseq_get(s, i + w + k - 2);
-			km1 |= ((uint64_t) c << (pad + 2));
-			if (km1 < mm){
+			km |= ((uint64_t) c << (pad + 2));
+			km_h = HASH64(km);
+			if (km_h < mm_h){
 				p = i + w - 1;
-				mm = km1;
-				printf("[2]minimizers at window %d: %d\n", i, p);
+				mm = km;
+				mm_h = km_h;
+				mm_db_insert(db, km);
+				DEBUG_PRINT("[2]minimizers at window %d: %d\n", i, p);
 			}
-			km1 <<= 2;
+			km <<= 2;
 		}
 	}
-	mm_print(db);
+	//mm_print(db);
+	return db;
 }
