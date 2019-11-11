@@ -16,6 +16,8 @@
 #include "resolve.h"
 
 KSEQ_INIT(gzFile, gzread);
+#define read_index_get_key(p) ((p).r1_offset)
+RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
 __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
 							__mix_2_64, __cmp_2_64);
@@ -567,8 +569,13 @@ void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int re
 	--g->n_e;
 }
 
+void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count)
+{
+	asm_join_edge3(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id, e3, g->edges[e3].rc_id, count);
+}
+
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
+					gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
 {
 	/*    contig 1  | overlap |      | overlap |  contig 3
 	 * ATCTTCGGTTTTTCTTTAAAAAAG      AAACTTTTTTTGGGGGATACCC
@@ -590,7 +597,7 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc3].target = g->edges[e_rc1].target;
 	g->edges[e_rc3].count += g->edges[e_rc1].count + e2_count;
-	
+
 	g->edges[e1].rc_id = e_rc3;
 	g->edges[e_rc3].rc_id = e1;
 
@@ -829,7 +836,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		if (e > e_rc)
 			continue;
 		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < 250)
+		if (cc_size[cc_id] < MIN_COMPONENT)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
@@ -841,7 +848,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		if (g->edges[e].source == -1)
 			continue;
 		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < 250)
+		if (cc_size[cc_id] < MIN_COMPONENT)
 			continue;
 		e_rc = g->edges[e].rc_id;
 		gint_t pe, pe_rc, next_pe, next_pe_rc;

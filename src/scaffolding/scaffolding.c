@@ -71,7 +71,7 @@ struct list_position {
 	pthread_mutex_t lock_entry;
 };
 
-KHASH_MAP_INIT_INT64(btable_sig, struct list_position*)
+KHASH_MAP_INIT_INT64(btable_sig, struct list_position*);
 
 struct params_build_candidate_edges {
 	struct asm_graph_t *g;
@@ -602,14 +602,15 @@ void find_scaffolds(struct asm_graph_t *g, struct opt_proc_t *opt, struct edges_
 	init_mark(g, opt, mark);
 	int count = 0;
 	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
-	for (int i = 0; i < g->n_e; i++) if (mark[i] && is_long_contig(&g->edges[i])){
-		int start_contig = i;
-		log_trace("Start find scaffolds from %d", start_contig);
-		struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig,
-							thres_score, &count);
-		add_path(scaffold, path);
-		free(path);
-	}
+	for (int i = 0; i < g->n_e; i++)
+		if (mark[i] && is_long_contig(&g->edges[i])) {
+			int start_contig = i;
+			log_trace("Start find scaffolds from %d", start_contig);
+			struct scaffold_path *path = find_path(opt, g, edges_score, mark, start_contig,
+												   thres_score, &count);
+			add_path(scaffold, path);
+			free(path);
+		}
 	int64_t total_very_short = 0;
 	for (int i = 0; i < g->n_e; i++) {
 		if (is_short_contig(&g->edges[i]) && mark[i]) {
@@ -733,6 +734,9 @@ void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 				if (buck->keys[l] != (uint64_t) (-1)) {
 					uint64_t barcode = buck->keys[l];
 					bc[n_bc++] = barcode;
+					if (n_bc > 3000){
+						break;
+					}
 				}
 			}
 			break;
@@ -754,6 +758,9 @@ void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
 				if (buck->keys[l] != (uint64_t) (-1)) {
 					uint64_t barcode = buck->keys[l];
 					bc[n_bc++] = barcode;
+					if (n_bc > 3000){
+						break;
+					}
 				}
 			}
 			break;

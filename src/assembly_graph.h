@@ -6,6 +6,7 @@
 #include "attribute.h"
 #include "barcode_hash.h"
 #include "khash.h"
+#include "radix_sort.h"
 
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
@@ -82,7 +83,7 @@ struct asm_graph_t {
 	khash_t(pair_contig_count) *candidates;
 };
 
-#define MIN_NOTICE_LEN			100
+#define MIN_NOTICE_LEN			250
 #define MIN_CONNECT_SIZE		500
 
 #define TIPS_RATIO_THRES		0.1
@@ -99,6 +100,7 @@ struct asm_graph_t {
 #define CONTIG_LEVEL_0			500
 #define CONTIG_LEVEL_1			3000
 #define CONTIG_LEVEL_2			10000
+#define MAX_BARCODE_REGION		10000
 
 #define MAX_READ_FRAG_LEN		350
 
@@ -117,6 +119,8 @@ struct asm_graph_t {
 
 #define MIN_BARCODE_RATIO		0.044
 #define MIN_SUB_BARCODE_RATIO		0.022
+#define CONTIG_PARTITION_LEN 1500
+#define MIN_COMPONENT			250
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
@@ -258,4 +262,5 @@ void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
 void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
+void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

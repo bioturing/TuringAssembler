@@ -71,4 +71,5 @@ void kmhash_set_idx_multi(struct kmhash_t *h, const uint8_t *key, gint_t id, pth
 
 void kmhash_destroy(struct kmhash_t *h);
 
+static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len);
 #endif /* __KMHASH_H__ */
