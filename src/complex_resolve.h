@@ -2,18 +2,18 @@
 #define __COMPLEX_RESOLVE__
 #include "assembly_graph.h"
 
-struct fixed_size_queue_t{
+struct fixed_size_q_t{
 	int *q;
 	int front;
 	int back;
 };
 
-void init_queue(struct fixed_size_queue_t *fq, int size);
-void push_queue(struct fixed_size_queue_t *fq, int v);
-int get_queue(struct fixed_size_queue_t *fq);
-void pop_queue(struct fixed_size_queue_t *fq);
-int is_queue_empty(struct fixed_size_queue_t *fq);
-void destroy_queue(struct fixed_size_queue_t *fq);
+void init_queue(struct fixed_size_q_t *fq, int size);
+void push_queue(struct fixed_size_q_t *fq, int v);
+int get_queue(struct fixed_size_q_t *fq);
+void pop_queue(struct fixed_size_q_t *fq);
+int is_queue_empty(struct fixed_size_q_t *fq);
+void destroy_queue(struct fixed_size_q_t *fq);
 
 struct vertex_t{
 	int deg_in;
@@ -25,18 +25,32 @@ struct vertex_t{
 struct virtual_graph_t {
 	int n_v;
 	struct vertex_t *vertices;
-	int *f;
+	int *exist;
+};
+
+struct resolve_bulges_bundle_t{
+	struct virtual_graph_t *graph;
+	int source;
+	int *dom;
+	int *B;
+	int *S;
+	int *T;
+	int *g;
+	int *j;
 };
 
 void asm_graph_to_virtual(struct asm_graph_t *g, struct virtual_graph_t *vg);
 void clone_virtual_graph(struct virtual_graph_t *org, struct virtual_graph_t *clone);
 void virtual_graph_destroy(struct virtual_graph_t *vg);
+void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
+void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 //void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len);
-void get_dominated_vertices(struct virtual_graph_t *vg, int v,
-		struct virtual_graph_t *dom);
-int get_closure(struct virtual_graph_t *vg, int s, struct virtual_graph_t *B);
+void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
+int get_closure(struct resolve_bulges_bundle_t *bundle);
+int get_skeleton(struct virtual_graph_t *B, int s, struct virtual_graph_t *S);
 void print_dom_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
 void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
-void add_vertex_to_B_dfs(struct virtual_graph_t *vg, int v, struct virtual_graph_t *B,
-		int *in_queue, struct fixed_size_queue_t *interested, int depth);
+void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
+		int *in_queue, struct fixed_size_q_t *interested, int depth);
+void resolve_bulges(struct asm_graph_t *g);
 #endif
