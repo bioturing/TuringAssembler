@@ -197,7 +197,7 @@ struct mm_db_t * mm_db_init()
 	return db;
 }
 
-static inline uint64_t get_km_i(uint32_t *s, int i, int k)
+static inline uint64_t get_km_i_bin(uint32_t *s, int i, int k)
 {
 	uint64_t km, c;
 	int j;
@@ -205,6 +205,21 @@ static inline uint64_t get_km_i(uint32_t *s, int i, int k)
 	km = 0;
 	for (j = 0; j < k; ++j) {
 		c = (uint64_t)__binseq_get(s, i + j);
+		km |= c;
+		km <<= 2;
+	}
+	km <<= pad;
+	return km;
+}
+
+static inline uint64_t get_km_i_str(char *s, int i, int k)
+{
+	uint64_t km, c;
+	int j;
+	int pad = (32 - k - 1)*2;
+	km = 0;
+	for (j = 0; j < k; ++j) {
+		c = (uint64_t)nt4_table[s[i + j]];
 		km |= c;
 		km <<= 2;
 	}
@@ -231,7 +246,7 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 		if (i + w + k - 1 >= l)
 			break;
 		if (p < i) {
-			km = mm = get_km_i(s, i, k);
+			km = mm = get_km_i_bin(s, i, k);
 			mm_h = km_h = HASH64(mm);
 			p = i;
 			for (j = 0; j < w; ++j) {
@@ -251,6 +266,59 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 			continue;
 		} else {
 			c = (uint64_t) __binseq_get(s, i + w + k - 2);
+			km |= ((uint64_t) c << (pad + 2));
+			km_h = HASH64(km);
+			if (km_h < mm_h){
+				p = i + w - 1;
+				mm = km;
+				mm_h = km_h;
+				mm_db_insert(db, km, p);
+				DEBUG_PRINT("[2]minimizers at window %d: %d\n", i, p);
+			}
+			km <<= 2;
+		}
+	}
+	//mm_print(db);
+	return db;
+}
+
+struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
+
+{
+	struct mm_db_t *db = mm_db_init();
+	db->k = k;
+
+	int i, j, p = -1;
+	uint64_t km, mm, c;
+	uint64_t km_h, mm_h;
+	int pad = (32 - k - 1)*2;
+
+	mm_h = km_h = HASH64(k);
+	for (i = 0; i < l - w + 1; ++i) {
+		DEBUG_PRINT("[i = %d]\n", i);
+		if (i + w + k - 1 >= l)
+			break;
+		if (p < i) {
+			km = mm = get_km_i_str(s, i, k);
+			mm_h = km_h = HASH64(mm);
+			p = i;
+			for (j = 0; j < w; ++j) {
+				c = (uint64_t) nt4_table[s[i + j + k - 1]];
+				km |= ((uint64_t) c << (pad + 2));
+				km_h = HASH64(km);
+				if (km_h < mm_h) {
+					mm = km;
+					mm_h = km_h;
+					p = i + j;
+					mm_db_insert(db, km, p);
+				}
+				km <<= 2;
+			}
+			DEBUG_PRINT("[1]minimizers at window %d: %d\n", i, p);
+
+			continue;
+		} else {
+			c = (uint64_t) nt4_table[s[i + w + k - 2]];
 			km |= ((uint64_t) c << (pad + 2));
 			km_h = HASH64(km);
 			if (km_h < mm_h){
