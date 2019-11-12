@@ -215,7 +215,7 @@ static inline uint64_t get_km_i(uint32_t *s, int i, int k)
 #define HASH64(k) MurmurHash3_x64_64((uint8_t *)&k, sizeof(uint64_t)/sizeof(uint8_t))
 #define DEBUG_PRINT printf
 
-struct mm_db_t * mm_index_str(uint32_t *s, int k, int w, int l)
+struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 {
 	struct mm_db_t *db = mm_db_init();
 	db->k = k;
