@@ -9,7 +9,6 @@
 #include <inttypes.h>
 
 #include "assembly_graph.h"
-#include "khash.h"
 #include "attribute.h"
 #include "utils.h"
 #include "minimizers.h"
@@ -20,6 +19,12 @@ const char *bit_rep[16] = {
 	[ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
 	[12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
 };
+// shorthand way to get the key from hashtable or defVal if not found
+#define kh_get_val(kname, hash, key, defVal) ({k=kh_get(kname, hash, key);(k!=kh_end(hash)?kh_val(hash,k):defVal);})
+
+// shorthand way to set value in hash with single line command.  Returns value
+// returns 0=replaced existing item, 1=bucket empty (new key), 2-adding element previously deleted
+#define kh_set(kname, hash, key, val) ({int ret; k = kh_put(kname, hash,key,&ret); kh_value(hash,k) = val; ret;})
 
 #define PRINT_BYTE(byte) printf("%s%s\n", bit_rep[(byte >> 4)& 0x0F], bit_rep[byte & 0x0F]);
 #define PRINT_UINT64(byte) printf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n", bit_rep[(byte >> 60) & 0x0F], bit_rep[(byte >> 56)& 0x0F], \
@@ -30,10 +35,6 @@ const char *bit_rep[16] = {
 								bit_rep[(byte >> 20) & 0x0F], bit_rep[(byte >> 16) & 0x0F], \
 								bit_rep[(byte >> 12) & 0x0F], bit_rep[(byte >> 8) & 0x0F],  \
 								bit_rep[(byte >> 4) & 0x0F], bit_rep[(uint8_t)byte & 0x0F]);
-
-
-KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
-
 
 
 #define BARCODES100M 100663320
@@ -197,6 +198,13 @@ struct mm_db_t * mm_db_init()
 	return db;
 }
 
+void mm_db_destroy(struct mm_db_t *db)
+{
+	free(db->mm);
+	free(db->p);
+	free(db);
+}
+
 static inline uint64_t get_km_i_bin(uint32_t *s, int i, int k)
 {
 	uint64_t km, c;
@@ -227,8 +235,18 @@ static inline uint64_t get_km_i_str(char *s, int i, int k)
 	return km;
 }
 
+static inline char *mm_dump_seq(uint64_t s, uint32_t l)
+{
+	char *seq = calloc(l, sizeof(char));
+	for (int i = 0; i < l; ++i) {
+		uint8_t c = (uint8_t)((s >> (64 - i*2 - 2)) & (uint64_t)3);
+		seq[i] = nt4_char[c];
+	}
+	return seq;
+}
+
 #define HASH64(k) MurmurHash3_x64_64((uint8_t *)&k, sizeof(uint64_t)/sizeof(uint8_t))
-#define DEBUG_PRINT printf
+#define DEBUG_PRINT
 
 struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 {
@@ -334,3 +352,72 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 	//mm_print(db);
 	return db;
 }
+
+struct mm_db_edge_t *mm_db_edge_init()
+{
+	struct mm_db_edge_t *db = calloc(1, sizeof(struct mm_db_edge_t));
+	db->h = kh_init(mm_hash);
+	db->cnt = kh_init(mm_hash);
+	db->p = kh_init(mm_hash);
+	return db;
+}
+
+//Only keep single-ton minimizers
+void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
+{
+	khiter_t k, k_h;
+
+	k = kh_get(mm_hash, db->cnt, mm);
+	if (k == kh_end(db->cnt)) {
+		kh_set(mm_hash, db->cnt, mm, 1);
+		kh_set(mm_hash, db->h, mm, e);
+		kh_set(mm_hash, db->p, mm, p);
+	} else {
+		k_h = kh_get(mm_hash, db->h, mm);
+		if (e != kh_value(db->h, k_h))
+			kh_value(db->cnt, k)++;
+	}
+
+}
+
+void mm_db_edge_destroy(struct mm_db_edge_t *db)
+{
+	kh_destroy(mm_hash, db->h);
+	kh_destroy(mm_hash, db->cnt);
+	kh_destroy(mm_hash, db->p);
+	free(db);
+}
+
+static inline void mm_singleton_print(struct mm_db_edge_t *db, int k_size)
+{
+	khiter_t k_cnt, k_h, k;
+	for (k_cnt = kh_begin(db->cnt); k_cnt != kh_end(db->cnt); ++k_cnt) {
+		if (kh_exist(db->cnt, k_cnt)) {
+			char *s = mm_dump_seq(kh_key(db->cnt, k_cnt), k_size);
+			uint32_t p = kh_get_val(mm_hash, db->p, kh_key(db->cnt, k_cnt), -1) ;
+			if (kh_value(db->cnt, k_cnt) == 1) {
+				printf("Singleton %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
+			} else {
+				printf("Redundant minimizers %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
+
+			}
+		}
+	}
+}
+
+struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
+	int i, j, e;
+	struct mm_db_edge_t *mm_db_e = mm_db_edge_init();
+	struct mm_db_t *mm_db;
+
+	for (e = 0; e < g->n_e; ++e) {
+		mm_db = mm_index_bin_str(g->edges[e].seq, k, w, g->edges[e].seq_len);
+		for (j = 0; j < mm_db->n; ++j) {
+			mm_db_edge_insert(mm_db_e, mm_db->mm[j], e, mm_db->p[j]);
+		}
+		mm_db_destroy(mm_db);
+	}
+	mm_singleton_print(mm_db_e, k);
+	return mm_db_e;
+}
+

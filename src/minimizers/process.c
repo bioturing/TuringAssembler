@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utils.h>
 
 #include "attribute.h"
 #include "verbose.h"
@@ -49,8 +48,8 @@ void index_mm_process(struct opt_proc_t *opt)
 	uint32_t *s;
 	//s = seq2uint32t(opt->bx_str, 16);
 	//mm_index_str(s, 4, 3, 16);
-	test_bin_minimizers();
 	test_str_minimizers();
+	test_index_mm_graph();
 	__VERBOSE("Done indexing\n");
 }
 

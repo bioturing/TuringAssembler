@@ -16,11 +16,12 @@ CFLAGS = -std=gnu99 -m64 -O2 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I .. -g 
+         -I ../ -g
 
 EXEC = skiminizer
 
 SRC =  \
+      ../utils.c 					\
 	   process.c \
 	   opt.c \
 	   count_barcodes.c \
@@ -38,7 +39,6 @@ SRC =  \
       ../sort_read.c 						\
       ../time_utils.c 					\
       smart_load.c 					\
-      ../utils.c 					\
       ../verbose.c 					\
 
 OBJ = $(SRC:.c=.o)
