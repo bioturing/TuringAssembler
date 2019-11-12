@@ -412,12 +412,13 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 	for (int i = 0; i < (int) g->n_e; i++)
 		partition[i] = -1;
 	int count = 0;
+	int count_resolvable = 0;
 	for (int i = 0; i < (int) g->n_e; i++)
 		if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
 			log_warn("Dfs from %d", i);
 			khash_t(union_barcode) *bc = kh_init(union_barcode);
 //			khash_t(big_kmer_count) *kmer_count_table = kh_init(big_kmer_count);
-			int total_barcodes = 0, total_length_component = 0, count_resolvable = 0;
+			int total_barcodes = 0, total_length_component = 0;
 			int n_edges = dfs_partition(g, partition, i, count, bc, &total_barcodes, &total_length_component,
 										&count_resolvable, kmer_pair_table);
 //			count++;
@@ -435,6 +436,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 //				break;
 //			}
 		}
+	log_info("count resolvable %d", count_resolvable);
 	*n_partition = count;
 }
 
