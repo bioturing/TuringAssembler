@@ -37,7 +37,7 @@ struct vertex_height_t{
 };
 
 struct resolve_bulges_bundle_t{
-	struct asm_graph_t *graph;
+	struct virtual_graph_t *graph;
 	struct queue_t *B_vertices;
 	struct queue_t *dom_vertices;
 	struct queue_t *closest;
