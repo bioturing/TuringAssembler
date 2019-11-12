@@ -16,6 +16,7 @@
 #include "basic_resolve.h"
 #include "fastg.h"
 #include "fastq_reducer.h"
+#include "resolve_big.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {

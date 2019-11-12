@@ -97,7 +97,7 @@ FORCE_INLINE uint64_t fmix64(uint64_t k)
 //-----------------------------------------------------------------------------
 
 
-static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
+inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 {
 	int n_blocks = len >> 4;
 	uint64_t h1 = BIG_CONSTANT(0x13097);

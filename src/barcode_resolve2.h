@@ -46,5 +46,4 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 			gint_t e1, gint_t e2, struct result_local_t *sret);
 void test_same_barcode(struct read_path_t *ref, khash_t(bcpos) *dict,
 					   uint64_t *shared, int n_shared);
-void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt);
 #endif

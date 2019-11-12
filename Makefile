@@ -65,6 +65,7 @@ SRC = src/assembly_graph.c 				\
       src/fastq_reducer.c 						\
       src/main.c \
       src/log.c 					\
+	  src/build_hash_table.c\
 	  src/resolve_big.c \
       src/unit_test.c
 

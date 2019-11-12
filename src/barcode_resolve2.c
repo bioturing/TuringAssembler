@@ -20,6 +20,7 @@
 #include "barcode_builder.h"
 #include "unit_test.h"
 #include "resolve_big.h"
+#include "build_hash_table.h"
 
 #define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)        ((r) + EPS >= 0.1)
@@ -2801,17 +2802,4 @@ void khash_2_arr(khash_t(gint) *h, uint64_t **arr, int *n)
 	}
 }
 
-void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt)
-{
-	int *partition = calloc(g->n_e, 4);
-	khash_t(big_kmer_count) **partition_kmer_count = NULL;
-	int n_partitions;
-	struct read_path_t *ori_read = calloc(1, sizeof(struct read_path_t));
-	assert(opt->n_files == 1); //todo 1 handle multiple files
-	log_info("%s", opt->files_1[0]);
-	ori_read->R1_path = opt->files_1[0];
-	ori_read->R2_path = opt->files_2[0];
-	ori_read->idx_path = opt->files_I[0];
-	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions);
-	free(partition);
-}
+
