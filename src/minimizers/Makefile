@@ -25,6 +25,7 @@ SRC =  \
 	   opt.c \
 	   count_barcodes.c \
 	   minimizers.c \
+	   unittest_minimizers.c \
       ../buffer_file_wrapper.c 	\
       ../buffer_file_wrapper.c 	\
       ../dqueue.c 					\

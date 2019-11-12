@@ -12,6 +12,7 @@
 #include "khash.h"
 #include "attribute.h"
 #include "utils.h"
+#include "minimizers.h"
 
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
@@ -33,12 +34,7 @@ const char *bit_rep[16] = {
 
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
 
-struct mm_db_t {
-	uint64_t *mm;
-	size_t n;
-	size_t size;
-	int k;
-};
+
 
 #define BARCODES100M 100663320
 #define BIG_CONSTANT(x) (x##LLU)
@@ -181,13 +177,15 @@ void mm_print(struct mm_db_t *db)
 	}
 }
 
-void mm_db_insert(struct mm_db_t *db, uint64_t km)
+void mm_db_insert(struct mm_db_t *db, uint64_t km, uint32_t p)
 {
 	if (db->n == db->size) {
 		db->mm =  realloc(db->mm, (db->size << 1) * sizeof(uint64_t));
+		db->p =  realloc(db->p, (db->size << 1) * sizeof(uint64_t));
 		db->size <<= 1;
 	}
-	db->mm[db->n++] = km;
+	db->mm[db->n] = km;
+	db->p[db->n++] = p;
 }
 struct mm_db_t * mm_db_init()
 {
@@ -195,6 +193,7 @@ struct mm_db_t * mm_db_init()
 	db->n = 0;
 	db->size = 8;
 	db->mm = calloc(db->size, sizeof(struct mm_db_t));
+	db->p = calloc(db->size, sizeof(struct mm_db_t));
 	return db;
 }
 
@@ -243,7 +242,7 @@ struct mm_db_t * mm_index_str(uint32_t *s, int k, int w, int l)
 					mm = km;
 					mm_h = km_h;
 					p = i + j;
-					mm_db_insert(db, km);
+					mm_db_insert(db, km, p);
 				}
 				km <<= 2;
 			}
@@ -258,7 +257,7 @@ struct mm_db_t * mm_index_str(uint32_t *s, int k, int w, int l)
 				p = i + w - 1;
 				mm = km;
 				mm_h = km_h;
-				mm_db_insert(db, km);
+				mm_db_insert(db, km, p);
 				DEBUG_PRINT("[2]minimizers at window %d: %d\n", i, p);
 			}
 			km <<= 2;
