@@ -209,6 +209,20 @@ void debug_dom_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
+void resolve_complex_bulges_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/resolve_bulges.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Resolve complex bulges");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	asm_resolve_complex_bulges_ite(opt, &g);
+
+	save_graph_info(opt->out_dir, &g, "level_3");
+	asm_graph_destroy(&g);
+}
+
 void resolve_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];
