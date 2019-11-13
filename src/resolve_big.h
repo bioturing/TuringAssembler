@@ -24,6 +24,12 @@ struct km_count_bundle_t {
 	pthread_mutex_t lock;
 
 };
+
+struct partition_information {
+	int total_len;
+	int n_barcodes;
+	khash_t(union_barcode) *union_barcodes;
+};
 void km_count_bundle_destroy(struct km_count_bundle_t *b);
 void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt);
 #endif //SKIPPING_RESOLVE_BIG_H

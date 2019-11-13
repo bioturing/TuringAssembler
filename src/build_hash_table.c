@@ -47,9 +47,11 @@ void ust_add_pair_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ks
 	int8_t *seq = compress_seq(r->seq);
 
 //	print_u8_seq(seq, r->len);
+	uint8_t *left = calloc((ksize + 3) >> 2, sizeof(uint8_t));
+	uint8_t *right = calloc((ksize + 3) >> 2, sizeof(uint8_t));
 	for (int i = 0, j = DISTANCE_KMER; i < r->len - DISTANCE_KMER; i++, j++) {
-		uint8_t *left = calloc((ksize + 3) >> 2, sizeof(uint8_t));
-		uint8_t *right = calloc((ksize + 3) >> 2, sizeof(uint8_t));
+		memset(left, 0, (ksize+3)>>2);
+		memset(right, 0, (ksize+3)>>2);
 		int64_t A[2];
 		get_seq(seq, i, ksize, left);
 		get_seq(seq, j, ksize, right);
@@ -69,6 +71,8 @@ void ust_add_pair_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ks
 		pthread_mutex_unlock(lock);
 		atomic_add_and_fetch32(&kh_value(table, k), 1);
 	}
+	free(left);
+	free(right);
 }
 
 void *get_pair_kmer_ust_iterator(void *data)

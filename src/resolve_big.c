@@ -60,22 +60,22 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 	assert(mid->seq_len <= DISTANCE_KMER + KMER_PAIR_SIZE - 2);
 	int span_len = DISTANCE_KMER + KMER_PAIR_SIZE;
 	int mid_len = mid->seq_len;
-	int left_len =  MIN(left->seq_len-graph_ksize, span_len- mid_len-1);
-	int right_len = MIN(right->seq_len-graph_ksize, span_len-mid_len-1);
+	int left_len = MIN(left->seq_len - graph_ksize, span_len - mid_len - 1);
+	int right_len = MIN(right->seq_len - graph_ksize, span_len - mid_len - 1);
 	int new_len = left_len + mid_len + right_len;
 	if (new_len < span_len)
 		return -1;
 
 	uint8_t *new_seq = calloc((new_len + 3) >> 2, 1);
-	printf("left: ");
-	print_u8_seq(left->seq, left->seq_len);
-	printf("mid: ");
-	print_u8_seq(mid->seq, mid->seq_len);
-	printf("right: ");
-	print_u8_seq(right->seq, right->seq_len);
+//	printf("left: ");
+//	print_u8_seq(left->seq, left->seq_len);
+//	printf("mid: ");
+//	print_u8_seq(mid->seq, mid->seq_len);
+//	printf("right: ");
+//	print_u8_seq(right->seq, right->seq_len);
 	copy_seq32_seq8(left->seq, left->seq_len - graph_ksize - left_len, new_seq, 0, left_len);
 	copy_seq32_seq8(mid->seq, 0, new_seq, left_len, mid->seq_len);
-	copy_seq32_seq8(right->seq, graph_ksize, new_seq, left_len+mid_len , right_len);
+	copy_seq32_seq8(right->seq, graph_ksize, new_seq, left_len + mid_len, right_len);
 	print_u8_seq(new_seq, new_len);
 
 //	if (left->seq_len >= new_len) {
@@ -88,12 +88,12 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 
 	//todo 1: does not need to copy all middle seq
 
-	int value=0;
-	for (int i = 0 ; i  < new_len - span_len  + 1; i++) {
+	int value = 0;
+	for (int i = 0; i < new_len - span_len + 1; i++) {
 		uint8_t *h1 = calloc((pair_ksize + 3) >> 2, sizeof(uint8_t));
 		uint8_t *h2 = calloc((pair_ksize + 3) >> 2, sizeof(uint8_t));
 		get_seq(new_seq, i, pair_ksize, h1);
-		get_seq(new_seq, i+DISTANCE_KMER, pair_ksize, h2);
+		get_seq(new_seq, i + DISTANCE_KMER, pair_ksize, h2);
 		print_u8_seq(h1, pair_ksize);
 		print_u8_seq(h2, pair_ksize);
 		int64_t A[2];
@@ -104,7 +104,7 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 		khint_t k = kh_get(pair_kmer_count, table, key);
 		int value1 = kh_value(table, k);
 //		log_warn("value of get pair is %d", value1);
-		value+= value1;
+		value += value1;
 	}
 	return value;
 }
@@ -188,25 +188,19 @@ int is_case_2_1_2(struct asm_graph_t *g, int i_e)
 	return 1;
 }
 
-int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par, khash_t(union_barcode) *uni_bar,
-				  int *total_barcodes, int *total_length_component, int *count_resolvable,
-				  khash_t(pair_kmer_count) *table)
+int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
+				  struct partition_information *part_infor)
 {
 //	log_warn("dfs from %d", i_e);
-	resolve_using_pair_kmer(g, i_e, table);
-	if (partition[i_e] != -1)
+	if (partition[i_e])
 		return 0;
 	if (g->edges[i_e].seq_len >= CONTIG_PARTITION_LEN) {
-//		log_warn("bc0&1&2 %d %d %d", g->edges[i_e].barcodes[0].n_item, g->edges[i_e].barcodes[1].n_item,
-//				 g->edges[i_e].barcodes[2].n_item);
-
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[2].n_item);
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[1].n_item);
 //		*total_barcodes += append_barcode_contig(&g->edges[i_e].barcodes[2], uni_bar);//todo 1 all barcode
 		return 0;
 	}
-	*count_resolvable += is_case_2_1_2(g, i_e);
-	*total_length_component += g->edges[i_e].seq_len;
+	part_infor->total_len += g->edges[i_e].seq_len;
 //	if ((*uni_bar)->size > 1500000 ){
 //		return 0;
 //	}
@@ -222,13 +216,11 @@ int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
 
 	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
 		int i_e_rc = g->nodes[source_rc].adj[i];
-		res += dfs_partition(g, partition, i_e_rc, index_par, uni_bar, total_barcodes, total_length_component,
-							 count_resolvable, table);
+		res += dfs_partition(g, partition, i_e_rc, index_par, part_infor);
 	}
 	for (int i = 0; i < g->nodes[target].deg; i++) {
 		int i_e = g->nodes[target].adj[i];
-		res += dfs_partition(g, partition, i_e, index_par, uni_bar, total_barcodes, total_length_component,
-							 count_resolvable, table);
+		res += dfs_partition(g, partition, i_e, index_par, part_infor);
 	}
 	return res;
 }
@@ -380,26 +372,30 @@ void filter_read_build_kmer(struct read_path_t *ori_read, khash_t(bcpos) *dict,
 	log_warn("kmer table size %d", kmer_count_table->size);
 }
 
-void dfs_resolve(struct asm_graph_t *g, int x, int partition_index, khash_t(pair_kmer_count) *table, int *partition)
+void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, khash_t(pair_kmer_count) *table, int *partition,
+				 int *resolve_stat)
 {
-	if (partition[x] != partition_index) {
+	if (partition[i_e] != partition_index) {
 		return;
 	}
-//	resolve_using_big_kmer(g, x, table);
-	resolve_using_pair_kmer(g, x, table);
-	partition[x] = 0;
+	int t = resolve_using_pair_kmer(g, i_e, table);
+	resolve_stat[t]++;
+//	resolve_using_big_kmer(g, i_e, table);
+	int x_rc = g->edges[i_e].rc_id;
+	partition[i_e] = -partition[i_e];
+	partition[x_rc] = -partition[x_rc];
 
-	int source = g->edges[x].source;
+	int source = g->edges[i_e].source;
 	int source_rc = g->nodes[source].rc_id;
-	int target = g->edges[x].target;
+	int target = g->edges[i_e].target;
 
 	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
 		int i_e_rc = g->nodes[source_rc].adj[i];
-		dfs_resolve(g, i_e_rc, partition_index, table, partition);
+		dfs_resolve(g, i_e_rc, partition_index, table, partition, resolve_stat);
 	}
 	for (int i = 0; i < g->nodes[target].deg; i++) {
 		int i_e = g->nodes[target].adj[i];
-		dfs_resolve(g, i_e, partition_index, table, partition);
+		dfs_resolve(g, i_e, partition_index, table, partition, resolve_stat);
 	}
 }
 
@@ -410,18 +406,17 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 //	construct_read_index(ori_read, dict);
 
 	for (int i = 0; i < (int) g->n_e; i++)
-		partition[i] = -1;
+		partition[i] = 0;
 	int count = 0;
-	int count_resolvable = 0;
-	for (int i = 0; i < (int) g->n_e; i++)
+	int *resolve_stat = calloc(4, 4);
+	for (int i = 0; i < (int) g->n_e; i++) if (partition[i] == 0)
 		if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
 			log_warn("Dfs from %d", i);
-			khash_t(union_barcode) *bc = kh_init(union_barcode);
+			count++;
 //			khash_t(big_kmer_count) *kmer_count_table = kh_init(big_kmer_count);
-			int total_barcodes = 0, total_length_component = 0;
-			int n_edges = dfs_partition(g, partition, i, count, bc, &total_barcodes, &total_length_component,
-										&count_resolvable, kmer_pair_table);
-//			count++;
+			struct partition_information *part_infor = calloc(1, sizeof(struct partition_information));
+			part_infor->union_barcodes = kh_init(union_barcode);
+			int n_edges = dfs_partition(g, partition, i, count, part_infor);
 //
 //			log_warn("n edges %d n barcodes %d total length %d", n_edges, total_barcodes, total_length_component);
 //			if (total_barcodes > 10000) {
@@ -431,12 +426,23 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 //			if (total_barcodes > 10 && total_length_component / 2 > MIN_COMPONENT && count_resolvable > 2) {
 ////				filter_read_build_kmer(ori_read, dict, bc, kmer_count_table, 55, 70, n_threads,
 ////									   mmem, count); //todo 0 choose range better
-//				dfs_resolve(g, i, count - 1, kmer_pair_table, partition);
+			dfs_resolve(g, i, count, kmer_pair_table, partition, resolve_stat);
 			//todo 0 not break
 //				break;
 //			}
 		}
-	log_info("count resolvable %d", count_resolvable);
+	log_info("Resolve 2-2 case:");
+	for (int i = 0; i < 4; i++) {
+		if (i == NOT_HAVE_SPAN_KMER) {
+			log_info("   Can't solve - not have span kmer: %d", resolve_stat[i]);
+		}
+		if (i == NOT_LONG_ENOUGH) {
+			log_info("   Can't solve - not long enough: %d", resolve_stat[i]);
+		}
+		if (i == 0) {
+			log_info("   Solved: %d", resolve_stat[i]);
+		}
+	}
 	*n_partition = count;
 }
 
@@ -444,7 +450,7 @@ int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
 							khash_t(pair_kmer_count) *table)
 {
 	if (!is_case_2_1_2(g, i_e)) {
-		return -1;
+		return 1;
 	}
 	int source = g->edges[i_e].source;
 	int target = g->edges[i_e].target;
@@ -462,7 +468,7 @@ int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
 	assert(table != NULL);
 
 	if (e->seq_len > DISTANCE_KMER + KMER_PAIR_SIZE - 2)
-		return -1;
+		return NOT_LONG_ENOUGH;
 	int pair_ksize = KMER_PAIR_SIZE;
 	int c00 = get_pair_seq_count(a0, o0, e, pair_ksize, g->ksize, table);
 	int c01 = get_pair_seq_count(a0, o1, e, pair_ksize, g->ksize, table);
@@ -482,7 +488,7 @@ int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
 		asm_remove_edge(g, i_e);
 		asm_remove_edge(g, i_e_rc);
 	} else {
-		return -1;
+		return NOT_HAVE_SPAN_KMER;
 	}
 	return 0;
 }
