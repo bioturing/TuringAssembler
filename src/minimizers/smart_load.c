@@ -17,8 +17,9 @@
 #include "count_barcodes.h"
 #include "minimizers.h"
 #include "assembly_graph.h"
+#include "attribute.h"
+#include "get_buffer.h"
 
-KSEQ_INIT(FILE*, read)
 /**
  * Construct the dictionary index of
  * barcode position in the barcode sorted file
@@ -133,16 +134,8 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	uint64_t m_buf1, m_buf2;
 	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
 
-	// Test string stream
-	FILE * buf1_stream = fmemopen((void *)buf1, m_buf1, "r");
-	FILE * buf2_stream = fmemopen((void *)buf2, m_buf2, "r");
-
-	if (buf1_stream == NULL || buf2_stream == NULL) {
-		log_error("Stream error!");
-	}
-
-	kseq_t *r1 = kseq_init(fileno(buf1_stream));
-	kseq_t *r2 = kseq_init(fileno(buf2_stream));
+	struct read_t r1, r2;
+	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
 	struct mm_db_t *db1;
 	struct mm_db_t *db2;
@@ -150,14 +143,15 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	hits1 = mm_hits_init();
 	hits2 = mm_hits_init();
 
+
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
 
-	while (kseq_read(r1) >= 0 && kseq_read(r2) >= 0 ) {
+	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
-		db1 = mm_index_char_str(r1->seq.s, 17, 17, r1->seq.l);
-		db2 = mm_index_char_str(r2->seq.s, 17, 17, r2->seq.l);
+		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
+		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
 
 		mm_hits_cmp(db1, mm_edges, hits1);
 		mm_hits_cmp(db2, mm_edges, hits2);
