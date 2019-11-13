@@ -33,4 +33,6 @@ void resolve_1_2_process(struct opt_proc_t *opt);
 void resolve_complex_bulges_process(struct opt_proc_t *opt);
 void index_mm_process(struct opt_proc_t *opt);
 void hits_barcode_process(struct opt_proc_t *opt);
+void count_bx_process(struct opt_proc_t *opt);
+
 #endif /* __PROCESS_H__ */

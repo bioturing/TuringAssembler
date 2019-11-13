@@ -20,6 +20,7 @@
 #include "complex_resolve.h"
 #include "minimizers/minimizers.h"
 #include "minimizers/smart_load.h"
+#include "minimizers/count_barcodes.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -227,6 +228,14 @@ void hits_barcode_process(struct opt_proc_t *opt)
 	set_log_stage("Barcode hits");
 	smart_load_barcode(opt);
 	__VERBOSE("Done hitting\n");
+}
+
+void count_bx_process(struct opt_proc_t *opt)
+{
+	struct read_path_t read_path;
+	__VERBOSE("Counting barcode frequencies\n");
+	count_bx_freq(opt, &read_path);
+	__VERBOSE("Done counting\n");
 }
 
 void reduce_read_process(struct opt_proc_t *opt)
