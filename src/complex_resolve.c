@@ -5,7 +5,11 @@
 #include "verbose.h"
 #include "helper.h"
 #include "dqueue.h"
+#include "process.h"
+#include "utils.h"
 
+KHASH_MAP_INIT_INT(int_int, int);
+KHASH_SET_INIT_INT(set_int);
 void *pointerize(void *data, int size)
 {
 	void *res = malloc(size);
@@ -56,70 +60,9 @@ void free_queue_content(struct queue_t *q)
 		free(q->data[i]);
 }
 
-void asm_graph_to_virtual(struct asm_graph_t *g, struct virtual_graph_t *vg)
-{
-	vg->n_v = g->n_v;
-	vg->vertices = calloc(vg->n_v, sizeof(struct vertex_t));
-	for (int i = 0; i < g->n_v; ++i){
-		vg->vertices[i].deg_out = g->nodes[i].deg;
-		vg->vertices[i].child = calloc(vg->vertices[i].deg_out,
-				sizeof(int));
-		for (int j = 0; j < vg->vertices[i].deg_out; ++j){
-			struct asm_edge_t e = g->edges[g->nodes[i].adj[j]];
-			vg->vertices[i].child[j] = e.target;
-		}
-
-		int rc = g->nodes[i].rc_id;
-		vg->vertices[i].deg_in = g->nodes[rc].deg;
-		vg->vertices[i].parent = calloc(vg->vertices[i].deg_in,
-				sizeof(int));
-		for (int j = 0; j < vg->vertices[i].deg_in; ++j){
-			struct asm_edge_t e = g->edges[g->nodes[rc].adj[j]];
-			int v = g->nodes[e.target].rc_id;
-			vg->vertices[i].parent[j] = v;
-		}
-	}
-
-	vg->exist = calloc(vg->n_v, sizeof(int));
-	for (int i = 0; i < vg->n_v; ++i)
-		vg->exist[i] = 1;
-}
-
-void clone_virtual_graph(struct virtual_graph_t *org, struct virtual_graph_t *clone)
-{
-	clone->n_v = org->n_v;
-	clone->vertices = calloc(clone->n_v, sizeof(struct vertex_t));
-	for (int i = 0; i < clone->n_v; ++i){
-		clone->vertices[i].deg_out = org->vertices[i].deg_out;
-		clone->vertices[i].child = calloc(clone->vertices[i].deg_out,
-				sizeof(int));
-		memcpy(clone->vertices[i].child, org->vertices[i].child,
-				sizeof(int) * clone->vertices[i].deg_out);
-
-		clone->vertices[i].deg_in = org->vertices[i].deg_in;
-		clone->vertices[i].parent = calloc(clone->vertices[i].deg_in,
-				sizeof(int));
-		memcpy(clone->vertices[i].parent, org->vertices[i].parent,
-				sizeof(int) * clone->vertices[i].deg_in);
-	}
-	clone->exist = calloc(clone->n_v, sizeof(int));
-	memcpy(clone->exist, org->exist, sizeof(int) * clone->n_v);
-}
-
-void virtual_graph_destroy(struct virtual_graph_t *vg)
-{
-	for (int i = 0; i < vg->n_v; ++i){
-		free(vg->vertices[i].child);
-		free(vg->vertices[i].parent);
-	}
-	free(vg->vertices);
-	free(vg->exist);
-}
-
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle)
 {
-	bundle->graph = calloc(1, sizeof(struct virtual_graph_t));
-	asm_graph_to_virtual(g, bundle->graph);
+	bundle->graph = g;
 
 	bundle->B_vertices = calloc(1, sizeof(struct queue_t));
 	init_queue(bundle->B_vertices, bundle->graph->n_v);
@@ -141,7 +84,7 @@ void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *
 	bundle->g = calloc(g->n_v, sizeof(int));
 	bundle->j = calloc(g->n_v, sizeof(int));
 	bundle->height = calloc(g->n_v, sizeof(int));
-	bundle->P = calloc(g->n_v, sizeof(int));
+	bundle->PE = calloc(g->n_v, sizeof(int));
 	bundle->L = calloc(g->n_v, sizeof(int));
 }
 
@@ -158,16 +101,18 @@ void reset_source(struct resolve_bulges_bundle_t *bundle, int s)
 	memset(bundle->g, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->j, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->height, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->P, 0, sizeof(int) * bundle->graph->n_v);
+	memset(bundle->PE, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->L, 0, sizeof(int) * bundle->graph->n_v);
 }
 
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle)
 {
-	virtual_graph_destroy(bundle->graph);
 	destroy_queue(bundle->B_vertices);
+	free(bundle->B_vertices);
 	destroy_queue(bundle->dom_vertices);
+	free(bundle->dom_vertices);
 	destroy_queue(bundle->closest);
+	free(bundle->closest);
 	free(bundle->dom);
 	free(bundle->B);
 	free(bundle->S);
@@ -175,7 +120,7 @@ void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle)
 	free(bundle->g);
 	free(bundle->j);
 	free(bundle->height);
-	free(bundle->P);
+	free(bundle->PE);
 	free(bundle->L);
 }
 
@@ -205,15 +150,15 @@ void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle)
 
 void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	int s = bundle->source;
 	int *dom = bundle->dom;
 
-	int *descresed_deg = calloc(graph->n_v, sizeof(int));
-
 	int *is_s_parents = calloc(graph->n_v, sizeof(int));
-	for (int i = 0; i < graph->vertices[s].deg_in; ++i){
-		int p = graph->vertices[s].parent[i];
+	int s_rc = graph->nodes[s].rc_id;
+	for (int i = 0; i < graph->nodes[s_rc].deg; ++i){
+		int e = graph->edges[graph->nodes[s_rc].adj[i]].rc_id;
+		int p = graph->edges[e].source;
 		is_s_parents[p] = 1;
 	}
 
@@ -221,33 +166,40 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 	init_queue(queue, graph->n_v);
 	push_queue(queue, pointerize(&s, sizeof(int)));
 
+	khash_t(int_int) *deg_in = kh_init(int_int);
 	while (is_queue_empty(queue) == 0){
 		int *v = get_queue(queue);
 		pop_queue(queue);
 		dom[*v] = 1;
 		push_queue(bundle->dom_vertices, pointerize(v, sizeof(int)));
-		for (int i = 0; i < graph->vertices[*v].deg_out; ++i){
-			int u = graph->vertices[*v].child[i];
-			int remain_deg = --graph->vertices[u].deg_in;
-			++descresed_deg[u];
-			if (remain_deg == 0 && is_s_parents[u] == 0)
+		for (int i = 0; i < graph->nodes[*v].deg; ++i){
+			int u = get_adj_node(graph, *v, i);
+			//__VERBOSE("%d %d\n", *v, u);
+			khiter_t it = kh_get(int_int, deg_in, u);
+			if (it == kh_end(deg_in)){
+				int ret;
+				it = kh_put(int_int, deg_in, u, &ret);
+				kh_val(deg_in, it) = 0;
+			}
+			int used_deg = ++kh_val(deg_in, it);
+			int u_rc = graph->nodes[u].rc_id;
+			//__VERBOSE("%d %d %d\n", u, kh_val(deg_in, it), graph->nodes[u_rc].deg);
+			if (used_deg == graph->nodes[u_rc].deg &&
+					is_s_parents[u] == 0)
 				push_queue(queue, pointerize(&u, sizeof(int)));
 		}
 		free(v);
 	}
-	for (int i = bundle->dom_vertices->front; i < bundle->dom_vertices->back;
-			++i){
-		int *v = bundle->dom_vertices->data[i];
-		bundle->graph->vertices[*v].deg_in += descresed_deg[*v];
-	}
+	kh_destroy(int_int, deg_in);
 	destroy_queue(queue);
 	free(queue);
 	free(is_s_parents);
-	free(descresed_deg);
+
 }
 
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v)
 {
+	//__VERBOSE("Add %d\n", v);
 	bundle->B[v] = 1;
 	push_queue(bundle->B_vertices, pointerize(&v, sizeof(int)));
 }
@@ -255,10 +207,12 @@ void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v)
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 		int *in_queue, struct queue_t *q, int depth)
 {
+	struct asm_graph_t *graph = bundle->graph;
 	int int_vertex = 0;
+	//__VERBOSE("vertex %d\n", v);
 	if (depth == 0){
-		for (int i = 0; i < bundle->graph->vertices[v].deg_out; ++i){
-			int u = bundle->graph->vertices[v].child[i];
+		for (int i = 0; i < graph->nodes[v].deg; ++i){
+			int u = get_adj_node(graph, v, i);
 			if (bundle->B[u] != 0)
 				int_vertex = 1;
 		}
@@ -274,55 +228,63 @@ void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 		return;
 	add_vertex_to_B(bundle, v);
 	//__VERBOSE("add %d\n", v);
-	for (int i = 0; i < bundle->graph->vertices[v].deg_in; ++i){
-		int p = bundle->graph->vertices[v].parent[i];
+	int v_rc = graph->nodes[v].rc_id;
+	for (int i = 0; i < graph->nodes[v_rc].deg; ++i){
+		int pe = graph->edges[graph->nodes[v_rc].adj[i]].rc_id;
+		int p = graph->edges[pe].source;
 		add_vertex_to_B_dfs(bundle, p, in_queue, q, depth + 1);
 	}
 }
 
 int get_closure(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	int s = bundle->source;
-	int res = 0;
+	int res = 1;
 	struct queue_t q;
 	init_queue(&q, graph->n_v);
 	
 	int *in_queue = calloc(graph->n_v, sizeof(int));
 	struct queue_t *B_vertices = bundle->B_vertices;
+	/*__VERBOSE("before: ");
+	for (int i = B_vertices->front; i < B_vertices->back; ++i){
+		int *v = B_vertices->data[i];
+		__VERBOSE("%d ", *v);
+	}
+	__VERBOSE("\n");*/
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
 		//__VERBOSE("%d %d\n", i, vg->vertices[i].deg_out);
-		for (int i = 0; i < graph->vertices[*v].deg_out; ++i){
-			int u = graph->vertices[*v].child[i];
+		for (int i = 0; i < graph->nodes[*v].deg; ++i){
+			int u = get_adj_node(graph, *v, i);
 			//__VERBOSE("%d %d\n", i, v);
 			if (bundle->B[u]){
 				in_queue[*v] = 1;
 				push_queue(&q, pointerize(v, sizeof(int)));
-				//__VERBOSE("queue in %d\n", i);
+				//__VERBOSE("queue in %d\n", *v);
 				break;
 			}
 		}
 	}
 
-	while (is_queue_empty(&q) == 0){
+	while (res && is_queue_empty(&q) == 0){
 		int *v = get_queue(&q);
 		pop_queue(&q);
-		//__VERBOSE("queue out %d\n", v);
-		for (int i = 0; i < graph->vertices[*v].deg_out; ++i){
-			int u = graph->vertices[*v].child[i];
+		//__VERBOSE("queue out %d\n", *v);
+		for (int i = 0; i < graph->nodes[*v].deg; ++i){
+			int u = get_adj_node(graph, *v, i);
+			//__VERBOSE("hihi %d %d\n", *v, u);
 			if (bundle->dom[u] == 0){
 				res = 0;
-				goto end_function;
+				break;
 			}
-			if (bundle->B[*v] != 0)
+			if (bundle->B[u] != 0)
 				continue;
 			add_vertex_to_B_dfs(bundle, u, in_queue, &q, 0);
 		}
 		free(v);
 	}
-	res = 1;
-end_function:
+	free_queue_content(&q);
 	free(in_queue);
 	destroy_queue(&q);
 	return res;
@@ -406,11 +368,11 @@ void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 void get_height_dfs(struct resolve_bulges_bundle_t *bundle, int v)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	int *height = bundle->height;
 	height[v] = 0;
-	for (int i = 0; i < graph->vertices[v].deg_out; ++i){
-		int u = graph->vertices[v].child[i];
+	for (int i = 0; i < graph->nodes[v].deg; ++i){
+		int u = get_adj_node(graph, v, i);
 		if (bundle->B[u] == 0)
 			continue;
 		if(height[u] == -1)
@@ -429,14 +391,16 @@ int is_able_to_map(struct resolve_bulges_bundle_t *bundle, int u, int v)
 {
 	if (bundle->height[u] == 0)
 		return 0;
-	struct virtual_graph_t *graph = bundle->graph;
-	for (int i = 0; i < graph->vertices[u].deg_out; ++i){
-		int w = graph->vertices[u].child[i];
+	struct asm_graph_t *graph = bundle->graph;
+	for (int i = 0; i < graph->nodes[u].deg; ++i){
+		int w = get_adj_node(graph, u, i);
 		if (bundle->B[w] == 0)
 			continue;
 		int ok = 0;
-		for (int j = 0; j < graph->vertices[w].deg_in; ++j){
-			int t = graph->vertices[w].parent[j];
+		int w_rc = graph->nodes[w].rc_id;
+		for (int j = 0; j < graph->nodes[w_rc].deg; ++j){
+			int pe = graph->edges[graph->nodes[w_rc].adj[j]].rc_id;
+			int t = graph->edges[pe].source;
 			if (t == v){
 				ok = 1;
 				break;
@@ -451,7 +415,7 @@ int is_able_to_map(struct resolve_bulges_bundle_t *bundle, int u, int v)
 int get_skeleton(struct resolve_bulges_bundle_t *bundle)
 {
 	get_height(bundle);
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
 	init_queue(q, graph->n_v);
 	for (int i = 0; i < graph->n_v; ++i){
@@ -490,8 +454,8 @@ int get_skeleton(struct resolve_bulges_bundle_t *bundle)
 
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
-	int *P = bundle->P;
+	struct asm_graph_t *graph = bundle->graph;
+	int *PE = bundle->PE;
 
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
 	push_queue(q, pointerize(&bundle->source, sizeof(int)));
@@ -503,18 +467,21 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 	while (!is_queue_empty(q)){
 		int *v = get_queue(q);
 		pop_queue(q);
-		for (int i = 0; i < graph->vertices[*v].deg_out; ++i){
-			int u = graph->vertices[*v].child[i];
+		for (int i = 0; i < graph->nodes[*v].deg; ++i){
+			int e = graph->nodes[*v].adj[i];
+			int u = get_adj_node(graph, *v, i);
 			if (bundle->B[u] == 0)
 				continue;
 			if (L[u] == -1){
 				L[u] = L[*v] + 1;
-				P[u] = *v;
+				PE[u] = e;
 				push_queue(q, pointerize(&u, sizeof(int)));
 			}
 		}
 		free(v);
 	}
+	destroy_queue(q);
+	free(q);
 	free(L);
 }
 
@@ -524,7 +491,7 @@ void get_tree(struct resolve_bulges_bundle_t *bundle)
 
 void get_distance(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	int *L = bundle->L;
 
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
@@ -537,8 +504,8 @@ void get_distance(struct resolve_bulges_bundle_t *bundle)
 		int *v = get_queue(q);
 		pop_queue(q);
 		push_queue(bundle->closest, pointerize(v, sizeof(int)));
-		for (int i = 0; i < graph->vertices[*v].deg_out; ++i){
-			int u = graph->vertices[*v].child[i];
+		for (int i = 0; i < graph->nodes[*v].deg; ++i){
+			int u = get_adj_node(graph, *v, i);
 			if (bundle->dom[u] == 0)
 				continue;
 			if (L[u] == -1){
@@ -548,31 +515,40 @@ void get_distance(struct resolve_bulges_bundle_t *bundle)
 		}
 		free(v);
 	}
+	destroy_queue(q);
+	free(q);
 }
 
 int is_complex_closure(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *B_vertices = bundle->B_vertices;
+	int res = 0;
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
-		for (int j = 0; j < graph->vertices[*v].deg_out; ++j){
-			int u = graph->vertices[*v].child[j];
-			if (bundle->B[u] != 0){
-			}
+		for (int j = 0; j < graph->nodes[*v].deg; ++j){
+			int e = graph->nodes[*v].adj[j];
+			int u = graph->edges[e].target;
+			if (bundle->B[u] != 0)
+				res = MAX(res, graph->edges[e].seq_len);
 		}
 	}
+	return res >= 1000;
 }
 
 int is_closure_tree(struct resolve_bulges_bundle_t *bundle)
 {
-	struct virtual_graph_t *graph = bundle->graph;
+	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *B_vertices = bundle->B_vertices;
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
+		//__VERBOSE("HAHA %d\n", *v);
 		int C = 0;
-		for (int i = 0; i < graph->vertices[*v].deg_in; ++i){
-			int w = graph->vertices[*v].parent[i];
+		int v_rc = graph->nodes[*v].rc_id;
+		for (int i = 0; i < graph->nodes[v_rc].deg; ++i){
+			int pe = graph->edges[graph->nodes[v_rc].adj[i]].rc_id;
+			int w = graph->edges[pe].source;
+			//__VERBOSE("HAHA %d %d\n", *v, w);
 			if (bundle->B[w] != 0)
 				++C;
 		}
@@ -596,34 +572,63 @@ int get_next_B_candidate(struct resolve_bulges_bundle_t *bundle)
 	return res;
 }
 
-void remove_edge_virtual(struct asm_graph_t *g, int e,
-		struct resolve_bulges_bundle_t *bundle)
+void supress_bulge(struct resolve_bulges_bundle_t *bundle)
 {
-	int v = g->edges[e].source;
-	int u = g->edges[e].target;
-	asm_remove_edge(g, e);
-	struct virtual_graph_t *graph = bundle->graph;
-	int deg_out = graph->vertices[v].deg_out;
-	for (int i = 0; i < deg_out; ++i){
-		if (graph->vertices[v].child[i] == u){
-			swap(graph->vertices[v].child + i,
-				graph->vertices[v].child + deg_out - 1,
-				sizeof(int));
-			break;
+	struct asm_graph_t *graph = bundle->graph;
+	struct queue_t *B_vertices = bundle->B_vertices;
+	int *mark = calloc(graph->n_v, sizeof(int));
+	mark[bundle->source] = 1;
+	//__VERBOSE("sink: ");
+	for (int i = B_vertices->front; i < B_vertices->back; ++i){
+		int *v = B_vertices->data[i];
+		int is_sink = 1;
+		for (int j = 0; j < graph->nodes[*v].deg; ++j){
+			int u = get_adj_node(graph, *v, j);
+			if (bundle->B[u] != 0){
+				is_sink = 0;
+				break;
+			}
+		}
+		if (is_sink){
+			//__VERBOSE("%d ", *v);
+			int w = *v;
+			while (mark[w] == 0){
+				mark[w] = 1;
+				int e = bundle->PE[w];
+				w = graph->edges[e].source;
+			}
 		}
 	}
-	--(graph->vertices[v].deg_out);
-
-	int deg_in = graph->vertices[u].deg_in;
-	for (int i = 0; i < deg_in; ++i){
-		if (graph->vertices[u].parent[i] == v){
-			swap(graph->vertices[u].parent + i,
-				graph->vertices[u].parent + deg_in - 1,
-				sizeof(int));
-			break;
+	//__VERBOSE("\n");
+	khash_t(set_int) *rm_edges = kh_init(set_int);
+	for (int i = B_vertices->front; i < B_vertices->back; ++i){
+		int *v = B_vertices->data[i];
+		for (int j = 0; j < graph->nodes[*v].deg; ++j){
+			int u = get_adj_node(graph, *v, j);
+			int e = graph->nodes[*v].adj[j];
+			int rc = graph->edges[e].rc_id;
+			//__VERBOSE("HEHE %d %d %d %d\n", *v, u, mark[*v], mark[u]);
+			if (bundle->B[u] == 0)
+				continue;
+			//__VERBOSE("HAHA %d %d %d %d\n", *v, u, mark[*v], mark[u]);
+			if (!mark[*v] || !mark[u] ||
+				(bundle->PE[u] != e && bundle->PE[u] != rc)){
+				int ret;
+				kh_put(set_int, rm_edges, e, &ret);
+				kh_put(set_int, rm_edges, rc, &ret);
+				//__VERBOSE("remove %d %d\n", e, rc);
+			}
 		}
 	}
-	--(graph->vertices[u].deg_in);
+	for (khiter_t it = kh_begin(rm_edges); it != kh_end(rm_edges); ++it){
+		if (!kh_exist(rm_edges, it))
+			continue;
+		int e = kh_key(rm_edges, it);
+		//__VERBOSE("remove %d\n", e);
+		asm_remove_edge(graph, e);
+	}
+	kh_destroy(set_int, rm_edges);
+	free(mark);
 }
 
 int resolve_bulges(struct asm_graph_t *g)
@@ -631,15 +636,16 @@ int resolve_bulges(struct asm_graph_t *g)
 	int res = 0;
 	struct resolve_bulges_bundle_t bundle;
 	init_resolve_bulges(g, &bundle);
-	struct virtual_graph_t *graph = bundle.graph;
+	struct asm_graph_t *graph = bundle.graph;
 	for (int i = 0; i < graph->n_v; ++i){
+		/*if (i != 36027)
+			continue;*/
 		reset_source(&bundle, i);
 		get_dominated_vertices(&bundle);
-		/*if (i == 1229){
-			for (int i = 0; i < bundle.dom_vertices->back; ++i)
-				__VERBOSE("%d ", *(int *)bundle.dom_vertices->data[i]);
-			__VERBOSE("\n");
-		}*/
+		/*__VERBOSE("dom: ");
+		for (int i = 0; i < bundle.dom_vertices->back; ++i)
+			__VERBOSE("%d ", *(int *)bundle.dom_vertices->data[i]);
+		__VERBOSE("\n");*/
 		get_distance(&bundle);
 
 		add_vertex_to_B(&bundle, i);
@@ -654,10 +660,13 @@ int resolve_bulges(struct asm_graph_t *g)
 			int ret = get_closure(&bundle);
 			if (!ret)
 				break;
+			if (is_complex_closure(&bundle))
+				break;
 			if (is_closure_tree(&bundle))
 				continue;
 			bfs_to_sinks(&bundle);
-			/*for (int j = bundle.B_vertices->front; j < bundle.B_vertices->back; ++j)
+			/*__VERBOSE("B\n");
+			for (int j = bundle.B_vertices->front; j < bundle.B_vertices->back; ++j)
 				__VERBOSE("%d ", *(int *)bundle.B_vertices->data[j]);
 			__VERBOSE("\n");*/
 			/*for (int i = 0; i < g->n_v; ++i){
@@ -671,41 +680,13 @@ int resolve_bulges(struct asm_graph_t *g)
 						asm_remove_edge(g, e);
 					}
 				}
-			}
-			if (i == 1229){
-				write_gfa(g, "./tmp.gfa");
-				exit(0);
 			}*/
-			while (!is_queue_empty(bundle.B_vertices)){
-				int *v = get_queue(bundle.B_vertices);
-				pop_queue(bundle.B_vertices);
-				int tmp[4];
-				int C = 0;
-				for (int j = 0; j < g->nodes[*v].deg; ++j){
-					int e = g->nodes[*v].adj[j];
-					int u = g->edges[e].target;
-					int del = 0;
-					if (bundle.P[u] != *v){
-						del = 1;
-					} else {
-						for (int k = 0; k < C; ++k)
-							if (tmp[k] == u)
-								del = 1;
-					}
-					if (del){
-						int rc = g->edges[e].rc_id;
-						remove_edge_virtual(g, e, &bundle);
-						remove_edge_virtual(g, rc, &bundle);
-					} else {
-						tmp[C++] = u;
-					}
-				}
-				free(v);
-			}
+			supress_bulge(&bundle);
 			log_debug("Bulge detected at %d", i);
 			++res;
 			break;
 		}
+		free_queue_content(bundle.B_vertices);
 		free_queue_content(bundle.dom_vertices);
 		free_queue_content(bundle.closest);
 	}
@@ -725,8 +706,22 @@ int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d bulge(s) resolved", ite, resolved);
+		char path[1024];
+		sprintf(path, "%d_ite", ite);
+		save_graph_info(opt->out_dir, g, path);
+		struct asm_graph_t g1;
+		asm_condense(g, &g1);
+		asm_graph_destroy(g);
+		*g = g1;
+
 	} while(1);
 	log_info("%d bulge(s) resolved after %d iterations", res, ite);
 	return res;
+}
+
+int get_adj_node(struct asm_graph_t *g, int v, int id)
+{
+	int e = g->nodes[v].adj[id];
+	return g->edges[e].target;
 }
 

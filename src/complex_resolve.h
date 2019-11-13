@@ -18,26 +18,13 @@ void pop_queue(struct queue_t *q);
 int is_queue_empty(struct queue_t *q);
 void destroy_queue(struct queue_t *q);
 
-struct vertex_t{
-	int deg_in;
-	int deg_out;
-	int *child;
-	int *parent;
-};
-
-struct virtual_graph_t {
-	int n_v;
-	struct vertex_t *vertices;
-	int *exist;
-};
-
 struct vertex_height_t{
 	int vertex;
 	int height;
 };
 
 struct resolve_bulges_bundle_t{
-	struct virtual_graph_t *graph;
+	struct asm_graph_t *graph;
 	struct queue_t *B_vertices;
 	struct queue_t *dom_vertices;
 	struct queue_t *closest;
@@ -49,13 +36,9 @@ struct resolve_bulges_bundle_t{
 	int *g;
 	int *j;
 	int *height;
-	int *P;
+	int *PE;
 	int *L;
 };
-
-void asm_graph_to_virtual(struct asm_graph_t *g, struct virtual_graph_t *vg);
-void clone_virtual_graph(struct virtual_graph_t *org, struct virtual_graph_t *clone);
-void virtual_graph_destroy(struct virtual_graph_t *vg);
 
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
@@ -83,8 +66,8 @@ void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v);
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 		int *in_queue, struct queue_t *q, int depth);
+void supress_bulge(struct resolve_bulges_bundle_t *bundle);
 int resolve_bulges(struct asm_graph_t *g);
-void remove_edge_virtual(struct asm_graph_t *g, int e,
-		struct resolve_bulges_bundle_t *bundle);
 int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
+int get_adj_node(struct asm_graph_t *g, int v, int id);
 #endif
