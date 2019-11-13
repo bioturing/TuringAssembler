@@ -53,12 +53,12 @@ void print_compress_seq(uint8_t *new_seq, int len)
 	printf("\n");
 }
 
-int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct asm_edge_t *mid, int pair_ksize,
+int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct asm_edge_t *mid, int big_ksize,
 					   int graph_ksize, khash_t(pair_kmer_count) *table)
 {
 	//todo 1 get more pair instead of only one pair right now
-	assert(mid->seq_len <= DISTANCE_KMER + KMER_PAIR_SIZE - 2);
-	int span_len = DISTANCE_KMER + KMER_PAIR_SIZE;
+	int span_len = big_ksize;
+	assert(mid->seq_len <= span_len - 2);
 	int mid_len = mid->seq_len;
 	int left_len = MIN(left->seq_len - graph_ksize, span_len - mid_len - 1);
 	int right_len = MIN(right->seq_len - graph_ksize, span_len - mid_len - 1);
@@ -67,39 +67,20 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 		return -1;
 
 	uint8_t *new_seq = calloc((new_len + 3) >> 2, 1);
-//	printf("left: ");
-//	print_u8_seq(left->seq, left->seq_len);
-//	printf("mid: ");
-//	print_u8_seq(mid->seq, mid->seq_len);
-//	printf("right: ");
-//	print_u8_seq(right->seq, right->seq_len);
 	copy_seq32_seq8(left->seq, left->seq_len - graph_ksize - left_len, new_seq, 0, left_len);
 	copy_seq32_seq8(mid->seq, 0, new_seq, left_len, mid->seq_len);
 	copy_seq32_seq8(right->seq, graph_ksize, new_seq, left_len + mid_len, right_len);
 	print_u8_seq(new_seq, new_len);
 
-//	if (left->seq_len >= new_len) {
-//		copy_seq32_seq8(left->seq, 0, new_seq, 0, new_len);
-//	}else if (right->seq_len >= new_len) {
-//		copy_seq32_seq8(right->seq, 0, new_seq, 0, new_len);
-//	}else {
-//		return -1;
-//	}
-
 	//todo 1: does not need to copy all middle seq
 
 	int value = 0;
 	for (int i = 0; i < new_len - span_len + 1; i++) {
-		uint8_t *h1 = calloc((pair_ksize + 3) >> 2, sizeof(uint8_t));
-		uint8_t *h2 = calloc((pair_ksize + 3) >> 2, sizeof(uint8_t));
-		get_seq(new_seq, i, pair_ksize, h1);
-		get_seq(new_seq, i + DISTANCE_KMER, pair_ksize, h2);
-		print_u8_seq(h1, pair_ksize);
-		print_u8_seq(h2, pair_ksize);
-		int64_t A[2];
-		A[0] = MurmurHash3_x64_64(h1, (pair_ksize + 3) >> 2);
-		A[1] = MurmurHash3_x64_64(h2, (pair_ksize + 3) >> 2);
-		int64_t key = MurmurHash3_x64_64((uint8_t *) &A[0], 16);
+		uint8_t *h1 = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
+		get_seq(new_seq, i, big_ksize, h1);
+//		print_u8_seq(h1, big_ksize);
+		int64_t key;
+		key = MurmurHash3_x64_64(h1, (big_ksize + 3) >> 2);
 
 		khint_t k = kh_get(pair_kmer_count, table, key);
 		int value1 = kh_value(table, k);
@@ -437,7 +418,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 			log_info("   Can't solve - not have span kmer: %d", resolve_stat[i]);
 		}
 		if (i == NOT_LONG_ENOUGH) {
-			log_info("   Can't solve - not long enough: %d", resolve_stat[i]);
+			log_info("   Can't solve - kmer not long enough: %d", resolve_stat[i]);
 		}
 		if (i == 0) {
 			log_info("   Solved: %d", resolve_stat[i]);
@@ -470,10 +451,10 @@ int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
 	if (e->seq_len > DISTANCE_KMER + KMER_PAIR_SIZE - 2)
 		return NOT_LONG_ENOUGH;
 	int pair_ksize = KMER_PAIR_SIZE;
-	int c00 = get_pair_seq_count(a0, o0, e, pair_ksize, g->ksize, table);
-	int c01 = get_pair_seq_count(a0, o1, e, pair_ksize, g->ksize, table);
-	int c10 = get_pair_seq_count(a1, o0, e, pair_ksize, g->ksize, table);
-	int c11 = get_pair_seq_count(a1, o1, e, pair_ksize, g->ksize, table);
+	int c00 = get_pair_seq_count(a0, o0, e, BIG_KSIZE, g->ksize, table);
+	int c01 = get_pair_seq_count(a0, o1, e, BIG_KSIZE, g->ksize, table);
+	int c10 = get_pair_seq_count(a1, o0, e, BIG_KSIZE, g->ksize, table);
+	int c11 = get_pair_seq_count(a1, o1, e, BIG_KSIZE, g->ksize, table);
 	log_warn("pair_ksize %d count00 %d count01 %d count10 %d count11 %d", pair_ksize, c00, c01, c10, c11);
 
 	if (c00 > 0 && c11 > 0 && c00 + c11 > c10 + c01) {

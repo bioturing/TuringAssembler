@@ -75,6 +75,32 @@ void ust_add_pair_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ks
 	free(right);
 }
 
+void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ksize, pthread_mutex_t *lock)
+{
+	int8_t *seq = compress_seq(r->seq);
+	int big_ksize = BIG_KSIZE;
+
+	uint8_t *left = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
+	for (int i = 0; i < r->len - DISTANCE_KMER; i++) {
+		memset(left, 0, (big_ksize+3)>>2);
+		int64_t res;
+		get_seq(seq, i, big_ksize, left);
+		res = MurmurHash3_x64_64(left, (big_ksize + 3) >> 2);
+		pthread_mutex_lock(lock);
+		khint_t k = kh_get(pair_kmer_count, table, res);
+		if (k == kh_end(table)) {
+			int tmp;
+			k = kh_put(pair_kmer_count, table, res, &tmp);
+			kh_value(table, k) = 0;
+			assert(tmp == 1);
+		}
+		pthread_mutex_unlock(lock);
+		atomic_add_and_fetch32(&kh_value(table, k), 1);
+	}
+	free(left);
+}
+
+
 void *get_pair_kmer_ust_iterator(void *data)
 {
 	struct kmer_pair_iterator_bundle_t *bundle = (struct kmer_pair_iterator_bundle_t *) data;
@@ -119,8 +145,8 @@ void *get_pair_kmer_ust_iterator(void *data)
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL || rcI == READ_FAIL)
 				__ERROR("\nWrong format file ust\n");
 
-			ust_add_pair_kmer(&read1, table, bundle->ksize, bundle->table_lock);
-			ust_add_pair_kmer(&read2, table, bundle->ksize, bundle->table_lock);
+			ust_add_big_kmer(&read1, table, bundle->ksize, bundle->table_lock);
+			ust_add_big_kmer(&read2, table, bundle->ksize, bundle->table_lock);
 			if (rc1 == READ_END)
 				break;
 		}
