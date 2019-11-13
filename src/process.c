@@ -181,34 +181,6 @@ void build_bridge_process(struct opt_proc_t *opt)
 	build_bridge(opt);
 }
 
-void debug_closure_process(struct opt_proc_t *opt)
-{
-	char path[1024];
-	sprintf(path, "%s/resolve_bulges.log", opt->out_dir);
-	init_logger(opt->log_level, path);
-	set_log_stage("Resolve bulges");
-	struct asm_graph_t g;
-	load_asm_graph(&g, opt->in_file);
-	print_closure_debug(opt, &g);
-
-	save_graph_info(opt->out_dir, &g, "level_2");
-	asm_graph_destroy(&g);
-}
-
-void debug_dom_process(struct opt_proc_t *opt)
-{
-	char path[1024];
-	sprintf(path, "%s/resolve_bulges.log", opt->out_dir);
-	init_logger(opt->log_level, path);
-	set_log_stage("Resolve bulges");
-	struct asm_graph_t g;
-	load_asm_graph(&g, opt->in_file);
-	print_dom_debug(opt, &g);
-
-	save_graph_info(opt->out_dir, &g, "level_2");
-	asm_graph_destroy(&g);
-}
-
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];

@@ -275,82 +275,6 @@ int get_closure(struct resolve_bulges_bundle_t *bundle)
 	return res;
 }
 
-void print_dom_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
-{
-	int v = opt->lk;
-	struct resolve_bulges_bundle_t bundle;
-	init_resolve_bulges(g, &bundle);
-	reset_source(&bundle, v);
-	get_dominated_vertices(&bundle);
-	int *keep = calloc(g->n_e, sizeof(int));
-	for (int i = 0; i < g->n_e; ++i){
-		int u = g->edges[i].source;
-		int v = g->edges[i].target;
-		if (u == -1)
-			continue;
-		if (bundle.dom[u] != 0 && bundle.dom[v] != 0)
-			keep[i] = keep[g->edges[i].rc_id] = 1;
-	}
-	for (int i = 0; i < g->n_e; ++i){
-		int rc = g->edges[i].rc_id;
-		if (i > rc)
-			continue;
-		if (!keep[i]){
-			asm_remove_edge(g, i);
-			asm_remove_edge(g, rc);
-		}
-	}
-	free(keep);
-	bulges_bundle_destroy(&bundle);
-}
-
-void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
-{
-//	struct virtual_graph_t vg;
-//	asm_graph_to_virtual(g, &vg);
-//	struct virtual_graph_t B;
-//	clone_virtual_graph(&vg, &B);
-//	for (int i = 0; i < B.n_v; ++i)
-//		B.f[i] = -1;
-//
-//	FILE *f = fopen(opt->in_fasta, "r");
-//	int n;
-//	fscanf(f, "%d\n", &n);
-//	for (int i = 0; i < n; ++i){
-//		int v;
-//		fscanf(f, "%d", &v);
-//		B.f[v] = v;
-//	}
-//	fclose(f);
-//
-//	int s = opt->lk;
-//	int ret = get_closure(&vg, s, &B);
-//	for (int i = 0; i < B.n_v; ++i)
-//		if (B.f[i] != -1)
-//			__VERBOSE("%d ", i);
-//	int *keep = calloc(g->n_e, sizeof(int));
-//	for (int i = 0; i < g->n_e; ++i){
-//		int u = g->edges[i].source;
-//		int v = g->edges[i].target;
-//		if (u == -1)
-//			continue;
-//		if (B.f[u] != -1 && B.f[v] != -1)
-//			keep[i] = keep[g->edges[i].rc_id] = 1;
-//	}
-//	for (int i = 0; i < g->n_e; ++i){
-//		int rc = g->edges[i].rc_id;
-//		if (i > rc)
-//			continue;
-//		if (!keep[i]){
-//			asm_remove_edge(g, i);
-//			asm_remove_edge(g, rc);
-//		}
-//	}
-//	free(keep);
-//	virtual_graph_destroy(&B);
-//	virtual_graph_destroy(&vg);
-}
-
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 {
 	struct asm_graph_t *graph = bundle->graph;
@@ -382,10 +306,6 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 	destroy_queue(q);
 	free(q);
 	free(L);
-}
-
-void get_tree(struct resolve_bulges_bundle_t *bundle)
-{
 }
 
 void get_distance(struct resolve_bulges_bundle_t *bundle)

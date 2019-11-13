@@ -45,15 +45,12 @@ int get_closure(struct resolve_bulges_bundle_t *bundle);
 
 
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle);
-void get_tree(struct resolve_bulges_bundle_t *bundle);
 void get_distance(struct resolve_bulges_bundle_t *bundle);
 int get_next_B_candidate(struct resolve_bulges_bundle_t *bundle);
 int is_complex_closure(struct resolve_bulges_bundle_t *bundle);
 int is_closure_tree(struct resolve_bulges_bundle_t *bundle);
 void free_queue_content(struct queue_t *q);
 
-void print_dom_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
-void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g);
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v);
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 		int *in_queue, struct queue_t *q, int depth);
