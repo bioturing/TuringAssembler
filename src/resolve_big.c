@@ -83,6 +83,7 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 		key = MurmurHash3_x64_64(h1, (big_ksize + 3) >> 2);
 
 		khint_t k = kh_get(pair_kmer_count, table, key);
+		assert(k != kh_end(table));
 		int value1 = kh_value(table, k);
 //		log_warn("value of get pair is %d", value1);
 		value += value1;
@@ -90,37 +91,6 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 	return value;
 }
 
-/**
- *						a	    e         b
- *					 o----1-ksize-o--------o-ksize-1-------o
- * @param a
- * @param b
- * @param e
- * @return
- */
-int get_new_seq_count(struct asm_edge_t *a, struct asm_edge_t *b, struct asm_edge_t *e, int ksize,
-					  khash_t(big_kmer_count) *table)
-{
-	test(e, table); //todo 0 remove this
-	int new_len = e->seq_len + 2;
-	uint8_t *new_seq = calloc((new_len + 3) >> 2, 1);
-	int x_a = get_nu(a->seq, a->seq_len - ksize - 1);
-	new_seq[0] |= x_a;
-	for (int i = 0; i < e->seq_len; i++) {
-		new_seq[(i + 1) >> 2] |= (e->seq[i >> 4] >> ((i & 15) << 1) & 3) << (((i + 1) & 3) << 1);
-	}
-	int x_b = get_nu(b->seq, ksize);
-	new_seq[((new_len + 3) >> 2) - 1] |= x_b << ((new_len & 3) << 1);
-//	print_compress_seq(new_seq, new_len); //todo 0 remove this
-	int value = 0;
-	gint_t hash_key = MurmurHash3_x64_64(new_seq, (new_len + 3) >> 2);
-	khint_t k = kh_get(big_kmer_count, table, hash_key);
-	if (k == kh_end(table))
-		value = 0;
-	else
-		value = kh_value(table, k);
-	return value;
-}
 
 int append_barcode_contig(struct barcode_hash_t *bc, khash_t(union_barcode) *uni_bar)
 {
@@ -361,7 +331,6 @@ void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, khash_t(pa
 	}
 	int t = resolve_using_pair_kmer(g, i_e, table);
 	resolve_stat[t]++;
-//	resolve_using_big_kmer(g, i_e, table);
 	int x_rc = g->edges[i_e].rc_id;
 	partition[i_e] = -partition[i_e];
 	partition[x_rc] = -partition[x_rc];
@@ -470,54 +439,6 @@ int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
 		asm_remove_edge(g, i_e_rc);
 	} else {
 		return NOT_HAVE_SPAN_KMER;
-	}
-	return 0;
-}
-
-/**
- *
- * @return
- */
-int resolve_using_big_kmer(struct asm_graph_t *g, int i_e,
-						   khash_t(big_kmer_count) *table)
-{
-	if (!is_case_2_1_2(g, i_e)) {
-		return -1;
-	}
-	int source = g->edges[i_e].source;
-	int target = g->edges[i_e].target;
-	int i_e_rc = g->edges[i_e].rc_id;
-	int i_a0 = g->edges[g->nodes[g->nodes[source].rc_id].adj[0]].rc_id;
-	int i_a1 = g->edges[g->nodes[g->nodes[source].rc_id].adj[1]].rc_id;
-	int i_o0 = g->nodes[target].adj[0];
-	int i_o1 = g->nodes[target].adj[1];
-	struct asm_edge_t *a0 = &g->edges[i_a0];
-	struct asm_edge_t *a1 = &g->edges[i_a1];
-	struct asm_edge_t *o0 = &g->edges[i_o0];
-	struct asm_edge_t *o1 = &g->edges[i_o1];
-	struct asm_edge_t *e = &g->edges[i_e];
-
-	assert(table != NULL);
-
-	int c00 = get_new_seq_count(a0, o0, e, g->ksize, table);
-	int c01 = get_new_seq_count(a0, o1, e, g->ksize, table);
-	int c10 = get_new_seq_count(a1, o0, e, g->ksize, table);
-	int c11 = get_new_seq_count(a1, o1, e, g->ksize, table);
-	log_warn("count00 %d count01 %d count10 %d count11 %d", c00, c01, c10, c11);
-
-	if (c00 > 0 && c11 > 0 && c00 + c11 > c10 + c01) {
-		//todo 1 get new count proportion to path
-		asm_join_edge3_wrapper(g, i_a0, i_e, i_o0, g->edges[i_e].count / 2);
-		asm_join_edge3_wrapper(g, i_a1, i_e, i_o1, g->edges[i_e].count / 2);
-		asm_remove_edge(g, i_e);
-		asm_remove_edge(g, i_e_rc);
-	} else if (c10 > 0 && c01 > 0 && c10 + c01 > c00 + c11) {
-		asm_join_edge3_wrapper(g, i_a0, i_e, i_o1, g->edges[i_e].count / 2);
-		asm_join_edge3_wrapper(g, i_a1, i_e, i_o0, g->edges[i_e].count / 2);
-		asm_remove_edge(g, i_e);
-		asm_remove_edge(g, i_e_rc);
-	} else {
-		return -1;
 	}
 	return 0;
 }

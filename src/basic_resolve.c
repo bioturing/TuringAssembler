@@ -23,7 +23,7 @@
 #define MIN_COVERAGE_RATIO 0.3
 #define MAX_VISITED 100000
 #define MAX_BULGE_LEN 1000
-#define MAX_ALTERNATIVE_LEN_RATIO 2.2
+#define MAX_ALTERNATIVE_LEN_RATIO 1.2
 #define MIN_ALTERNATIVE_LEN_RATIO 0.8
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
