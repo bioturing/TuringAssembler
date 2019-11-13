@@ -129,7 +129,6 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		log_info("Barcode does exist. Getting reads");
 	}
 
-
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
 	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
@@ -137,12 +136,9 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
-	struct mm_db_t *db1;
-	struct mm_db_t *db2;
-	struct mm_hits_t *hits1, *hits2;
-	hits1 = mm_hits_init();
-	hits2 = mm_hits_init();
-
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits1 = mm_hits_init();
+	struct mm_hits_t *hits2 = mm_hits_init();
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
@@ -157,7 +153,9 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		mm_hits_cmp(db2, mm_edges, hits2);
 	}
 	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	log_info("Number of singleton hits of R1: %d", hits1->n);
-	log_info("Number of singleton hits of R2: %d", hits2->n);
+	log_info("Number of singleton hits of R1: %d", kh_size(hits1->edges));
+	log_info("Number of singleton hits of R2: %d", kh_size(hits2->edges));
 
+	free(buf1);
+	free(buf2);
 }

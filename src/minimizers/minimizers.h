@@ -14,6 +14,7 @@
 #include "assembly_graph.h"
 
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
+KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
 
 struct mm_db_t {
     uint64_t *mm;
@@ -24,11 +25,8 @@ struct mm_db_t {
 };
 
 struct mm_hits_t {
-    uint64_t *mm;
-    uint32_t *p;
-    uint32_t *e;
-    size_t n;
-    size_t size;
+    kh_mm_edges_t *edges;
+    uint32_t n;
 };
 
 struct mm_db_edge_t {
@@ -37,6 +35,7 @@ struct mm_db_edge_t {
     kh_mm_hash_t *p;
 };
 
+struct mm_hits_t *mm_hits_init();
 struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l);
 struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l);
 struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w);

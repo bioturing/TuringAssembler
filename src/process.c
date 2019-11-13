@@ -330,23 +330,19 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	char *log_file = str_concate(opt->out_dir, "/build_barcode_scaffold.log");
 	init_logger(opt->log_level, log_file);
 	struct asm_graph_t g;
-	struct read_path_t read_path;
+	struct read_path_t read_sorted_path, read_path;
 
 	load_asm_graph(&g, opt->in_file);
 	char fasta_path[MAX_PATH];
-//	if (opt->lib_type == LIB_TYPE_SORTED) {
-//		read_sorted_path.R1_path = opt->files_1[0];
-//		read_sorted_path.R2_path = opt->files_2[0];
-//		read_sorted_path.idx_path = opt->files_I[0];
-//	} else {
-//		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
-//		sort_read(opt, &read_sorted_path);
-//	}
-	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type== LIB_TYPE_UST) {
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
+		sort_read(opt, &read_sorted_path);
 		read_path.R1_path = opt->files_1[0];
 		read_path.R2_path = opt->files_2[0];
-	} else{
-		__ERROR("MUST BE SORTED OR UST TYPE");
 	}
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
 	mkdir(fasta_path, 0755);

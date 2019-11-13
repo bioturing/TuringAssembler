@@ -197,17 +197,16 @@ void mm_db_insert(struct mm_db_t *db, uint64_t km, uint32_t p)
 	db->p[db->n++] = p;
 }
 
-void mm_hits_insert(struct mm_hits_t *db, uint64_t km, uint32_t p, uint32_t e)
-{
-	if (db->n == db->size) {
-		db->mm =  realloc(db->mm, (db->size << 1) * sizeof(uint64_t));
-		db->e =  realloc(db->e, (db->size << 1) * sizeof(uint64_t));
-		db->p =  realloc(db->p, (db->size << 1) * sizeof(uint64_t));
-		db->size <<= 1;
-	}
-	db->mm[db->n] = km;
-	db->e[db->n] = km;
-	db->p[db->n++] = p;
+void mm_hits_insert(struct mm_hits_t *hits, uint32_t e) {
+	khiter_t k;
+	int miss;
+	k = kh_get(mm_edges, hits->edges, e);
+	if (k == kh_end(hits->edges)) {
+		k = kh_put(mm_edges, hits->edges, e, &miss);
+		kh_value(hits->edges, k) = 1;
+	} else
+		kh_value(hits->edges, k)++;
+	hits->n++;
 }
 
 struct mm_db_t * mm_db_init()
@@ -227,23 +226,18 @@ void mm_db_destroy(struct mm_db_t *db)
 	free(db);
 }
 
-struct mm_hits_t * mm_hits_init()
+struct mm_hits_t *mm_hits_init()
 {
-	struct mm_hits_t *db = calloc(1, sizeof(struct mm_db_t));
-	db->n = 0;
-	db->size = 8;
-	db->mm = calloc(db->size, sizeof(struct mm_db_t));
-	db->p = calloc(db->size, sizeof(struct mm_db_t));
-	db->e = calloc(db->size, sizeof(struct mm_db_t));
-	return db;
+	struct mm_hits_t *hits = calloc(1, sizeof(struct mm_hits_t));
+	hits->edges = kh_init(mm_edges);
+	hits->n = 0;
+	return hits;
 }
 
-void mm_hits_destroy(struct mm_hits_t *db)
+void mm_hits_destroy(struct mm_hits_t *hits)
 {
-	free(db->mm);
-	free(db->p);
-	free(db->e);
-	free(db);
+	kh_destroy(mm_edges, hits->edges);
+	free(hits);
 }
 
 static inline uint64_t get_km_i_bin(uint32_t *s, int i, int k)
@@ -477,7 +471,7 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 	for (i = 0; i < db->n; ++i) {
 		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
 		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
-			mm_hits_insert(hits, db->mm[i], db->p[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1));
+			mm_hits_insert(hits, kh_get_val(mm_hash, db_e->h, db->mm[i], -1));
 		}
 	}
 	return hits;
