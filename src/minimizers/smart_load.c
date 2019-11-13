@@ -18,8 +18,7 @@
 #include "minimizers.h"
 #include "assembly_graph.h"
 
-KSEQ_INIT(gzFile, gzread);
-
+KSEQ_INIT(FILE*, read)
 /**
  * Construct the dictionary index of
  * barcode position in the barcode sorted file
@@ -142,9 +141,9 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		log_error("Stream error!");
 	}
 
-	char *line = malloc(1024);
-	kseq_t *r1 = kseq_init(buf1_stream);
-	kseq_t *r2 = kseq_init(buf2_stream);
+	kseq_t *r1 = kseq_init(fileno(buf1_stream));
+	kseq_t *r2 = kseq_init(fileno(buf2_stream));
+	int n_reads = 0;
 	struct mm_db_t *db1;
 	struct mm_db_t *db2;
 	struct mm_hits_t *hits1, *hits2;
@@ -156,13 +155,14 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
 
 	while (kseq_read(r1) >= 0 && kseq_read(r2) >= 0 ) {
+		n_reads++;
 		db1 = mm_index_char_str(r1->seq.s, 17, 17, r1->seq.l);
 		db2 = mm_index_char_str(r2->seq.s, 17, 17, r2->seq.l);
 
 		mm_hits_cmp(db1, mm_edges, hits1);
 		mm_hits_cmp(db2, mm_edges, hits2);
 	}
-
+	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
 	log_info("Number of singleton hits of R1: %d", hits1->n);
 	log_info("Number of singleton hits of R2: %d", hits2->n);
 
