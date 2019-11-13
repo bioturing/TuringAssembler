@@ -79,11 +79,6 @@ void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *
 	bundle->source = -1;
 	bundle->dom = calloc(g->n_v, sizeof(int));
 	bundle->B = calloc(g->n_v, sizeof(int));
-	bundle->S = calloc(g->n_v, sizeof(int));
-	bundle->T = calloc(g->n_v, sizeof(int));
-	bundle->g = calloc(g->n_v, sizeof(int));
-	bundle->j = calloc(g->n_v, sizeof(int));
-	bundle->height = calloc(g->n_v, sizeof(int));
 	bundle->PE = calloc(g->n_v, sizeof(int));
 	bundle->L = calloc(g->n_v, sizeof(int));
 }
@@ -96,11 +91,6 @@ void reset_source(struct resolve_bulges_bundle_t *bundle, int s)
 	bundle->source = s;
 	memset(bundle->dom, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->B, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->S, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->T, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->g, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->j, 0, sizeof(int) * bundle->graph->n_v);
-	memset(bundle->height, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->PE, 0, sizeof(int) * bundle->graph->n_v);
 	memset(bundle->L, 0, sizeof(int) * bundle->graph->n_v);
 }
@@ -115,11 +105,6 @@ void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle)
 	free(bundle->closest);
 	free(bundle->dom);
 	free(bundle->B);
-	free(bundle->S);
-	free(bundle->T);
-	free(bundle->g);
-	free(bundle->j);
-	free(bundle->height);
 	free(bundle->PE);
 	free(bundle->L);
 }
@@ -364,92 +349,6 @@ void print_closure_debug(struct opt_proc_t *opt, struct asm_graph_t *g)
 //	free(keep);
 //	virtual_graph_destroy(&B);
 //	virtual_graph_destroy(&vg);
-}
-
-void get_height_dfs(struct resolve_bulges_bundle_t *bundle, int v)
-{
-	struct asm_graph_t *graph = bundle->graph;
-	int *height = bundle->height;
-	height[v] = 0;
-	for (int i = 0; i < graph->nodes[v].deg; ++i){
-		int u = get_adj_node(graph, v, i);
-		if (bundle->B[u] == 0)
-			continue;
-		if(height[u] == -1)
-			get_height_dfs(bundle, u);
-		height[v] = max(height[v], height[u] + 1);
-	}
-}
-
-void get_height(struct resolve_bulges_bundle_t *bundle)
-{
-	memset(bundle->height, -1, sizeof(int) * bundle->graph->n_v);
-	get_height_dfs(bundle, bundle->source);
-}
-
-int is_able_to_map(struct resolve_bulges_bundle_t *bundle, int u, int v)
-{
-	if (bundle->height[u] == 0)
-		return 0;
-	struct asm_graph_t *graph = bundle->graph;
-	for (int i = 0; i < graph->nodes[u].deg; ++i){
-		int w = get_adj_node(graph, u, i);
-		if (bundle->B[w] == 0)
-			continue;
-		int ok = 0;
-		int w_rc = graph->nodes[w].rc_id;
-		for (int j = 0; j < graph->nodes[w_rc].deg; ++j){
-			int pe = graph->edges[graph->nodes[w_rc].adj[j]].rc_id;
-			int t = graph->edges[pe].source;
-			if (t == v){
-				ok = 1;
-				break;
-			}
-		}
-		if (!ok)
-			return 0;
-	}
-	return 1;
-}
-
-int get_skeleton(struct resolve_bulges_bundle_t *bundle)
-{
-	get_height(bundle);
-	struct asm_graph_t *graph = bundle->graph;
-	struct queue_t *q = calloc(1, sizeof(struct queue_t));
-	init_queue(q, graph->n_v);
-	for (int i = 0; i < graph->n_v; ++i){
-		if (bundle->height[i] == 0){
-			struct vertex_height_t pair = {
-				.vertex = i,
-				.height = 0
-			};
-			push_queue(q, pointerize(&pair, sizeof(struct vertex_height_t)));
-		}
-	}
-
-	int *height = bundle->height;
-	while (!is_queue_empty(q)){
-		int p = q->front;
-		while (p < q->back &&
-			((struct vertex_height_t *)q->data[p])->height ==
-			((struct vertex_height_t *)q->data[q->front])->height)
-			++p;
-		int n = p - q->front;
-		for (int i = 0; i < n - 1; ++i){
-			struct vertex_height_t *u = q->data[q->front + i];
-			if (u->height != height[u->vertex]){
-				struct vertex_height_t new_u = {
-					.vertex = u->vertex,
-					.height = u->height - 1
-				};
-				//int pr = 
-			}
-			for (int j = i + 1; j < n; ++j){
-			}
-		}
-	}
-	free(q);
 }
 
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)

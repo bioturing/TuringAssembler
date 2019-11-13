@@ -31,11 +31,6 @@ struct resolve_bulges_bundle_t{
 	int source;
 	int *dom;
 	int *B;
-	int *S;
-	int *T;
-	int *g;
-	int *j;
-	int *height;
 	int *PE;
 	int *L;
 };
@@ -49,10 +44,6 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
 int get_closure(struct resolve_bulges_bundle_t *bundle);
 
 
-int is_able_to_map(struct resolve_bulges_bundle_t *bundle, int u, int v);
-void get_height_dfs(struct resolve_bulges_bundle_t *bundle, int v);
-void get_height(struct resolve_bulges_bundle_t *bundle);
-int get_skeleton(struct resolve_bulges_bundle_t *bundle);
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle);
 void get_tree(struct resolve_bulges_bundle_t *bundle);
 void get_distance(struct resolve_bulges_bundle_t *bundle);
