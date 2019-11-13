@@ -137,8 +137,8 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
 	struct mm_db_t *db1, *db2;
-	struct mm_hits_t *hits1 = mm_hits_init();
-	struct mm_hits_t *hits2 = mm_hits_init();
+	struct mm_hits_t *hits;
+	hits = mm_hits_init();
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
@@ -149,12 +149,11 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
 		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
 
-		mm_hits_cmp(db1, mm_edges, hits1);
-		mm_hits_cmp(db2, mm_edges, hits2);
+		mm_hits_cmp(db1, mm_edges, hits);
+		mm_hits_cmp(db2, mm_edges, hits);
 	}
 	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	log_info("Number of singleton hits of R1: %d", kh_size(hits1->edges));
-	log_info("Number of singleton hits of R2: %d", kh_size(hits2->edges));
+	log_info("Number of singleton hits: %d", kh_size(hits->edges));
 
 	free(buf1);
 	free(buf2);

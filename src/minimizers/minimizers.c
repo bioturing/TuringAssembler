@@ -336,7 +336,6 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 }
 
 struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
-
 {
 	struct mm_db_t *db = mm_db_init();
 	db->k = k;
