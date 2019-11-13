@@ -3,6 +3,7 @@
 #include "assembly_graph.h"
 
 KHASH_SET_INIT_INT(set_int);
+KHASH_MAP_INIT_INT(int_int, int);
 void *pointerize(void *data, int size);
 
 struct queue_t{
@@ -30,10 +31,10 @@ struct resolve_bulges_bundle_t{
 	struct queue_t *dom_vertices;
 	struct queue_t *closest;
 	int source;
-	int *dom;
-	int *B;
-	int *PE;
-	int *L;
+	khash_t(set_int) *dom;
+	khash_t(set_int) *B;
+	khash_t(int_int) *PE;
+	khash_t(int_int) *L;
 };
 
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
@@ -42,6 +43,13 @@ void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
 
 void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
 int get_closure(struct resolve_bulges_bundle_t *bundle);
+
+void put_in_set(khash_t(set_int) *h, int k);
+int check_in_set(khash_t(set_int) *h, int k);
+void put_in_map(khash_t(int_int) *h, int k, int v);
+void increase_in_map(khash_t(int_int) *h, int k, int v);
+int check_in_map(khash_t(int_int) *h, int k);
+int get_in_map(khash_t(int_int) *h, int k);
 
 
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle);
