@@ -208,6 +208,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-i")) {
 			opt->in_file = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-bx")) {
+			opt->bx_str = argv[pos + 1];
+			pos += 2;
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
