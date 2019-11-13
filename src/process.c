@@ -298,7 +298,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 //		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
 //		sort_read(opt, &read_sorted_path);
 //	}
-	if (opt->lib_type == LIB_TYPE_SORTED|| opt->lib_type== LIB_TYPE_UST) {
+	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type== LIB_TYPE_UST) {
 		read_path.R1_path = opt->files_1[0];
 		read_path.R2_path = opt->files_2[0];
 	} else{
