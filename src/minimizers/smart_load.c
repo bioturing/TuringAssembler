@@ -154,6 +154,7 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	}
 	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
 	log_info("Number of singleton hits: %d", kh_size(hits->edges));
+	mm_hits_print(hits, "barcode_hits.csv");
 
 	free(buf1);
 	free(buf2);
