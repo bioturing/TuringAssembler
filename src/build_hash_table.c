@@ -219,7 +219,7 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type == LIB_TYPE_10X)
 		free_fastq_pair(producer_bundles, opt->n_files);
 	else if (opt->lib_type == LIB_TYPE_UST)
-		free_fastq_triple(producer_bundles, opt->n_files);
+		free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 }
 
