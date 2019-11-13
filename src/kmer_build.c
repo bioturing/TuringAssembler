@@ -20,15 +20,6 @@
 
 #define __kmerseq_get(seq, k) (((seq)[(k) >> 2] >> (((k) & 3) << 1)) & (uint32_t)3)
 
-struct kmbuild_bundle_t {
-	struct kmhash_t *h;
-	int ksize;
-	uint8_t *k1;
-	uint8_t *k2;
-	uint8_t *k1_rc;
-	uint8_t *k2_rc;
-};
-
 /* ------------------------------>
  *  T A C C A C T G G G A T T C A
  *  4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
@@ -534,6 +525,11 @@ void kmbuild_bundle_destroy(struct kmbuild_bundle_t *b)
 	free(b->k1_rc);
 	free(b->k2_rc);
 	b->k1 = b->k2 = b->k1_rc = b->k2_rc = NULL;
+}
+
+void km_count_bundle_destroy(struct km_count_bundle_t *b)
+{
+	//todo 0 destroy
 }
 
 int have_contig_file(int n_files) {

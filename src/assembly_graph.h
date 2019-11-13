@@ -6,6 +6,7 @@
 #include "attribute.h"
 #include "barcode_hash.h"
 #include "khash.h"
+#include "radix_sort.h"
 
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
@@ -17,8 +18,15 @@
 #define ASM_BUILD_COVERAGE		0x4
 #define ASM_BUILD_CANDIDATE		0x8
 
+#define DISTANCE_KMER 60
+#define KMER_PAIR_SIZE 51
+#define BIG_KSIZE 111
+
 #define NOT_FOR_SCAFF 0x1
 #define FOR_SCAFFOLD 0x2
+#define NOT_LONG_ENOUGH 2
+#define NOT_HAVE_SPAN_KMER 3
+#define ASEQ "CTGTCGAGATGAAAATTGTTTTGAAAAATGACGTTCCAGCTTATCAGCATCCCAGGCGACTGTCGTATAGTGACCAAAACTTTGTAGATGAGCAGATGCGGGAATGGTTAAAAGAAGGTATAATACAGCCCGTAGTCCTGGTGGCTAAGA"
 
 struct pair_contig_t {
 	gint_t e1;
@@ -82,7 +90,7 @@ struct asm_graph_t {
 	khash_t(pair_contig_count) *candidates;
 };
 
-#define MIN_NOTICE_LEN			100
+#define MIN_NOTICE_LEN			250
 #define MIN_CONNECT_SIZE		500
 
 #define TIPS_RATIO_THRES		0.1
@@ -99,6 +107,7 @@ struct asm_graph_t {
 #define CONTIG_LEVEL_0			500
 #define CONTIG_LEVEL_1			3000
 #define CONTIG_LEVEL_2			10000
+#define MAX_BARCODE_REGION		10000
 
 #define MAX_READ_FRAG_LEN		350
 
@@ -117,6 +126,8 @@ struct asm_graph_t {
 
 #define MIN_BARCODE_RATIO		0.044
 #define MIN_SUB_BARCODE_RATIO		0.022
+#define CONTIG_PARTITION_LEN 1500
+#define MIN_COMPONENT			250
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
@@ -129,7 +140,9 @@ void build_initial_graph(struct opt_proc_t *opt, int ksize, struct asm_graph_t *
 
 /* get the barcode share ratio between two contigs */
 double get_barcode_ratio(struct asm_graph_t *g, gint_t e1, gint_t e2);
+
 double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
+
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
     struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
@@ -194,17 +207,27 @@ static inline struct cov_range_t convert_cov_range(double fcov)
 	else
 		return (struct cov_range_t){icov + 1, icov + 1};
 }
+
 /* Estimate coverage of 1 walk on genome */
 double get_genome_coverage(struct asm_graph_t *g);
+
 double get_genome_coverage_h(struct asm_graph_t *g);
+
 /* Copy sequence, gap and kmer count information from src to dst */
 void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src);
+
 gint_t asm_create_node(struct asm_graph_t *g);
+
 gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src);
+
 void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t overlap);
+
 void asm_clean_edge(struct asm_graph_t *g, gint_t e);
+
 void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src);
+
 void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
+
 void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int rep);
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -216,14 +239,20 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 			gint_t e2, gint_t e_rc2, uint64_t added_count);
 void asm_graph_destroy(struct asm_graph_t *g);
+
 /* only set the link to the edge to -1 */
 void asm_remove_edge(struct asm_graph_t *g, gint_t e);
+
 /* get the real length of the edge */
 uint32_t get_edge_len(struct asm_edge_t *e);
+
 /* get the index of the longest edge */
 gint_t get_longest_edge(struct asm_graph_t *g);
+
 void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov);
+
 void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov);
+
 void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
 				gint_t e_rc2, gint_t e_rc1);
 void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
@@ -234,13 +263,18 @@ void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 
 /* Write confidence contigs/scaffolds to fasta file */
 void write_fasta(struct asm_graph_t *g, const char *path);
+
 /* Write graph as gfa format */
 void write_gfa(struct asm_graph_t *g, const char *path);
+
 void write_fasta_seq(struct asm_graph_t *g, const char *fasta_path);
+
 /* Save graph topology as binary format */
 void save_asm_graph(struct asm_graph_t *g, const char *path);
+
 /* Load graph, auto detect saved type */
 void load_asm_graph(struct asm_graph_t *g, const char *path);
+
 /* Load fasta file and build graph base on reported contigs/scaffold */
 void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize);
 
@@ -248,14 +282,21 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize);
 /******************************************************************************/
 
 void test_asm_graph(struct asm_graph_t *g);
+
 void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
+
 void print_test_pair_end(struct asm_graph_t *g, gint_t e);
+
 void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
 						gint_t e2, gint_t e2a);
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
+
 void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
+
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
+void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
+
 #endif  /* __ASSEMBLY_GRAPH_H__ */

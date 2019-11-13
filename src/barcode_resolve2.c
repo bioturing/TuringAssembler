@@ -14,11 +14,14 @@
 #include "time_utils.h"
 #include "utils.h"
 #include "utils.h"
-#include "verbose.h" 
+#include "verbose.h"
 #include "barcode_resolve2.h"
 #include "process.h"
 #include "barcode_builder.h"
 #include "unit_test.h"
+#include "resolve_big.h"
+#include "build_hash_table.h"
+
 #define MIN_EXCLUDE_BARCODE_CONTIG_LEN 6000
 #define __positive_ratio(r)		((r) + EPS >= 0.1)
 #define __positive_ratio_unique(r)	((r) + EPS >= 0.08)
@@ -182,10 +185,10 @@ static uint32_t count_shared_bc(struct barcode_hash_t *t1, struct barcode_hash_t
 {
 	uint32_t i, k, ret = 0;
 	for (i = 0; i < t1->size; ++i) {
-		if (t1->keys[i] == (uint64_t)-1)
+		if (t1->keys[i] == (uint64_t) -1)
 			continue;
 		k = barcode_hash_get(t2, t1->keys[i]);
-		ret += (int)(k != BARCODE_HASH_END(t2));
+		ret += (int) (k != BARCODE_HASH_END(t2));
 	}
 	return ret;
 }
@@ -227,7 +230,7 @@ static int check_barcode_superior(struct asm_graph_t *g, gint_t e1, gint_t e2, g
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] == (uint64_t)-1)
+		if (h1->keys[i] == (uint64_t) -1)
 			continue;
 		k2 = barcode_hash_get(h2, h1->keys[i]);
 		k2a = barcode_hash_get(h2a, h1->keys[i]);
@@ -257,7 +260,7 @@ static int check_barcode_greater(struct asm_graph_t *g, gint_t e1, gint_t e2, gi
 	uint32_t share_1_2, share_1_2a, share_1_2_2a, i, k2, k2a;
 	share_1_2 = share_1_2a = share_1_2_2a = 0;
 	for (i = 0; i < h1->size; ++i) {
-		if (h1->keys[i] == (uint64_t)-1)
+		if (h1->keys[i] == (uint64_t) -1)
 			continue;
 		k2 = barcode_hash_get(h2, h1->keys[i]);
 		k2a = barcode_hash_get(h2a, h1->keys[i]);
@@ -1459,7 +1462,7 @@ static inline void dump_edge_fasta(char **seq, int *m_seq, struct asm_edge_t *e)
 		*m_seq = len + 1;
 		*seq = realloc(*seq, *m_seq);
 	}
-	for (i = k = 0; i < (int)e->seq_len; ++i) {
+	for (i = k = 0; i < (int) e->seq_len; ++i) {
 		(*seq)[k++] = nt4_char[__binseq_get(e->seq, i)];
 		if ((i + 1) % 80 == 0)
 			(*seq)[k++] = '\n';
@@ -1494,14 +1497,14 @@ void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
 	while ((byte_read = fread(buf, 1, 40, fp))) {
 		if (byte_read != 40)
 			__ERROR("Corrupted barcode in read index file");
-		barcode = unpack_int64((uint8_t *)buf);
+		barcode = unpack_int64((uint8_t *) buf);
 		k = kh_put(bcpos, h, barcode, &ret);
 		if (ret != 1)
 			__ERROR("Insert barcode failed");
-		kh_value(h, k).r1_offset = unpack_int64((uint8_t *)buf + 8);
-		kh_value(h, k).r2_offset = unpack_int64((uint8_t *)buf + 16);
-		kh_value(h, k).r1_len = unpack_int64((uint8_t *)buf + 24);
-		kh_value(h, k).r2_len = unpack_int64((uint8_t *)buf + 32);
+		kh_value(h, k).r1_offset = unpack_int64((uint8_t *) buf + 8);
+		kh_value(h, k).r2_offset = unpack_int64((uint8_t *) buf + 16);
+		kh_value(h, k).r1_len = unpack_int64((uint8_t *) buf + 24);
+		kh_value(h, k).r2_len = unpack_int64((uint8_t *) buf + 32);
 	}
 	fclose(fp);
 }
@@ -1626,6 +1629,7 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 		h_tail = kh_init(gint);*/
 	bc1 = g->edges[e1].barcodes + 1;
 	bc2 = g->edges[e2].barcodes + 1;
+
 	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
 	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
 	khash_t(gint) *h_head = kh_init(gint);
@@ -1978,7 +1982,7 @@ void print_one_path(struct asm_graph_t *g, gint_t e1, gint_t e2, uint32_t id,
 			}
 		}
 	}
-	log_debug( "Candidate %u, len: %u", id, sum_len + g->ksize);
+	log_debug("Candidate %u, len: %u", id, sum_len + g->ksize);
 	e2_len = __min(g->edges[e2].seq_len, 200);
 	for (k = g->ksize; k < e2_len; ++k) {
 		buf[buf_len++] = nt4_char[__binseq_get(g->edges[e2].seq, k)];
@@ -2408,11 +2412,11 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 		ret = find_best_local_path(opt, g, ep1.seq[ep1.len - 1], ep2.seq[0],
 			sub_e1, sub_e2, sret);
 		if (ret == 1)
-			log_debug( "Found path: %ld <-> %ld", e1, e2);
+			log_debug("Found path: %ld <-> %ld", e1, e2);
 		else if (ret == 2)
-			log_debug( "Too many path:  %ld <-> %ld", e1, e2);
+			log_debug("Too many path:  %ld <-> %ld", e1, e2);
 		else if (ret == -1)
-			log_debug( "No path:  %ld <-> %ld", e1, e2);
+			log_debug("No path:  %ld <-> %ld", e1, e2);
 	}
 fill_path_clean:
 	free(ep1.seq);
@@ -2488,7 +2492,7 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	}
 	count_readpair_path(opt->n_threads, &local_read, fasta_path, ctg_cnt);
 	destroy_read_path(&local_read);
-	
+
 	log_debug( "Testing local path %ld <-> %ld", e1, e2);
 	int best_cnt, best_len, best_cand;
 	best_cnt = 0;
@@ -2726,7 +2730,7 @@ khash_t(gint) *barcode_hash_2_khash(struct barcode_hash_t *bc)
 {
 	khash_t(gint) *res = kh_init(gint);
 	for (uint32_t i = 0; i < bc->size; ++i) {
-		if (bc->keys[i] != (uint64_t)-1){
+		if (bc->keys[i] != (uint64_t) -1) {
 			int ret;
 			kh_put(gint, res, bc->keys[i], &ret);
 		}
@@ -2753,17 +2757,17 @@ khash_t(gint) *get_shared_bc(khash_t(gint) *h1, khash_t(gint) *h2)
 khash_t(gint) *get_union_bc(khash_t(gint) *h1, khash_t(gint) *h2)
 {
 	khash_t(gint) *res = kh_init(gint);
-	for (khiter_t it = kh_begin(h1); it != kh_end(h1); ++it){
+	for (khiter_t it = kh_begin(h1); it != kh_end(h1); ++it) {
 		if (!kh_exist(h1, it))
 			continue;
 		int ret;
 		kh_put(gint, res, kh_key(h1, it), &ret);
 	}
-	for (khiter_t it = kh_begin(h2); it != kh_end(h2); ++it){
+	for (khiter_t it = kh_begin(h2); it != kh_end(h2); ++it) {
 		if (!kh_exist(h2, it))
 			continue;
 		khiter_t it2 = kh_get(gint, h1, kh_key(h2, it));
-		if (it2 == kh_end(h1)){
+		if (it2 == kh_end(h1)) {
 			int ret;
 			kh_put(gint, res, kh_key(h2, it), &ret);
 		}
@@ -2774,11 +2778,11 @@ khash_t(gint) *get_union_bc(khash_t(gint) *h1, khash_t(gint) *h2)
 khash_t(gint) *get_exclude_bc(khash_t(gint) *h_in, khash_t(gint) *h_ex)
 {
 	khash_t(gint) *res = kh_init(gint);
-	for (khiter_t it = kh_begin(h_in); it != kh_end(h_in); ++it){
+	for (khiter_t it = kh_begin(h_in); it != kh_end(h_in); ++it) {
 		if (!kh_exist(h_in, it))
 			continue;
 		khiter_t it2 = kh_get(gint, h_ex, kh_key(h_in, it));
-		if (it2 == kh_end(h_ex)){
+		if (it2 == kh_end(h_ex)) {
 			int ret;
 			kh_put(gint, res, kh_key(h_in, it), &ret);
 		}
@@ -2790,9 +2794,11 @@ void khash_2_arr(khash_t(gint) *h, uint64_t **arr, int *n)
 {
 	*n = 0;
 	*arr = calloc(kh_size(h), sizeof(uint64_t));
-	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
+	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it) {
 		if (!kh_exist(h, it))
 			continue;
 		(*arr)[(*n)++] = kh_key(h, it);
 	}
 }
+
+

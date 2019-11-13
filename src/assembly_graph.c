@@ -16,11 +16,14 @@
 #include "resolve.h"
 
 KSEQ_INIT(gzFile, gzread);
+#define read_index_get_key(p) ((p).r1_offset)
+RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
 __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
 							__mix_2_64, __cmp_2_64);
 
 __KHASH_IMPL(contig_count, , gint_t, int, 1, kh_int64_hash_func, kh_int64_hash_equal);
+
 static inline int is_hole_rc(struct asm_edge_t *e1, struct asm_edge_t *e2)
 {
 	if (e1->n_holes != e2->n_holes)
@@ -132,14 +135,14 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 		if (g->edges[e].source == -1)
 			continue;
 		int len = get_edge_len(&g->edges[e]);
-		float cov = __get_edge_cov(g->edges +e, g->ksize);
+		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		if (len < 1000)
 			continue;
 		sum_len += g->edges[e].seq_len;
 		sum_cov += g->edges[e].seq_len * cov;
 	}
 	log_debug("total sumlen %d sumcov %lf", sum_len, sum_cov);
-	return sum_cov/sum_len;
+	return sum_cov / sum_len;
 }
 
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
@@ -163,7 +166,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 		}
 	}
 	(*seq)[k] = '\0';
-	return (gint_t)k;
+	return (gint_t) k;
 }
 
 // void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov)
@@ -228,7 +231,7 @@ void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src)
 	dst->seq_len = src->seq_len;
 	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
 	memcpy(dst->seq, src->seq,
-		((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
+		   ((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
 	dst->n_holes = src->n_holes;
 	if (dst->n_holes) {
 		dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
@@ -567,8 +570,20 @@ void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int re
 	--g->n_e;
 }
 
+void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count)
+{
+	log_warn("join 3 edge %d %d %d", e1, e2, e3);
+	int e1_rc = g->edges[e1].rc_id;
+	int e2_rc = g->edges[e2].rc_id;
+	int e3_rc = g->edges[e3].rc_id;
+	log_warn("their rc %d %d %d", e1_rc, e2_rc, e3_rc);
+	assert(g->edges[e1].source != -1 && g->edges[e2].source != -1 && g->edges[e3].source != -1);
+	assert(g->edges[e1_rc].source != -1 && g->edges[e2_rc].source != -1 && g->edges[e3_rc].source != -1);
+	asm_join_edge3(g, e1, e1_rc, e2, e2_rc, e3, e3_rc, count);
+}
+
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
+					gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
 {
 	/*    contig 1  | overlap |      | overlap |  contig 3
 	 * ATCTTCGGTTTTTCTTTAAAAAAG      AAACTTTTTTTGGGGGATACCC
@@ -590,7 +605,7 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 	asm_append_seq(g->edges + e_rc3, g->edges + e_rc1, g->ksize);
 	g->edges[e_rc3].target = g->edges[e_rc1].target;
 	g->edges[e_rc3].count += g->edges[e_rc1].count + e2_count;
-	
+
 	g->edges[e1].rc_id = e_rc3;
 	g->edges[e_rc3].rc_id = e1;
 
@@ -756,7 +771,7 @@ static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
 	uint32_t i, len = e->seq_len;
 	for (i = 0; i < e->n_holes; ++i)
 		len += e->l_holes[i];
-	return (uint64_t)(cov * len);
+	return (uint64_t) (cov * len);
 }
 
 static void print_debug(struct asm_edge_t *e)
@@ -829,7 +844,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		if (e > e_rc)
 			continue;
 		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < 250)
+		if (cc_size[cc_id] < MIN_COMPONENT)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
@@ -841,7 +856,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		if (g->edges[e].source == -1)
 			continue;
 		gint_t cc_id = id_edge[e];
-		if (cc_size[cc_id] < 250)
+		if (cc_size[cc_id] < MIN_COMPONENT)
 			continue;
 		e_rc = g->edges[e].rc_id;
 		gint_t pe, pe_rc, next_pe, next_pe_rc;
@@ -1318,7 +1333,7 @@ int asm_fasta_edge_convert(struct asm_graph_t *g, gint_t e, kseq_t *seq)
 	last_c = 0;
 	n_holes = 0;
 	for (i = k = 0; i < seq->seq.l; ++i) {
-		c = nt4_table[(int)seq->seq.s[i]];
+		c = nt4_table[(int) seq->seq.s[i]];
 		if (c >= 4) {
 			if (last_c >= 4) {
 				++l_holes[j];
@@ -1370,7 +1385,7 @@ void load_asm_graph_fasta(struct asm_graph_t *g, const char *path, int ksize)
 	kseq_t *seq = kseq_init(fp);
 	while (kseq_read(seq) >= 0) {
 		/* add new edge */
-		if ((int)seq->seq.l < ksize)
+		if ((int) seq->seq.l < ksize)
 			continue;
 		g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
 		g->nodes = realloc(g->nodes, (g->n_v + 4) * sizeof(struct asm_node_t));
@@ -1413,7 +1428,7 @@ void asm_graph_destroy(struct asm_graph_t *g)
 {
 	log_debug("Destroying graph with flag %d", g->aux_flag);
 	gint_t u, e;
-	for (e = 0; e < g->n_e; ++e){
+	for (e = 0; e < g->n_e; ++e) {
 		int u = g->edges[e].source;
 		if (u == -1)
 			continue;
@@ -1434,16 +1449,16 @@ void asm_graph_destroy(struct asm_graph_t *g)
 
 void asm_resolve_local_loop(struct asm_graph_t *lg)
 {
-	for (int e = 0; e < lg->n_e; ++e){
+	for (int e = 0; e < lg->n_e; ++e) {
 		int rc = lg->edges[e].rc_id;
 		if (e > rc)
 			continue;
 		int tg = lg->edges[e].target;
 		int sr = lg->nodes[lg->edges[e].source].rc_id;
-		if (lg->nodes[tg].deg == 2 && lg->nodes[sr].deg == 2){
+		if (lg->nodes[tg].deg == 2 && lg->nodes[sr].deg == 2) {
 			int loop_e = -1;
-			for (int i = 0; loop_e == -1 && i < 2; ++i){
-				for (int j = 0; loop_e == -1 && j < 2; ++j){
+			for (int i = 0; loop_e == -1 && i < 2; ++i) {
+				for (int j = 0; loop_e == -1 && j < 2; ++j) {
 					if (lg->nodes[tg].adj[i] ==
 						lg->edges[lg->nodes[sr].adj[j]].rc_id)
 						loop_e = lg->nodes[tg].adj[i];
@@ -1500,10 +1515,10 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	g1->aux_flag = g0->aux_flag;
 	g1->n_v = g0->n_v;
 	g1->n_e = g0->n_e;
-	if (g0->candidates != NULL){
+	if (g0->candidates != NULL) {
 		g1->candidates = kh_init(pair_contig_count);
 		for (khiter_t it = kh_begin(g0->candidates); it != kh_end(g0->candidates);
-				++it){
+			 ++it) {
 			if (!kh_exist(g0->candidates, it))
 				continue;
 			struct pair_contig_t key = kh_key(g0->candidates, it);
@@ -1516,7 +1531,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		g1->candidates = NULL;
 	}
 	g1->nodes = (struct asm_node_t *) calloc(g0->n_v, sizeof(struct asm_node_t));
-	for (int i = 0; i < g1->n_v; ++i){
+	for (int i = 0; i < g1->n_v; ++i) {
 		g1->nodes[i].rc_id = g0->nodes[i].rc_id;
 		g1->nodes[i].deg = g0->nodes[i].deg;
 		g1->nodes[i].adj = (gint_t *) calloc(g1->nodes[i].deg, sizeof(gint_t));
@@ -1524,7 +1539,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	}
 
 	g1->edges = (struct asm_edge_t *) calloc(g0->n_e, sizeof(struct asm_edge_t));
-	for (int i = 0; i < g1->n_e; ++i){
+	for (int i = 0; i < g1->n_e; ++i) {
 		g1->edges[i].count = g0->edges[i].count;
 		g1->edges[i].seq_len = g0->edges[i].seq_len;
 		g1->edges[i].n_holes = g0->edges[i].n_holes;

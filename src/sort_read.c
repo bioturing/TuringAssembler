@@ -22,15 +22,6 @@
 #define read_sort_get_key(p) ((p).barcode)
 RS_IMPL(read_sort, struct readbc_t, 64, 8, read_sort_get_key);
 
-#define read_index_get_key(p) ((p).r1_offset)
-RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
-
-struct readsort_bundle_t {
-	struct dqueue_t *q;
-	char prefix[MAX_PATH];
-	int64_t sm;
-};
-
 static inline uint64_t get_barcode_ust_raw(struct read_t *I)
 {
 	uint64_t ret = 0;
