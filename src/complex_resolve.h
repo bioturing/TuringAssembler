@@ -2,6 +2,7 @@
 #define __COMPLEX_RESOLVE__
 #include "assembly_graph.h"
 
+KHASH_SET_INIT_INT(set_int);
 void *pointerize(void *data, int size);
 
 struct queue_t{
@@ -39,7 +40,6 @@ void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
 
-//void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len);
 void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
 int get_closure(struct resolve_bulges_bundle_t *bundle);
 
@@ -53,7 +53,7 @@ void free_queue_content(struct queue_t *q);
 
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v);
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
-		int *in_queue, struct queue_t *q, int depth);
+		khash_t(set_int) *in_queue, struct queue_t *q, int depth);
 void supress_bulge(struct resolve_bulges_bundle_t *bundle);
 int resolve_bulges(struct asm_graph_t *g);
 int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g);

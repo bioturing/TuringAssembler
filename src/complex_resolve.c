@@ -9,7 +9,6 @@
 #include "utils.h"
 
 KHASH_MAP_INIT_INT(int_int, int);
-KHASH_SET_INIT_INT(set_int);
 void *pointerize(void *data, int size)
 {
 	void *res = malloc(size);
@@ -109,46 +108,23 @@ void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle)
 	free(bundle->L);
 }
 
-//void bfs_by_vertice(struct asm_graph_t *g, int v, int **path_len)
-//{
-//	int *q = calloc(g->n_v, sizeof(int));
-//	int front = 0;
-//	int back = 0;
-//	q[0] = v;
-//	*path_len = calloc(g->n_v, sizeof(int));
-//	for (int i = 0; i < g->n_v; ++i)
-//		(*path_len)[i] = -1;
-//	(*path_len)[v] = 0;
-//	while (front <= back){
-//		int v = q[front++];
-//		for (int i = 0; i < g->nodes[v].deg; ++i){
-//			int e = g->nodes[v].adj[i];
-//			int u = g->edges[e].target;
-//			if ((*path_len)[u] != -1)
-//				continue;
-//			(*path_len)[u] = (*path_len[v]) + 1;
-//			q[back++] = u;
-//		}
-//	}
-//	free(q);
-//}
-
 void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 {
 	struct asm_graph_t *graph = bundle->graph;
 	int s = bundle->source;
 	int *dom = bundle->dom;
 
-	int *is_s_parents = calloc(graph->n_v, sizeof(int));
 	int s_rc = graph->nodes[s].rc_id;
+	khash_t(set_int) *s_parents = kh_init(set_int);
 	for (int i = 0; i < graph->nodes[s_rc].deg; ++i){
 		int e = graph->edges[graph->nodes[s_rc].adj[i]].rc_id;
 		int p = graph->edges[e].source;
-		is_s_parents[p] = 1;
+		int ret;
+		kh_put(set_int, s_parents, p, &ret);
 	}
 
 	struct queue_t *queue = calloc(1, sizeof(struct queue_t));
-	init_queue(queue, graph->n_v);
+	init_queue(queue, 1024);
 	push_queue(queue, pointerize(&s, sizeof(int)));
 
 	khash_t(int_int) *deg_in = kh_init(int_int);
@@ -159,7 +135,6 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 		push_queue(bundle->dom_vertices, pointerize(v, sizeof(int)));
 		for (int i = 0; i < graph->nodes[*v].deg; ++i){
 			int u = get_adj_node(graph, *v, i);
-			//__VERBOSE("%d %d\n", *v, u);
 			khiter_t it = kh_get(int_int, deg_in, u);
 			if (it == kh_end(deg_in)){
 				int ret;
@@ -168,9 +143,8 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 			}
 			int used_deg = ++kh_val(deg_in, it);
 			int u_rc = graph->nodes[u].rc_id;
-			//__VERBOSE("%d %d %d\n", u, kh_val(deg_in, it), graph->nodes[u_rc].deg);
 			if (used_deg == graph->nodes[u_rc].deg &&
-					is_s_parents[u] == 0)
+				kh_get(set_int, s_parents, u) == kh_end(s_parents))
 				push_queue(queue, pointerize(&u, sizeof(int)));
 		}
 		free(v);
@@ -178,8 +152,7 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle)
 	kh_destroy(int_int, deg_in);
 	destroy_queue(queue);
 	free(queue);
-	free(is_s_parents);
-
+	kh_destroy(set_int, s_parents);
 }
 
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v)
@@ -190,11 +163,10 @@ void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v)
 }
 
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
-		int *in_queue, struct queue_t *q, int depth)
+		khash_t(set_int) *in_queue, struct queue_t *q, int depth)
 {
 	struct asm_graph_t *graph = bundle->graph;
 	int int_vertex = 0;
-	//__VERBOSE("vertex %d\n", v);
 	if (depth == 0){
 		for (int i = 0; i < graph->nodes[v].deg; ++i){
 			int u = get_adj_node(graph, v, i);
@@ -204,8 +176,9 @@ void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 	} else {
 		int_vertex = 1;
 	}
-	if (int_vertex && in_queue[v] == 0){
-		in_queue[v] = 1;
+	if (int_vertex && kh_get(set_int, in_queue, v) == kh_end(in_queue)){
+		int ret;
+		kh_put(set_int, in_queue, v, &ret);
 		push_queue(q, pointerize(&v, sizeof(int)));
 		//__VERBOSE("queue in %d\n", v);
 	}
@@ -227,9 +200,9 @@ int get_closure(struct resolve_bulges_bundle_t *bundle)
 	int s = bundle->source;
 	int res = 1;
 	struct queue_t q;
-	init_queue(&q, graph->n_v);
-	
-	int *in_queue = calloc(graph->n_v, sizeof(int));
+	init_queue(&q, 1024);
+
+	khash_t(set_int) *in_queue = kh_init(set_int);
 	struct queue_t *B_vertices = bundle->B_vertices;
 	/*__VERBOSE("before: ");
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
@@ -244,7 +217,8 @@ int get_closure(struct resolve_bulges_bundle_t *bundle)
 			int u = get_adj_node(graph, *v, i);
 			//__VERBOSE("%d %d\n", i, v);
 			if (bundle->B[u]){
-				in_queue[*v] = 1;
+				int ret;
+				kh_put(set_int, in_queue, *v, &ret);
 				push_queue(&q, pointerize(v, sizeof(int)));
 				//__VERBOSE("queue in %d\n", *v);
 				break;
@@ -270,7 +244,7 @@ int get_closure(struct resolve_bulges_bundle_t *bundle)
 		free(v);
 	}
 	free_queue_content(&q);
-	free(in_queue);
+	kh_destroy(set_int, in_queue);
 	destroy_queue(&q);
 	return res;
 }
@@ -281,11 +255,11 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 	int *PE = bundle->PE;
 
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
+	init_queue(q, 1024);
 	push_queue(q, pointerize(&bundle->source, sizeof(int)));
-	int *L = calloc(graph->n_v, sizeof(int));
-	memset(L, -1, sizeof(int) * graph->n_v);
-	L[bundle->source] = 0;
-
+	khash_t(set_int) *visited = kh_init(set_int);
+	int ret;
+	khiter_t it = kh_put(set_int, visited, bundle->source, &ret);
 
 	while (!is_queue_empty(q)){
 		int *v = get_queue(q);
@@ -295,8 +269,9 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 			int u = get_adj_node(graph, *v, i);
 			if (bundle->B[u] == 0)
 				continue;
-			if (L[u] == -1){
-				L[u] = L[*v] + 1;
+			it = kh_get(set_int, visited, u);
+			if (it == kh_end(visited)){
+				kh_put(set_int, visited, u, &ret);
 				PE[u] = e;
 				push_queue(q, pointerize(&u, sizeof(int)));
 			}
@@ -305,7 +280,7 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 	}
 	destroy_queue(q);
 	free(q);
-	free(L);
+	kh_destroy(set_int, visited);
 }
 
 void get_distance(struct resolve_bulges_bundle_t *bundle)
@@ -314,7 +289,7 @@ void get_distance(struct resolve_bulges_bundle_t *bundle)
 	int *L = bundle->L;
 
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
-	init_queue(q, graph->n_v);
+	init_queue(q, 1024);
 	push_queue(q, pointerize(&bundle->source, sizeof(int)));
 	memset(L, -1, sizeof(int) * graph->n_v);
 	L[bundle->source] = 0;
@@ -395,8 +370,9 @@ void supress_bulge(struct resolve_bulges_bundle_t *bundle)
 {
 	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *B_vertices = bundle->B_vertices;
-	int *mark = calloc(graph->n_v, sizeof(int));
-	mark[bundle->source] = 1;
+	khash_t(set_int) *mark = kh_init(set_int);
+	int ret;
+	kh_put(set_int, mark, bundle->source, &ret);
 	//__VERBOSE("sink: ");
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
@@ -411,8 +387,8 @@ void supress_bulge(struct resolve_bulges_bundle_t *bundle)
 		if (is_sink){
 			//__VERBOSE("%d ", *v);
 			int w = *v;
-			while (mark[w] == 0){
-				mark[w] = 1;
+			while (kh_get(set_int, mark, w) == kh_end(mark)){
+				kh_put(set_int, mark, w, &ret);
 				int e = bundle->PE[w];
 				w = graph->edges[e].source;
 			}
@@ -430,8 +406,9 @@ void supress_bulge(struct resolve_bulges_bundle_t *bundle)
 			if (bundle->B[u] == 0)
 				continue;
 			//__VERBOSE("HAHA %d %d %d %d\n", *v, u, mark[*v], mark[u]);
-			if (!mark[*v] || !mark[u] ||
-				(bundle->PE[u] != e && bundle->PE[u] != rc)){
+			if (kh_get(set_int, mark, *v) == kh_end(mark)
+				|| kh_get(set_int, mark, u) == kh_end(mark)
+				|| (bundle->PE[u] != e && bundle->PE[u] != rc)){
 				int ret;
 				kh_put(set_int, rm_edges, e, &ret);
 				kh_put(set_int, rm_edges, rc, &ret);
@@ -447,7 +424,7 @@ void supress_bulge(struct resolve_bulges_bundle_t *bundle)
 		asm_remove_edge(graph, e);
 	}
 	kh_destroy(set_int, rm_edges);
-	free(mark);
+	kh_destroy(set_int, mark);
 }
 
 int resolve_bulges(struct asm_graph_t *g)
@@ -457,8 +434,6 @@ int resolve_bulges(struct asm_graph_t *g)
 	init_resolve_bulges(g, &bundle);
 	struct asm_graph_t *graph = bundle.graph;
 	for (int i = 0; i < graph->n_v; ++i){
-		/*if (i != 36027)
-			continue;*/
 		reset_source(&bundle, i);
 		get_dominated_vertices(&bundle);
 		/*__VERBOSE("dom: ");
