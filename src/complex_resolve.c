@@ -349,7 +349,7 @@ int is_complex_closure(struct resolve_bulges_bundle_t *bundle)
 			int e = graph->nodes[*v].adj[j];
 			int u = graph->edges[e].target;
 			if (bundle->B[u] != 0)
-				res = MAX(res, graph->edges[e].seq_len);
+				res = MAX(res, (int) graph->edges[e].seq_len);
 		}
 	}
 	return res >= 1000;
