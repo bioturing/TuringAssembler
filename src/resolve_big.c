@@ -188,6 +188,7 @@ void get_pos(khash_t(bcpos) *dict, khash_t(union_barcode) *bc, struct read_index
 
 		gint_t key = kh_key(bc, it);
 		khiter_t k = kh_get(bcpos, dict, key);
+		assert(k != KMHASH_END(dict));
 		pos = realloc(pos, (count + 1) * sizeof(struct read_index_t));
 		pos[count] = kh_value(dict, k);
 		count++;
