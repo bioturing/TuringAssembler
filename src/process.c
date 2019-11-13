@@ -241,6 +241,7 @@ void resolve_local_process(struct opt_proc_t *opt)
 	/*asm_resolve_dump_loop_ite(&g0);
 	asm_resolve_dump_jungle_ite(opt, &g0);
 	do_some_resolve_bridge(&g0);*/
+	//resolve_1_2(&g0, opt);
 	asm_resolve_simple_bulges_ite(opt, &g0);
 	asm_resolve_complex_bulges_ite(opt, &g0);
 	char path[1024];
