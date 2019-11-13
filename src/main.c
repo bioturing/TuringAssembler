@@ -463,6 +463,11 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_1_2_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+		build_opt_process(argc, argv, &build_scaffolding_test_process);
+	else if (!strcmp(argv[1], "mm_index"))
+		build_opt_process(argc, argv, &index_mm_process);
+	else if (!strcmp(argv[1], "barcode_hit"))
+		build_opt_process(argc, argv, &hits_barcode_process);
 	else
 		print_usage();
 	return 0;

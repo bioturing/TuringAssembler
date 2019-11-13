@@ -12,6 +12,14 @@
 #include "attribute.h"
 #include "utils.h"
 #include "minimizers.h"
+#include "log.h"
+
+
+#ifdef DEBUG
+#define DEBUG_MM printf
+#else
+#define DEBUG_MM
+#endif
 
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
@@ -188,6 +196,20 @@ void mm_db_insert(struct mm_db_t *db, uint64_t km, uint32_t p)
 	db->mm[db->n] = km;
 	db->p[db->n++] = p;
 }
+
+void mm_hits_insert(struct mm_hits_t *db, uint64_t km, uint32_t p, uint32_t e)
+{
+	if (db->n == db->size) {
+		db->mm =  realloc(db->mm, (db->size << 1) * sizeof(uint64_t));
+		db->e =  realloc(db->e, (db->size << 1) * sizeof(uint64_t));
+		db->p =  realloc(db->p, (db->size << 1) * sizeof(uint64_t));
+		db->size <<= 1;
+	}
+	db->mm[db->n] = km;
+	db->e[db->n] = km;
+	db->p[db->n++] = p;
+}
+
 struct mm_db_t * mm_db_init()
 {
 	struct mm_db_t *db = calloc(1, sizeof(struct mm_db_t));
@@ -202,6 +224,25 @@ void mm_db_destroy(struct mm_db_t *db)
 {
 	free(db->mm);
 	free(db->p);
+	free(db);
+}
+
+struct mm_hits_t * mm_hits_init()
+{
+	struct mm_hits_t *db = calloc(1, sizeof(struct mm_db_t));
+	db->n = 0;
+	db->size = 8;
+	db->mm = calloc(db->size, sizeof(struct mm_db_t));
+	db->p = calloc(db->size, sizeof(struct mm_db_t));
+	db->e = calloc(db->size, sizeof(struct mm_db_t));
+	return db;
+}
+
+void mm_hits_destroy(struct mm_hits_t *db)
+{
+	free(db->mm);
+	free(db->p);
+	free(db->e);
 	free(db);
 }
 
@@ -388,36 +429,57 @@ void mm_db_edge_destroy(struct mm_db_edge_t *db)
 	free(db);
 }
 
-static inline void mm_singleton_print(struct mm_db_edge_t *db, int k_size)
+static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 {
 	khiter_t k_cnt, k_h, k;
+	uint64_t single_cnt = 0, n_mm = 0;
 	for (k_cnt = kh_begin(db->cnt); k_cnt != kh_end(db->cnt); ++k_cnt) {
 		if (kh_exist(db->cnt, k_cnt)) {
+			n_mm++;
 			char *s = mm_dump_seq(kh_key(db->cnt, k_cnt), k_size);
 			uint32_t p = kh_get_val(mm_hash, db->p, kh_key(db->cnt, k_cnt), -1) ;
 			if (kh_value(db->cnt, k_cnt) == 1) {
-				printf("Singleton %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
+				single_cnt++;
+				DEBUG_MM("Singleton %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
 			} else {
-				printf("Redundant minimizers %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
+				DEBUG_MM("Redundant minimizers %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
 
 			}
 		}
 	}
+	log_info("Total number of minimizers %d", single_cnt);
+	log_info("Total number of singleton minimizers %d (%d%)", n_mm, single_cnt*100/n_mm);
+
 }
 
 struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
-	int i, j, e;
+	int j, e;
 	struct mm_db_edge_t *mm_db_e = mm_db_edge_init();
 	struct mm_db_t *mm_db;
 
 	for (e = 0; e < g->n_e; ++e) {
+		if (!(e % 10000))
+			log_info("%d edges", e);
 		mm_db = mm_index_bin_str(g->edges[e].seq, k, w, g->edges[e].seq_len);
 		for (j = 0; j < mm_db->n; ++j) {
 			mm_db_edge_insert(mm_db_e, mm_db->mm[j], e, mm_db->p[j]);
 		}
 		mm_db_destroy(mm_db);
 	}
-	mm_singleton_print(mm_db_e, k);
+	mm_singleton_stats(mm_db_e, k);
 	return mm_db_e;
+}
+
+void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits)
+{
+	khiter_t k;
+	uint32_t i;
+	for (i = 0; i < db->n; ++i) {
+		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
+		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
+			mm_hits_insert(hits, db->mm[i], db->p[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1));
+		}
+	}
+	return hits;
 }
 

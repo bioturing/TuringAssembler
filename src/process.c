@@ -18,6 +18,8 @@
 #include "fastq_reducer.h"
 #include "resolve_big.h"
 #include "complex_resolve.h"
+#include "minimizers/minimizers.h"
+#include "minimizers/smart_load.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -207,6 +209,24 @@ void resolve_bulges_process(struct opt_proc_t *opt)
 
 	save_graph_info(opt->out_dir, &g, "level_2");
 	asm_graph_destroy(&g);
+}
+
+void index_mm_process(struct opt_proc_t *opt)
+{
+	__VERBOSE("Index minimizers for an example string\n");
+	set_log_stage("Minimizers Index");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	mm_index_edges(&g, 17, 17);
+	__VERBOSE("Done indexing\n");
+}
+
+void hits_barcode_process(struct opt_proc_t *opt)
+{
+	__VERBOSE("Hitting reads from one barcode to edges\n");
+	set_log_stage("Barcode hits");
+	smart_load_barcode(opt);
+	__VERBOSE("Done hitting\n");
 }
 
 void reduce_read_process(struct opt_proc_t *opt)

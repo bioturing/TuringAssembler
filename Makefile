@@ -14,8 +14,8 @@ CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I ./src  -fPIC -g -I ./ \
-	 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC -I ./src 
+         -I ./src  -fPIC -g -I ./src/minimizers \
+	 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC
 
 EXEC = TuringAssembler_dev
 
@@ -69,6 +69,10 @@ SRC = src/assembly_graph.c 				\
 	  src/build_hash_table.c\
 	  src/resolve_big.c \
       src/unit_test.c
+      src/unit_test.c \
+      src/minimizers/minimizers.c \
+      src/minimizers/smart_load.c \
+      src/minimizers/count_barcodes.c
 
 OBJ = $(SRC:.c=.o)
 

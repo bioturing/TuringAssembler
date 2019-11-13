@@ -23,6 +23,14 @@ struct mm_db_t {
     int k;
 };
 
+struct mm_hits_t {
+    uint64_t *mm;
+    uint32_t *p;
+    uint32_t *e;
+    size_t n;
+    size_t size;
+};
+
 struct mm_db_edge_t {
     kh_mm_hash_t *h;
     kh_mm_hash_t *cnt;
@@ -32,5 +40,6 @@ struct mm_db_edge_t {
 struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l);
 struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l);
 struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w);
+void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits);
 
 #endif //SKIPPING_MINIMIZERS_H

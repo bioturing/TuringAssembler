@@ -8,6 +8,7 @@
 #include "smart_load.h"
 #include "count_barcodes.h"
 #include "minimizers.h"
+#include "assembly_graph.h"
 
 void print_usage(const char *prog)
 {
@@ -46,10 +47,10 @@ void index_mm_process(struct opt_proc_t *opt)
 {
 	__VERBOSE("Index minimizers for an example string\n");
 	uint32_t *s;
-	//s = seq2uint32t(opt->bx_str, 16);
-	//mm_index_str(s, 4, 3, 16);
-	test_str_minimizers();
-	test_index_mm_graph();
+	set_log_stage("Minimizers Index");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	mm_index_edges(&g, 17, 17);
 	__VERBOSE("Done indexing\n");
 }
 

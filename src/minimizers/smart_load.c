@@ -3,6 +3,7 @@
 //
 
 #include <zlib.h>
+#include <string.h>
 
 #include "smart_load.h"
 #include "sort_read.h"
@@ -14,6 +15,10 @@
 #include "utils.h"
 #include "log.h"
 #include "count_barcodes.h"
+#include "minimizers.h"
+#include "assembly_graph.h"
+
+KSEQ_INIT(gzFile, gzread);
 
 /**
  * Construct the dictionary index of
@@ -138,8 +143,27 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	}
 
 	char *line = malloc(1024);
-	size_t len, read;
-	while ((read = getline(&line, &len, buf1_stream)) != -1) {
-		printf("%s", line);
+	kseq_t *r1 = kseq_init(buf1_stream);
+	kseq_t *r2 = kseq_init(buf2_stream);
+	struct mm_db_t *db1;
+	struct mm_db_t *db2;
+	struct mm_hits_t *hits1, *hits2;
+	hits1 = mm_hits_init();
+	hits2 = mm_hits_init();
+
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+
+	while (kseq_read(r1) >= 0 && kseq_read(r2) >= 0 ) {
+		db1 = mm_index_char_str(r1->seq.s, 17, 17, r1->seq.l);
+		db2 = mm_index_char_str(r2->seq.s, 17, 17, r2->seq.l);
+
+		mm_hits_cmp(db1, mm_edges, hits1);
+		mm_hits_cmp(db2, mm_edges, hits2);
 	}
+
+	log_info("Number of singleton hits of R1: %d", hits1->n);
+	log_info("Number of singleton hits of R2: %d", hits2->n);
+
 }
