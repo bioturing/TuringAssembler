@@ -529,7 +529,7 @@ int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g
 			break;
 		res += resolved;
 		++ite;
-		log_debug("%d-th iteration: %d bulge(s) resolved", ite, resolved);
+		log_debug("%d-th iteration: %d complex bulge(s) resolved", ite, resolved);
 		char path[1024];
 		sprintf(path, "%d_ite", ite);
 		save_graph_info(opt->out_dir, g, path);
@@ -539,7 +539,7 @@ int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g
 		*g = g1;
 
 	} while(1);
-	log_info("%d bulge(s) resolved after %d iterations", res, ite);
+	log_info("%d complex bulge(s) resolved after %d iterations", res, ite);
 	return res;
 }
 
