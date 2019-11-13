@@ -13,10 +13,10 @@
 #define ASM_HAVE_CANDIDATE		0x8
 #define ASM_HAVE_BARCODE_SCAF		0x10
 
-#define ASM_BUILD_BARCODE        0x1
-#define ASM_BUILD_READPAIR        0x2
-#define ASM_BUILD_COVERAGE        0x4
-#define ASM_BUILD_CANDIDATE        0x8
+#define ASM_BUILD_BARCODE		0x1
+#define ASM_BUILD_READPAIR		0x2
+#define ASM_BUILD_COVERAGE		0x4
+#define ASM_BUILD_CANDIDATE		0x8
 
 #define DISTANCE_KMER 60
 #define KMER_PAIR_SIZE 51
@@ -46,30 +46,30 @@ KHASH_DECLARE(pair_contig_count, struct pair_contig_t, struct contig_count_t);
 KHASH_DECLARE(contig_count, gint_t, int);
 
 struct asm_node_t {
-	gint_t rc_id;        /* reverse complement link */
-	gint_t deg;        /* out degree */
-	gint_t *adj;        /* list of out edges */
+	gint_t rc_id;		/* reverse complement link */
+	gint_t deg;		/* out degree */
+	gint_t *adj;		/* list of out edges */
 };
 
 struct asm_edge_t {
 	uint64_t count;
-	uint32_t *seq;        /* only store contigs */
-	uint32_t seq_len;    /* length of "seq" */
+	uint32_t *seq;		/* only store contigs */
+	uint32_t seq_len;	/* length of "seq" */
 
-	uint32_t n_holes;    /* number of gaps */
+	uint32_t n_holes;	/* number of gaps */
 	/* the i-th gap starts right after the position p_holes[i]-th of seq and
 	 * has length equal to l_holes[i]
 	 */
-	uint32_t *p_holes;    /* positions of holes */
-	uint32_t *l_holes;    /* length of holes */
+	uint32_t *p_holes;	/* positions of holes */
+	uint32_t *l_holes;	/* length of holes */
 
-	gint_t source;        /* start node */
-	gint_t target;        /* end node */
-	gint_t rc_id;        /* reverse complement link */
-	pthread_mutex_t lock;    /* lock for build/mapping process */
-	struct barcode_hash_t *barcodes;        /* mapped barcode */
-	struct barcode_hash_t barcodes_scaf;        /* mapped barcode */
-	struct barcode_hash_t barcodes_scaf2;        /* mapped barcode */
+	gint_t source;		/* start node */
+	gint_t target;		/* end node */
+	gint_t rc_id;		/* reverse complement link */
+	pthread_mutex_t lock;	/* lock for build/mapping process */
+	struct barcode_hash_t *barcodes;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf;		/* mapped barcode */
+	struct barcode_hash_t barcodes_scaf2;		/* mapped barcode */
 	// int n_mate_contigs;
 	// struct barcode_hash_t *mate_barcodes;
 	// gint_t *mate_counts;
@@ -79,55 +79,55 @@ struct asm_edge_t {
 };
 
 struct asm_graph_t {
-	int ksize;            /* ksize of nodes */
-	int bin_size;            /* deprecated */
-	uint32_t aux_flag;        /* aux flag, marker for storing BARCODE of READPAIR */
-	gint_t n_v, n_e;        /* number of nodes, number of edges */
+	int ksize;			/* ksize of nodes */
+	int bin_size;			/* deprecated */
+	uint32_t aux_flag;		/* aux flag, marker for storing BARCODE of READPAIR */
+	gint_t n_v, n_e;		/* number of nodes, number of edges */
 
-	struct asm_node_t *nodes;    /* list of nodes */
-	struct asm_edge_t *edges;    /* list of edges */
+	struct asm_node_t *nodes;	/* list of nodes */
+	struct asm_edge_t *edges;	/* list of edges */
 
 	khash_t(pair_contig_count) *candidates;
 };
 
-#define MIN_NOTICE_LEN            250
-#define MIN_CONNECT_SIZE        500
+#define MIN_NOTICE_LEN			250
+#define MIN_CONNECT_SIZE		500
 
-#define TIPS_RATIO_THRES        0.1
-#define TIPS_COV_THRES                10
-#define TIPS_LEN_THRES            150
-#define MIN_TIPS_LEG            200
+#define TIPS_RATIO_THRES		0.1
+#define TIPS_COV_THRES		        10
+#define TIPS_LEN_THRES			150
+#define MIN_TIPS_LEG			200
 #define TIPS_HARD_THRESHOLD             30
 
-#define CHIMERIC_RATIO_THRES        0.1
-#define CHIMERIC_COV_THRES        100
-#define CHIMERIC_LEN_THRES        200
+#define CHIMERIC_RATIO_THRES		0.1
+#define CHIMERIC_COV_THRES		100
+#define CHIMERIC_LEN_THRES		200
 
-#define CONTIG_USE_BARCODE        200
-#define CONTIG_LEVEL_0            500
-#define CONTIG_LEVEL_1            3000
-#define CONTIG_LEVEL_2            10000
-#define MAX_BARCODE_REGION        10000
+#define CONTIG_USE_BARCODE		200
+#define CONTIG_LEVEL_0			500
+#define CONTIG_LEVEL_1			3000
+#define CONTIG_LEVEL_2			10000
+#define MAX_BARCODE_REGION		10000
 
-#define MAX_READ_FRAG_LEN        350
+#define MAX_READ_FRAG_LEN		350
 
 /* Add barcode upto prefix length */
-#define MIN_CONTIG_BARCODE        5000
-#define MIN_CONTIG_BARCODE2        500
+#define MIN_CONTIG_BARCODE		5000
+#define MIN_CONTIG_BARCODE2		500
 /* Only add and use barcode for contig with length minimum */
-#define MIN_LONG_CONTIG            1000
-#define MIN_CONTIG_READPAIR        500
+#define MIN_LONG_CONTIG			1000
+#define MIN_CONTIG_READPAIR		500
 
-#define MAX_PAIR_LEN            700
-#define MAX_MOLECULE_LEN        30000
+#define MAX_PAIR_LEN			700
+#define MAX_MOLECULE_LEN		30000
 
-#define MIN_BARCODE_COUNT        150
-#define MIN_READPAIR_COUNT        15
+#define MIN_BARCODE_COUNT		150
+#define MIN_READPAIR_COUNT		15
 
-#define MIN_BARCODE_RATIO        0.044
-#define MIN_SUB_BARCODE_RATIO        0.022
+#define MIN_BARCODE_RATIO		0.044
+#define MIN_SUB_BARCODE_RATIO		0.022
 #define CONTIG_PARTITION_LEN 1500
-#define MIN_COMPONENT            250
+#define MIN_COMPONENT			250
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/
@@ -145,21 +145,18 @@ double get_barcode_ratio_unique(struct asm_graph_t *g, gint_t e1, gint_t e2);
 
 /* construct the barcode map */
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
-						struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
-
+    struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build, int mapper_algo);
 void count_readpair_path(int n_threads, struct read_path_t *rpath,
-						 const char *fasta_path, khash_t(contig_count) *count_cand);
-
+				const char *fasta_path, khash_t(contig_count) *count_cand);
 void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
-							 const char *fasta_path, khash_t(contig_count) *count_cand,
-							 khash_t(contig_count) *count_err);
+				const char *fasta_path, khash_t(contig_count) *count_cand,
+				khash_t(contig_count) *count_err);
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
-								char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
-								struct asm_graph_t *g0, gint_t e1, gint_t e2);
-
+	char **files_1, char **files_2, char *work_dir, struct asm_graph_t *g,
+				struct asm_graph_t *g0, gint_t e1, gint_t e2);
 struct asm_graph_t test_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
-									   gint_t e1, gint_t e2);
+							gint_t e1, gint_t e2);
 /********************* Utilities for edges manipulating ***********************/
 /******************************************************************************/
 
@@ -170,8 +167,8 @@ struct cov_range_t {
 
 #define __ratio_greater(fcov1, fcov2) ((fcov1) > 2.0 * (fcov2))
 #define __coverage_range_intersect(rcov1, rcov2) ((rcov1).lo <= (rcov2).hi && (rcov2).lo <= (rcov1).hi)
-#define __check_coverage(fcov1, fcov2, rcov1, rcov2)            \
-    (__coverage_range_intersect(rcov1, rcov2) && __abs((fcov1) - (fcov2)) < 0.3)
+#define __check_coverage(fcov1, fcov2, rcov1, rcov2)			\
+	(__coverage_range_intersect(rcov1, rcov2) && __abs((fcov1) - (fcov2)) < 0.3)
 
 /* Function signature:
  * int __int_cov_ratio(float cov1, float cov2);
@@ -186,30 +183,29 @@ struct cov_range_t {
 /* Function signature:
  * float __get_edge_cov(struct asm_edge_t *e, int ksize);
  * */
-#define __get_edge_cov(e, ksize) ((e)->count * 1.0 /            \
-                ((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
-
+#define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
+				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 static inline struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
 	double fcov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
-	int icov = (int) fcov;
+	int icov = (int)fcov;
 	if (fcov + EPS < icov + 0.25)
-		return (struct cov_range_t) {icov, icov};
+		return (struct cov_range_t){icov, icov};
 	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
-		return (struct cov_range_t) {icov, icov + 1};
+		return (struct cov_range_t){icov, icov + 1};
 	else
-		return (struct cov_range_t) {icov + 1, icov + 1};
+		return (struct cov_range_t){icov + 1, icov + 1};
 }
 
 static inline struct cov_range_t convert_cov_range(double fcov)
 {
-	int icov = (int) fcov;
+	int icov = (int)fcov;
 	if (fcov + EPS < icov + 0.25)
-		return (struct cov_range_t) {icov, icov};
+		return (struct cov_range_t){icov, icov};
 	else if (fcov + EPS > icov + 0.25 && fcov + EPS < icov + 0.75)
-		return (struct cov_range_t) {icov, icov + 1};
+		return (struct cov_range_t){icov, icov + 1};
 	else
-		return (struct cov_range_t) {icov + 1, icov + 1};
+		return (struct cov_range_t){icov + 1, icov + 1};
 }
 
 /* Estimate coverage of 1 walk on genome */
@@ -235,17 +231,13 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int rep);
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-				   gint_t e2, gint_t e_rc2);
-
+					gint_t e2, gint_t e_rc2);
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-							gint_t e2, gint_t e_rc2, uint32_t gap_size);
-
+				gint_t e2, gint_t e_rc2, uint32_t gap_size);
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-					gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count);
-
+	gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t added_count);
 void asm_join_edge_loop(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-						gint_t e2, gint_t e_rc2, uint64_t added_count);
-
+			gint_t e2, gint_t e_rc2, uint64_t added_count);
 void asm_graph_destroy(struct asm_graph_t *g);
 
 /* only set the link to the edge to -1 */
@@ -262,10 +254,9 @@ void asm_duplicate_edge_seq(struct asm_graph_t *g, gint_t e, int cov);
 void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov);
 
 void asm_join_edge_loop_reverse(struct asm_graph_t *g, gint_t e1, gint_t e2,
-								gint_t e_rc2, gint_t e_rc1);
-
+				gint_t e_rc2, gint_t e_rc1);
 void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-							 gint_t e2, gint_t e_rc2, uint32_t *aseq, int alen, int trim_e1, int trim_e2);
+	gint_t e2, gint_t e_rc2, uint32_t *aseq, int alen, int trim_e1, int trim_e2);
 
 /********************** Utilities for graph manipulating **********************/
 /******************************************************************************/
@@ -297,8 +288,7 @@ void print_test_barcode_edge(struct asm_graph_t *g, gint_t e1, gint_t e2);
 void print_test_pair_end(struct asm_graph_t *g, gint_t e);
 
 void print_test_barcode_superior(struct asm_graph_t *g, gint_t e1,
-								 gint_t e2, gint_t e2a);
-
+						gint_t e2, gint_t e2a);
 gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e);
 
 void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
@@ -306,8 +296,7 @@ void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src);
 void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
-					 char *tmp_name);
-
+		char *tmp_name);
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
