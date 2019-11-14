@@ -69,12 +69,12 @@ void get_local_edge_head(struct asm_graph_t g, struct asm_graph_t lg,
 	struct subseq_pos_t *gpos = &emap->gpos;
 	struct subseq_pos_t *lpos = &emap->lpos;
 	emap->lc_e = lg.edges[emap->lc_e].rc_id;
-	gpos->start = e.seq_len - gpos->start - WINDOW_SIZE;
-	gpos->end = e.seq_len - gpos->end - WINDOW_SIZE;
+	gpos->start = e.seq_len - gpos->start - 1;
+	gpos->end = e.seq_len - gpos->end - 1;
 	swap(&gpos->start, &gpos->end, sizeof(khint32_t));
 
-	lpos->start = lg.edges[emap->lc_e].seq_len - lpos->start - WINDOW_SIZE;
-	lpos->end = lg.edges[emap->lc_e].seq_len - lpos->end - WINDOW_SIZE;
+	lpos->start = lg.edges[emap->lc_e].seq_len - lpos->start - 1;
+	lpos->end = lg.edges[emap->lc_e].seq_len - lpos->end - 1;
 	swap(&lpos->start, &lpos->end, sizeof(khint32_t));
 
 end_function:
