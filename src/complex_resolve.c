@@ -351,6 +351,8 @@ int is_complex_closure(struct resolve_bulges_bundle_t *bundle)
 	int res = 0;
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
+		if (check_in_set(bundle->B, graph->nodes[*v].rc_id) != 0)
+			return 1;
 		for (int j = 0; j < graph->nodes[*v].deg; ++j){
 			int e = graph->nodes[*v].adj[j];
 			int u = graph->edges[e].target;
