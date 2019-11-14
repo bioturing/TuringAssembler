@@ -42,39 +42,6 @@ uint8_t *compress_seq(char *a)
 	return res;
 }
 
-void ust_add_pair_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ksize, pthread_mutex_t *lock)
-{
-	int8_t *seq = compress_seq(r->seq);
-
-//	print_u8_seq(seq, r->len);
-	uint8_t *left = calloc((ksize + 3) >> 2, sizeof(uint8_t));
-	uint8_t *right = calloc((ksize + 3) >> 2, sizeof(uint8_t));
-	for (int i = 0, j = DISTANCE_KMER; i < r->len - DISTANCE_KMER; i++, j++) {
-		memset(left, 0, (ksize + 3) >> 2);
-		memset(right, 0, (ksize + 3) >> 2);
-		int64_t A[2];
-		get_seq(seq, i, ksize, left);
-		get_seq(seq, j, ksize, right);
-//		print_u8_seq(left, ksize);
-//		print_u8_seq(right, ksize);
-		A[0] = MurmurHash3_x64_64(left, (ksize + 3) >> 2);
-		A[1] = MurmurHash3_x64_64(right, (ksize + 3) >> 2);
-		int64_t res = MurmurHash3_x64_64((uint8_t *) &A[0], 16);
-		pthread_mutex_lock(lock);
-		khint_t k = kh_get(pair_kmer_count, table, res);
-		if (k == kh_end(table)) {
-			int tmp;
-			k = kh_put(pair_kmer_count, table, res, &tmp);
-			kh_value(table, k) = 0;
-			assert(tmp == 1);
-		}
-		pthread_mutex_unlock(lock);
-		atomic_add_and_fetch32(&kh_value(table, k), 1);
-	}
-	free(left);
-	free(right);
-}
-
 void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ksize, pthread_mutex_t *lock)
 {
 	int8_t *seq = compress_seq(r->seq);
@@ -105,7 +72,7 @@ void *get_pair_kmer_ust_iterator(void *data)
 {
 	struct kmer_pair_iterator_bundle_t *bundle = (struct kmer_pair_iterator_bundle_t *) data;
 	struct dqueue_t *q = bundle->q;
-	struct read_t read1, read2, readI;
+	struct read_t read1, read2;
 	struct pair_buffer_t *own_buf, *ext_buf;
 	khash_t(pair_kmer_count) *table = bundle->table;
 	own_buf = init_trip_buffer();
