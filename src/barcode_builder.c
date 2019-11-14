@@ -874,8 +874,11 @@ void *barcode_buffer_iterator(void *data) {
 			      get_read_from_fa(&read2, buf2, &pos2);
 
 
-			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
+				log_warn("buf1 %s", buf1);
+				log_warn("buf2 %s", buf2);
 				__ERROR("\nWrong format file when build barcode scaffold\n");
+			}
 
 			barcode = get_barcode(&read1);
 			if (barcode == (uint64_t) -1) {

@@ -50,8 +50,8 @@ void ust_add_pair_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ks
 	uint8_t *left = calloc((ksize + 3) >> 2, sizeof(uint8_t));
 	uint8_t *right = calloc((ksize + 3) >> 2, sizeof(uint8_t));
 	for (int i = 0, j = DISTANCE_KMER; i < r->len - DISTANCE_KMER; i++, j++) {
-		memset(left, 0, (ksize+3)>>2);
-		memset(right, 0, (ksize+3)>>2);
+		memset(left, 0, (ksize + 3) >> 2);
+		memset(right, 0, (ksize + 3) >> 2);
 		int64_t A[2];
 		get_seq(seq, i, ksize, left);
 		get_seq(seq, j, ksize, right);
@@ -82,7 +82,7 @@ void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ksi
 
 	uint8_t *left = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
 	for (int i = 0; i < r->len - DISTANCE_KMER; i++) {
-		memset(left, 0, (big_ksize+3)>>2);
+		memset(left, 0, (big_ksize + 3) >> 2);
 		int64_t res;
 		get_seq(seq, i, big_ksize, left);
 		res = MurmurHash3_x64_64(left, (big_ksize + 3) >> 2);
@@ -106,7 +106,7 @@ void *get_pair_kmer_ust_iterator(void *data)
 	struct kmer_pair_iterator_bundle_t *bundle = (struct kmer_pair_iterator_bundle_t *) data;
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2, readI;
-	struct trip_buffer_t *own_buf, *ext_buf;
+	struct pair_buffer_t *own_buf, *ext_buf;
 	khash_t(pair_kmer_count) *table = bundle->table;
 	own_buf = init_trip_buffer();
 	int64_t sm = bundle->sm;
@@ -126,23 +126,18 @@ void *get_pair_kmer_ust_iterator(void *data)
 		pos1 = pos2 = posI = 0;
 		R1_buf = ext_buf->R1_buf;
 		R2_buf = ext_buf->R2_buf;
-		I_buf = ext_buf->I_buf;
 		input_format = ext_buf->input_format;
 
 		while (1) {
 			rc1 = input_format == TYPE_FASTQ ?
-				  get_read_from_fq(&read1, R1_buf, &pos1) :
-				  get_read_from_fa(&read1, R1_buf, &pos1);
+			      get_read_from_fq(&read1, R1_buf, &pos1) :
+			      get_read_from_fa(&read1, R1_buf, &pos1);
 
 			rc2 = input_format == TYPE_FASTQ ?
-				  get_read_from_fq(&read2, R2_buf, &pos2) :
-				  get_read_from_fa(&read2, R2_buf, &pos2);
+			      get_read_from_fq(&read2, R2_buf, &pos2) :
+			      get_read_from_fa(&read2, R2_buf, &pos2);
 
-			rcI = input_format == TYPE_FASTQ ?
-				  get_read_from_fq(&readI, I_buf, &posI) :
-				  get_read_from_fa(&readI, I_buf, &posI);
-
-			if (rc1 == READ_FAIL || rc2 == READ_FAIL || rcI == READ_FAIL)
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL )
 				__ERROR("\nWrong format file ust\n");
 
 			ust_add_big_kmer(&read1, table, bundle->ksize, bundle->table_lock);
@@ -171,9 +166,9 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 //		else
 //			buffer_iterator = x10_buffer_iterator;
 		__ERROR("not handle yet");
-	} else if (opt->lib_type == LIB_TYPE_UST) {
-		producer_bundles = init_fastq_triple(opt->n_threads, opt->n_files,
-											 opt->files_1, opt->files_2, opt->files_I);
+	} else if (opt->lib_type == LIB_TYPE_UST || opt->lib_type == LIB_TYPE_SORTED) {
+		producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
+		                                   opt->files_1, opt->files_2);
 		buffer_iterator = get_pair_kmer_ust_iterator;
 	} else {
 		__ERROR("Wrong library format\n");
@@ -209,11 +204,11 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 
 	for (i = 0; i < opt->n_files; ++i)
 		pthread_create(producer_threads + i, &attr, fastq_producer,
-					   producer_bundles + i);
+		               producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_create(worker_threads + i, &attr, buffer_iterator,
-					   worker_bundles + i);
+		               worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
 		pthread_join(producer_threads[i], NULL);
@@ -224,7 +219,7 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type == LIB_TYPE_10X)
 		free_fastq_pair(producer_bundles, opt->n_files);
 	else if (opt->lib_type == LIB_TYPE_UST)
-		free_fastq_triple(producer_bundles, opt->n_files);
+		free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 }
 

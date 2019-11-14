@@ -83,7 +83,8 @@ int get_pair_seq_count(struct asm_edge_t *left, struct asm_edge_t *right, struct
 		key = MurmurHash3_x64_64(h1, (big_ksize + 3) >> 2);
 
 		khint_t k = kh_get(pair_kmer_count, table, key);
-		assert(k != kh_end(table));
+		if (k == kh_end(table))
+			continue;
 		int value1 = kh_value(table, k);
 //		log_warn("value of get pair is %d", value1);
 		value += value1;
