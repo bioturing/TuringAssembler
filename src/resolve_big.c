@@ -50,11 +50,11 @@ void print_compress_seq(uint8_t *new_seq, int len)
 	for (int i = 0; i < len; i++) {
 		printf("%c", to_char[new_seq[i >> 2] >> ((i & 3) << 1) & 3]);
 	}
-	printf("\n");
+//	printf("\n");
 }
 
 int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct asm_edge_t *mid,
-                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table)
+                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table, int five_to_big_ksize_m1)
 {
 	//todo 1 get more pair instead of only one pair right now
 	int span_len = big_ksize;
@@ -75,12 +75,15 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 	//todo 1: does not need to copy all middle seq
 
 	int value = 0;
-	for (int i = 0; i < new_len - span_len + 1; i++) {
-		uint8_t *h1 = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
-		get_seq(new_seq, i, big_ksize, h1);
-//		print_u8_seq(h1, big_ksize);
-		int64_t key;
-		key = MurmurHash3_x64_64(h1, (big_ksize + 3) >> 2);
+	int64_t key = get_first_hash(new_seq, big_ksize);
+	khint_t k = kh_get(pair_kmer_count, table, key);
+	if (k != kh_end(table))
+		value += kh_value(table, k);
+
+	for (int i = 1; i < new_len - span_len + 1; i++) {
+		int a0 = get_char(new_seq, i - 1);
+		int an = get_char(new_seq, i - 1 + big_ksize);
+		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
 		khint_t k = kh_get(pair_kmer_count, table, key);
 		if (k == kh_end(table))
@@ -93,39 +96,41 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 }
 
 int join_2_and_count(struct asm_edge_t *a, struct asm_edge_t *b,
-                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table)
+                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
 {
 	int span_len = big_ksize;
 
 	int a_len = MIN(a->seq_len - graph_ksize, span_len - 1);
 	int b_len = MIN(b->seq_len, span_len - 1);
 	int new_len = a_len + b_len;
-	log_warn("len a %d len b %d len new %d", a->seq_len, b->seq_len, new_len);
+//	log_warn("len a %d len b %d len new %d", a->seq_len, b->seq_len, new_len);
 	if (new_len < span_len)
 		return -1;
 
 	uint8_t *new_seq = calloc((new_len + 3) >> 2, 1);
 	copy_seq32_seq8(a->seq, a->seq_len - graph_ksize - a_len, new_seq, 0, a_len);
 	copy_seq32_seq8(b->seq, 0, new_seq, a_len, b_len);
-	print_u8_seq(a->seq, a->seq_len);
-	print_u8_seq(b->seq, b->seq_len);
-	print_u8_seq(new_seq, new_len);
 	printf("\n\n");
+
 	int value = 0;
-	for (int i = 0; i < new_len - span_len + 1; i++) {
-		uint8_t *h1 = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
-		get_seq(new_seq, i, big_ksize, h1);
-		print_u8_seq(h1, big_ksize);
-		int64_t key;
-		key = MurmurHash3_x64_64(h1, (big_ksize + 3) >> 2);
+	int64_t key = get_first_hash(new_seq, big_ksize);
+	khint_t k = kh_get(pair_kmer_count, table, key);
+	if (k != kh_end(table))
+		value += kh_value(table, k);
+
+	for (int i = 1; i < new_len - span_len + 1; i++) {
+		int a0 = get_char(new_seq, i - 1);
+		int an = get_char(new_seq, i - 1 + big_ksize);
+		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
 		khint_t k = kh_get(pair_kmer_count, table, key);
 		if (k == kh_end(table))
 			continue;
 		int value1 = kh_value(table, k);
-//		log_warn("value of get pair is %d", value1);
+//		log_warn("value of get pair is %ld %d", key, value1);
 		value += value1;
 	}
+
 	return value;
 }
 
@@ -443,14 +448,18 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 ////		if (g->edges[i].seq_len < CONTIG_PARTITION_LEN)
 //		assert(partition[i] <= 0);
 //	}
+	int64_t five_to_big_ksize_m1 = 1;
+	for (int i = 0; i < BIG_KSIZE - 1; i++) {
+		five_to_big_ksize_m1 = (five_to_big_ksize_m1 * 5) % SM;
+	}
 	int old_resolve = 0;
 	do {
 		old_resolve = resolve_stat[0];
 		for (int i = 0; i < g->n_e; i++) {
-			int t = resolve_212_using_big_kmer(g, i, kmer_pair_table);
+			int t = resolve_212_using_big_kmer(g, i, kmer_pair_table, five_to_big_ksize_m1);
 			resolve_stat[t]++;
 			if (t == NOT_212_CASE) {
-				t = resolve_202_using_big_kmer(g, i, kmer_pair_table);
+				t = resolve_202_using_big_kmer(g, i, kmer_pair_table, five_to_big_ksize_m1);
 				resolve_stat[t]++;
 			}
 		}
@@ -468,13 +477,14 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 			log_info("   Solved: %d", resolve_stat[i]);
 		}
 	}
+	log_info("Size of table %d", kmer_pair_table->size);
 	*n_partition = count;
 }
 
 int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
-                               khash_t(pair_kmer_count) *table)
+                               khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
 {
-//	return 1;
+	return 1;
 	if (!is_case_2_1_2(g, i_e)) {
 		return NOT_212_CASE;
 	}
@@ -496,11 +506,11 @@ int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
 	if (e->seq_len > DISTANCE_KMER + KMER_PAIR_SIZE - 2)
 		return NOT_LONG_ENOUGH;
 	int pair_ksize = KMER_PAIR_SIZE;
-	int c00 = join_3_and_count(a0, o0, e, BIG_KSIZE, g->ksize, table);
-	int c01 = join_3_and_count(a0, o1, e, BIG_KSIZE, g->ksize, table);
-	int c10 = join_3_and_count(a1, o0, e, BIG_KSIZE, g->ksize, table);
-	int c11 = join_3_and_count(a1, o1, e, BIG_KSIZE, g->ksize, table);
-	log_warn("pair_ksize %d count00 %d count01 %d count10 %d count11 %d", pair_ksize, c00, c01, c10, c11);
+	int c00 = join_3_and_count(a0, o0, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int c01 = join_3_and_count(a0, o1, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int c10 = join_3_and_count(a1, o0, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int c11 = join_3_and_count(a1, o1, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+//	log_warn("pair_ksize %d count00 %d count01 %d count10 %d count11 %d", pair_ksize, c00, c01, c10, c11);
 
 	if (c00 > 0 && c11 > 0 && c00 + c11 > c10 + c01) {
 		//todo 1 get new count proportion to path
@@ -543,7 +553,7 @@ int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
  *
  */
 int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
-                               khash_t(pair_kmer_count) *table)
+                               khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
 {
 //	return 1;
 	int i_target = g->edges[i_e].target;
@@ -587,18 +597,18 @@ int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
 	struct asm_edge_t *a2_rc = &g->edges[i_a2_rc];
 	struct asm_edge_t *e = &g->edges[i_e];
 	struct asm_edge_t *a1 = &g->edges[i_a1];
-	log_warn("edge len %d %d %d %d", e->seq_len, a0_rc->seq_len, a1->seq_len, a2_rc->seq_len);
 	assert(a0_rc->source != -1);
 	assert(a1->source != -1);
 	assert(a2_rc->source != -1);
 	assert(e->source != -1);
-	int ce0 = join_2_and_count(e, a0_rc, BIG_KSIZE, g->ksize, table);
-	int ce2 = join_2_and_count(e, a2_rc, BIG_KSIZE, g->ksize, table);
-	int c10 = join_2_and_count(a1, a0_rc, BIG_KSIZE, g->ksize, table);
-	int c12 = join_2_and_count(a1, a2_rc, BIG_KSIZE, g->ksize, table);
+	int ce0 = join_2_and_count(e, a0_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int ce2 = join_2_and_count(e, a2_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int c10 = join_2_and_count(a1, a0_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int c12 = join_2_and_count(a1, a2_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
 
 
-	log_warn("%d %d %d %d", ce0, ce2, c10, c12);
+//	log_warn("edge len %d %d %d %d", e->seq_len, a0_rc->seq_len, a1->seq_len, a2_rc->seq_len);
+//	log_warn("%d %d %d %d", ce0, ce2, c10, c12);
 	if (ce0 > 0 && c12 > 0 && ce0 + c12 > ce2 + c10) {
 		asm_join_edge_wrapper(g, i_e, i_a0_rc);
 		asm_join_edge_wrapper(g, i_a1, i_a2_rc);

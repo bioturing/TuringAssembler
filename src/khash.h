@@ -317,7 +317,8 @@ static const double __ac_HASH_UPPER = 0.77;
 				while (!__ac_isempty(h->flags, i) && (__ac_isdel(h->flags, i) || !__hash_equal(h->keys[i], key))) { \
 					if (__ac_isdel(h->flags, i)) site = i;				\
 					i = (i + (++step)) & mask; \
-					if (i == last) { x = site; break; }					\
+					if (i == last) { x = site; \
+					break; }					\
 				}														\
 				if (x == h->n_buckets) {								\
 					if (__ac_isempty(h->flags, i) && site != h->n_buckets) x = site; \

@@ -29,7 +29,7 @@ void print_u8_seq(uint8_t *a, int len)
 	for (int i = 0; i < len; i++) {
 		printf("%c", nt4_char[(a[i >> 2] >> ((i & 3) << 1)) & 3]);
 	}
-	printf("\n");
+//	printf("\n");
 }
 
 uint8_t *compress_seq(char *a)
@@ -42,29 +42,52 @@ uint8_t *compress_seq(char *a)
 	return res;
 }
 
-void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, int ksize, pthread_mutex_t *lock)
+uint64_t get_first_hash(int8_t *seq, int ksize)
+{
+	uint64_t res = 0;
+	for (int i = 0; i < ksize; i++) {
+		res = (res * 5 + ((seq[i >> 2] >> ((i & 3) << 1)) & 3)) %SM;
+	}
+	return res;
+}
+
+int get_char(int8_t *seq, int pos)
+{
+	return ((seq[pos >> 2] >> ((pos & 3) << 1)) & 3);
+}
+
+void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, pthread_mutex_t *lock,
+                      int64_t five_to_big_ksize_m1)
 {
 	int8_t *seq = compress_seq(r->seq);
 	int big_ksize = BIG_KSIZE;
 
-	uint8_t *left = calloc((big_ksize + 3) >> 2, sizeof(uint8_t));
-	for (int i = 0; i < r->len - DISTANCE_KMER; i++) {
-		memset(left, 0, (big_ksize + 3) >> 2);
-		int64_t res;
-		get_seq(seq, i, big_ksize, left);
-		res = MurmurHash3_x64_64(left, (big_ksize + 3) >> 2);
+	int64_t res =  get_first_hash(seq, big_ksize);
+	pthread_mutex_lock(lock);
+	khint_t k = kh_get(pair_kmer_count, table, res);
+	if (k == kh_end(table)) {
+		int tmp;
+		k = kh_put(pair_kmer_count, table, res, &tmp);
+		kh_value(table, k) = 0;
+		assert(tmp == 1);
+	}
+	pthread_mutex_unlock(lock);
+	int tmp;
+	for (int i = 1; i < r->len - DISTANCE_KMER; i++) {
+		int64_t a0 = get_char(seq, i - 1);
+		int an = get_char(seq, i - 1 + big_ksize);
+		res = (((((res - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
+
 		pthread_mutex_lock(lock);
-		khint_t k = kh_get(pair_kmer_count, table, res);
+		k = kh_get(pair_kmer_count, table, res);
 		if (k == kh_end(table)) {
-			int tmp;
 			k = kh_put(pair_kmer_count, table, res, &tmp);
 			kh_value(table, k) = 0;
 			assert(tmp == 1);
 		}
 		pthread_mutex_unlock(lock);
-		atomic_add_and_fetch32(&kh_value(table, k), 1);
+//		atomic_add_and_fetch32(&kh_value(table, k), 1);
 	}
-	free(left);
 }
 
 
@@ -83,6 +106,10 @@ void *get_pair_kmer_ust_iterator(void *data)
 	__round_up_32(m_read);
 	char *R1_buf, *R2_buf, *I_buf;
 	int pos1, pos2, posI, rc1, rc2, rcI, input_format;
+	int64_t five_to_big_ksize_m1 = 1;
+	for (int i = 0; i < BIG_KSIZE-1; i++) {
+		five_to_big_ksize_m1 = (five_to_big_ksize_m1*5) %SM;
+	}
 
 	while (1) {
 		ext_buf = d_dequeue_in(q);
@@ -104,11 +131,11 @@ void *get_pair_kmer_ust_iterator(void *data)
 			      get_read_from_fq(&read2, R2_buf, &pos2) :
 			      get_read_from_fa(&read2, R2_buf, &pos2);
 
-			if (rc1 == READ_FAIL || rc2 == READ_FAIL )
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				__ERROR("\nWrong format file ust\n");
 
-			ust_add_big_kmer(&read1, table, bundle->ksize, bundle->table_lock);
-			ust_add_big_kmer(&read2, table, bundle->ksize, bundle->table_lock);
+			ust_add_big_kmer(&read1, table, bundle->table_lock, five_to_big_ksize_m1);
+			ust_add_big_kmer(&read2, table, bundle->table_lock, five_to_big_ksize_m1);
 			if (rc1 == READ_END)
 				break;
 		}
@@ -125,6 +152,7 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 
 	void *(*buffer_iterator)(void *) = NULL;
 	struct producer_bundle_t *producer_bundles = NULL;
+	kh_resize(pair_kmer_count, table, 100000000);
 	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type == LIB_TYPE_10X) {
 //		producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 //										   opt->files_1, opt->files_2);

@@ -21,6 +21,7 @@
 #define DISTANCE_KMER 60
 #define KMER_PAIR_SIZE 51
 #define BIG_KSIZE 111
+#define SM 1000000007
 
 #define NOT_FOR_SCAFF 0x1
 #define FOR_SCAFFOLD 0x2
