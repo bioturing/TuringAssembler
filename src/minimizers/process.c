@@ -4,8 +4,11 @@
 
 #include "attribute.h"
 #include "verbose.h"
+#include "utils.h"
 #include "smart_load.h"
 #include "count_barcodes.h"
+#include "minimizers.h"
+#include "assembly_graph.h"
 
 void print_usage(const char *prog)
 {
@@ -40,6 +43,17 @@ void search_bx_process(struct opt_proc_t *opt)
 	__VERBOSE("Done searching\n");
 }
 
+void index_mm_process(struct opt_proc_t *opt)
+{
+	__VERBOSE("Index minimizers for an example string\n");
+	uint32_t *s;
+	set_log_stage("Minimizers Index");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	mm_index_edges(&g, 17, 17);
+	__VERBOSE("Done indexing\n");
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 2) {
@@ -52,6 +66,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &count_bx_process);
 	else if (!strcmp(argv[1], "search_bx"))
 		build_opt_process(argc, argv, &search_bx_process);
+	else if (!strcmp(argv[1], "index"))
+		build_opt_process(argc, argv, &index_mm_process);
 	else
 		return -1;
 	return 0;

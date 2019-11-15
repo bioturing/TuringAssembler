@@ -4,7 +4,7 @@ CXX = g++
 
 CPP = cpp
 
-LIBS = -pthread -O3 -std=c++11 \
+LIBS = -pthread -O2 -std=c++11 \
        -lpthread \
        ../../libs/bzip2/libbz2.a ../../libs/zlib/libz.a \
        ../../libs/bwa/libbwa.a -lm 
@@ -12,18 +12,21 @@ LIBS = -pthread -O3 -std=c++11 \
 
 GIT_SHA := $(shell git rev-parse HEAD)
 
-CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
+CFLAGS = -std=gnu99 -m64 -O2 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
          -DGIT_SHA='"$(GIT_SHA)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
-         -I .. -g 
+         -I ../ -g
 
 EXEC = skiminizer
 
 SRC =  \
+      ../utils.c 					\
 	   process.c \
 	   opt.c \
 	   count_barcodes.c \
+	   minimizers.c \
+	   unittest_minimizers.c \
       ../buffer_file_wrapper.c 	\
       ../buffer_file_wrapper.c 	\
       ../dqueue.c 					\
@@ -36,7 +39,6 @@ SRC =  \
       ../sort_read.c 						\
       ../time_utils.c 					\
       smart_load.c 					\
-      ../utils.c 					\
       ../verbose.c 					\
 
 OBJ = $(SRC:.c=.o)

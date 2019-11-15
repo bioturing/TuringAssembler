@@ -3,6 +3,7 @@
 //
 
 #include <zlib.h>
+#include <string.h>
 
 #include "smart_load.h"
 #include "sort_read.h"
@@ -14,6 +15,10 @@
 #include "utils.h"
 #include "log.h"
 #include "count_barcodes.h"
+#include "minimizers.h"
+#include "assembly_graph.h"
+#include "attribute.h"
+#include "get_buffer.h"
 
 /**
  * Construct the dictionary index of
@@ -124,22 +129,33 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		log_info("Barcode does exist. Getting reads");
 	}
 
-
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
 	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
 
-	// Test string stream
-	FILE * buf1_stream = fmemopen((void *)buf1, m_buf1, "r");
-	FILE * buf2_stream = fmemopen((void *)buf2, m_buf2, "r");
+	struct read_t r1, r2;
+	int pos1 = 0, pos2 = 0;
+	int n_reads = 0;
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits;
+	hits = mm_hits_init();
 
-	if (buf1_stream == NULL || buf2_stream == NULL) {
-		log_error("Stream error!");
-	}
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
 
-	char *line = malloc(1024);
-	size_t len, read;
-	while ((read = getline(&line, &len, buf1_stream)) != -1) {
-		printf("%s", line);
+	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
+		n_reads++;
+		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
+		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+
+		mm_hits_cmp(db1, mm_edges, hits);
+		mm_hits_cmp(db2, mm_edges, hits);
 	}
+	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
+	log_info("Number of singleton hits: %d", kh_size(hits->edges));
+	mm_hits_print(hits, "barcode_hits.csv");
+
+	free(buf1);
+	free(buf2);
 }

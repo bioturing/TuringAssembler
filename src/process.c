@@ -18,6 +18,9 @@
 #include "fastq_reducer.h"
 #include "resolve_big.h"
 #include "complex_resolve.h"
+#include "minimizers/minimizers.h"
+#include "minimizers/smart_load.h"
+#include "minimizers/count_barcodes.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -209,6 +212,32 @@ void resolve_bulges_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
+void index_mm_process(struct opt_proc_t *opt)
+{
+	__VERBOSE("Index minimizers for an example string\n");
+	set_log_stage("Minimizers Index");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	mm_index_edges(&g, 17, 17);
+	__VERBOSE("Done indexing\n");
+}
+
+void hits_barcode_process(struct opt_proc_t *opt)
+{
+	__VERBOSE("Hitting reads from one barcode to edges\n");
+	set_log_stage("Barcode hits");
+	smart_load_barcode(opt);
+	__VERBOSE("Done hitting\n");
+}
+
+void count_bx_process(struct opt_proc_t *opt)
+{
+	struct read_path_t read_path;
+	__VERBOSE("Counting barcode frequencies\n");
+	count_bx_freq(opt, &read_path);
+	__VERBOSE("Done counting\n");
+}
+
 void reduce_read_process(struct opt_proc_t *opt)
 {
 	struct read_path_t org_rpath;
@@ -301,23 +330,19 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	char *log_file = str_concate(opt->out_dir, "/build_barcode_scaffold.log");
 	init_logger(opt->log_level, log_file);
 	struct asm_graph_t g;
-	struct read_path_t read_path;
+	struct read_path_t read_sorted_path, read_path;
 
 	load_asm_graph(&g, opt->in_file);
 	char fasta_path[MAX_PATH];
-//	if (opt->lib_type == LIB_TYPE_SORTED) {
-//		read_sorted_path.R1_path = opt->files_1[0];
-//		read_sorted_path.R2_path = opt->files_2[0];
-//		read_sorted_path.idx_path = opt->files_I[0];
-//	} else {
-//		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
-//		sort_read(opt, &read_sorted_path);
-//	}
-	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type== LIB_TYPE_UST) {
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
+		sort_read(opt, &read_sorted_path);
 		read_path.R1_path = opt->files_1[0];
 		read_path.R2_path = opt->files_2[0];
-	} else{
-		__ERROR("MUST BE SORTED OR UST TYPE");
 	}
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
 	mkdir(fasta_path, 0755);

@@ -208,6 +208,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-i")) {
 			opt->in_file = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-bx")) {
+			opt->bx_str = argv[pos + 1];
+			pos += 2;
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
@@ -463,6 +466,12 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_1_2_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+	else if (!strcmp(argv[1], "mm_index"))
+		build_opt_process(argc, argv, &index_mm_process);
+	else if (!strcmp(argv[1], "barcode_hit"))
+		build_opt_process(argc, argv, &hits_barcode_process);
+	else if (!strcmp(argv[1], "count_bx"))
+		build_opt_process(argc, argv, &count_bx_process);
 	else
 		print_usage();
 	return 0;
