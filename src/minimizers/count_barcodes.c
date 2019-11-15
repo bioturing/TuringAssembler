@@ -118,7 +118,7 @@ void destroy_mini_hash(struct mini_hash_t *h_table)
 	free(h_table);
 }
 
-static struct mini_hash_t *h_table;
+struct mini_hash_t *h_table;
 
 uint64_t barcode_hash_mini(char *s)
 {
@@ -222,9 +222,7 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 	return h2;
 }
 
-void mini_inc(uint64_t data, int len)
-{
-	uint64_t key = MurmurHash3_x64_64((uint8_t *)&data, len);
+void huu(uint64_t data, uint64_t key) {
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
@@ -253,6 +251,12 @@ void mini_inc(uint64_t data, int len)
 			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
 	}
+}
+
+void mini_inc(uint64_t data, int len)
+{
+	uint64_t key = MurmurHash3_x64_64((uint8_t *)&data, len);
+	huu(data, key);
 }
 
 void mini_print(size_t bx_size, char *out_dir)

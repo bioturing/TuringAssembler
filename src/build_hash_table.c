@@ -1,15 +1,15 @@
 //
 // Created by che on 11/11/2019.
 //
+#include <minimizers/count_barcodes.h>
 #include "attribute.h"
 #include "utils.h"
 #include "fastq_producer.h"
 #include "verbose.h"
 #include "build_hash_table.h"
 #include "assembly_graph.h"
-#include "kmhash.h"
-#include "atomic.h"
 
+extern struct mini_hash_t *h_table;
 void get_seq(char *seq, int start, int len, uint8_t *res)
 {
 	for (int i = start, i_res = 0; i < start + len; i++, i_res++) {
@@ -72,21 +72,12 @@ void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, pthread
 		assert(tmp == 1);
 	}
 	pthread_mutex_unlock(lock);
-	int tmp=1;
 	for (int i = 1; i < r->len - DISTANCE_KMER; i++) {
 		int64_t a0 = get_char(seq, i - 1);
 		int an = get_char(seq, i - 1 + big_ksize);
 		res = (((((res - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		pthread_mutex_lock(lock);
-		k = kh_get(pair_kmer_count, table, res);
-		if (k == kh_end(table)) {
-//			k = kh_put(pair_kmer_count, table, res, &tmp);
-//			kh_value(table, k) = 0;
-			assert(tmp == 1);
-		}
-		pthread_mutex_unlock(lock);
-//		atomic_add_and_fetch32(&kh_value(table, k), 1);
+		huu(res, res);
 	}
 }
 
@@ -144,6 +135,7 @@ void *get_pair_kmer_ust_iterator(void *data)
 
 void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *table)
 {
+	h_table = init_mini_hash();
 	struct read_path_t read_path;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
