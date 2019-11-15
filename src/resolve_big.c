@@ -110,7 +110,7 @@ int join_2_and_count(struct asm_edge_t *a, struct asm_edge_t *b,
 	uint8_t *new_seq = calloc((new_len + 3) >> 2, 1);
 	copy_seq32_seq8(a->seq, a->seq_len - graph_ksize - a_len, new_seq, 0, a_len);
 	copy_seq32_seq8(b->seq, 0, new_seq, a_len, b_len);
-	printf("\n\n");
+//	printf("\n\n");
 
 	int value = 0;
 	int64_t key = get_first_hash(new_seq, big_ksize);
