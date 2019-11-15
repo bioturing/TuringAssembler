@@ -248,7 +248,6 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	int i;
 	struct producer_bundle_t *producer_bundles;
-	__VERBOSE_LOG("DEBUG", "NTHREAD = %d\n", n_threads);
 	producer_bundles = init_fastq_pair(n_threads, 1,
 	                                   &(rpath->R1_path), &(rpath->R2_path));
 

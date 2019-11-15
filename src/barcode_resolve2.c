@@ -2048,8 +2048,11 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 		save_graph_info(work_dir, &lg, "local_lvl_0");
 		build_local_0_1(&lg, &lg1);
 		save_graph_info(work_dir, &lg1, "local_lvl_1");
+		delete_file(local_read_path.R1_path);
+		delete_file(local_read_path.R2_path);
 		destroy_read_path(&local_read_path);
 		asm_graph_destroy(&lg1);
+
 	}
 	post_test(get_local_assembly, opt->lk, work_dir, ret);
 }
