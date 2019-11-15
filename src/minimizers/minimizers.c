@@ -481,11 +481,12 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	FILE *f = fopen(file_path, "w");
 	khiter_t k;
 	uint32_t even, key;
+	fprintf(f, "edge,Colour,hits\n", even, even + 1, kh_value(hits->edges, k));
 	for (k = kh_begin(hits->edges); k != kh_end(hits->edges); ++k) {
 		if (kh_exist(hits->edges, k)) {
 			key = kh_key(hits->edges, k);
 			even = key % 2 ? key - 1 : key;
-			fprintf(f, "%d_%d,%d\n", even, even + 1, kh_value(hits->edges, k));
+			fprintf(f, "%d_%d,red,%d\n", even, even + 1, kh_value(hits->edges, k));
 		}
 	}
 	fclose(f);
