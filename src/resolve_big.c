@@ -443,14 +443,19 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 ////		if (g->edges[i].seq_len < CONTIG_PARTITION_LEN)
 //		assert(partition[i] <= 0);
 //	}
-	for (int i = 0 ; i < g->n_e; i++) {
-		int t = resolve_212_using_big_kmer(g, i, kmer_pair_table);
-		resolve_stat[t]++;
-		if (t == NOT_212_CASE) {
-			t = resolve_202_using_big_kmer(g, i, kmer_pair_table);
+	int old_resolve = 0;
+	do {
+		old_resolve = resolve_stat[0];
+		for (int i = 0; i < g->n_e; i++) {
+			int t = resolve_212_using_big_kmer(g, i, kmer_pair_table);
 			resolve_stat[t]++;
+			if (t == NOT_212_CASE) {
+				t = resolve_202_using_big_kmer(g, i, kmer_pair_table);
+				resolve_stat[t]++;
+			}
 		}
-	}
+		log_info("   Solved: %d", resolve_stat[0]);
+	} while (resolve_stat[0] != old_resolve);
 	log_info("Resolve 2-2 case:");
 	for (int i = 0; i < 4; i++) {
 		if (i == NOT_HAVE_SPAN_KMER) {
@@ -469,6 +474,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
                                khash_t(pair_kmer_count) *table)
 {
+//	return 1;
 	if (!is_case_2_1_2(g, i_e)) {
 		return NOT_212_CASE;
 	}
@@ -539,6 +545,7 @@ int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
 int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
                                khash_t(pair_kmer_count) *table)
 {
+//	return 1;
 	int i_target = g->edges[i_e].target;
 	if (i_target == -1)
 		return NOT_202_CASE;
