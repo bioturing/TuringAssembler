@@ -1,0 +1,90 @@
+#include "split_molecules.h"
+#include "verbose.h"
+#define MAX_EDGE_VISITED 100000
+#define MAX_EDGE_DEPTH 10
+
+int get_edges_order_dfs(struct asm_graph_t *g, int e, int p, int total, int *path,
+		int depth, khash_t(int_int) *multi, struct edge_ordering_t *order)
+{
+	//__VERBOSE("%d %d\n", e, *n_visit);
+	int res = 0;
+	if (depth > MAX_EDGE_DEPTH)
+		goto ignore_stage_1;
+	int id = g->edges[e].rc_id;
+	if (id > e)
+		id = e;
+
+	int early_stop = 1;
+	int is_edge_in_list = check_in_map(multi, id);
+	if (!is_edge_in_list || get_in_map(multi, id) > 0)
+		early_stop = 0;
+	if (early_stop)
+		goto ignore_stage_1;
+
+
+	if (is_edge_in_list){
+		__VERBOSE("HAHA %d\n", e);
+		increase_in_map(multi, id, -1);
+		path[p++] = e;
+		if (p == total){
+			order->n = total;
+			order->edges = calloc(total, sizeof(int));
+			for (int i = 0; i < total; ++i)
+				order->edges[i] = path[i];
+			res = 1;
+			goto ignore_stage_2;
+		}
+	}
+
+	int v = g->edges[e].target;
+	for (int i = 0; i < g->nodes[v].deg; ++i){
+		int next_e = g->nodes[v].adj[i];
+		if (get_edges_order_dfs(g, next_e, p, total, path, depth + 1,
+					multi, order)){
+			res = 1;
+			break;
+		}
+	}
+ignore_stage_2:
+	if (is_edge_in_list){
+		increase_in_map(multi, id, 1);
+		--p;
+	}
+ignore_stage_1:
+	return res;
+}
+
+void get_edges_order(struct asm_graph_t *g, int *edges, int n_e,
+		struct edge_ordering_t *order)
+{
+	float unit_cov = get_genome_coverage(g);
+	khash_t(int_int) *multi = kh_init(int_int);
+	int total = 0;
+	for (int i = 0; i < n_e; ++i){
+		int e = edges[i];
+		int rc = g->edges[e].rc_id;
+		if (e > rc)
+			e = rc;
+		float cov = __get_edge_cov(g->edges + e, g->ksize);
+		int v = (int) (cov / unit_cov + 0.5);
+		total += v;
+		put_in_map(multi, e, v);
+	}
+
+	int *path = calloc(g->n_e, sizeof(int));
+	for (int i = 0; i < n_e; ++i){
+		int e = edges[i];
+		__VERBOSE("START FROM %d\n", e);
+		if (get_edges_order_dfs(g, e, 0, total, path, 0, multi, order) ||
+			get_edges_order_dfs(g, g->edges[e].rc_id, 0, total, path,
+				0, multi, order)){
+			__VERBOSE("FOUND: ");
+			for (int i = 0; i < total; ++i)
+				__VERBOSE("%d ", path[i]);
+			__VERBOSE("\n");
+		}
+	}
+	free(path);
+	kh_destroy(int_int, multi);
+}
+
