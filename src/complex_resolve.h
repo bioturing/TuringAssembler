@@ -45,6 +45,7 @@ void get_dominated_vertices(struct resolve_bulges_bundle_t *bundle);
 int get_closure(struct resolve_bulges_bundle_t *bundle);
 
 void put_in_set(khash_t(set_int) *h, int k);
+void erase_from_set(khash_t(set_int) *h, int k);
 int check_in_set(khash_t(set_int) *h, int k);
 void put_in_map(khash_t(int_int) *h, int k, int v);
 void increase_in_map(khash_t(int_int) *h, int k, int v);

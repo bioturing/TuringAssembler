@@ -21,6 +21,7 @@
 #include "minimizers/minimizers.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/count_barcodes.h"
+#include "split_molecules.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -182,6 +183,26 @@ void build_barcode_read(struct opt_proc_t *opt, struct asm_graph_t *g)
 void build_bridge_process(struct opt_proc_t *opt)
 {
 	build_bridge(opt);
+}
+
+void split_molecules_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Split molecules");
+
+	FILE *f = fopen(opt->in_fasta, "r");
+	int n;
+	fscanf(f, "%d\n", &n);
+	int *edges = calloc(n, sizeof(int));
+	for (int i = 0; i < n; ++i)
+		fscanf(f, "%d ", edges + i);
+	fclose(f);
+
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	order_edges(&g, n, edges);
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)

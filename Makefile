@@ -50,6 +50,7 @@ SRC = src/assembly_graph.c 				\
       src/helper.c 					\
       src/fastg.c 					\
       src/complex_resolve.c 				\
+      src/split_molecules.c 				\
       src/scaffolding/bin_hash.c 						\
       src/scaffolding/algorithm.c 						\
       src/scaffolding/compare.c 						\
@@ -68,7 +69,6 @@ SRC = src/assembly_graph.c 				\
       src/log.c 					\
 	  src/build_hash_table.c\
 	  src/resolve_big.c \
-      src/unit_test.c
       src/unit_test.c \
       src/minimizers/minimizers.c \
       src/minimizers/smart_load.c \
