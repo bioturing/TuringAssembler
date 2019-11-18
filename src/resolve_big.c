@@ -77,14 +77,14 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 
 	int value = 0;
 	int64_t key = get_first_hash(new_seq, big_ksize);
-	value += get_huu(key, key);
+	value += mini_get(key, key);
 
 	for (int i = 1; i < new_len - span_len + 1; i++) {
 		int a0 = get_char(new_seq, i - 1);
 		int an = get_char(new_seq, i - 1 + big_ksize);
 		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		int value1 = get_huu(key, key);
+		int value1 = mini_get(key, key);
 //		log_warn("value of get pair is %d", value1);
 		value += value1;
 	}
@@ -110,14 +110,14 @@ int join_2_and_count(struct asm_edge_t *a, struct asm_edge_t *b,
 
 	int value = 0;
 	int64_t key = get_first_hash(new_seq, big_ksize);
-	value += get_huu(key, key);
+	value += mini_get(key, key);
 
 	for (int i = 1; i < new_len - span_len + 1; i++) {
 		int a0 = get_char(new_seq, i - 1);
 		int an = get_char(new_seq, i - 1 + big_ksize);
 		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		int value1 =  get_huu(key, key);
+		int value1 = mini_get(key, key);
 //		log_warn("value of get pair is %ld %d", key, value1);
 		value += value1;
 	}

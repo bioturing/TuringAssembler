@@ -254,7 +254,7 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 	return h2;
 }
 
-void huu(uint64_t data, uint64_t key)
+void mini_inc_by_key(uint64_t data, uint64_t key)
 {
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
@@ -288,7 +288,7 @@ void huu(uint64_t data, uint64_t key)
 }
 
 //This function only for Huu purpose, not safe for concurrency purpose/
-uint64_t get_huu(uint64_t data, uint64_t key)
+uint64_t mini_get(uint64_t data, uint64_t key)
 {
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
@@ -305,7 +305,7 @@ uint64_t get_huu(uint64_t data, uint64_t key)
 void mini_inc(uint64_t data, int len)
 {
 	uint64_t key = MurmurHash3_x64_64((uint8_t *) &data, len);
-	huu(data, key);
+	mini_inc_by_key(data, key);
 }
 
 void mini_print(size_t bx_size, char *out_dir)
