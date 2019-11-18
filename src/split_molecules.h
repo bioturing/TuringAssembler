@@ -20,8 +20,8 @@ struct line_graph_t{
 
 void init_line_graph(struct line_graph_t *lig, int n_e, int *edges);
 void construct_line_graph(struct asm_graph_t *g, struct line_graph_t *lig);
-void get_nearby_edges(struct asm_graph_t *g, int e, khash_t(set_int) *nearby);
-void get_nearby_edges_dfs(struct asm_graph_t *g, int e, int len,
+void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby);
+void get_edges_in_radius_dfs(struct asm_graph_t *g, int e, int len,
 		khash_t(set_int) *visited);
 void add_line_edge(struct line_graph_t *lig, int v, int u);
 //struct edge_ordering_t{

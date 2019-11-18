@@ -187,7 +187,7 @@ void build_bridge_process(struct opt_proc_t *opt)
 
 void split_molecules_process(struct opt_proc_t *opt)
 {
-	char path[1024];
+	/*char path[1024];
 	sprintf(path, "%s/debug.log", opt->out_dir);
 	init_logger(opt->log_level, path);
 	set_log_stage("Split molecules");
@@ -203,7 +203,7 @@ void split_molecules_process(struct opt_proc_t *opt)
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 	struct edge_ordering_t order;
-	get_edges_order(&g, edges, n, &order);
+	get_edges_order(&g, edges, n, &order);*/
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)

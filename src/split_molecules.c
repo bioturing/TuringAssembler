@@ -23,7 +23,7 @@ void construct_line_graph(struct asm_graph_t *g, struct line_graph_t *lig)
 	for (int i = 0; i < lig->n_v; ++i){
 		int e = lig->line_v[i];
 		khash_t(set_int) *nearby = kh_init(set_int);
-		get_nearby_edges(g, e, nearby);
+		get_edges_in_radius(g, e, nearby);
 		__VERBOSE("Nearby of %d: ", e);
 		for (int j = 0; j < lig->n_v; ++j){
 			int next_e = lig->line_v[j];
@@ -49,7 +49,7 @@ void add_line_edge(struct line_graph_t *lig, int v, int u)
 	lv->parents[lv->deg_in++] = v;
 }
 
-void get_nearby_edges_dfs(struct asm_graph_t *g, int e, int len,
+void get_edges_in_radius_dfs(struct asm_graph_t *g, int e, int len,
 		khash_t(set_int) *visited)
 {
 	if (len > MAX_SEARCH_LEN)
@@ -61,13 +61,13 @@ void get_nearby_edges_dfs(struct asm_graph_t *g, int e, int len,
 	int target = g->edges[e].target;
 	for (int i = 0; i < g->nodes[target].deg; ++i){
 		int next_e = g->nodes[target].adj[i];
-		get_nearby_edges_dfs(g, next_e, len, visited);
+		get_edges_in_radius_dfs(g, next_e, len, visited);
 	}
 }
 
-void get_nearby_edges(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
+void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
 {
-	get_nearby_edges_dfs(g, e, 0, nearby);
+	get_edges_in_radius_dfs(g, e, 0, nearby);
 }
 
 //int get_edges_order_dfs(struct asm_graph_t *g, int e, int p, int total, int *path,
