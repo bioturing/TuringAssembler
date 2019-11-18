@@ -775,7 +775,7 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 	free(q);
 }
 
-static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
+uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
 {
 	float cov = __get_edge_cov(e, ksize);
 	uint32_t i, len = e->seq_len;
