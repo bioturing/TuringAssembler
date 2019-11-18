@@ -39,12 +39,11 @@ pthread_mutex_t lock_key;
  http://br.endernet.org/~akrowne/
  http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
  */
-static const uint64_t primes[] = { 100663319, 201326611, 402653189,
-                                   805306457, 1610612741, 2147483647,
+static const uint64_t primes[] = { 1610612741, 2147483647,
                                    4294967295};
-#define N_PRIMES_NUMBER 7
+#define N_PRIMES_NUMBER 3
 
-#define MAX_LOAD_FACTOR 0.65
+#define MAX_LOAD_FACTOR 0.9
 #define FATAL_LOAD_FACTOR 0.9
 #define BIG_CONSTANT(x) (x##LLU)
 
@@ -282,6 +281,7 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 /**
  * @brief Expand the hash table by re-hash and doubling size
  * when the load factor reach MAX_LOAD_FACTOR (0.65 by default)
+ * key must be hashed by MurMurHash64
  */
 void mini_expand()
 {
@@ -340,8 +340,10 @@ int try_expanding()
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
  */
-void mini_inc_by_key(uint64_t data, uint64_t key)
+int mini_inc_by_key(uint64_t data, uint64_t key)
 {
+	if (h_table->count > h_table->max_cnt) // Return for counting big kmer
+		return -1;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
@@ -371,6 +373,7 @@ void mini_inc_by_key(uint64_t data, uint64_t key)
 			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
 	}
+	return 0;
 }
 
 /**
