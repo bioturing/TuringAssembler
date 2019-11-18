@@ -33,7 +33,8 @@
 
 pthread_mutex_t lock_key;
 
-#define BARCODES100M 100663320
+#define BARCODES100M 100663319
+#define MAX_LOAD_FACTOR 0.65
 #define BIG_CONSTANT(x) (x##LLU)
 
 #if defined(_MSC_VER)
@@ -95,17 +96,21 @@ static struct readsort_bundle_t {
 };
 
 struct mini_hash_t {
-    uint64_t *h;
+    uint32_t *h;
     uint64_t *key;
-    unsigned int size;
+    uint64_t size;
+    uint64_t count;
+    uint64_t max_cnt;
 };
 
 struct mini_hash_t *init_mini_hash()
 {
 	struct mini_hash_t *h_table = malloc(sizeof(struct mini_hash_t));
-	h_table->h = calloc(BARCODES100M, sizeof(uint64_t));
+	h_table->h = calloc(BARCODES100M, sizeof(uint32_t));
 	h_table->key = calloc(BARCODES100M, sizeof(uint64_t));
 	h_table->size = BARCODES100M;
+	h_table->max_cnt = (uint64_t) (h_table->size * MAX_LOAD_FACTOR);
+	h_table->count = 0;
 	memset(h_table->h, 0, h_table->size);
 	memset(h_table->key, 0, h_table->size);
 	return h_table;
@@ -118,7 +123,7 @@ void destroy_mini_hash(struct mini_hash_t *h_table)
 	free(h_table);
 }
 
-struct mini_hash_t *h_table;
+struct mini_hash_t *h_table;            /* Constant hash table */
 
 uint64_t barcode_hash_mini(char *s)
 {
@@ -254,9 +259,14 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 	return h2;
 }
 
+/**
+ * Increase the the count of one barcode by 1
+ * @param data  barcode encoded as an uint64_t number
+ * @param key   hash(data)
+ */
 void mini_inc_by_key(uint64_t data, uint64_t key)
 {
-	uint64_t mask = h_table->size - 1;
+	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
@@ -287,7 +297,13 @@ void mini_inc_by_key(uint64_t data, uint64_t key)
 	}
 }
 
-//This function only for Huu purpose, not safe for concurrency purpose/
+/**
+ * @brief This function only for Huu purpose, not safe for concurrency purpose
+ * @param data
+ * @param key
+ * @return count of data
+ */
+
 uint64_t mini_get(uint64_t data, uint64_t key)
 {
 	uint64_t mask = h_table->size - 1;
@@ -302,12 +318,22 @@ uint64_t mini_get(uint64_t data, uint64_t key)
 	return h_table->h[slot];
 }
 
+/**
+ * @brief Increase the count of data to 1
+ * @param data byte array of data
+ * @param len length in byte of data
+ */
 void mini_inc(uint64_t data, int len)
 {
 	uint64_t key = MurmurHash3_x64_64((uint8_t *) &data, len);
 	mini_inc_by_key(data, key);
 }
 
+/**
+ * @brief Print the barcode frequencies to a file
+ * @param bx_size
+ * @param out_dir
+ */
 void mini_print(size_t bx_size, char *out_dir)
 {
 	char count_file[1024];
@@ -336,6 +362,11 @@ void mini_print(size_t bx_size, char *out_dir)
 
 static inline void *biot_buffer_iterator_simple(void *data);
 
+/**
+ * @brief main function that count barcode frequencies
+ * @param opt
+ * @param r_path
+ */
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
 	pthread_mutex_init(&lock_key, NULL);
@@ -379,10 +410,15 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	free_fastq_pair(producer_bundles, opt->n_files);
 	free(worker_bundles);
 
-	mini_print(18, opt->out_dir);
+	mini_print(18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
 	destroy_mini_hash(h_table);
 }
 
+/**
+ * @brief Worker for counting barcode
+ * @param data
+ * @return
+ */
 static inline void *biot_buffer_iterator_simple(void *data)
 {
 	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *) data;
