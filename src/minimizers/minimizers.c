@@ -211,7 +211,7 @@ struct mm_align_t *init_mm_align()
  * @param e edge ID
  * @param p mapped position
  */
-void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint32_t e, uint32_t p) {
+void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint64_t e, uint32_t p) {
 	khiter_t k;
 	int miss;
 	struct mm_align_t *aln;
@@ -228,7 +228,6 @@ void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint32_t e, uint32_t p)
 		k = kh_put(mm_align, hits->aln, e, &miss);
 		kh_value(hits->aln, k) = init_mm_align();
 	}
-	k = kh_get(mm_align, hits->aln, mm); // after insert or already have
 	aln = kh_value(hits->aln, k);
 	aln->cnt++;
 	aln->edge = e;
