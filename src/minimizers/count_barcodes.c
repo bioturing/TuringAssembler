@@ -33,7 +33,7 @@
 
 pthread_mutex_t lock_key;
 
-#define BARCODES100M 1006633200
+#define BARCODES100M 100663320
 #define BIG_CONSTANT(x) (x##LLU)
 
 #if defined(_MSC_VER)
