@@ -349,7 +349,7 @@ int mini_inc_by_key(uint64_t data, uint64_t key)
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
 		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
-		h_table->count++;
+		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)) {
 		atomic_add_and_fetch64(h_table->h + slot, 1);
 	} else { //linear probing
@@ -368,7 +368,7 @@ int mini_inc_by_key(uint64_t data, uint64_t key)
 		}
 		if (!prev) { //room at probe is empty -> fill in
 			atomic_bool_CAS64(h_table->key + i, 0, data); //TODO: check return
-			h_table->count++;
+			atomic_add_and_fetch64(&(h_table->count), 1);
 		} else {
 			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
