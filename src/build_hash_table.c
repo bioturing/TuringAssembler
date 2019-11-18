@@ -63,15 +63,8 @@ void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, pthread
 	int big_ksize = BIG_KSIZE;
 
 	int64_t res =  get_first_hash(seq, big_ksize);
-	pthread_mutex_lock(lock);
-	khint_t k = kh_get(pair_kmer_count, table, res);
-	if (k == kh_end(table)) {
-		int tmp;
-		k = kh_put(pair_kmer_count, table, res, &tmp);
-		kh_value(table, k) = 0;
-		assert(tmp == 1);
-	}
-	pthread_mutex_unlock(lock);
+	huu(res,res);
+
 	for (int i = 1; i < r->len - DISTANCE_KMER; i++) {
 		int64_t a0 = get_char(seq, i - 1);
 		int an = get_char(seq, i - 1 + big_ksize);

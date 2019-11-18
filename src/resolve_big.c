@@ -19,6 +19,7 @@
 #include "barcode_resolve2.h"
 #include "atomic.h"
 #include "build_hash_table.h"
+#include "count_barcodes.h"
 
 
 inline int get_nu(const uint32_t *seq, int pos)
@@ -76,19 +77,14 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 
 	int value = 0;
 	int64_t key = get_first_hash(new_seq, big_ksize);
-	khint_t k = kh_get(pair_kmer_count, table, key);
-	if (k != kh_end(table))
-		value += kh_value(table, k);
+	value += get_huu(key, key);
 
 	for (int i = 1; i < new_len - span_len + 1; i++) {
 		int a0 = get_char(new_seq, i - 1);
 		int an = get_char(new_seq, i - 1 + big_ksize);
 		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		khint_t k = kh_get(pair_kmer_count, table, key);
-		if (k == kh_end(table))
-			continue;
-		int value1 = kh_value(table, k);
+		int value1 = get_huu(key, key);
 //		log_warn("value of get pair is %d", value1);
 		value += value1;
 	}
@@ -114,19 +110,14 @@ int join_2_and_count(struct asm_edge_t *a, struct asm_edge_t *b,
 
 	int value = 0;
 	int64_t key = get_first_hash(new_seq, big_ksize);
-	khint_t k = kh_get(pair_kmer_count, table, key);
-	if (k != kh_end(table))
-		value += kh_value(table, k);
+	value += get_huu(key, key);
 
 	for (int i = 1; i < new_len - span_len + 1; i++) {
 		int a0 = get_char(new_seq, i - 1);
 		int an = get_char(new_seq, i - 1 + big_ksize);
 		key = (((((key - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		khint_t k = kh_get(pair_kmer_count, table, key);
-		if (k == kh_end(table))
-			continue;
-		int value1 = kh_value(table, k);
+		int value1 =  get_huu(key, key);
 //		log_warn("value of get pair is %ld %d", key, value1);
 		value += value1;
 	}
@@ -484,7 +475,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
                                khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
 {
-	return 1;
+//	return 1;
 	if (!is_case_2_1_2(g, i_e)) {
 		return NOT_212_CASE;
 	}
@@ -635,6 +626,7 @@ void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 	khash_t(pair_kmer_count) *table = kh_init(pair_kmer_count);
 	build_pair_kmer_table(opt, table);
+	log_info("Build big kmer table done");
 
 	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, table);
 	free(partition);
