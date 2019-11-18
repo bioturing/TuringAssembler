@@ -1,8 +1,7 @@
 #include "split_molecules.h"
 #include "verbose.h"
 #define MAX_EDGE_VISITED 100000
-#define MAX_EDGE_DEPTH 10
-#define MAX_SEARCH_LEN 10000
+#define MAX_PATH_LEN 10
 
 void init_line_graph(struct line_graph_t *lig, struct asm_graph_t *g, int n_e,
 		int *edges)
@@ -11,6 +10,8 @@ void init_line_graph(struct line_graph_t *lig, struct asm_graph_t *g, int n_e,
 	for (int i = 0; i < n_e; ++i){
 		int e = edges[i];
 		int rc = g->edges[e].rc_id;
+		if (g->edges[e].seq_len < 500)
+			continue;
 		put_in_set(mark, e);
 		put_in_set(mark, rc);
 	}
@@ -63,46 +64,80 @@ void add_line_edge(struct line_graph_t *lig, int v, int u)
 void get_edges_in_radius_dfs(struct asm_graph_t *g, int e, int len,
 		khash_t(set_int) *visited, khash_t(set_int) *nearby)
 {
-	if (len > MAX_SEARCH_LEN)
+	if (len > MAX_PATH_LEN)
 		return;
 	if (check_in_set(visited, e))
 		return;
 	put_in_set(visited, e);
 	put_in_set(nearby, e);
-	len += g->edges[e].seq_len;
 	//__VERBOSE("%d %d\n", e, len);
 	int target = g->edges[e].target;
 	for (int i = 0; i < g->nodes[target].deg; ++i){
 		int next_e = g->nodes[target].adj[i];
-		get_edges_in_radius_dfs(g, next_e, len, visited, nearby);
+		get_edges_in_radius_dfs(g, next_e, len + 1, visited, nearby);
 	}
 	erase_from_set(visited, e);
 }
 
 void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
 {
-	khash_t(set_int) *visited = kh_init(set_int);
-	get_edges_in_radius_dfs(g, e, -g->edges[e].seq_len, visited, nearby);
-	kh_destroy(set_int, visited);
+	struct queue_t q;
+	init_queue(&q, 1024);
+	push_queue(&q, pointerize(&e, sizeof(int)));
+	khash_t(int_int) *L = kh_init(int_int);
+	put_in_map(L, e, 0);
+	//__VERBOSE("BFS FROM %d\n", e);
+	while (!is_queue_empty(&q)){
+		int *cur_e = get_queue(&q);
+		pop_queue(&q);
+		int tg = g->edges[*cur_e].target;
+		int cur_len = get_in_map(L, *cur_e);
+		put_in_set(nearby, *cur_e);
+		//__VERBOSE("%d %d\n", *cur_e, cur_len);
+		if (cur_len < MAX_PATH_LEN){
+			for (int i = 0; i < g->nodes[tg].deg; ++i){
+				int next_e = g->nodes[tg].adj[i];
+				if (check_in_map(L, next_e) == 0){
+					put_in_map(L, next_e, cur_len + 1);
+					push_queue(&q, pointerize(&next_e, sizeof(int)));
+				}
+			}
+		}
+		free(cur_e);
+	}
+	kh_destroy(int_int, L);
+	destroy_queue(&q);
 }
+
+//void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
+//{
+//	khash_t(set_int) *visited = kh_init(set_int);
+//	get_edges_in_radius_dfs(g, e, 0, visited, nearby);
+//	kh_destroy(set_int, visited);
+//}
 
 void order_edges(struct asm_graph_t *g, int n_e, int *edges)
 {
 	struct line_graph_t *lig = calloc(1, sizeof(struct line_graph_t));
 	init_line_graph(lig, g, n_e, edges);
+	construct_line_graph(g, lig);
 	for (khiter_t it = kh_begin(lig->vertices); it != kh_end(lig->vertices);
 			++it){
+		if (!kh_exist(lig->vertices, it))
+			continue;
 		int e = kh_key(lig->vertices, it);
 		struct line_vertex_t *lv = kh_val(lig->vertices, it);
 		if (lv->deg_in != 0)
 			continue;
 		int *tmp = calloc(lig->n_v, sizeof(int));
 		int n = 0;
+		//__VERBOSE("start at %d:\n", e);
 		while (lv->deg_out == 1){
 			tmp[n++] = e;
 			e = lv->children[0];
 			khiter_t it2 = kh_get(edge_line, lig->vertices, e);
 			lv = kh_val(lig->vertices, it2);
+			//__VERBOSE("%d %d\n", e, lv->deg_out);
 		}
 		if (lv->deg_out == 0){
 			tmp[n++] = e;
@@ -113,89 +148,4 @@ void order_edges(struct asm_graph_t *g, int n_e, int *edges)
 		}
 	}
 }
-
-//int get_edges_order_dfs(struct asm_graph_t *g, int e, int p, int total, int *path,
-//		int depth, khash_t(int_int) *multi, struct edge_ordering_t *order)
-//{
-//	//__VERBOSE("%d %d\n", e, *n_visit);
-//	int res = 0;
-//	if (depth > MAX_EDGE_DEPTH)
-//		goto ignore_stage_1;
-//	int id = g->edges[e].rc_id;
-//	if (id > e)
-//		id = e;
-//
-//	int early_stop = 1;
-//	int is_edge_in_list = check_in_map(multi, id);
-//	if (!is_edge_in_list || get_in_map(multi, id) > 0)
-//		early_stop = 0;
-//	if (early_stop)
-//		goto ignore_stage_1;
-//
-//
-//	if (is_edge_in_list){
-//		__VERBOSE("HAHA %d\n", e);
-//		increase_in_map(multi, id, -1);
-//		path[p++] = e;
-//		if (p == total){
-//			order->n = total;
-//			order->edges = calloc(total, sizeof(int));
-//			for (int i = 0; i < total; ++i)
-//				order->edges[i] = path[i];
-//			res = 1;
-//			goto ignore_stage_2;
-//		}
-//	}
-//
-//	int v = g->edges[e].target;
-//	for (int i = 0; i < g->nodes[v].deg; ++i){
-//		int next_e = g->nodes[v].adj[i];
-//		if (get_edges_order_dfs(g, next_e, p, total, path, depth + 1,
-//					multi, order)){
-//			res = 1;
-//			break;
-//		}
-//	}
-//ignore_stage_2:
-//	if (is_edge_in_list){
-//		increase_in_map(multi, id, 1);
-//		--p;
-//	}
-//ignore_stage_1:
-//	return res;
-//}
-//
-//void get_edges_order(struct asm_graph_t *g, int *edges, int n_e,
-//		struct edge_ordering_t *order)
-//{
-//	float unit_cov = get_genome_coverage(g);
-//	khash_t(int_int) *multi = kh_init(int_int);
-//	int total = 0;
-//	for (int i = 0; i < n_e; ++i){
-//		int e = edges[i];
-//		int rc = g->edges[e].rc_id;
-//		if (e > rc)
-//			e = rc;
-//		float cov = __get_edge_cov(g->edges + e, g->ksize);
-//		int v = (int) (cov / unit_cov + 0.5);
-//		total += v;
-//		put_in_map(multi, e, v);
-//	}
-//
-//	int *path = calloc(g->n_e, sizeof(int));
-//	for (int i = 0; i < n_e; ++i){
-//		int e = edges[i];
-//		__VERBOSE("START FROM %d\n", e);
-//		if (get_edges_order_dfs(g, e, 0, total, path, 0, multi, order) ||
-//			get_edges_order_dfs(g, g->edges[e].rc_id, 0, total, path,
-//				0, multi, order)){
-//			__VERBOSE("FOUND: ");
-//			for (int i = 0; i < total; ++i)
-//				__VERBOSE("%d ", path[i]);
-//			__VERBOSE("\n");
-//		}
-//	}
-//	free(path);
-//	kh_destroy(int_int, multi);
-//}
 
