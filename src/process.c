@@ -627,8 +627,14 @@ void resolve_1_2_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, log_file);
 	init_clock();
 	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	struct asm_graph_t *g1 = calloc(1, sizeof(struct asm_graph_t));
 	log_info("resolve 1_2 process");
 	resolve_1_2(g0,opt);
+//	asm_lazy_condense(g0);
+	asm_condense(g0, g1);
+	log_info("condense done");
+	g0 = g1;
+	test_asm_graph(g0);
 	save_graph_info(opt->out_dir, g0, "level_2_huu");
 	asm_graph_destroy(g0);
 	free(g0);

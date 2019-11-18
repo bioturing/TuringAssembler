@@ -6,17 +6,12 @@
 #define SKIPPING_RESOLVE_BIG_H
 
 #include "build_hash_table.h"
+#include <stdio.h>
+
 
 KHASH_MAP_INIT_INT64(big_kmer_count, int);
 KHASH_SET_INIT_INT64(union_barcode);
 
-int resolve_using_big_kmer(struct asm_graph_t *g, int i_e,
-						   khash_t(big_kmer_count) *table);
-int resolve_using_pair_kmer(struct asm_graph_t *g, int i_e,
-							khash_t(pair_kmer_count) *table);
-
-void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *partition, int n_threads,
-					 int mmem, int *n_partition, khash_t(pair_kmer_count) *kmer_pair_table);
 
 struct km_count_bundle_t {
 	khash_t(big_kmer_count) *kmer_count_table;
@@ -28,7 +23,10 @@ struct km_count_bundle_t {
 struct partition_information {
 	int total_len;
 	int n_barcodes;
+	int *map_node;
 	khash_t(union_barcode) *union_barcodes;
+	struct asm_graph_t *sub_graph;
+	FILE *output_gfa_file;
 };
 void km_count_bundle_destroy(struct km_count_bundle_t *b);
 void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt);

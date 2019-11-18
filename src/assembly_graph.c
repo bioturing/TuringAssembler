@@ -524,6 +524,16 @@ void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1, gin
 	asm_remove_edge(g, e_rc1);
 }
 
+void asm_join_edge_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2)
+{
+//	log_warn("join edge %d %d", e1, e2);
+	int e1_rc = g->edges[e1].rc_id;
+	int e2_rc = g->edges[e2].rc_id;
+	assert(g->edges[e1].source != -1 && g->edges[e2].source != -1 );
+	assert(g->edges[e1_rc].source != -1 && g->edges[e2_rc].source != -1 );
+	asm_join_edge(g, e1, e1_rc, e2, e2_rc);
+}
+
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 					gint_t e2, gint_t e_rc2)
 {
@@ -572,11 +582,11 @@ void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int re
 
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count)
 {
-	log_warn("join 3 edge %d %d %d", e1, e2, e3);
+//	log_warn("join 3 edge %d %d %d", e1, e2, e3);
 	int e1_rc = g->edges[e1].rc_id;
 	int e2_rc = g->edges[e2].rc_id;
 	int e3_rc = g->edges[e3].rc_id;
-	log_warn("their rc %d %d %d", e1_rc, e2_rc, e3_rc);
+//	log_warn("their rc %d %d %d", e1_rc, e2_rc, e3_rc);
 	assert(g->edges[e1].source != -1 && g->edges[e2].source != -1 && g->edges[e3].source != -1);
 	assert(g->edges[e1_rc].source != -1 && g->edges[e2_rc].source != -1 && g->edges[e3_rc].source != -1);
 	asm_join_edge3(g, e1, e1_rc, e2, e2_rc, e3, e3_rc, count);
@@ -765,7 +775,7 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 	free(q);
 }
 
-static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
+uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
 {
 	float cov = __get_edge_cov(e, ksize);
 	uint32_t i, len = e->seq_len;

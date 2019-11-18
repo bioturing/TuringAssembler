@@ -6,7 +6,7 @@
 #define SKIPPING_BUILD_HASH_TABLE_H
 
 #include "khash.h"
-KHASH_MAP_INIT_INT64(pair_kmer_count, int);
+KHASH_MAP_INIT_INT(pair_kmer_count, int);
 
 struct kmer_pair_iterator_bundle_t {
 	struct dqueue_t *q;

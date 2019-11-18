@@ -95,7 +95,7 @@ void print_kmer_count_on_seq(khash_t(kmer_int) *h, char *seq, int ksize)
 		else
 			printf("0 ");
 	}
-	printf("\n");
+//	printf("\n");
 }
 
 int kmer_check(char *first, char *second, int overlap_ksize, int check_ksize,

@@ -21,11 +21,16 @@
 #define DISTANCE_KMER 60
 #define KMER_PAIR_SIZE 51
 #define BIG_KSIZE 111
+#define SM 1000000007
 
 #define NOT_FOR_SCAFF 0x1
 #define FOR_SCAFFOLD 0x2
+
+#define NOT_212_CASE 1
+#define NOT_202_CASE 1
 #define NOT_LONG_ENOUGH 2
 #define NOT_HAVE_SPAN_KMER 3
+
 #define ASEQ "CTGTCGAGATGAAAATTGTTTTGAAAAATGACGTTCCAGCTTATCAGCATCCCAGGCGACTGTCGTATAGTGACCAAAACTTTGTAGATGAGCAGATGCGGGAATGGTTAAAAGAAGGTATAATACAGCCCGTAGTCCTGGTGGCTAAGA"
 
 struct pair_contig_t {
@@ -126,7 +131,7 @@ struct asm_graph_t {
 
 #define MIN_BARCODE_RATIO		0.044
 #define MIN_SUB_BARCODE_RATIO		0.022
-#define CONTIG_PARTITION_LEN 1500
+#define CONTIG_PARTITION_LEN 500
 #define MIN_COMPONENT			250
 
 /************************* Build graph ultilities *****************************/
@@ -298,5 +303,7 @@ void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
+void asm_join_edge_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2);
+inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
