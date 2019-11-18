@@ -197,15 +197,43 @@ void mm_db_insert(struct mm_db_t *db, uint64_t km, uint32_t p)
 	db->p[db->n++] = p;
 }
 
-void mm_hits_insert(struct mm_hits_t *hits, uint32_t e) {
+struct mm_align_t *init_mm_align()
+{
+	struct mm_align_t *aln = calloc(1, sizeof(struct mm_align_t));
+	aln->pos = aln->edge = aln->cnt = 0;
+	return aln;
+}
+
+/**
+ * @brief Insert one hit of minimizers to the hits database
+ * @param hits hits database
+ * @param mm encode minimizers
+ * @param e edge ID
+ * @param p mapped position
+ */
+void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint32_t e, uint32_t p) {
 	khiter_t k;
 	int miss;
+	struct mm_align_t *aln;
 	k = kh_get(mm_edges, hits->edges, e);
+	// Increase the number of hits of each edge to 1
 	if (k == kh_end(hits->edges)) {
 		k = kh_put(mm_edges, hits->edges, e, &miss);
 		kh_value(hits->edges, k) = 1;
 	} else
 		kh_value(hits->edges, k)++;
+	k = kh_get(mm_align, hits->aln, mm);
+	// Add the alignment object of each minimizers hit
+	if (k == kh_end(hits->aln)) {
+		k = kh_put(mm_align, hits->aln, e, &miss);
+		kh_value(hits->aln, k) = init_mm_align();
+	}
+	k = kh_get(mm_align, hits->aln, mm); // after insert or already have
+	aln = kh_value(hits->aln, k);
+	aln->cnt++;
+	aln->edge = e;
+	aln->pos  = p; // Single-ton minimizers so the pos and edge ID doens't change
+
 	hits->n++;
 }
 
@@ -230,6 +258,7 @@ struct mm_hits_t *mm_hits_init()
 {
 	struct mm_hits_t *hits = calloc(1, sizeof(struct mm_hits_t));
 	hits->edges = kh_init(mm_edges);
+	hits->aln = kh_init(mm_align);
 	hits->n = 0;
 	return hits;
 }
@@ -237,6 +266,7 @@ struct mm_hits_t *mm_hits_init()
 void mm_hits_destroy(struct mm_hits_t *hits)
 {
 	kh_destroy(mm_edges, hits->edges);
+	kh_destroy(mm_align, hits->aln);
 	free(hits);
 }
 
@@ -396,7 +426,13 @@ struct mm_db_edge_t *mm_db_edge_init()
 	return db;
 }
 
-//Only keep single-ton minimizers
+/**
+ * @brief Insert one minimizer into the minimizer database of edges.
+ * @param db edges minimizers database collection
+ * @param mm encoded minimizer
+ * @param e edge ID
+ * @param p mapped position
+ */
 void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
 {
 	khiter_t k, k_h;
@@ -408,8 +444,8 @@ void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_
 		kh_set(mm_hash, db->p, mm, p);
 	} else {
 		k_h = kh_get(mm_hash, db->h, mm);
-		if (e != kh_value(db->h, k_h))
-			kh_value(db->cnt, k)++;
+		//if (e != kh_value(db->h, k_h)) // Allow multiple mapped on one edge minimizer to be single-ton
+		kh_value(db->cnt, k)++;
 	}
 
 }
@@ -463,6 +499,13 @@ struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
 	return mm_db_e;
 }
 
+/**
+ * @brief Map the minimizers from query to database
+ * @param db minimizers collection from query
+ * @param db_e minimizers collection from database
+ * @param hits object to store the results
+ * @return
+ */
 void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits)
 {
 	khiter_t k;
@@ -470,7 +513,8 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 	for (i = 0; i < db->n; ++i) {
 		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
 		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
-			mm_hits_insert(hits, kh_get_val(mm_hash, db_e->h, db->mm[i], -1));
+			mm_hits_insert(hits, db->mm[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1),
+			               kh_get_val(mm_hash, db_e->p, db->mm[i], -1));
 		}
 	}
 	return hits;
@@ -481,7 +525,7 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	FILE *f = fopen(file_path, "w");
 	khiter_t k;
 	uint32_t even, key;
-	fprintf(f, "edge,Colour,hits\n", even, even + 1, kh_value(hits->edges, k));
+	fprintf(f, "edge,Colour,hits\n");
 	for (k = kh_begin(hits->edges); k != kh_end(hits->edges); ++k) {
 		if (kh_exist(hits->edges, k)) {
 			key = kh_key(hits->edges, k);
