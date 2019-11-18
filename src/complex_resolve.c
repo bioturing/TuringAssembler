@@ -64,6 +64,14 @@ void put_in_set(khash_t(set_int) *h, int k)
 	kh_put(set_int, h, k, &ret);
 }
 
+void erase_from_set(khash_t(set_int) *h, int k)
+{
+	khiter_t it = kh_get(set_int, h, k);
+	if (it == kh_end(h))
+		log_error("Key is not in set, something went wrong!");
+	kh_del(set_int, h, it);
+}
+
 int check_in_set(khash_t(set_int) *h, int k)
 {
 	return kh_get(set_int, h, k) != kh_end(h);
