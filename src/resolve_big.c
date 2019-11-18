@@ -71,7 +71,7 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 	copy_seq32_seq8(left->seq, left->seq_len - graph_ksize - left_len, new_seq, 0, left_len);
 	copy_seq32_seq8(mid->seq, 0, new_seq, left_len, mid->seq_len);
 	copy_seq32_seq8(right->seq, graph_ksize, new_seq, left_len + mid_len, right_len);
-	print_u8_seq(new_seq, new_len);
+//	print_u8_seq(new_seq, new_len);
 
 	//todo 1: does not need to copy all middle seq
 
@@ -172,6 +172,104 @@ int is_case_2_1_2(struct asm_graph_t *g, int i_e)
 	return 1;
 }
 
+#define SWAP(a, b) {a+=b;b=a-b;a=a-b;}
+
+void fwrite_gfa(FILE *f, struct asm_graph_t *g, int i_e)
+{
+	assert(g->edges[i_e].source != -1);
+	int i_e_rc = g->edges[i_e].rc_id;
+	if (i_e > i_e_rc) {
+		SWAP(i_e, i_e_rc);
+	}
+
+	uint64_t fake_count = get_bandage_count(g->edges + i_e, g->ksize);
+	fprintf(f, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long) i_e,
+	        (long long) i_e_rc, g->edges[i_e].seq, (long long unsigned) fake_count);
+
+	int source = g->edges[i_e].source;
+	int source_rc = g->nodes[source].rc_id;
+	int target = g->edges[i_e].target;
+	for (int i = 0; i < g->nodes[target].deg; i++) {
+		gint_t next_e = g->nodes[target].adj[i];
+		gint_t next_e_rc = g->edges[next_e].rc_id;
+		char next_ce = '+';
+		if (next_e > next_e_rc) {
+			SWAP(next_e, next_e_rc);
+			next_ce = '-';
+		}
+		fprintf(f, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
+		        (long long) i_e, (long long) i_e_rc, '+',
+		        (long long) next_e, (long long) next_e_rc,
+		        next_ce, g->ksize);
+	}
+	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
+		gint_t next_e = g->nodes[source_rc].adj[i];
+		gint_t next_e_rc = g->edges[next_e].rc_id;
+		char next_ce = '+';
+		if (next_e > next_e_rc) {
+			SWAP(next_e, next_e_rc);
+			next_ce = '-';
+		}
+		fprintf(f, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
+		        (long long) i_e, (long long) i_e_rc, '-',
+		        (long long) next_e, (long long) next_e_rc,
+		        next_ce, g->ksize);
+	}
+}
+
+void deepcopy_edge(struct asm_edge_t *src, struct asm_edge_t *des)
+{
+	assert("not implemented yet");
+	des->count = src->count;
+	des->seq = calloc(src->seq_len, 1);
+	COPY_ARR(src->seq, des->seq, src->seq_len);
+	des->source = src->source;
+	des-> target = des->target;
+	des->rc_id = des->rc_id;
+}
+
+void add_node_to_graph(struct asm_graph_t *sub_graph)
+{
+	sub_graph->nodes = realloc(sub_graph->nodes, (sub_graph->n_v+1) * sizeof(struct asm_node_t));
+	sub_graph->n_v++;
+}
+
+//add edge and it's node if they haven't exist in graph yet
+void add_edge_to_sub_graph(struct asm_graph_t *g, int i_e, struct asm_graph_t *sub_graph,
+                           int *map_node)
+{
+	sub_graph->edges = realloc(sub_graph->edges, (sub_graph->n_e + 1) * sizeof(struct asm_edge_t));
+	deepcopy_edge(&g->edges[i_e], &sub_graph->edges[sub_graph->n_e]);
+
+	struct asm_edge_t *e = &sub_graph->edges[sub_graph->n_e];
+	if (map_node[e->source] == -1) {
+		map_node[e->source] = sub_graph->n_v;
+		add_node_to_graph(sub_graph);
+	}
+	e->source = map_node[e->source];
+	if (map_node[e->target] == -1) {
+		map_node[e->target] = sub_graph->n_v;
+		add_node_to_graph(sub_graph);
+	}
+	e->target = map_node[e->target];
+
+	struct asm_node_t *source = &g->nodes[e->source];
+	source->adj = realloc(source->adj, (source->deg+1) * sizeof(gint_t));
+	source->adj[source->deg] = sub_graph->n_e;
+	sub_graph->n_e++;
+	source->deg++;
+}
+
+void add_pair_edge_to_sub_graph(struct asm_graph_t *g, int i_e, struct asm_graph_t *sub_graph,
+                                int *map_node)
+{
+	add_edge_to_sub_graph(g, i_e, sub_graph, map_node);
+	add_edge_to_sub_graph(g, g->edges[i_e].rc_id, sub_graph, map_node);
+	int n_e = sub_graph->n_e;
+	sub_graph->edges[n_e-2].rc_id = n_e-1;
+	sub_graph->edges[n_e-1].rc_id = n_e-2;
+}
+
 int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
                   struct partition_information *part_infor)
 {
@@ -202,6 +300,10 @@ int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
 	int source_rc = g->nodes[source].rc_id;
 	int target = g->edges[i_e].target;
 
+//	FILE *f = part_infor->output_gfa_file;
+	//todo huu write gfa
+//	fwrite_gfa(f, g, i_e);
+	add_pair_edge_to_sub_graph(g, i_e, part_infor->sub_graph, part_infor->map_node);
 	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
 		int i_e_rc = g->nodes[source_rc].adj[i];
 		res += dfs_partition(g, partition, i_e_rc, index_par, part_infor);
@@ -402,7 +504,7 @@ void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, khash_t(pa
 }
 
 void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *partition, int n_threads,
-                     int mmem, int *n_partition, khash_t(pair_kmer_count) *kmer_pair_table)
+                     int mmem, int *n_partition, khash_t(pair_kmer_count) *kmer_pair_table, char *out_dir)
 {
 //	khash_t(bcpos) *dict = kh_init(bcpos);
 //	construct_read_index(ori_read, dict);
@@ -411,18 +513,28 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 		partition[i] = 0;
 	int count = 0;
 	int *resolve_stat = calloc(4, 4);
+	char *output_gfa_dir = calloc(PATH_MAX, 1);
+	struct partition_information *part_infor
+		= calloc(1, sizeof(struct partition_information));
+	part_infor->map_node = calloc(g->n_v, 4);
+	for (int i = 0 ; i < g->n_v; i ++)
+		part_infor->map_node[i] = -1;
+
 	for (int i = 0; i < (int) g->n_e; i++)
 		if (partition[i] == 0)
 			if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
 				log_warn("Dfs from %d", i);
 				count++;
-//			khash_t(big_kmer_count) *kmer_count_table = kh_init(big_kmer_count);
-				struct partition_information *part_infor
-					= calloc(1, sizeof(struct partition_information));
+				part_infor->sub_graph = calloc(1, sizeof(struct asm_graph_t));
+				part_infor->total_len = 0;
+				sprintf(output_gfa_dir, "partition_%d", count);
+//				part_infor->output_gfa_file = fopen(output_gfa_dir, "w");
 				part_infor->union_barcodes = kh_init(union_barcode);
 				int n_edges = dfs_partition(g, partition, i, count, part_infor);
-//
-//			log_warn("n edges %d n barcodes %d total length %d", n_edges, total_barcodes, total_length_component);
+				test_asm_graph(part_infor->sub_graph);
+				save_graph_info(out_dir, g, output_gfa_dir);
+				dfs_resolve(g, i, count, kmer_pair_table, partition, resolve_stat);
+				fclose(part_infor->output_gfa_file);
 //			if (total_barcodes > 10000) {
 //				//todo 1 work for big case
 //				continue;
@@ -430,7 +542,6 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 //			if (total_barcodes > 10 && total_length_component / 2 > MIN_COMPONENT && count_resolvable > 2) {
 ////				filter_read_build_kmer(ori_read, dict, bc, kmer_count_table, 55, 70, n_threads,
 ////									   mmem, count); //todo 0 choose range better
-				dfs_resolve(g, i, count, kmer_pair_table, partition, resolve_stat);
 				//todo 0 not break
 //				break;
 //			}
@@ -470,6 +581,7 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 	}
 	log_info("Size of table %d", kmer_pair_table->size);
 	*n_partition = count;
+	free(output_gfa_dir);
 }
 
 int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
@@ -628,6 +740,6 @@ void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt)
 	build_pair_kmer_table(opt, table);
 	log_info("Build big kmer table done");
 
-	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, table);
+	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, table, opt->out_dir);
 	free(partition);
 }

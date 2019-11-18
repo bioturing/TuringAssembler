@@ -131,7 +131,7 @@ struct asm_graph_t {
 
 #define MIN_BARCODE_RATIO		0.044
 #define MIN_SUB_BARCODE_RATIO		0.022
-#define CONTIG_PARTITION_LEN 1500
+#define CONTIG_PARTITION_LEN 500
 #define MIN_COMPONENT			250
 
 /************************* Build graph ultilities *****************************/
@@ -304,5 +304,6 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
 void asm_join_edge_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2);
+inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize);
 
 #endif  /* __ASSEMBLY_GRAPH_H__ */
