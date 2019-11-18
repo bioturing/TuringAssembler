@@ -130,3 +130,12 @@ int check_file_exist(char *path)
 {
 	return access(path, F_OK) != -1;
 }
+
+int delete_file(char *file_path)
+{
+	int status = remove(file_path);
+	if (status == 0)
+		log_debug("%s deleted succesfully", file_path);
+	else
+		log_debug("Cannot delete %s", file_path);
+}

@@ -505,6 +505,8 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	free(error);
 ignore_stage_2:
 	path_info_destroy(&pinfo);
+	delete_file(local_read_path.R1_path);
+	delete_file(local_read_path.R2_path);
 ignore_stage_1:
 	destroy_read_path(&local_read_path);
 }
