@@ -128,7 +128,7 @@ void *get_pair_kmer_ust_iterator(void *data)
 
 void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *table)
 {
-	h_table = init_mini_hash();
+	h_table = init_mini_hash(0);
 	struct read_path_t read_path;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);

@@ -30,11 +30,22 @@
 #include "utils.h"
 #include "verbose.h"
 #include "atomic.h"
+#include "log.h"
 
 pthread_mutex_t lock_key;
 
-#define BARCODES100M 100663319
+/*
+ Credit for primes table: Aaron Krowne
+ http://br.endernet.org/~akrowne/
+ http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
+ */
+static const uint64_t primes[] = { 100663319, 201326611, 402653189,
+                                   805306457, 1610612741, 2147483647,
+                                   4294967295};
+#define N_PRIMES_NUMBER 7
+
 #define MAX_LOAD_FACTOR 0.65
+#define FATAL_LOAD_FACTOR 0.9
 #define BIG_CONSTANT(x) (x##LLU)
 
 #if defined(_MSC_VER)
@@ -96,19 +107,28 @@ static struct readsort_bundle_t {
 };
 
 struct mini_hash_t {
-    uint32_t *h;
+    uint64_t *h;
     uint64_t *key;
     uint64_t size;
     uint64_t count;
     uint64_t max_cnt;
+    int prime_index;
+    pthread_mutex_t mut;
 };
 
-struct mini_hash_t *init_mini_hash()
+/**
+ * @brief Init a hash table with a pre-define size in the prime number table
+ * @param p_index index of the prime number table
+ * @return
+ */
+struct mini_hash_t *init_mini_hash(uint32_t p_index)
 {
 	struct mini_hash_t *h_table = malloc(sizeof(struct mini_hash_t));
-	h_table->h = calloc(BARCODES100M, sizeof(uint32_t));
-	h_table->key = calloc(BARCODES100M, sizeof(uint64_t));
-	h_table->size = BARCODES100M;
+	h_table->prime_index = p_index;
+	uint32_t h_size = primes[h_table->prime_index];
+	h_table->h = calloc(h_size, sizeof(uint64_t));
+	h_table->key = calloc(h_size, sizeof(uint64_t));
+	h_table->size = h_size;
 	h_table->max_cnt = (uint64_t) (h_table->size * MAX_LOAD_FACTOR);
 	h_table->count = 0;
 	memset(h_table->h, 0, h_table->size);
@@ -260,6 +280,62 @@ static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
 }
 
 /**
+ * @brief Expand the hash table by re-hash and doubling size
+ * when the load factor reach MAX_LOAD_FACTOR (0.65 by default)
+ */
+void mini_expand()
+{
+	int i;
+	uint32_t slot, prev;
+	uint64_t val, key;
+	uint32_t log_size = 1<<16;
+	struct mini_hash_t *new_table = init_mini_hash(h_table->prime_index + 1);
+	for (i = 0; i < h_table->size; ++i) {
+		if (!(i % log_size)) {
+			log_info("Copied %d elements", log_size);
+			log_size <<= 1;
+		}
+		if (!h_table->h[i])
+			continue;
+		val = h_table->h[i];
+		key = h_table->key[i];
+		slot = prev = key % new_table->size;
+		while (new_table->key[slot] != 0 && slot < new_table->size) {
+			slot++;
+		}
+		if (slot == new_table->size) {
+			slot = 0;
+			while (new_table->key[slot] != 0 && slot < prev) {
+				slot++;
+			}
+		}
+		new_table->key[slot] = key;
+		new_table->h[slot] = val;
+		new_table->count++;
+	}
+	destroy_mini_hash(h_table);
+	h_table = new_table;
+}
+
+/**
+ * @brief Try expanding the hash table by doubling in size
+ */
+int try_expanding()
+{
+	if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
+		log_info("Doubling hash table...");
+		pthread_mutex_lock(&h_table->mut);
+		mini_expand();
+		pthread_mutex_unlock(&h_table->mut);
+	} else {
+		if ((double)h_table->count > FATAL_LOAD_FACTOR * (h_table->size)) {
+			log_error("Hash table size reached limit!");
+		}
+	}
+}
+
+
+/**
  * Increase the the count of one barcode by 1
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
@@ -271,6 +347,7 @@ void mini_inc_by_key(uint64_t data, uint64_t key)
 	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
 		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
+		h_table->count++;
 	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)) {
 		atomic_add_and_fetch64(h_table->h + slot, 1);
 	} else { //linear probing
@@ -287,10 +364,9 @@ void mini_inc_by_key(uint64_t data, uint64_t key)
 				prev = atomic_val_CAS64(h_table->h + i, 0, 1);
 			}
 		}
-		if (i == slot)
-			__ERROR("No more slot in the hash table! There are more than 100 millions distinct barcodes in \n your data. Please check it or let tan@bioturing.com know to increase the size of the hash table!");
 		if (!prev) { //room at probe is empty -> fill in
 			atomic_bool_CAS64(h_table->key + i, 0, data); //TODO: check return
+			h_table->count++;
 		} else {
 			atomic_add_and_fetch64(h_table->h + i, 1);
 		}
@@ -326,6 +402,9 @@ uint64_t mini_get(uint64_t data, uint64_t key)
 void mini_inc(uint64_t data, int len)
 {
 	uint64_t key = MurmurHash3_x64_64((uint8_t *) &data, len);
+	if (h_table->count > h_table->max_cnt) {
+		try_expanding();
+	}
 	mini_inc_by_key(data, key);
 }
 
@@ -370,7 +449,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
 	pthread_mutex_init(&lock_key, NULL);
-	h_table = init_mini_hash();
+	h_table = init_mini_hash(0);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
