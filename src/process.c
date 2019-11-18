@@ -202,9 +202,7 @@ void split_molecules_process(struct opt_proc_t *opt)
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct line_graph_t lig;
-	init_line_graph(&lig, &g, n, edges);
-	construct_line_graph(&g, &lig);
+	order_edges(&g, n, edges);
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)

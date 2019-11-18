@@ -25,6 +25,7 @@ void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
 void get_edges_in_radius_dfs(struct asm_graph_t *g, int e, int len,
 		khash_t(set_int) *visited, khash_t(set_int) *nearby);
 void add_line_edge(struct line_graph_t *lig, int v, int u);
+void order_edges(struct asm_graph_t *g, int n_e, int *edges);
 //struct edge_ordering_t{
 //	int *edges;
 //	int n;

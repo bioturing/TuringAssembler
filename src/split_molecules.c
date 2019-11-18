@@ -2,7 +2,7 @@
 #include "verbose.h"
 #define MAX_EDGE_VISITED 100000
 #define MAX_EDGE_DEPTH 10
-#define MAX_SEARCH_LEN 4000
+#define MAX_SEARCH_LEN 10000
 
 void init_line_graph(struct line_graph_t *lig, struct asm_graph_t *g, int n_e,
 		int *edges)
@@ -84,6 +84,34 @@ void get_edges_in_radius(struct asm_graph_t *g, int e, khash_t(set_int) *nearby)
 	khash_t(set_int) *visited = kh_init(set_int);
 	get_edges_in_radius_dfs(g, e, -g->edges[e].seq_len, visited, nearby);
 	kh_destroy(set_int, visited);
+}
+
+void order_edges(struct asm_graph_t *g, int n_e, int *edges)
+{
+	struct line_graph_t *lig = calloc(1, sizeof(struct line_graph_t));
+	init_line_graph(lig, g, n_e, edges);
+	for (khiter_t it = kh_begin(lig->vertices); it != kh_end(lig->vertices);
+			++it){
+		int e = kh_key(lig->vertices, it);
+		struct line_vertex_t *lv = kh_val(lig->vertices, it);
+		if (lv->deg_in != 0)
+			continue;
+		int *tmp = calloc(lig->n_v, sizeof(int));
+		int n = 0;
+		while (lv->deg_out == 1){
+			tmp[n++] = e;
+			e = lv->children[0];
+			khiter_t it2 = kh_get(edge_line, lig->vertices, e);
+			lv = kh_val(lig->vertices, it2);
+		}
+		if (lv->deg_out == 0){
+			tmp[n++] = e;
+			__VERBOSE("Edges order: ");
+			for (int i = 0; i < n; ++i)
+				__VERBOSE("%d ", tmp[i]);
+			__VERBOSE("\n");
+		}
+	}
 }
 
 //int get_edges_order_dfs(struct asm_graph_t *g, int e, int p, int total, int *path,
