@@ -1,5 +1,6 @@
 #include "cluster_molecules.h"
 #include "helper.h"
+#define MAX_RADIUS 40000
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
@@ -29,12 +30,14 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 			goto dijkstra_node_outdated;
 		if (v == target)
 			break;
+		if (len > MAX_RADIUS)
+			break;
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
 			if (check_in_map(L, u) == 0)
 				put_in_map(L, u, 2e9);
-			if (get_in_map(L, u) > len + g->edges[u].seq_len){
+			if ((uint32_t) get_in_map(L, u) > len + g->edges[u].seq_len){
 				khiter_t it = kh_get(int_int, L, u);
 				kh_val(L, it) = len + g->edges[u].seq_len;
 				wrapper.vertex = u;
@@ -49,11 +52,46 @@ dijkstra_node_outdated:
 	kh_destroy(int_int, L);
 	free_queue_content(q);
 	destroy_queue(q);
+
+	if (check_in_map(L, target) == 0)
+		return -1;
+	return get_in_map(L, target);
 }
 
-void get_sub_graph_of_molecules(struct asm_graph_t *g, struct mm_hits_t *hits)
+void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct mm_hits_t *hits)
 {
-	khash_t(set_int) edges = kh_init(set_int);
-	//for (khiter_t it = kh_begin(hits); it != 
+	khash_t(set_int) *edges = kh_init(set_int);
+	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
+		if (!kh_exist(hits->edges, it))
+			continue;
+		int e = kh_val(hits->edges, it);
+		put_in_set(edges, e);
+		put_in_set(edges, g->edges[e].rc_id);
+	}
+
+	int *tmp = calloc(kh_size(edges), sizeof(int));
+	int n = 0;
+	for (khiter_t it = kh_begin(edges); it != kh_end(edges); ++it){
+		if (!kh_exist(edges, it))
+			continue;
+		tmp[n++] = kh_val(edges, it);
+	}
+	kh_destroy(set_int, edges);
+
+	FILE *f = fopen(opt->lc, "w");
+	fprintf(f, "graph %s{\n", opt->bx_str);
+	for (int i = 0; i < n; ++i){
+		for (int j = 0; j < n; ++j){
+			if (i == j)
+				continue;
+			int len = get_shortest_path(g, i, j);
+			if (len != -1 && len <= MAX_RADIUS)
+				fprintf(f, "%d -> %d;\n", i, j);
+		}
+	}
+	fprintf(f, "}\n");
+	fclose(f);
+	free(tmp);
 }
 

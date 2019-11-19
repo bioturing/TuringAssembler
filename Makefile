@@ -51,6 +51,7 @@ SRC = src/assembly_graph.c 				\
       src/fastg.c 					\
       src/complex_resolve.c 				\
       src/split_molecules.c 				\
+      src/cluster_molecules.c 				\
       src/scaffolding/bin_hash.c 						\
       src/scaffolding/algorithm.c 						\
       src/scaffolding/compare.c 						\

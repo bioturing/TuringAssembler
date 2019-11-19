@@ -282,6 +282,20 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
+void cluster_molecules_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/cluster_molecules.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Cluster molecules");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	asm_resolve_complex_bulges_ite(opt, &g);
+
+	save_graph_info(opt->out_dir, &g, "level_3");
+	asm_graph_destroy(&g);
+}
+
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];

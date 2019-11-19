@@ -10,5 +10,6 @@ struct dijkstra_node_t{
 };
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
-void get_sub_graph_of_molecules(struct asm_graph_t *g, struct mm_hits_t *hits);
+void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct mm_hits_t *hits);
 #endif

@@ -468,6 +468,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_1_2_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+	else if (!strcmp(argv[1], "debug_cluster_molecules"))
+		build_opt_process(argc, argv, &cluster_molecules_process);
 	else if (!strcmp(argv[1], "mm_index"))
 		build_opt_process(argc, argv, &index_mm_process);
 	else if (!strcmp(argv[1], "barcode_hit"))

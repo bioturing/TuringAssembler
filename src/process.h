@@ -42,4 +42,5 @@ void count_bx_process(struct opt_proc_t *opt);
 void split_molecules_wrapper(struct opt_proc_t *opt);
 void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct mm_db_edge_t *mm_edges, khash_t(bcpos) *bx_pos_dict);
+void cluster_molecules_process(struct opt_proct_t *opt);
 #endif /* __PROCESS_H__ */
