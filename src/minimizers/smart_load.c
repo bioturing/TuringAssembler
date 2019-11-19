@@ -159,3 +159,58 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	free(buf1);
 	free(buf2);
 }
+
+struct mm_hits_t *get_hits_from_barcode(struct opt_proc_t *opt)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, &read_sorted_path);
+	}
+	uint64_t bx_encoded = barcode_hash_mini(opt->bx_str);
+	log_info("Hashed barcode: %lu", bx_encoded);
+	uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
+	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
+	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
+
+	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k == kh_end(bx_pos_dict)) {
+		log_error("Barcode does not exists!");
+	} else {
+		log_info("Barcode does exist. Getting reads");
+	}
+
+	char *buf1, *buf2;
+	uint64_t m_buf1, m_buf2;
+	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
+
+	struct read_t r1, r2;
+	int pos1 = 0, pos2 = 0;
+	int n_reads = 0;
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits;
+	hits = mm_hits_init();
+
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+
+	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
+		n_reads++;
+		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
+		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+
+		mm_hits_cmp(db1, mm_edges, hits, &g);
+		mm_hits_cmp(db2, mm_edges, hits, &g);
+	}
+	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
+	log_info("Number of singleton hits: %d", kh_size(hits->edges));
+
+	free(buf1);
+	free(buf2);
+	return hits;
+}

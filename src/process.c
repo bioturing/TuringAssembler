@@ -290,9 +290,9 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	set_log_stage("Cluster molecules");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	asm_resolve_complex_bulges_ite(opt, &g);
 
-	save_graph_info(opt->out_dir, &g, "level_3");
+	struct mm_hits_t *hits = get_hits_from_barcode(opt);
+	get_sub_graph(opt, &g, hits);
 	asm_graph_destroy(&g);
 }
 

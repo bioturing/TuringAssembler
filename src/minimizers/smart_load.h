@@ -27,4 +27,5 @@ void stream_filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
                         uint64_t *shared, int n_shared, char **buf1, char **buf2,
                         uint64_t *size1, uint64_t *size2);
 
+struct mm_hits_t *get_hits_from_barcode(struct opt_proc_t *opt);
 #endif //SRC_SMART_LOAD_H
