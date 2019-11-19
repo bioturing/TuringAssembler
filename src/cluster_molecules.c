@@ -12,7 +12,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	khash_t(int_int) *L = kh_init(int_int);
-	put_in_map(L, source, 0);
+	put_in_map(L, source, wrapper.len);
 	while (!is_queue_empty(q)){
 		int p = q->front;
 		for (int i = q->front + 1; i < q->back; ++i){
@@ -20,8 +20,13 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				((struct dijkstra_node_t *)q->data[i])->len)
 				p = i;
 		}
-		if (p != q->front)
-			swap(q->data[q->front], q->data[p], sizeof(struct dijkstra_node_t));
+		if (p != q->front){
+			struct dijkstra_node_t *tmp = q->data[q->front];
+			q->data[q->front] = q->data[p];
+			q->data[p] = tmp;
+			/*swap(q->data + q->front, q->data + p,
+					sizeof(struct dijkstra_node_t *));*/
+		}
 		struct dijkstra_node_t *node = get_queue(q);
 		pop_queue(q);
 		int v = node->vertex;
@@ -49,13 +54,14 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 dijkstra_node_outdated:
 		free(node);
 	}
+	int res = -1;
+	if (check_in_map(L, target) != 0)
+		res = get_in_map(L, target);
 	kh_destroy(int_int, L);
 	free_queue_content(q);
 	destroy_queue(q);
 
-	if (check_in_map(L, target) == 0)
-		return -1;
-	return get_in_map(L, target);
+	return res;
 }
 
 void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -65,7 +71,7 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
 		if (!kh_exist(hits->edges, it))
 			continue;
-		int e = kh_val(hits->edges, it);
+		int e = kh_key(hits->edges, it);
 		put_in_set(edges, e);
 		put_in_set(edges, g->edges[e].rc_id);
 	}
@@ -75,7 +81,7 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 	for (khiter_t it = kh_begin(edges); it != kh_end(edges); ++it){
 		if (!kh_exist(edges, it))
 			continue;
-		tmp[n++] = kh_val(edges, it);
+		tmp[n++] = kh_key(edges, it);
 	}
 	kh_destroy(set_int, edges);
 
@@ -85,9 +91,9 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 		for (int j = 0; j < n; ++j){
 			if (i == j)
 				continue;
-			int len = get_shortest_path(g, i, j);
+			int len = get_shortest_path(g, tmp[i], tmp[j]);
 			if (len != -1 && len <= MAX_RADIUS)
-				fprintf(f, "%d -> %d;\n", i, j);
+				fprintf(f, "%d -> %d;\n", tmp[i], tmp[j]);
 		}
 	}
 	fprintf(f, "}\n");
