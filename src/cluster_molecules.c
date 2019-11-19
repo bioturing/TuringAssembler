@@ -1,6 +1,7 @@
 #include "cluster_molecules.h"
 #include "helper.h"
-#define MAX_RADIUS 40000
+#include "verbose.h"
+#define MAX_RADIUS 20000
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
@@ -86,14 +87,16 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 	kh_destroy(set_int, edges);
 
 	FILE *f = fopen(opt->lc, "w");
-	fprintf(f, "graph %s{\n", opt->bx_str);
+	fprintf(f, "digraph %s{\n", opt->bx_str);
 	for (int i = 0; i < n; ++i){
 		for (int j = 0; j < n; ++j){
 			if (i == j)
 				continue;
 			int len = get_shortest_path(g, tmp[i], tmp[j]);
-			if (len != -1 && len <= MAX_RADIUS)
+			if (len != -1 && len <= MAX_RADIUS){
 				fprintf(f, "%d -> %d;\n", tmp[i], tmp[j]);
+				__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
+			}
 		}
 	}
 	fprintf(f, "}\n");
