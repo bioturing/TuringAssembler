@@ -21,6 +21,8 @@
 #define DEBUG_MM
 #endif
 
+#define MOLECULE_MARGIN 40000
+
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
 	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
@@ -503,15 +505,19 @@ struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
  * @param hits object to store the results
  * @return
  */
-void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits)
+void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits, struct asm_graph_t *g)
 {
 	khiter_t k;
-	uint32_t i;
+	uint32_t i, p;
+	uint64_t e;
 	for (i = 0; i < db->n; ++i) {
 		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
 		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
-			mm_hits_insert(hits, db->mm[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1),
-			               kh_get_val(mm_hash, db_e->p, db->mm[i], -1));
+			p = kh_get_val(mm_hash, db_e->p, db->mm[i], -1);
+			e = kh_get_val(mm_hash, db_e->h, db->mm[i], -1);
+			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
+				continue;
+			mm_hits_insert(hits, db->mm[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1), p);
 		}
 	}
 	return hits;

@@ -222,6 +222,13 @@ void split_molecules_wrapper(struct opt_proc_t *opt)
 	fclose(f);
 }
 
+/**
+ *
+ * @param opt
+ * @param g
+ * @param mm_edges
+ * @param bx_pos_dict
+ */
 void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct mm_db_edge_t *mm_edges, khash_t(bcpos) *bx_pos_dict)
 {
