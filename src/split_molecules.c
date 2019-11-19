@@ -174,12 +174,13 @@ void order_edges(struct opt_proc_t *opt, struct asm_graph_t *g, struct mm_hits_t
 				fprintf(f, "%s\n", opt->bx_str);
 				for (int i = 0; i < n; ++i){
 					fprintf(f, "%d ", tmp[i]);
-					__VERBOSE("%d ", tmp[i]);
+					//__VERBOSE("%d ", tmp[i]);
 				}
-				__VERBOSE("\n");
+				//__VERBOSE("\n");
 				fprintf(f, "\n");
 			}
 		}
 	}
+	fclose(f);
 }
 
