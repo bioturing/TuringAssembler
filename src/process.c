@@ -270,8 +270,8 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
 		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
 
-		mm_hits_cmp(db1, mm_edges, hits);
-		mm_hits_cmp(db2, mm_edges, hits);
+		mm_hits_cmp(db1, mm_edges, hits, g);
+		mm_hits_cmp(db2, mm_edges, hits, g);
 	}
 	//log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
 	//log_info("Number of singleton hits: %d", kh_size(hits->edges));
