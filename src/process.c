@@ -210,8 +210,12 @@ void split_molecules_wrapper(struct opt_proc_t *opt)
 		sort_read(opt, &read_sorted_path);
 	}
 	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
+	int C = 0;
 	while (fscanf(f, "%s\t%d\n", bx, &count)){
-		log_debug("Processing barcode %s", bx);
+		if (C == 50000)
+			break;
+		if ((++C) % 1000 == 0)
+			log_debug("Processing %d-th barcode", C);
 		opt->bx_str = bx;
 		split_molecules_process(opt, &g, mm_edges, bx_pos_dict);
 	}
@@ -232,19 +236,19 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 		sort_read(opt, &read_sorted_path);
 	}
 	uint64_t bx_encoded = barcode_hash_mini(opt->bx_str);
-	log_info("Hashed barcode: %lu", bx_encoded);
+	//log_info("Hashed barcode: %lu", bx_encoded);
 	uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
 
 	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
 	if (k == kh_end(bx_pos_dict)) {
 		log_error("Barcode does not exists!");
 	} else {
-		log_info("Barcode does exist. Getting reads");
+		//log_info("Barcode does exist. Getting reads");
 	}
 
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
-	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
+	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
 
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
@@ -262,8 +266,8 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 		mm_hits_cmp(db1, mm_edges, hits);
 		mm_hits_cmp(db2, mm_edges, hits);
 	}
-	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	log_info("Number of singleton hits: %d", kh_size(hits->edges));
+	//log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
+	//log_info("Number of singleton hits: %d", kh_size(hits->edges));
 	mm_hits_print(hits, "barcode_hits.csv");
 	free(buf1);
 	free(buf2);

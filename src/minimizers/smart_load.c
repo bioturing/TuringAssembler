@@ -82,8 +82,8 @@ void stream_filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 		m_buf1 += pos[i].r1_len;
 		m_buf2 += pos[i].r2_len;
 	}
-	char *buf1_ = malloc(m_buf1);
-	char *buf2_ = malloc(m_buf2);
+	char *buf1_ = calloc(m_buf1 + 1, sizeof(char));
+	char *buf2_ = calloc(m_buf2 + 1, sizeof(char));
 
 	for (i = 0; i < n_shared; ++i) {
 		fseek(fi1, pos[i].r1_offset, SEEK_SET);
