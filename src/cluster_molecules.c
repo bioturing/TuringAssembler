@@ -3,6 +3,7 @@
 #include "verbose.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
+#include "minimizers/minimizers.h"
 #include "helper.h"
 
 #define MAX_RADIUS 7000
@@ -70,6 +71,7 @@ dijkstra_node_outdated:
 		res = get_in_map(L, target) - g->edges[target].seq_len;
 	free_queue_content(q);
 	destroy_queue(q);
+	free(q);
 
 	/*if (res != -1){
 		__VERBOSE("PATH FROM %d to %d:\n", source, target);
@@ -104,7 +106,6 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct read_t r1, r2;
 		int pos1 = 0, pos2 = 0;
 		int n_reads = 0;
-		struct mm_db_t *db1, *db2;
 		struct mm_hits_t *hits;
 		hits = mm_hits_init();
 
@@ -112,14 +113,18 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS
 			&& get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 			n_reads++;
+			struct mm_db_t *db1, *db2;
 			db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
 			db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
 
 			mm_hits_cmp(db1, mm_edges, hits, g);
 			mm_hits_cmp(db2, mm_edges, hits, g);
+			mm_db_destroy(db1);
+			mm_db_destroy(db2);
 		}
 		
 		get_sub_graph(opt, g, hits, pair_count);
+		mm_hits_destroy(hits);
 		free(buf1);
 		free(buf2);
 	}
@@ -131,7 +136,8 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int count = kh_val(pair_count, it);
 		int u = code >> 32;
 		int v = code & ((((uint64_t) 1) << 32) - 1);
-		fprintf(f, "%d %d %d\n", u, v, count);
+		if (count != -1)
+			fprintf(f, "%d %d %d\n", u, v, count);
 	}
 	fclose(f);
 	kh_destroy(long_int, pair_count);
