@@ -18,9 +18,7 @@
 #define ASM_BUILD_COVERAGE		0x4
 #define ASM_BUILD_CANDIDATE		0x8
 
-#define DISTANCE_KMER 60
-#define KMER_PAIR_SIZE 51
-#define BIG_KSIZE 111
+#define BIG_KSIZE 71
 #define SM 1000000007
 
 #define NOT_FOR_SCAFF 0x1
@@ -132,7 +130,7 @@ struct asm_graph_t {
 #define MIN_BARCODE_RATIO		0.044
 #define MIN_SUB_BARCODE_RATIO		0.022
 #define CONTIG_PARTITION_LEN 500
-#define MIN_COMPONENT			250
+#define MIN_COMPONENT			20
 
 /************************* Build graph ultilities *****************************/
 /******************************************************************************/

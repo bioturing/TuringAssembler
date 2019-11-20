@@ -10,6 +10,7 @@
 #include "assembly_graph.h"
 
 extern struct mini_hash_t *h_table;
+
 void get_seq(char *seq, int start, int len, uint8_t *res)
 {
 	for (int i = start, i_res = 0; i < start + len; i++, i_res++) {
@@ -46,7 +47,7 @@ uint64_t get_first_hash(int8_t *seq, int ksize)
 {
 	uint64_t res = 0;
 	for (int i = 0; i < ksize; i++) {
-		res = (res * 5 + ((seq[i >> 2] >> ((i & 3) << 1)) & 3)) %SM;
+		res = (res * 5 + ((seq[i >> 2] >> ((i & 3) << 1)) & 3)) % SM;
 	}
 	return res;
 }
@@ -56,16 +57,16 @@ int get_char(int8_t *seq, int pos)
 	return ((seq[pos >> 2] >> ((pos & 3) << 1)) & 3);
 }
 
-void ust_add_big_kmer(struct read_t *r, khash_t(pair_kmer_count) *table, pthread_mutex_t *lock,
+void ust_add_big_kmer(struct read_t *r,
                       int64_t five_to_big_ksize_m1)
 {
 	int8_t *seq = compress_seq(r->seq);
 	int big_ksize = BIG_KSIZE;
 
-	int64_t res =  get_first_hash(seq, big_ksize);
+	int64_t res = get_first_hash(seq, big_ksize);
 	mini_inc_by_key(res, res);
 
-	for (int i = 1; i < r->len - DISTANCE_KMER; i++) {
+	for (int i = 1; i < r->len - BIG_KSIZE; i++) {
 		int64_t a0 = get_char(seq, i - 1);
 		int an = get_char(seq, i - 1 + big_ksize);
 		res = (((((res - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
@@ -81,7 +82,6 @@ void *get_pair_kmer_ust_iterator(void *data)
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2;
 	struct pair_buffer_t *own_buf, *ext_buf;
-	khash_t(pair_kmer_count) *table = bundle->table;
 	own_buf = init_trip_buffer();
 	int64_t sm = bundle->sm;
 
@@ -91,8 +91,8 @@ void *get_pair_kmer_ust_iterator(void *data)
 	char *R1_buf, *R2_buf, *I_buf;
 	int pos1, pos2, posI, rc1, rc2, rcI, input_format;
 	int64_t five_to_big_ksize_m1 = 1;
-	for (int i = 0; i < BIG_KSIZE-1; i++) {
-		five_to_big_ksize_m1 = (five_to_big_ksize_m1*5) %SM;
+	for (int i = 0; i < BIG_KSIZE - 1; i++) {
+		five_to_big_ksize_m1 = (five_to_big_ksize_m1 * 5) % SM;
 	}
 
 	while (1) {
@@ -118,18 +118,17 @@ void *get_pair_kmer_ust_iterator(void *data)
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				__ERROR("\nWrong format file ust\n");
 
-			ust_add_big_kmer(&read1, table, bundle->table_lock, five_to_big_ksize_m1);
-			ust_add_big_kmer(&read2, table, bundle->table_lock, five_to_big_ksize_m1);
+			ust_add_big_kmer(&read1,  five_to_big_ksize_m1);
+			ust_add_big_kmer(&read2,  five_to_big_ksize_m1);
 			if (rc1 == READ_END)
 				break;
 		}
 	}
 }
 
-void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *table)
+void build_pair_kmer_table(struct opt_proc_t *opt)
 {
-	h_table = init_mini_hash(0);
-	struct read_path_t read_path;
+	h_table = init_mini_hash(2);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
@@ -137,8 +136,7 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 
 	void *(*buffer_iterator)(void *) = NULL;
 	struct producer_bundle_t *producer_bundles = NULL;
-	kh_resize(pair_kmer_count, table, 100000000);
-	if (opt->lib_type == LIB_TYPE_BIOT || opt->lib_type == LIB_TYPE_10X) {
+	if (opt->lib_type == LIB_TYPE_10X) {
 //		producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 //										   opt->files_1, opt->files_2);
 //		if (opt->lib_type == LIB_TYPE_BIOT)
@@ -146,7 +144,7 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 //		else
 //			buffer_iterator = x10_buffer_iterator;
 		__ERROR("not handle yet");
-	} else if (opt->lib_type == LIB_TYPE_UST || opt->lib_type == LIB_TYPE_SORTED) {
+	} else if (opt->lib_type == LIB_TYPE_UST || opt->lib_type == LIB_TYPE_SORTED || opt->lib_type == LIB_TYPE_BIOT) {
 		producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 		                                   opt->files_1, opt->files_2);
 		buffer_iterator = get_pair_kmer_ust_iterator;
@@ -171,9 +169,6 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].sm = sm_per_thread;
-		worker_bundles[i].table = table;
-		worker_bundles[i].ksize = KMER_PAIR_SIZE;
-		worker_bundles[i].table_lock = &lock;
 
 		sprintf(worker_bundles[i].prefix, "%s/thread_%d", read_dir, i);
 	}

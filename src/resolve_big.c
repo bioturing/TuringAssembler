@@ -55,7 +55,7 @@ void print_compress_seq(uint8_t *new_seq, int len)
 }
 
 int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct asm_edge_t *mid,
-                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table, int five_to_big_ksize_m1)
+                     int big_ksize, int graph_ksize, int five_to_big_ksize_m1)
 {
 	//todo 1 get more pair instead of only one pair right now
 	int span_len = big_ksize;
@@ -92,7 +92,7 @@ int join_3_and_count(struct asm_edge_t *left, struct asm_edge_t *right, struct a
 }
 
 int join_2_and_count(struct asm_edge_t *a, struct asm_edge_t *b,
-                     int big_ksize, int graph_ksize, khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
+                     int big_ksize, int graph_ksize, int64_t five_to_big_ksize_m1)
 {
 	int span_len = big_ksize;
 
@@ -220,17 +220,26 @@ void fwrite_gfa(FILE *f, struct asm_graph_t *g, int i_e)
 void deepcopy_edge(struct asm_edge_t *src, struct asm_edge_t *des)
 {
 	assert("not implemented yet");
+	assert(src->source != -1);
 	des->count = src->count;
-	des->seq = calloc(src->seq_len, 1);
-	COPY_ARR(src->seq, des->seq, src->seq_len);
+	des->seq_len = src->seq_len;
+	des->seq = calloc((src->seq_len + 15) >> 4, 4);
+//	COPY_ARR(src->seq, des->seq, src->seq_len);
+	for (int i = 0; i < (src->seq_len + 15) >> 4; i++) {
+		des->seq[i] = src->seq[i];
+	}
 	des->source = src->source;
-	des-> target = des->target;
-	des->rc_id = des->rc_id;
+	des->target = src->target;
+	des->rc_id = src->rc_id;
+	assert(src->n_holes == 0);
+	des->n_holes = src->n_holes;
 }
 
 void add_node_to_graph(struct asm_graph_t *sub_graph)
 {
-	sub_graph->nodes = realloc(sub_graph->nodes, (sub_graph->n_v+1) * sizeof(struct asm_node_t));
+	sub_graph->nodes = realloc(sub_graph->nodes, (sub_graph->n_v + 1) * sizeof(struct asm_node_t));
+	sub_graph->nodes[sub_graph->n_v].deg = 0;
+	sub_graph->nodes[sub_graph->n_v].adj = NULL;
 	sub_graph->n_v++;
 }
 
@@ -238,6 +247,7 @@ void add_node_to_graph(struct asm_graph_t *sub_graph)
 void add_edge_to_sub_graph(struct asm_graph_t *g, int i_e, struct asm_graph_t *sub_graph,
                            int *map_node)
 {
+//	log_warn("add edge %d", i_e);
 	sub_graph->edges = realloc(sub_graph->edges, (sub_graph->n_e + 1) * sizeof(struct asm_edge_t));
 	deepcopy_edge(&g->edges[i_e], &sub_graph->edges[sub_graph->n_e]);
 
@@ -246,15 +256,17 @@ void add_edge_to_sub_graph(struct asm_graph_t *g, int i_e, struct asm_graph_t *s
 		map_node[e->source] = sub_graph->n_v;
 		add_node_to_graph(sub_graph);
 	}
+	assert(map_node[e->source] < sub_graph->n_v);
 	e->source = map_node[e->source];
 	if (map_node[e->target] == -1) {
 		map_node[e->target] = sub_graph->n_v;
 		add_node_to_graph(sub_graph);
 	}
+	assert(map_node[e->target] < sub_graph->n_v);
 	e->target = map_node[e->target];
 
-	struct asm_node_t *source = &g->nodes[e->source];
-	source->adj = realloc(source->adj, (source->deg+1) * sizeof(gint_t));
+	struct asm_node_t *source = &sub_graph->nodes[e->source];
+	source->adj = realloc(source->adj, (source->deg + 1) * sizeof(gint_t));
 	source->adj[source->deg] = sub_graph->n_e;
 	sub_graph->n_e++;
 	source->deg++;
@@ -266,20 +278,29 @@ void add_pair_edge_to_sub_graph(struct asm_graph_t *g, int i_e, struct asm_graph
 	add_edge_to_sub_graph(g, i_e, sub_graph, map_node);
 	add_edge_to_sub_graph(g, g->edges[i_e].rc_id, sub_graph, map_node);
 	int n_e = sub_graph->n_e;
-	sub_graph->edges[n_e-2].rc_id = n_e-1;
-	sub_graph->edges[n_e-1].rc_id = n_e-2;
+	sub_graph->edges[n_e - 2].rc_id = n_e - 1;
+	sub_graph->edges[n_e - 1].rc_id = n_e - 2;
+	gint_t src1 = sub_graph->edges[n_e - 2].source;
+	gint_t src2 = sub_graph->edges[n_e - 1].source;
+	gint_t des1 = sub_graph->edges[n_e - 2].target;
+	gint_t des2 = sub_graph->edges[n_e - 1].target;
+	sub_graph->nodes[src1].rc_id = des2;
+	sub_graph->nodes[src2].rc_id = des1;
+	sub_graph->nodes[des1].rc_id = src2;
+	sub_graph->nodes[des2].rc_id = src1;
 }
 
 int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
                   struct partition_information *part_infor)
 {
 //	log_warn("dfs from %d %d", i_e, partition[i_e]);
-	if (partition[i_e]) {
-		if (partition[i_e] != index_par) {
-			log_error("dfs partition[i_e] %d, index :%d", partition[i_e], index_par);
-		}
+	if (partition[i_e] == index_par) {
 		return 0;
 	}
+	int x_rc = g->edges[i_e].rc_id;
+	partition[i_e] = index_par;
+	partition[x_rc] = index_par;
+	add_pair_edge_to_sub_graph(g, i_e, part_infor->sub_graph, part_infor->map_node);
 	if (g->edges[i_e].seq_len >= CONTIG_PARTITION_LEN) {
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[2].n_item);
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[1].n_item);
@@ -291,9 +312,6 @@ int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
 //		return 0;
 //	}
 	int res = 1;
-	int x_rc = g->edges[i_e].rc_id;
-	partition[i_e] = index_par;
-	partition[x_rc] = index_par;
 	//todo 1 build all barcode
 
 	int source = g->edges[i_e].source;
@@ -303,7 +321,6 @@ int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
 //	FILE *f = part_infor->output_gfa_file;
 	//todo huu write gfa
 //	fwrite_gfa(f, g, i_e);
-	add_pair_edge_to_sub_graph(g, i_e, part_infor->sub_graph, part_infor->map_node);
 	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
 		int i_e_rc = g->nodes[source_rc].adj[i];
 		res += dfs_partition(g, partition, i_e_rc, index_par, part_infor);
@@ -463,12 +480,12 @@ void filter_read_build_kmer(struct read_path_t *ori_read, khash_t(bcpos) *dict,
 	log_warn("kmer table size %d", kmer_count_table->size);
 }
 
-void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, khash_t(pair_kmer_count) *table, int *partition,
+void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, int *partition,
                  int *resolve_stat)
 {
 //	log_warn("resol %d", i_e);
 	if (g->edges[i_e].seq_len >= CONTIG_PARTITION_LEN) {
-		return 0;
+		return;
 	}
 	if (partition[i_e] != partition_index && partition[i_e] != -partition_index) {
 		log_error("partition[i_e] %d, real :%d", partition[i_e], partition_index);
@@ -495,61 +512,71 @@ void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, khash_t(pa
 
 	for (int i = 0; i < g->nodes[source_rc].deg; i++) {
 		int i_e_rc = g->nodes[source_rc].adj[i];
-		dfs_resolve(g, i_e_rc, partition_index, table, partition, resolve_stat);
+		dfs_resolve(g, i_e_rc, partition_index, partition, resolve_stat);
 	}
 	for (int i = 0; i < g->nodes[target].deg; i++) {
 		int i_e = g->nodes[target].adj[i];
-		dfs_resolve(g, i_e, partition_index, table, partition, resolve_stat);
+		dfs_resolve(g, i_e, partition_index, partition, resolve_stat);
 	}
 }
 
 void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *partition, int n_threads,
-                     int mmem, int *n_partition, khash_t(pair_kmer_count) *kmer_pair_table, char *out_dir)
+                     int mmem, int *n_partition, char *out_dir)
 {
-//	khash_t(bcpos) *dict = kh_init(bcpos);
-//	construct_read_index(ori_read, dict);
-
-	for (int i = 0; i < (int) g->n_e; i++)
-		partition[i] = 0;
-	int count = 0;
-	int *resolve_stat = calloc(4, 4);
-	char *output_gfa_dir = calloc(PATH_MAX, 1);
-	struct partition_information *part_infor
-		= calloc(1, sizeof(struct partition_information));
-	part_infor->map_node = calloc(g->n_v, 4);
-	for (int i = 0 ; i < g->n_v; i ++)
-		part_infor->map_node[i] = -1;
-
-	for (int i = 0; i < (int) g->n_e; i++)
-		if (partition[i] == 0)
-			if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
-				log_warn("Dfs from %d", i);
-				count++;
-				part_infor->sub_graph = calloc(1, sizeof(struct asm_graph_t));
-				part_infor->total_len = 0;
-				sprintf(output_gfa_dir, "partition_%d", count);
-//				part_infor->output_gfa_file = fopen(output_gfa_dir, "w");
-				part_infor->union_barcodes = kh_init(union_barcode);
-				int n_edges = dfs_partition(g, partition, i, count, part_infor);
-				test_asm_graph(part_infor->sub_graph);
-				save_graph_info(out_dir, g, output_gfa_dir);
-				dfs_resolve(g, i, count, kmer_pair_table, partition, resolve_stat);
-				fclose(part_infor->output_gfa_file);
-//			if (total_barcodes > 10000) {
-//				//todo 1 work for big case
-//				continue;
-//			}
-//			if (total_barcodes > 10 && total_length_component / 2 > MIN_COMPONENT && count_resolvable > 2) {
+//	int argmax = -1;
+//	float max_cov = -1;
+//	for (int i = 0; i < g->n_e; i++) {
+//		float cov = __get_edge_cov(&g->edges[i], g->ksize);
+//		if (cov > max_cov) {
+//			max_cov = cov;
+//			argmax = i;
+//		}
+//	}
+//	log_info("telomere %d", argmax);
+//	for (int i = 0; i < (int) g->n_e; i++)
+//		partition[i] = 0;
+//	int count = 0;
+//	char *output_gfa_dir = calloc(PATH_MAX, 1);
+//	struct partition_information *part_infor
+//		= calloc(1, sizeof(struct partition_information));
+//	part_infor->map_node = calloc(g->n_v, 4);
+//	for (int i = 0; i < g->n_v; i++)
+//		part_infor->map_node[i] = -1;
+//
+//	for (int i = 0; i < (int) g->n_e; i++)
+//		if (partition[i] == 0)
+//			if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
+//				log_warn("Dfs from %d", i);
+//				count++;
+//				part_infor->sub_graph = calloc(1, sizeof(struct asm_graph_t));
+//				part_infor->total_len = 0;
+//				for (int i = 0; i < g->n_v; i++)
+//					part_infor->map_node[i] = -1;
+//				sprintf(output_gfa_dir, "partition_%d", count);
+////				part_infor->output_gfa_file = fopen(output_gfa_dir, "w");
+//				part_infor->union_barcodes = kh_init(union_barcode);
+//				int n_edges = dfs_partition(g, partition, i, count, part_infor);
+//				test_asm_graph(part_infor->sub_graph);
+//				save_graph_info(out_dir, part_infor->sub_graph, output_gfa_dir);
+//				dfs_resolve(g, i, count, partition, resolve_stat);
+////			if (total_barcodes > 10000) {
+////				//todo 1 work for big case
+////				continue;
+////			}
+////			if (total_barcodes > 10 && total_length_component / 2 > MIN_COMPONENT && count_resolvable > 2) {
 ////				filter_read_build_kmer(ori_read, dict, bc, kmer_count_table, 55, 70, n_threads,
 ////									   mmem, count); //todo 0 choose range better
-				//todo 0 not break
-//				break;
+//				//todo 0 not break
+////				break;
+////			}
 //			}
-			}
 //	for (int i = 0; i < g->n_e; i++) {
 ////		if (g->edges[i].seq_len < CONTIG_PARTITION_LEN)
 //		assert(partition[i] <= 0);
 //	}
+//	*n_partition = count;
+//	free(output_gfa_dir);
+	int *resolve_stat = calloc(4, 4);
 	int64_t five_to_big_ksize_m1 = 1;
 	for (int i = 0; i < BIG_KSIZE - 1; i++) {
 		five_to_big_ksize_m1 = (five_to_big_ksize_m1 * 5) % SM;
@@ -558,10 +585,10 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 	do {
 		old_resolve = resolve_stat[0];
 		for (int i = 0; i < g->n_e; i++) {
-			int t = resolve_212_using_big_kmer(g, i, kmer_pair_table, five_to_big_ksize_m1);
+			int t = resolve_212_using_big_kmer(g, i, five_to_big_ksize_m1);
 			resolve_stat[t]++;
 			if (t == NOT_212_CASE) {
-				t = resolve_202_using_big_kmer(g, i, kmer_pair_table, five_to_big_ksize_m1);
+				t = resolve_202_using_big_kmer(g, i, five_to_big_ksize_m1);
 				resolve_stat[t]++;
 			}
 		}
@@ -579,15 +606,66 @@ void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *p
 			log_info("   Solved: %d", resolve_stat[i]);
 		}
 	}
-	log_info("Size of table %d", kmer_pair_table->size);
-	*n_partition = count;
-	free(output_gfa_dir);
+}
+
+void only_partition_graph(struct asm_graph_t *g, char *out_dir)
+{
+	int *partition = calloc(g->n_e, 4);
+	for (int i = 0; i < (int) g->n_e; i++)
+		partition[i] = 0;
+	int count = 0;
+	int *resolve_stat = calloc(4, 4);
+	char *output_gfa_dir = calloc(PATH_MAX, 1);
+	struct partition_information *part_infor
+		= calloc(1, sizeof(struct partition_information));
+	part_infor->map_node = calloc(g->n_v, 4);
+	for (int i = 0; i < g->n_v; i++)
+		part_infor->map_node[i] = -1;
+
+	for (int i = 0; i < (int) g->n_e; i++)
+		if (partition[i] == 0)
+			if (g->edges[i].seq_len < CONTIG_PARTITION_LEN) {
+				log_warn("Dfs from %d", i);
+				count++;
+				part_infor->sub_graph = calloc(1, sizeof(struct asm_graph_t));
+				part_infor->sub_graph->ksize = g->ksize;
+				part_infor->total_len = 0;
+				for (int i = 0; i < g->n_v; i++)
+					part_infor->map_node[i] = -1;
+				sprintf(output_gfa_dir, "partition_%d", count);
+//				part_infor->output_gfa_file = fopen(output_gfa_dir, "w");
+				part_infor->union_barcodes = kh_init(union_barcode);
+				int n_edges = dfs_partition(g, partition, i, count, part_infor);
+				test_asm_graph(part_infor->sub_graph);
+				if (part_infor->sub_graph->n_e > 50)
+					save_graph_info(out_dir, part_infor->sub_graph, output_gfa_dir);
+			}
+
+
+}
+
+int check_use_same_edge(struct asm_graph_t *g, int n_edge, ...)
+{
+	va_list list_argv;
+	va_start(list_argv, n_edge);
+	int *list_edge =calloc(n_edge, sizeof(int));
+	for(int i= 0; i < n_edge; i++) {
+		list_edge[i] = va_arg(list_argv, int);
+	}
+	for (int i = 0 ;  i< n_edge; i++) {
+		for (int j =i+1 ; j < n_edge; j++){
+			if (list_edge[i] == list_edge[j]
+			|| g->edges[list_edge[i]].rc_id == list_edge[j])
+				return 0;
+		}
+
+	}
+	return 1;
 }
 
 int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
-                               khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
+                               int64_t five_to_big_ksize_m1)
 {
-//	return 1;
 	if (!is_case_2_1_2(g, i_e)) {
 		return NOT_212_CASE;
 	}
@@ -604,17 +682,17 @@ int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
 	struct asm_edge_t *o1 = &g->edges[i_o1];
 	struct asm_edge_t *e = &g->edges[i_e];
 
-	assert(table != NULL);
-
-	if (e->seq_len > DISTANCE_KMER + KMER_PAIR_SIZE - 2)
+	if (e->seq_len > BIG_KSIZE- 2)
 		return NOT_LONG_ENOUGH;
-	int pair_ksize = KMER_PAIR_SIZE;
-	int c00 = join_3_and_count(a0, o0, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int c01 = join_3_and_count(a0, o1, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int c10 = join_3_and_count(a1, o0, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int c11 = join_3_and_count(a1, o1, e, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-//	log_warn("pair_ksize %d count00 %d count01 %d count10 %d count11 %d", pair_ksize, c00, c01, c10, c11);
+	if (!check_use_same_edge(g, 5, i_e, i_a0, i_a1, i_o0, i_o1))
+		return NOT_212_CASE;
+	int c00 = join_3_and_count(a0, o0, e, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int c01 = join_3_and_count(a0, o1, e, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int c10 = join_3_and_count(a1, o0, e, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int c11 = join_3_and_count(a1, o1, e, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
 
+	if (!(c00>0 && c01>0 && c10>0 && c11 >0))
+		return NOT_HAVE_SPAN_KMER;
 	if (c00 > 0 && c11 > 0 && c00 + c11 > c10 + c01) {
 		//todo 1 get new count proportion to path
 		asm_join_edge3_wrapper(g, i_a0, i_e, i_o0, g->edges[i_e].count / 2);
@@ -656,7 +734,7 @@ int resolve_212_using_big_kmer(struct asm_graph_t *g, int i_e,
  *
  */
 int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
-                               khash_t(pair_kmer_count) *table, int64_t five_to_big_ksize_m1)
+                               int64_t five_to_big_ksize_m1)
 {
 //	return 1;
 	int i_target = g->edges[i_e].target;
@@ -691,11 +769,17 @@ int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
 		return NOT_202_CASE;
 
 	gint_t i_a1 = g->edges[i_a1_rc].rc_id;
-	if (i_e == i_a0 || i_e == i_a2 || i_e == i_a1_rc || i_a0 == i_a1 || i_a0 == i_a2 || i_a1 == i_a2)
-		return NOT_202_CASE;
-
 	gint_t i_a0_rc = g->edges[i_a0].rc_id;
 	gint_t i_a2_rc = g->edges[i_a2].rc_id;
+//	log_warn("%d %d %d %d", i_e, i_a0, i_a1, i_a2);
+	if (!check_use_same_edge(g, 4, i_e, i_a0, i_a1, i_a2))
+//	if (i_e == i_a0 || i_e == i_a1 || i_e == i_a2
+//	    || i_e == i_a0_rc || i_e == i_a1_rc || i_e == i_a2_rc
+//	    || i_a0 == i_a1 || i_a0 == i_a2
+//	    || i_a0 == i_a1_rc || i_a0 == i_a2_rc
+//	    || i_a1 == i_a2 || i_a1 == i_a2_rc)
+		return NOT_202_CASE;
+
 	struct asm_edge_t *a0_rc = &g->edges[i_a0_rc];
 	struct asm_edge_t *a2_rc = &g->edges[i_a2_rc];
 	struct asm_edge_t *e = &g->edges[i_e];
@@ -704,10 +788,10 @@ int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
 	assert(a1->source != -1);
 	assert(a2_rc->source != -1);
 	assert(e->source != -1);
-	int ce0 = join_2_and_count(e, a0_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int ce2 = join_2_and_count(e, a2_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int c10 = join_2_and_count(a1, a0_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
-	int c12 = join_2_and_count(a1, a2_rc, BIG_KSIZE, g->ksize, table, five_to_big_ksize_m1);
+	int ce0 = join_2_and_count(e, a0_rc, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int ce2 = join_2_and_count(e, a2_rc, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int c10 = join_2_and_count(a1, a0_rc, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
+	int c12 = join_2_and_count(a1, a2_rc, BIG_KSIZE, g->ksize, five_to_big_ksize_m1);
 
 
 //	log_warn("edge len %d %d %d %d", e->seq_len, a0_rc->seq_len, a1->seq_len, a2_rc->seq_len);
@@ -719,6 +803,9 @@ int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
 		asm_join_edge_wrapper(g, i_e, i_a2_rc);
 		asm_join_edge_wrapper(g, i_a1, i_a0_rc);
 	} else {
+//		log_warn("22case %d", i_e);
+//		log_warn("%d %d %d %d", i_e, i_a0, i_a1, i_a2);
+//		log_warn("%d %d %d %d\n", ce0, ce2, c10, c12);
 		return NOT_HAVE_SPAN_KMER;
 	}
 	return 0;
@@ -727,19 +814,18 @@ int resolve_202_using_big_kmer(struct asm_graph_t *g, int i_e,
 void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 	int *partition = calloc(g->n_e, 4);
-	khash_t(big_kmer_count) **partition_kmer_count = NULL;
 	int n_partitions;
 	struct read_path_t *ori_read = calloc(1, sizeof(struct read_path_t));
 	assert(opt->n_files == 1); //todo 1 handle multiple files
-	log_info("%s", opt->files_1[0]);
 	ori_read->R1_path = opt->files_1[0];
 	ori_read->R2_path = opt->files_2[0];
-	ori_read->idx_path = opt->files_I[0];
 
 	khash_t(pair_kmer_count) *table = kh_init(pair_kmer_count);
-	build_pair_kmer_table(opt, table);
+	build_pair_kmer_table(opt);
 	log_info("Build big kmer table done");
 
-	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, table, opt->out_dir);
+	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, opt->out_dir);
 	free(partition);
 }
+
+

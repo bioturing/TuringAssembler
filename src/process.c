@@ -528,6 +528,9 @@ void build_0_process(struct opt_proc_t *opt)
 void build_0_1_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
+	char path[1024];
+	sprintf(path, "%s/build_0_1.log", opt->out_dir);
+	init_logger(opt->log_level, path);
 	load_asm_graph(&g1, opt->in_file);
 	build_0_1(&g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");
@@ -640,4 +643,11 @@ void resolve_1_2_process(struct opt_proc_t *opt)
 	free(g0);
 	free(log_file);
 	close_logger();
+}
+
+void partition_graph_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g = create_and_load_graph(opt);
+//	log_info("ksize %d", g->ksize);
+	only_partition_graph(g, opt->out_dir);
 }

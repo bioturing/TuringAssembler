@@ -20,7 +20,7 @@ KSEQ_INIT(gzFile, gzread);
 RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
 
 __KHASH_IMPL(pair_contig_count, , struct pair_contig_t, struct contig_count_t, 1,
-							__mix_2_64, __cmp_2_64);
+             __mix_2_64, __cmp_2_64);
 
 __KHASH_IMPL(contig_count, , gint_t, int, 1, kh_int64_hash_func, kh_int64_hash_equal);
 
@@ -65,7 +65,7 @@ static inline void asm_remove_node_adj(struct asm_graph_t *g, gint_t u, gint_t e
 }
 
 static inline int is_seq_rc(uint32_t *seq1, uint32_t l1,
-						uint32_t *seq2, uint32_t l2)
+                            uint32_t *seq2, uint32_t l2)
 {
 	if (l1 != l2)
 		return 0;
@@ -231,7 +231,7 @@ void asm_clone_seq(struct asm_edge_t *dst, struct asm_edge_t *src)
 	dst->seq_len = src->seq_len;
 	dst->seq = calloc((dst->seq_len + 15) >> 4, sizeof(uint32_t));
 	memcpy(dst->seq, src->seq,
-		   ((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
+	       ((dst->seq_len + 15) >> 4) * sizeof(uint32_t));
 	dst->n_holes = src->n_holes;
 	if (dst->n_holes) {
 		dst->p_holes = malloc(dst->n_holes * sizeof(uint32_t));
@@ -252,8 +252,8 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	uint32_t i, k;
 	for (i = 0; i < dst->seq_len; ++i) {
 		k = dst->seq_len - i - 1;
-		dst->seq[i >> 4] |= (uint32_t)(__binseq_get(src->seq, k) ^ 3)
-							<< ((i & 15) << 1);
+		dst->seq[i >> 4] |= (uint32_t) (__binseq_get(src->seq, k) ^ 3)
+			<< ((i & 15) << 1);
 	}
 	dst->n_holes = src->n_holes;
 	dst->l_holes = malloc(dst->n_holes * sizeof(uint32_t));
@@ -261,7 +261,7 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	for (i = 0; i < dst->n_holes; ++i) {
 		dst->l_holes[i] = src->l_holes[dst->n_holes - i - 1];
 		dst->p_holes[i] = dst->seq_len - 1
-			- (src->p_holes[dst->n_holes - i - 1] + 1);
+		                  - (src->p_holes[dst->n_holes - i - 1] + 1);
 	}
 }
 
@@ -295,7 +295,7 @@ gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src)
 }
 
 void asm_append_seq_with_gap(struct asm_edge_t *dst,
-				struct asm_edge_t *src, uint32_t gap_size)
+                             struct asm_edge_t *src, uint32_t gap_size)
 {
 	/* append the bin seq */
 	uint32_t seq_len, new_m, m, i, k;
@@ -309,7 +309,7 @@ void asm_append_seq_with_gap(struct asm_edge_t *dst,
 	for (i = 0; i < src->seq_len; ++i) {
 		k = i + dst->seq_len;
 		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1) & 3)
-							<< ((k & 15) << 1));
+			<< ((k & 15) << 1));
 	}
 	uint32_t n_holes = dst->n_holes + src->n_holes + 1;
 	dst->p_holes = realloc(dst->p_holes, n_holes * sizeof(uint32_t));
@@ -355,27 +355,27 @@ void asm_append_barcode_readpair(struct asm_graph_t *g, gint_t dst, gint_t src)
 		if (g->edges[dst].seq_len < CONTIG_LEVEL_1) {
 			if (g->edges[dst].seq_len + CONTIG_LEVEL_0 >= CONTIG_LEVEL_1)
 				barcode_hash_merge(g->edges[dst].barcodes + 1,
-						g->edges[src].barcodes);
+				                   g->edges[src].barcodes);
 			else
 				barcode_hash_merge(g->edges[dst].barcodes + 1,
-						g->edges[src].barcodes + 1);
+				                   g->edges[src].barcodes + 1);
 		}
 		if (g->edges[dst].seq_len < CONTIG_LEVEL_2) {
 			if (g->edges[dst].seq_len + CONTIG_LEVEL_0 >= CONTIG_LEVEL_2)
 				barcode_hash_merge(g->edges[dst].barcodes + 2,
-						g->edges[src].barcodes);
+				                   g->edges[src].barcodes);
 			else if (g->edges[dst].seq_len + CONTIG_LEVEL_1 >= CONTIG_LEVEL_2)
 				barcode_hash_merge(g->edges[dst].barcodes + 2,
-						g->edges[src].barcodes + 1);
+				                   g->edges[src].barcodes + 1);
 			else
 				barcode_hash_merge(g->edges[dst].barcodes + 2,
-						g->edges[src].barcodes + 2);
+				                   g->edges[src].barcodes + 2);
 		}
 	}
 }
 
 void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
-			uint32_t *seq, int len, int trim_dst, int trim_src)
+                              uint32_t *seq, int len, int trim_dst, int trim_src)
 {
 	uint32_t seq_len, new_m, m, c;
 	int i, k;
@@ -387,8 +387,8 @@ void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
 		log_error("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
-		(((uint32_t)1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
+	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t) -1 :
+	                (((uint32_t) 1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
 	dst->seq[m - 1] &= mask;
 
 	if (len >= 0) {
@@ -412,7 +412,7 @@ void asm_append_seq_with_fill(struct asm_edge_t *dst, struct asm_edge_t *src,
 }
 
 void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t *src,
-			uint32_t *seq, int len, int trim_dst, int trim_src)
+                                      uint32_t *seq, int len, int trim_dst, int trim_src)
 {
 	uint32_t c, seq_len, new_m, m;
 	int i, k;
@@ -424,8 +424,8 @@ void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t 
 		__ERROR("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
-	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
-		(((uint32_t)1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
+	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t) -1 :
+	                (((uint32_t) 1 << ((((dst->seq_len - trim_dst) & 15) << 1))) - 1);
 	dst->seq[m - 1] &= mask;
 
 	if (len >= 0) {
@@ -466,7 +466,7 @@ void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t ove
 	for (i = overlap; i < src->seq_len; ++i) {
 		k = i - overlap + dst->seq_len;
 		dst->seq[k >> 4] |= ((src->seq[i >> 4] >> ((i & 15) << 1)) & 3)
-							<< ((k & 15) << 1);
+			<< ((k & 15) << 1);
 	}
 	/* append the gaps */
 	if (src->n_holes) {
@@ -483,7 +483,7 @@ void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t ove
 }
 
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-				gint_t e2, gint_t e_rc2, uint32_t gap_size)
+                            gint_t e2, gint_t e_rc2, uint32_t gap_size)
 {
 	/*    contig 1  |  gap  |   contig2
 	 * AAAAAAAAAAAAANNNNNNNNNAAAAAAAAAAAA
@@ -505,7 +505,7 @@ void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 }
 
 void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1, gint_t e2, gint_t e_rc2,
-	uint32_t *aseq, int alen, int trim_e1, int trim_e2)
+                             uint32_t *aseq, int alen, int trim_e1, int trim_e2)
 {
 	asm_append_barcode_readpair(g, e1, e2);
 	asm_append_seq_with_fill(g->edges + e1, g->edges + e2, aseq, alen, trim_e1, trim_e2);
@@ -529,13 +529,18 @@ void asm_join_edge_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2)
 //	log_warn("join edge %d %d", e1, e2);
 	int e1_rc = g->edges[e1].rc_id;
 	int e2_rc = g->edges[e2].rc_id;
-	assert(g->edges[e1].source != -1 && g->edges[e2].source != -1 );
-	assert(g->edges[e1_rc].source != -1 && g->edges[e2_rc].source != -1 );
+	if (g->edges[e1].source == -1 || g->edges[e2].source == -1) {
+		log_error("e1 %d. e2 %d e1rc %d e2rc %d. e1.source %d e2.source %d ",
+		          e1, e2, e1_rc, e2_rc, g->edges[e1].source, g->edges[e2].source);
+
+	}
+	assert(g->edges[e1].source != -1 && g->edges[e2].source != -1);
+	assert(g->edges[e1_rc].source != -1 && g->edges[e2_rc].source != -1);
 	asm_join_edge(g, e1, e1_rc, e2, e2_rc);
 }
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-					gint_t e2, gint_t e_rc2)
+                   gint_t e2, gint_t e_rc2)
 {
 	/*    contig 1  | overlap |
 	 * ATCTTCGGTTTTTCTTTAAAAAAG
@@ -593,7 +598,7 @@ void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t 
 }
 
 void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-					gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
+                    gint_t e2, gint_t e_rc2, gint_t e3, gint_t e_rc3, uint64_t e2_count)
 {
 	/*    contig 1  | overlap |      | overlap |  contig 3
 	 * ATCTTCGGTTTTTCTTTAAAAAAG      AAACTTTTTTTGGGGGATACCC
@@ -791,7 +796,7 @@ static void print_debug(struct asm_edge_t *e)
 	uint32_t i;
 	for (i = 0; i < e->n_holes; ++i) {
 		__DEBUG("p_holes = %u; l_holes = %u\n",
-				e->p_holes[i], e->l_holes[i]);
+		        e->p_holes[i], e->l_holes[i]);
 	}
 }
 
@@ -815,12 +820,12 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 			continue;
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
-			g->edges[e].seq_len < MIN_NOTICE_LEN)
+		    g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
 		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
-			(long long)e, (long long)e_rc, (long long)len,
-			__get_edge_cov(g->edges + e, g->ksize));
+		        (long long) e, (long long) e_rc, (long long) len,
+		        __get_edge_cov(g->edges + e, g->ksize));
 		gint_t k = 0;
 		while (k < len) {
 			gint_t l = __min(80, len - k);
@@ -859,8 +864,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
 		/* print fake count for correct coverage display on Bandage */
-		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long)e,
-			(long long)e_rc, seq, (long long unsigned)fake_count);
+		fprintf(fp, "S\t%lld_%lld\t%s\tKC:i:%llu\n", (long long) e,
+		        (long long) e_rc, seq, (long long unsigned) fake_count);
 		//fprintf(fp, "S\t%lld_%d->%d_%lld_%d->%d\t%s\tKC:i:%llu\n", (long long)e,
 		//	g->edges[e].source, g->edges[e].target,
 		//	(long long)e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
@@ -900,9 +905,9 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 				next_ce = '+';
 			}
 			fprintf(fp, "L\t%lld_%lld\t%c\t%lld_%lld\t%c\t%dM\n",
-				(long long)pe, (long long)pe_rc, ce,
-				(long long)next_pe, (long long)next_pe_rc,
-				next_ce, g->ksize);
+			        (long long) pe, (long long) pe_rc, ce,
+			        (long long) next_pe, (long long) next_pe_rc,
+			        next_ce, g->ksize);
 			//fprintf(fp, "L\t%lld_%d->%d_%lld_%d->%d\t%c\t%lld_%d->%d_%lld_%d->%d\t%c\t%dM\n",
 			//	(long long)pe, g->edges[pe].source, g->edges[pe].target,
 			//	(long long)pe_rc, g->edges[pe_rc].source, g->edges[pe_rc].target,
@@ -927,9 +932,9 @@ void test2_asm_graph(struct asm_graph_t *g)
 			e = g->nodes[u].adj[j];
 			gint_t e_rc = g->edges[e].rc_id;
 			if (!is_seq_rc(g->edges[e].seq, g->edges[e].seq_len,
-					g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
+			               g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
 				fprintf(stderr, "seq_len = %u; rc_seq_len = %u\n",
-					g->edges[e].seq_len, g->edges[e_rc].seq_len);
+				        g->edges[e].seq_len, g->edges[e_rc].seq_len);
 				assert(g->edges[e].seq_len == g->edges[e_rc].seq_len);
 				char *seq = NULL;
 				uint32_t lseq = 0;
@@ -969,7 +974,7 @@ void test_asm_graph(struct asm_graph_t *g)
 	gint_t le_idx = get_longest_edge(g);
 	if (le_idx != -1) {
 		log_info("Longest edge %ld_%ld, length %u",
-			le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
+		         le_idx, g->edges[le_idx].rc_id, get_edge_len(g->edges + le_idx));
 	}
 	uint64_t sum_count = 0;
 	for (gint_t e = 0; e < g->n_e; ++e) {
@@ -989,8 +994,8 @@ void test_asm_graph(struct asm_graph_t *g)
 			e = g->nodes[u].adj[j];
 			if (g->edges[e].source != u) {
 				log_debug("node = %ld; edge = [%ld](%ld->%ld)",
-					u, e,
-					g->edges[e].source, g->edges[e].target);
+				          u, e,
+				          g->edges[e].source, g->edges[e].target);
 				log_error("Node's adjs are node consistent with edges's source");
 			}
 		}
@@ -1029,12 +1034,12 @@ void test_asm_graph(struct asm_graph_t *g)
 			for (k = 0; k < g->ksize; ++k) {
 				j = g->edges[e2].seq_len - g->ksize + k;
 				if (__binseq_get(g->edges[e2].seq, j) !=
-					__binseq_get(g->edges[e1].seq, k)) {
+				    __binseq_get(g->edges[e1].seq, k)) {
 					log_debug("(%ld, %ld) -> (%ld, %ld)",
-						g->edges[e2].source,
-						g->edges[e2].target,
-						g->edges[e1].source,
-						g->edges[e1].target);
+					          g->edges[e2].source,
+					          g->edges[e2].target,
+					          g->edges[e1].source,
+					          g->edges[e1].target);
 					deb_dump_seq(g, e2);
 					deb_dump_seq(g, e1);
 					log_error("Continuous edges not share kmer");
@@ -1049,28 +1054,28 @@ void test_asm_graph(struct asm_graph_t *g)
 		/* Test 1: Check correct reverse complement edge id */
 		if (e_rc < 0 || e_rc >= g->n_e) {
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			log_error("Edge has undefined reverse complement");
 		}
 		if (e != g->edges[e_rc].rc_id) {
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
-				g->edges[e_rc].rc_id);
+			          e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			          g->edges[e_rc].rc_id);
 			log_error("Edge reverse complement link is not 2-way");
 		}
 		/* Test 2: source and target within [0, g->n_e) */
 		if (g->edges[e].source < 0 || g->edges[e].target >= g->n_v ||
-			g->edges[e_rc].source < 0 || g->edges[e_rc].target >= g->n_v) {
+		    g->edges[e_rc].source < 0 || g->edges[e_rc].target >= g->n_v) {
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
-				g->edges[e_rc].rc_id);
+			          e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			          g->edges[e_rc].rc_id);
 			log_error("Edge source and target node are undefined");
 		}
 		gint_t src, dst, src_rc, dst_rc;
@@ -1078,10 +1083,10 @@ void test_asm_graph(struct asm_graph_t *g)
 		dst = g->edges[e].target;
 		/* Test 3: Edge must be in source's adj */
 		gint_t idx = find_adj_idx(g->nodes[src].adj,
-						g->nodes[src].deg, e);
+		                          g->nodes[src].deg, e);
 		if (idx == -1) {
-			log_debug("node [%ld]; edge [%ld](%ld->%ld)",
-				src, e, src, dst);
+			log_warn("node [%ld]; edge [%ld](%ld->%ld)",
+			         src, e, src, dst);
 			log_error("Edge not in source's adj");
 		}
 		src_rc = g->edges[e_rc].source;
@@ -1091,27 +1096,27 @@ void test_asm_graph(struct asm_graph_t *g)
 		 */
 		if (src != g->nodes[dst_rc].rc_id || dst != g->nodes[src_rc].rc_id) {
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
-				g->edges[e_rc].rc_id);
+			          e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			          g->edges[e_rc].rc_id);
 			log_error("Edge and reverse complement not link between reverse complemented nodes");
 		}
 		/* Test 5: Sequence reverse complement */
 		if (!is_seq_rc(g->edges[e].seq, g->edges[e].seq_len,
-				g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
+		               g->edges[e_rc].seq, g->edges[e_rc].seq_len)) {
 			char *seq = NULL;
 			uint32_t lseq = 0;
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e);
 			// log_info("%s", seq);
 			printf("seq_len = %lu; seq = %s\n", strlen(seq), seq);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
-				g->edges[e_rc].rc_id);
+			          e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			          g->edges[e_rc].rc_id);
 			dump_edge_seq_h(&seq, &lseq, g->edges + e_rc);
 			log_debug("seq_len = %lu; seq = %s", strlen(seq), seq);
 			// log_info("%s", seq);
@@ -1119,24 +1124,24 @@ void test_asm_graph(struct asm_graph_t *g)
 		}
 		if (!is_hole_rc(g->edges + e, g->edges + e_rc)) {
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e, g->edges[e].source, g->edges[e].target,
-				g->edges[e].rc_id);
+			          e, g->edges[e].source, g->edges[e].target,
+			          g->edges[e].rc_id);
 			log_debug("n_holes = %u; seq_len = %u",
-				g->edges[e].n_holes, g->edges[e].seq_len);
+			          g->edges[e].n_holes, g->edges[e].seq_len);
 			uint32_t j;
 			for (j = 0; j < g->edges[e].n_holes; ++j)
 				log_debug("(p=%u, l=%u) ",
-					g->edges[e].p_holes[j],
-					g->edges[e].l_holes[j]);
+				          g->edges[e].p_holes[j],
+				          g->edges[e].l_holes[j]);
 			log_debug("edge [%ld](%ld->%ld); rc_id = %ld",
-				e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
-				g->edges[e_rc].rc_id);
+			          e_rc, g->edges[e_rc].source, g->edges[e_rc].target,
+			          g->edges[e_rc].rc_id);
 			log_debug("n_holes = %u; seq_len = %u",
-				g->edges[e_rc].n_holes, g->edges[e_rc].seq_len);
+			          g->edges[e_rc].n_holes, g->edges[e_rc].seq_len);
 			for (j = 0; j < g->edges[e_rc].n_holes; ++j)
 				log_debug("(p=%u, l=%u) ",
-					g->edges[e_rc].p_holes[j],
-					g->edges[e_rc].l_holes[j]);
+				          g->edges[e_rc].p_holes[j],
+				          g->edges[e_rc].l_holes[j]);
 			log_error("Edge and rc holes is not symmetric");
 		}
 	}
@@ -1213,7 +1218,7 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
-			continue;
+				continue;
 			struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
@@ -1320,7 +1325,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	if (g->aux_flag & ASM_HAVE_BARCODE_SCAF) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
-			continue;
+				continue;
 			struct barcode_hash_t *h = &g->edges[e].barcodes_scaf;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
@@ -1481,36 +1486,36 @@ void asm_resolve_local_loop(struct asm_graph_t *lg)
 			for (int i = 0; loop_e == -1 && i < 2; ++i) {
 				for (int j = 0; loop_e == -1 && j < 2; ++j) {
 					if (lg->nodes[tg].adj[i] ==
-						lg->edges[lg->nodes[sr].adj[j]].rc_id)
+					    lg->edges[lg->nodes[sr].adj[j]].rc_id)
 						loop_e = lg->nodes[tg].adj[i];
 				}
 			}
 			if (loop_e == -1)
 				continue;
 			int e1 = lg->edges[lg->nodes[sr].adj[0]].rc_id != loop_e ?
-				lg->edges[lg->nodes[sr].adj[0]].rc_id :
-				lg->edges[lg->nodes[sr].adj[1]].rc_id;
+			         lg->edges[lg->nodes[sr].adj[0]].rc_id :
+			         lg->edges[lg->nodes[sr].adj[1]].rc_id;
 			int e2 = lg->nodes[tg].adj[0] != loop_e ?
-				lg->nodes[tg].adj[0] : lg->nodes[tg].adj[1];
+			         lg->nodes[tg].adj[0] : lg->nodes[tg].adj[1];
 			if (e1 == e2 || e == loop_e)
 				continue;
 			log_debug("Local loop detected, e1: %d, e: %d, loop e: %d, e2: %d, rc: %d",
-					e1, e, loop_e, e2, rc);
+			          e1, e, loop_e, e2, rc);
 
 			asm_append_barcode_readpair(lg, loop_e, e);
 			asm_append_seq(lg->edges + loop_e, lg->edges + e,
-					lg->ksize);
+			               lg->ksize);
 			asm_append_barcode_readpair(lg, e, loop_e);
 			asm_append_seq(lg->edges + e, lg->edges + loop_e,
-					lg->ksize);
+			               lg->ksize);
 			int loop_e_rc = lg->edges[loop_e].rc_id;
 			int e_rc = lg->edges[e].rc_id;
 			asm_append_barcode_readpair(lg, loop_e_rc, e_rc);
 			asm_append_seq(lg->edges + loop_e_rc, lg->edges + e_rc,
-					lg->ksize);
+			               lg->ksize);
 			asm_append_barcode_readpair(lg, e_rc, loop_e_rc);
 			asm_append_seq(lg->edges + e_rc, lg->edges + loop_e_rc,
-					lg->ksize);
+			               lg->ksize);
 
 			asm_remove_edge(lg, loop_e);
 			asm_remove_edge(lg, lg->edges[loop_e].rc_id);
@@ -1523,7 +1528,7 @@ void asm_resolve_local_loop(struct asm_graph_t *lg)
 }
 
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
-		char *tmp_name)
+                     char *tmp_name)
 {
 	save_asm_graph(g0, tmp_name);
 	load_asm_graph(g1, tmp_name);
@@ -1539,7 +1544,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	if (g0->candidates != NULL) {
 		g1->candidates = kh_init(pair_contig_count);
 		for (khiter_t it = kh_begin(g0->candidates); it != kh_end(g0->candidates);
-			 ++it) {
+		     ++it) {
 			if (!kh_exist(g0->candidates, it))
 				continue;
 			struct pair_contig_t key = kh_key(g0->candidates, it);
@@ -1571,20 +1576,20 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		log_debug("seq len %d", g1->edges[i].seq_len);
 		log_debug("g0->edges[i].seq == NULL or not: %d", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
-				sizeof(uint32_t));
+		                                       sizeof(uint32_t));
 		for (int j = 0; (uint32_t) j < g0->edges[i].seq_len; ++j)
 			log_debug("%d", __binseq_get(g0->edges[i].seq, j));
 		memcpy(g1->edges[i].seq, g0->edges[i].seq,
-				sizeof(uint32_t) * ((g1->edges[i].seq_len + 3) / 4));
-		if (g1->edges[i].n_holes > 0){
+		       sizeof(uint32_t) * ((g1->edges[i].seq_len + 3) / 4));
+		if (g1->edges[i].n_holes > 0) {
 			g1->edges[i].p_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
-					sizeof(uint32_t));
+			                                           sizeof(uint32_t));
 			memcpy(g1->edges[i].p_holes, g0->edges[i].p_holes,
-					sizeof(uint32_t) * g1->edges[i].n_holes);
+			       sizeof(uint32_t) * g1->edges[i].n_holes);
 			g1->edges[i].l_holes = (uint32_t *) calloc(g1->edges[i].n_holes,
-					sizeof(uint32_t));
+			                                           sizeof(uint32_t));
 			memcpy(g1->edges[i].l_holes, g0->edges[i].l_holes,
-					sizeof(uint32_t) * g1->edges[i].n_holes);
+			       sizeof(uint32_t) * g1->edges[i].n_holes);
 		}
 	}
 	log_info("DONE cloning assembly edges");

@@ -388,7 +388,6 @@ uint64_t mini_get(uint64_t data, uint64_t key)
 	uint64_t mask = h_table->size - 1;
 	uint64_t slot = key % mask;
 	while (h_table->key[slot] != data && h_table->key[slot] != 0 && slot != h_table->size) {
-		printf("slot %ld . h_table key %ld \n", slot, h_table->key[slot]);
 		slot++;
 	}
 	if (slot == h_table->size) slot = 0;

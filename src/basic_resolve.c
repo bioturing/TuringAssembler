@@ -11,12 +11,13 @@
 #include "graph_search.h"
 #include "kmer_hash.h"
 #include "process.h"
+
 #define KSIZE_CHECK (g->ksize + 6)
-#define LEN_VAR				20
-#define MAX_JOIN_LEN			2000
+#define LEN_VAR                                20
+#define MAX_JOIN_LEN                        2000
 #define __get_edge_cov_int(g, e, uni_cov) (int)((g)->edges[e].count * 1.0 /    \
-	((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
-	(uni_cov) + 0.499999999)
+        ((g)->edges[e].seq_len - ((g)->edges[e].n_holes + 1) * (g)->ksize) /   \
+        (uni_cov) + 0.499999999)
 #define JUNGLE_RADIUS 10
 #define MIN_NOTICE_BRIDGE 4000
 #define MAX_DUMP_EDGE_LEN 200
@@ -25,6 +26,7 @@
 #define MAX_BULGE_LEN 1000
 #define MAX_ALTERNATIVE_LEN_RATIO 1.2
 #define MIN_ALTERNATIVE_LEN_RATIO 0.8
+
 static inline gint_t find_adj_idx(gint_t *adj, gint_t deg, gint_t id)
 {
 	gint_t i, ret;
@@ -82,7 +84,7 @@ void asm_lazy_condense(struct asm_graph_t *g)
 				g->nodes[u].adj[g->nodes[u].deg++] = e_id;
 		}
 		g->nodes[u].adj = realloc(g->nodes[u].adj,
-					g->nodes[u].deg * sizeof(gint_t));
+		                          g->nodes[u].deg * sizeof(gint_t));
 	}
 
 	/* join non-branching path */
@@ -121,7 +123,7 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
 		}
 		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
-					g0->nodes[u].deg * sizeof(gint_t));
+		                           g0->nodes[u].deg * sizeof(gint_t));
 	}
 	/* nodes on new graph only consist of branching nodes on old graph */
 	n_v = 0;
@@ -130,14 +132,14 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
 		/* non-branching node */
 		int is_single_loop = 0;
-		if (deg_fw == 1 && deg_rv == 1){
+		if (deg_fw == 1 && deg_rv == 1) {
 			int fw_e = g0->nodes[u].adj[0];
 			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
 			if (fw_e == rv_e)
 				is_single_loop = 1;
 		}
 		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
-				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
+		                        || deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
 			continue;
 		node_id[u] = n_v++;
 	}
@@ -175,14 +177,15 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
 			if (e == -1)
 				continue;
-			p = n_e; q = n_e + 1;
+			p = n_e;
+			q = n_e + 1;
 			edges[p].rc_id = q;
 			edges[q].rc_id = p;
 			asm_clone_seq(edges + p, g0->edges + e);
 			edges[p].barcodes = calloc(3, sizeof(struct barcode_hash_t));
-			for (int i = 0; i < 3; ++i){
+			for (int i = 0; i < 3; ++i) {
 				barcode_hash_clone(edges[p].barcodes + i,
-						g0->edges[e].barcodes + i);
+				                   g0->edges[e].barcodes + i);
 			}
 			int n_mid = 0;
 			int *mid_nodes = calloc(g0->n_v, sizeof(int));
@@ -192,15 +195,15 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 				if (node_id[v] == -1) { /* middle node */
 					if (g0->nodes[v].deg != 1) {
 						fprintf(stderr, "Node %ld, deg = %ld\n",
-							v, g0->nodes[v].deg);
+						        v, g0->nodes[v].deg);
 						assert(0 && "Middle node degree is not equal to 1");
 					}
 					e = g0->nodes[v].adj[0];
 					assert(e != -1);
 					asm_append_seq(edges + p,
-						g0->edges + e, g0->ksize);
+					               g0->edges + e, g0->ksize);
 					asm_append_barcode_edge(edges + p,
-							g0->edges + e);
+					                        g0->edges + e);
 					edges[p].count += g0->edges[e].count;
 				} else {
 					break;
@@ -212,27 +215,28 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 			v_rc = g0->nodes[v].rc_id;
 			e_rc = g0->edges[e].rc_id;
 			edges[q].barcodes = calloc(3, sizeof(struct barcode_hash_t));
-			for (int i = 0; i < 3; ++i){
+			for (int i = 0; i < 3; ++i) {
 				barcode_hash_clone(edges[q].barcodes + i,
-						g0->edges[e_rc].barcodes + i);
+				                   g0->edges[e_rc].barcodes + i);
 			}
-			for (int i = n_mid - 2; i >= 0; --i){
+			for (int i = n_mid - 2; i >= 0; --i) {
 				int v = g0->nodes[mid_nodes[i]].rc_id;
 				int e_rc = g0->nodes[v].adj[0];
 				asm_append_barcode_edge(edges + q, g0->edges + e_rc);
 			}
 			free(mid_nodes);
 			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
-						g0->nodes[v_rc].deg, e_rc);
+			                        g0->nodes[v_rc].deg, e_rc);
 			assert(j >= 0);
-			g0->nodes[v_rc].adj[j] = -1; y_rc = node_id[v_rc];
+			g0->nodes[v_rc].adj[j] = -1;
+			y_rc = node_id[v_rc];
 			edges[q].source = y_rc;
 			edges[q].target = nodes[x].rc_id;
 
 			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
 			nodes[x].adj[nodes[x].deg++] = p;
 			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
-					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			                          (nodes[y_rc].deg + 1) * sizeof(gint_t));
 			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
 			n_e += 2;
 		}
@@ -266,7 +270,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
 		}
 		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
-					g0->nodes[u].deg * sizeof(gint_t));
+		                           g0->nodes[u].deg * sizeof(gint_t));
 	}
 	/* nodes on new graph only consist of branching nodes on old graph */
 	n_v = 0;
@@ -275,14 +279,14 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
 		/* non-branching node */
 		int is_single_loop = 0;
-		if (deg_fw == 1 && deg_rv == 1){
+		if (deg_fw == 1 && deg_rv == 1) {
 			int fw_e = g0->nodes[u].adj[0];
 			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
 			if (fw_e == rv_e)
 				is_single_loop = 1;
 		}
 		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
-				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
+		                        || deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
 			continue;
 		node_id[u] = n_v++;
 	}
@@ -320,7 +324,8 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
 			if (e == -1)
 				continue;
-			p = n_e; q = n_e + 1;
+			p = n_e;
+			q = n_e + 1;
 			edges[p].rc_id = q;
 			edges[q].rc_id = p;
 			asm_clone_seq(edges + p, g0->edges + e);
@@ -329,14 +334,14 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 				if (node_id[v] == -1) { /* middle node */
 					if (g0->nodes[v].deg != 1) {
 						fprintf(stderr, "Node %ld, deg = %ld\n",
-							v, g0->nodes[v].deg);
+						        v, g0->nodes[v].deg);
 						log_debug("Middle node degree is not equal to 1");
 						assert(0 && "Middle node degree is not equal to 1");
 					}
 					e = g0->nodes[v].adj[0];
 					assert(e != -1);
 					asm_append_seq(edges + p,
-						g0->edges + e, g0->ksize);
+					               g0->edges + e, g0->ksize);
 					edges[p].count += g0->edges[e].count;
 				} else {
 					break;
@@ -348,7 +353,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			v_rc = g0->nodes[v].rc_id;
 			e_rc = g0->edges[e].rc_id;
 			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
-						g0->nodes[v_rc].deg, e_rc);
+			                        g0->nodes[v_rc].deg, e_rc);
 			assert(j >= 0);
 			g0->nodes[v_rc].adj[j] = -1;
 			y_rc = node_id[v_rc];
@@ -358,7 +363,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
 			nodes[x].adj[nodes[x].deg++] = p;
 			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
-					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			                          (nodes[y_rc].deg + 1) * sizeof(gint_t));
 			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
 			n_e += 2;
 		}
@@ -392,7 +397,7 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 				g0->nodes[u].adj[g0->nodes[u].deg++] = e_id;
 		}
 		g0->nodes[u].adj = realloc(g0->nodes[u].adj,
-					g0->nodes[u].deg * sizeof(gint_t));
+		                           g0->nodes[u].deg * sizeof(gint_t));
 	}
 	/* nodes on new graph only consist of branching nodes on old graph */
 	n_v = 0;
@@ -401,14 +406,14 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 		gint_t deg_rv = g0->nodes[g0->nodes[u].rc_id].deg;
 		/* non-branching node */
 		int is_single_loop = 0;
-		if (deg_fw == 1 && deg_rv == 1){
+		if (deg_fw == 1 && deg_rv == 1) {
 			int fw_e = g0->nodes[u].adj[0];
 			int rv_e = g0->edges[g0->nodes[g0->nodes[u].rc_id].adj[0]].rc_id;
 			if (fw_e == rv_e)
 				is_single_loop = 1;
 		}
 		if (!is_single_loop && ((deg_fw == 1 && deg_rv == 1)
-				|| deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
+		                        || deg_fw + deg_rv == 0 || is_dead_end(g0, u)))
 			continue;
 		node_id[u] = n_v++;
 	}
@@ -450,7 +455,8 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 			gint_t e = g0->nodes[u].adj[c], e_rc, v, v_rc, p, q;
 			if (e == -1)
 				continue;
-			p = n_e; q = n_e + 1;
+			p = n_e;
+			q = n_e + 1;
 			edges[p].rc_id = q;
 			edges[q].rc_id = p;
 			asm_clone_seq(edges + p, g0->edges + e);
@@ -459,14 +465,14 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 				if (node_id[v] == -1) { /* middle node */
 					if (g0->nodes[v].deg != 1) {
 						fprintf(stderr, "Node %ld, deg = %ld\n",
-							v, g0->nodes[v].deg);
+						        v, g0->nodes[v].deg);
 						log_debug("Middle node degree is not equal to 1");
 						assert(0 && "Middle node degree is not equal to 1");
 					}
 					e = g0->nodes[v].adj[0];
 					assert(e != -1);
 					asm_append_seq(edges + p,
-						g0->edges + e, g0->ksize);
+					               g0->edges + e, g0->ksize);
 					edges[p].count += g0->edges[e].count;
 				} else {
 					break;
@@ -478,7 +484,7 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 			v_rc = g0->nodes[v].rc_id;
 			e_rc = g0->edges[e].rc_id;
 			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
-						g0->nodes[v_rc].deg, e_rc);
+			                        g0->nodes[v_rc].deg, e_rc);
 			assert(j >= 0);
 			g0->nodes[v_rc].adj[j] = -1;
 			y_rc = node_id[v_rc];
@@ -488,7 +494,7 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 			nodes[x].adj = realloc(nodes[x].adj, (nodes[x].deg + 1) * sizeof(gint_t));
 			nodes[x].adj[nodes[x].deg++] = p;
 			nodes[y_rc].adj = realloc(nodes[y_rc].adj,
-					(nodes[y_rc].deg + 1) * sizeof(gint_t));
+			                          (nodes[y_rc].deg + 1) * sizeof(gint_t));
 			nodes[y_rc].adj[nodes[y_rc].deg++] = q;
 			n_e += 2;
 		}
@@ -504,7 +510,7 @@ void asm_condense_map(struct asm_graph_t *g0, struct asm_graph_t *g, int **map)
 }
 
 static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
-			gint_t len, gint_t max_len, int ksize)
+                        gint_t len, gint_t max_len, int ksize)
 {
 	if (len >= max_len)
 		return 0;
@@ -512,7 +518,7 @@ static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		int k = dfs_dead_end(g, g->edges[e].target,
-			len + get_edge_len(g->edges + e) - ksize, max_len, ksize);
+		                     len + get_edge_len(g->edges + e) - ksize, max_len, ksize);
 		if (k == 0)
 			return 0;
 	}
@@ -520,8 +526,8 @@ static int dfs_dead_end(struct asm_graph_t *g, gint_t u,
 }
 
 struct edge_cov_t {
-	double cov;
-	gint_t e;
+    double cov;
+    gint_t e;
 };
 
 static inline void ec_sort(struct edge_cov_t *b, struct edge_cov_t *e)
@@ -542,7 +548,8 @@ void find_topo(struct asm_graph_t *g, gint_t *d, gint_t *deg, uint32_t max_len)
 	gint_t u, u_rc, v, v_rc, e, l, r, j, ksize;
 	gint_t *q;
 	q = malloc(g->n_v * sizeof(gint_t));
-	l = 0; r = -1;
+	l = 0;
+	r = -1;
 	ksize = g->ksize;
 	for (u = 0; u < g->n_v; ++u) {
 		deg[u] = g->nodes[u].deg;
@@ -604,7 +611,8 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 			cov_fw = __max(cov_fw, cov);
 			len_fw = __max(len_fw, g->edges[e].seq_len);
 			v = g->edges[e].target;
-			extend_left |= (degs[v] != 0 || d[v] == -1 || d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
+			extend_left |= (degs[v] != 0 || d[v] == -1 ||
+			                d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
 		}
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 			e = g->nodes[u_rc].adj[j];
@@ -612,7 +620,8 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 			cov_rv = __max(cov_rv, cov);
 			len_rv = __max(len_rv, g->edges[e].seq_len);
 			v = g->edges[e].target;
-			extend_right |= (degs[v] != 0 || d[v] == -1 || d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
+			extend_right |= (degs[v] != 0 || d[v] == -1 ||
+			                 d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
 		}
 		max_cov = __max(cov_fw, cov_rv);
 		for (j = 0; j < g->nodes[u].deg; ++j) {
@@ -620,9 +629,10 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize);
 			if (degs[v] == 0 && d[v] != -1 && cov < max_cov &&
-				((d[v] + g->edges[e].seq_len - g->ksize < TIPS_LEN_THRES && ((extend_left && extend_right && cov < 30) || (cov < cov_fw))) ||
-				 (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
-				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
+			    ((d[v] + g->edges[e].seq_len - g->ksize < TIPS_LEN_THRES &&
+			      ((extend_left && extend_right && cov < 30) || (cov < cov_fw))) ||
+			     (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
+			     (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
 				e_rc = g->edges[e].rc_id;
 				asm_remove_edge(g, e);
 				asm_remove_edge(g, e_rc);
@@ -679,9 +689,10 @@ gint_t remove_tips(struct asm_graph_t *g)
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize);
 			if (g->nodes[v].deg == 0 && cov < max_cov &&
-				((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right && cov < TIPS_HARD_THRESHOLD) ||
-				 (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
-				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
+			    ((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right &&
+			      cov < TIPS_HARD_THRESHOLD) ||
+			     (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
+			     (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
 				e_rc = g->edges[e].rc_id;
 				asm_remove_edge(g, e);
 				asm_remove_edge(g, e_rc);
@@ -727,9 +738,9 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 		cov_fw = __min(cov_fw, get_max_out_cov(g, u_rc));
 		cov_rv = get_max_out_cov(g, v);
 		cov_rv = __min(cov_rv, get_max_out_cov(g, v_rc));
-		if ((cov < CHIMERIC_RATIO_THRES * cov_fw ||
-			cov < CHIMERIC_RATIO_THRES * cov_rv) &&
-			g->edges[e].seq_len < CHIMERIC_LEN_THRES) {
+		if ((cov < CHIMERIC_RATIO_THRES * cov_fw
+//		     || cov < CHIMERIC_RATIO_THRES * cov_rv
+		    ) && g->edges[e].seq_len < CHIMERIC_LEN_THRES) {
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			++cnt_removed;
@@ -825,7 +836,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		}
 	} else {
 		if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
-			g->nodes[u_rc].deg > 2 || g->nodes[v].deg > 2)
+		    g->nodes[u_rc].deg > 2 || g->nodes[v].deg > 2)
 			return 0;
 		e1 = e2 = e_return = e_return_rc = -1;
 		for (j = 0; j < g->nodes[v].deg; ++j) {
@@ -855,7 +866,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 			mean_cov = __get_edge_cov(g->edges + e1, g->ksize);
 		else
 			mean_cov = (__get_edge_cov(g->edges + e1, g->ksize) +
-				__get_edge_cov(g->edges + e2, g->ksize)) / 2;
+			            __get_edge_cov(g->edges + e2, g->ksize)) / 2;
 		fcov_e = __get_edge_cov(g->edges + e, g->ksize) / mean_cov;
 		fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize) / mean_cov;
 		rcov_e = convert_cov_range(fcov_e);
@@ -892,7 +903,7 @@ gint_t unroll_simple_loop(struct asm_graph_t *g)
 		cnt_false += (ret == -1);
 	}
 	log_debug("Number of unroll: self loop (%ld), self loop reverse (%ld), double loop (%ld), false loop (%ld)",
-		cnt_self, cnt_self_rv, cnt_double, cnt_false);
+	          cnt_self, cnt_self_rv, cnt_double, cnt_false);
 	return cnt_self + cnt_self_rv + cnt_double + cnt_false;
 }
 
@@ -945,7 +956,8 @@ static int bubble_check_align_edge(struct asm_graph_t *g, gint_t e1, gint_t e2)
 			A[i * (n + 1) + j] = __max(A[i * (n + 1) + j], A[(i - 1) * (n + 1) + j - 1] + score);
 		}
 	}
-	ret = (A[(m + 1) * (n + 1) - 1] * 100 > 50 * (int)__max(m, n) && __max(m, n) - A[(m + 1) * (n + 1) - 1] < MIN_NOTICE_LEN * 2);
+	ret = (A[(m + 1) * (n + 1) - 1] * 100 > 50 * (int) __max(m, n) &&
+	       __max(m, n) - A[(m + 1) * (n + 1) - 1] < MIN_NOTICE_LEN * 2);
 	free(A);
 	return ret;
 }
@@ -966,7 +978,7 @@ static gint_t check_align_bubble(struct asm_graph_t *g, gint_t se)
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
 		if (g->edges[e].seq_len < 1000 && g->edges[e].target == v &&
-			e != se && bubble_check_align_edge(g, se, e))
+		    e != se && bubble_check_align_edge(g, se, e))
 			branch[n++] = e;
 	}
 	if (n < 2)
@@ -1040,7 +1052,7 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
-		 cnt_chimeric = remove_chimeric(g0);
+		cnt_chimeric = remove_chimeric(g0);
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
@@ -1065,6 +1077,8 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
+	gint_t total_tips = 0, total_tips_complex = 0, total_chimeric = 0, total_loop = 0, total_collapse = 0;
+
 	int iter = 0;
 	do {
 		log_debug("Iteration [%d]", ++iter);
@@ -1093,13 +1107,24 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			cnt_collapse += resolve_align_bubble(g0);
 			cnt_loop += resolve_loop(g0);
 			asm_lazy_condense(g0);
+			total_loop += cnt_loop;
+			total_collapse += cnt_collapse;
 		} while (cnt_loop + cnt_collapse);
 
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
+		total_tips += cnt_tips;
+		total_tips_complex += cnt_tips_complex;
+		total_chimeric += cnt_chimeric;
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
+	log_info("Resolve graph operation summary:");
+	log_info("    Total tips:         %d", total_tips);
+	log_info("    Total tips complex: %d", total_tips_complex);
+	log_info("    Total chimeric:     %d", total_chimeric);
+	log_info("    Total bubble:       %d", total_collapse);
+	log_info("    Total loop:         %d", total_loop);
 }
 
 int check_loop(struct asm_graph_t *g, int i_e2)
@@ -1131,7 +1156,7 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 		return 0;
 	if (b->deg != 1)
 		return 0;
-	if (a_rc->deg != 2) 
+	if (a_rc->deg != 2)
 		return 0;
 	if (b_rc->deg != 2)
 		return 0;
@@ -1140,13 +1165,13 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 	struct asm_edge_t *e1 = NULL, *e3 = NULL, *e4 = NULL;
 	for (int i = 0; i < 2; i++) {
 		struct asm_edge_t *e = &g->edges[a_rc->adj[i]];
-		if (e->target != i_b)  {
+		if (e->target != i_b) {
 			i_e1 = e->rc_id;
 		} else {
 			b1 = 1;
 		}
 	}
-	if (b1 == 0) 
+	if (b1 == 0)
 		return 0;
 	i_e3 = b->adj[0];
 	for (int i = 0; i < 2; i++) {
@@ -1182,9 +1207,10 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 int resolve_loop(struct asm_graph_t *g0)
 {
 	int count = 0;
-	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++) if (g0->edges[i_e2].source != -1) {
-		count += check_loop(g0, i_e2);
-	}
+	for (int i_e2 = 0; i_e2 < g0->n_e; i_e2++)
+		if (g0->edges[i_e2].source != -1) {
+			count += check_loop(g0, i_e2);
+		}
 	log_debug("remove %d loop", count);
 	return count;
 }
@@ -1197,14 +1223,14 @@ int asm_resolve_dump_loop_ite(struct asm_graph_t *g)
 {
 	int ite = 0;
 	int res = 0;
-	do{
+	do {
 		int resolved = asm_resolve_dump_loop(g);
 		if (!resolved)
 			break;
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d loop(s) resolved", ite, resolved);
-	} while(1);
+	} while (1);
 	log_info("%d dump loop(s) resolved after %d iterations", res, ite);
 	return res;
 }
@@ -1221,7 +1247,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 {
 	int res = 0;
 	int tmp_n_e = g->n_e;
-	for (int e = 0; e < tmp_n_e; ++e){
+	for (int e = 0; e < tmp_n_e; ++e) {
 		int rc = g->edges[e].rc_id;
 		if (e > rc)
 			continue;
@@ -1229,40 +1255,40 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 		if (tg == -1)
 			continue;
 		int sr = g->nodes[g->edges[e].source].rc_id;
-		if (g->nodes[tg].deg == 2 && g->nodes[sr].deg == 2){
+		if (g->nodes[tg].deg == 2 && g->nodes[sr].deg == 2) {
 			int loop_e = -1;
-			for (int i = 0; loop_e == -1 && i < 2; ++i){
-				for (int j = 0; loop_e == -1 && j < 2; ++j){
+			for (int i = 0; loop_e == -1 && i < 2; ++i) {
+				for (int j = 0; loop_e == -1 && j < 2; ++j) {
 					if (g->nodes[tg].adj[i] ==
-						g->edges[g->nodes[sr].adj[j]].rc_id)
+					    g->edges[g->nodes[sr].adj[j]].rc_id)
 						loop_e = g->nodes[tg].adj[i];
 				}
 			}
 			if (loop_e == -1)
 				continue;
 			int e1 = g->edges[g->nodes[sr].adj[0]].rc_id != loop_e ?
-				g->edges[g->nodes[sr].adj[0]].rc_id :
-				g->edges[g->nodes[sr].adj[1]].rc_id;
+			         g->edges[g->nodes[sr].adj[0]].rc_id :
+			         g->edges[g->nodes[sr].adj[1]].rc_id;
 			int e2 = g->nodes[tg].adj[0] != loop_e ?
-				g->nodes[tg].adj[0] : g->nodes[tg].adj[1];
+			         g->nodes[tg].adj[0] : g->nodes[tg].adj[1];
 			if (e1 == e2 || e == loop_e)
 				continue;
 			log_debug("Dump loop detected, e1: %d, e: %d, loop e: %d, e2: %d",
-					e1, e, loop_e, e2);
+			          e1, e, loop_e, e2);
 			asm_append_seq(g->edges + loop_e, g->edges + e,
-					g->ksize);
+			               g->ksize);
 			asm_append_barcode_readpair(g, loop_e, e);
 			asm_append_seq(g->edges + e, g->edges + loop_e,
-					g->ksize);
+			               g->ksize);
 			asm_append_barcode_readpair(g, e, loop_e);
 			g->edges[e].count += g->edges[e].count + g->edges[loop_e].count;
 			int loop_e_rc = g->edges[loop_e].rc_id;
 			int e_rc = g->edges[e].rc_id;
 			asm_append_seq(g->edges + loop_e_rc, g->edges + e_rc,
-					g->ksize);
+			               g->ksize);
 			asm_append_barcode_readpair(g, loop_e_rc, e_rc);
 			asm_append_seq(g->edges + e_rc, g->edges + loop_e_rc,
-					g->ksize);
+			               g->ksize);
 			asm_append_barcode_readpair(g, e_rc, loop_e_rc);
 			g->edges[e_rc].count = g->edges[e].count;
 			asm_remove_edge(g, loop_e);
@@ -1277,7 +1303,7 @@ int asm_resolve_dump_loop(struct asm_graph_t *g)
 int asm_resolve_dump_branch(struct asm_graph_t *g)
 {
 	int res = 0;
-	for (int e = 0; e < g->n_e; ++e){
+	for (int e = 0; e < g->n_e; ++e) {
 		int rc = g->edges[e].rc_id;
 		if (e > rc)
 			continue;
@@ -1288,7 +1314,7 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 			continue;
 		int next_edge[2] = {-1, -2};
 		int mid_edge[2];
-		for (int i = 0; i < 2; ++i){
+		for (int i = 0; i < 2; ++i) {
 			int mid_e = g->nodes[tg].adj[i];
 			mid_edge[i] = mid_e;
 			int mid_tg = g->edges[mid_e].target;
@@ -1299,10 +1325,10 @@ int asm_resolve_dump_branch(struct asm_graph_t *g)
 		if (next_edge[0] != next_edge[1] || next_edge[0] == e)
 			continue;
 		__VERBOSE("Dump branch detected, e1: %d, e2: %d, branches: %d %d\n",
-				e, next_edge[0], mid_edge[0], mid_edge[1]);
+		          e, next_edge[0], mid_edge[0], mid_edge[1]);
 		int trash_e = __get_edge_cov(g->edges + mid_edge[0], g->ksize)
-			< __get_edge_cov(g->edges + mid_edge[1], g->ksize) ?
-			mid_edge[0] : mid_edge[1];
+		              < __get_edge_cov(g->edges + mid_edge[1], g->ksize) ?
+		              mid_edge[0] : mid_edge[1];
 		asm_remove_edge(g, trash_e);
 		trash_e = g->edges[trash_e].rc_id;
 		asm_remove_edge(g, trash_e);
@@ -1324,16 +1350,16 @@ int asm_resolve_dump_jungle_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	int ite = 0;
 	int res = 0;
-	do{
+	do {
 		int resolved = asm_resolve_dump_jungle(opt, g);
 		if (!resolved)
 			break;
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d jungle(s) resolved", ite, resolved);
-	} while(1);
+	} while (1);
 	log_info("%d dump jungle(s) resolved after %d iterations",
-			res, ite);
+	         res, ite);
 	return res;
 }
 
@@ -1360,10 +1386,10 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 
 	int e1 = e;
 	int e2 = -1;
-	for (int i = 0; i < n_nb; ++i){
+	for (int i = 0; i < n_nb; ++i) {
 		if (nearby[i] == e || nearby[i] == g->edges[e].rc_id)
 			continue;
-		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_BRIDGE){
+		if (g->edges[nearby[i]].seq_len >= MIN_NOTICE_BRIDGE) {
 			e2 = nearby[i];
 			break;
 		}
@@ -1390,12 +1416,12 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	get_nearby_edges(g, g->edges[e2].rc_id, &ginfo, JUNGLE_RADIUS, &nb2, &n_nb2);
 	graph_info_destroy(&ginfo);
 
-	for (int i = 0; i < n_nb1; ++i){
+	for (int i = 0; i < n_nb1; ++i) {
 		int e = nb1[i];
 		if (e == e1 || e == g->edges[e1].rc_id
-				|| e == e2 || e == g->edges[e2].rc_id)
+		    || e == e2 || e == g->edges[e2].rc_id)
 			continue;
-		if (g->edges[e].seq_len >= MAX_DUMP_EDGE_LEN){
+		if (g->edges[e].seq_len >= MAX_DUMP_EDGE_LEN) {
 			e2 = -1;
 			break;
 		}
@@ -1403,12 +1429,12 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	if (e2 == -1)
 		goto free_stage_2;
 
-	for (int i = 0; i < n_nb2; ++i){
+	for (int i = 0; i < n_nb2; ++i) {
 		int e = g->edges[nb2[i]].rc_id;
 		if (e == e1 || e == g->edges[e1].rc_id
-				|| e == e2 || e == g->edges[e2].rc_id)
+		    || e == e2 || e == g->edges[e2].rc_id)
 			continue;
-		if (g->edges[e].seq_len >= MAX_DUMP_EDGE_LEN){
+		if (g->edges[e].seq_len >= MAX_DUMP_EDGE_LEN) {
 			e2 = -1;
 			break;
 		}
@@ -1421,15 +1447,15 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	int *mark = calloc(g->n_e, sizeof(int));
 	for (int i = 0; i < n_nb1; ++i)
 		mark[nb1[i]] = 1;
-	for (int i = 0; i < n_nb1 && e2 != -1; ++i){
+	for (int i = 0; i < n_nb1 && e2 != -1; ++i) {
 		int e = nb1[i];
 		int tg = g->edges[e].target;
-		for (int j = 0; j < g->nodes[tg].deg; ++j){
+		for (int j = 0; j < g->nodes[tg].deg; ++j) {
 			int next_e = g->nodes[tg].adj[j];
 			if (next_e == e1 || next_e == g->edges[e1].rc_id
-				|| next_e == e2 || next_e == g->edges[e2].rc_id)
+			    || next_e == e2 || next_e == g->edges[e2].rc_id)
 				continue;
-			if (!mark[next_e]){
+			if (!mark[next_e]) {
 				e2 = -1;
 				break;
 			}
@@ -1441,15 +1467,15 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	memset(mark, 0, g->n_e * sizeof(int));
 	for (int i = 0; i < n_nb2; ++i)
 		mark[nb2[i]] = 1;
-	for (int i = 0; i < n_nb2 && e2 != -1; ++i){
+	for (int i = 0; i < n_nb2 && e2 != -1; ++i) {
 		int e = nb2[i];
 		int tg = g->edges[e].target;
-		for (int j = 0; j < g->nodes[tg].deg; ++j){
+		for (int j = 0; j < g->nodes[tg].deg; ++j) {
 			int next_e = g->nodes[tg].adj[j];
 			if (next_e == e1 || next_e == g->edges[e1].rc_id
-				|| next_e == e2 || next_e == g->edges[e2].rc_id)
+			    || next_e == e2 || next_e == g->edges[e2].rc_id)
 				continue;
-			if (!mark[next_e]){
+			if (!mark[next_e]) {
 				e2 = -1;
 				break;
 			}
@@ -1464,12 +1490,12 @@ int detect_dump_jungle(struct asm_graph_t *g, int e, int **dump_edges, int *n_du
 	for (int i = 1; i < n_nb2; ++i)
 		(*dump_edges)[(*n_dump)++] = g->edges[nb2[i]].rc_id;
 
-free_stage_3:
+	free_stage_3:
 	free(mark);
-free_stage_2:
+	free_stage_2:
 	free(nb1);
 	free(nb2);
-free_stage_1:
+	free_stage_1:
 	free(nearby);
 	return e2;
 }
@@ -1490,7 +1516,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 	int res = 0;
 	int tmp = g->n_e;
 	int m_e = g->n_e;
-	for (int e1 = 0; e1 < tmp; ++e1){
+	for (int e1 = 0; e1 < tmp; ++e1) {
 		if (g->edges[e1].target == -1)
 			continue;
 		if (g->edges[e1].seq_len < MIN_NOTICE_BRIDGE)
@@ -1509,42 +1535,43 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		log_debug("Get local reads");
 		struct read_path_t local_read_path;
 		int ret = get_reads_kmer_check(opt, g, e1, e2, &local_read_path);
-		if (!ret){
-			log_warn("Something supicious happens, probably that read files are empty, please check at %s and %s",
-					local_read_path.R1_path, local_read_path.R2_path);
+		if (!ret) {
+			log_warn(
+				"Something supicious happens, probably that read files are empty, please check at %s and %s",
+				local_read_path.R1_path, local_read_path.R2_path);
 			goto ignore_stage_1;
 		}
 		//		STAGE 2 detect dump jungle and find path  		//
 		khash_t(kmer_int) *kmer_count = get_kmer_hash(local_read_path.R1_path,
-				local_read_path.R2_path, KSIZE_CHECK);
+		                                              local_read_path.R2_path, KSIZE_CHECK);
 		log_debug("Finding paths between %d and %d", e1, e2);
 		struct path_info_t pinfo;
 		path_info_init(&pinfo);
 		get_all_paths_kmer_check(g, &emap1, &emap2, &pinfo, KSIZE_CHECK,
-				kmer_count);
+		                         kmer_count);
 		int longest_path = 0;
-		for (int i = 0; i < pinfo.n_paths; ++i){
+		for (int i = 0; i < pinfo.n_paths; ++i) {
 			if (pinfo.path_lens[i] > pinfo.path_lens[longest_path])
 				longest_path = i;
 		}
 		int *path = pinfo.paths[longest_path];
 		int len = pinfo.path_lens[longest_path];
-		if (len <= 2){
+		if (len <= 2) {
 			log_debug("No reliable paths found, continue");
 			goto ignore_stage_2;
 		}
 
 		//		STAGE 2 condence the jungle 		//
-		if (g->n_e == m_e){
+		if (g->n_e == m_e) {
 			g->edges = (struct asm_edge_t *) realloc(g->edges,
-					sizeof(struct asm_edge_t) * (m_e << 1));
+			                                         sizeof(struct asm_edge_t) * (m_e << 1));
 			memset(g->edges + m_e, 0, m_e * sizeof(struct asm_edge_t));
 			m_e <<= 1;
 		}
 		int p = g->n_e;
 		int q = g->n_e + 1;
 		asm_clone_edge(g, p, path[0]);
-		for (int i = 1; i < len; ++i){
+		for (int i = 1; i < len; ++i) {
 			int e1 = p;
 			int e2 = path[i];
 			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
@@ -1553,7 +1580,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		}
 
 		asm_clone_edge(g, q, g->edges[path[len - 1]].rc_id);
-		for (int i = len - 2; i >= 0; --i){
+		for (int i = len - 2; i >= 0; --i) {
 			int e1 = q;
 			int e2 = g->edges[path[i]].rc_id;
 			asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
@@ -1567,7 +1594,7 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		g->edges[p].target = v;
 		g->edges[p].rc_id = q;
 		g->nodes[u].adj = realloc(g->nodes[u].adj, (g->nodes[u].deg + 1)
-				* sizeof(struct asm_edge_t));
+		                                           * sizeof(struct asm_edge_t));
 		g->nodes[u].adj[g->nodes[u].deg] = p;
 		++g->nodes[u].deg;
 		int u_rc = g->nodes[u].rc_id;
@@ -1576,12 +1603,12 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		g->edges[q].target = u_rc;
 		g->edges[q].rc_id = p;
 		g->nodes[v_rc].adj = realloc(g->nodes[v_rc].adj, (g->nodes[v_rc].deg + 1)
-				* sizeof(struct asm_edge_t));
+		                                                 * sizeof(struct asm_edge_t));
 		g->nodes[v_rc].adj[g->nodes[v_rc].deg] = q;
 		++g->nodes[v_rc].deg;
 		g->n_e += 2;
 
-		for (int i = 0; i < n_dump; ++i){
+		for (int i = 0; i < n_dump; ++i) {
 			int e = dump_edges[i];
 			int e_rc = g->edges[e].rc_id;
 			asm_remove_edge(g, e);
@@ -1592,10 +1619,10 @@ int asm_resolve_dump_jungle(struct opt_proc_t *opt, struct asm_graph_t *g)
 		asm_remove_edge(g, e2);
 		asm_remove_edge(g, g->edges[e2].rc_id);
 		++res;
-ignore_stage_2:
+		ignore_stage_2:
 		path_info_destroy(&pinfo);
 		kh_destroy(kmer_int, kmer_count);
-ignore_stage_1:
+		ignore_stage_1:
 		destroy_read_path(&local_read_path);
 		free(dump_edges);
 	}
@@ -1604,7 +1631,7 @@ ignore_stage_1:
 }
 
 int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
-		int *visited, int *total_visited, int cur_u, int cur_len)
+                              int *visited, int *total_visited, int cur_u, int cur_len)
 {
 	if (*total_visited > MAX_VISITED)
 		return 0;
@@ -1616,13 +1643,13 @@ int find_alternative_path_dfs(struct asm_graph_t *g, int v, int e, int len,
 		return 1;
 	++(*total_visited);
 	visited[cur_u] = 1;
-	for (int i = 0; i < g->nodes[cur_u].deg; ++i){
+	for (int i = 0; i < g->nodes[cur_u].deg; ++i) {
 		int next_e = g->nodes[cur_u].adj[i];
 		if (next_e == e)
 			continue;
 		int next_v = g->edges[next_e].target;
 		if (find_alternative_path_dfs(g, v, e, len, visited, total_visited,
-				next_v, cur_len + g->edges[next_e].seq_len - g->ksize))
+		                              next_v, cur_len + g->edges[next_e].seq_len - g->ksize))
 			return 1;
 	}
 	visited[cur_u] = 0;
@@ -1634,16 +1661,16 @@ int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
 	int total_visited = 0;
 	int *visited = calloc(g->n_v, sizeof(int));
 	int res = find_alternative_path_dfs(g, v, e, len, visited, &total_visited,
-			u, g->ksize);
+	                                    u, g->ksize);
 	free(visited);
 	return res;
 }
 
 int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
-		khash_t(int64_alterp) *h, int *map)
+                              khash_t(int64_alterp) *h, int *map)
 {
 	int res = 0;
-	for (int i = 0; i < g->n_e; ++i){
+	for (int i = 0; i < g->n_e; ++i) {
 		int e = i;
 		int rc = g->edges[e].rc_id;
 		int u = g->edges[e].source;
@@ -1657,27 +1684,27 @@ int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
 		int already_checked = 0;
 		int64_t code = get_edge_code(map[u], map[v]);
 		khiter_t it = kh_get(int64_alterp, h, code);
-		if (it == kh_end(h)){
+		if (it == kh_end(h)) {
 			int ret;
 			struct alter_path_info_t *alterp = calloc(1,
-					sizeof(struct alter_path_info_t));
+			                                          sizeof(struct alter_path_info_t));
 			it = kh_put(int64_alterp, h, code, &ret);
 			kh_val(h, it) = alterp;
 		}
 		struct alter_path_info_t *alterp = kh_val(h, it);
-		for (int j = 0; j < alterp->n; ++j){
+		for (int j = 0; j < alterp->n; ++j) {
 			float minl = MIN_ALTERNATIVE_LEN_RATIO * g->edges[e].seq_len;
 			float maxl = MAX_ALTERNATIVE_LEN_RATIO * g->edges[e].seq_len;
-			if (alterp->lens[j] >= minl && alterp->lens[j] <= maxl){
+			if (alterp->lens[j] >= minl && alterp->lens[j] <= maxl) {
 				already_checked = 1;
 				break;
 			}
 		}
 		if (already_checked)
 			continue;
-		if (find_alternative_path(g, u, v, e, g->edges[e].seq_len)){
+		if (find_alternative_path(g, u, v, e, g->edges[e].seq_len)) {
 			log_debug("Simple bulge detected: %d->%d, edge id: %d",
-					u, v, e);
+			          u, v, e);
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, rc);
 			++res;
@@ -1702,12 +1729,12 @@ int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 	int *map = calloc(g->n_v, sizeof(int));
 	for (int i = 0; i < g->n_v; ++i)
 		map[i] = i;
-	do{
+	do {
 		int resolved = asm_resolve_simple_bulges(opt, g, h, map);
 		if (!resolved)
 			break;
 		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
-				resolved);
+		          resolved);
 		struct asm_graph_t g1;
 		int *map_cur_prev;
 		asm_condense_map(g, &g1, &map_cur_prev);
@@ -1721,11 +1748,11 @@ int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 		*g = g1;
 		res += resolved;
 		++ite;
-	} while(1);
+	} while (1);
 	free(map);
 	log_info("%d simple bulge(s) resolved after %d iterations",
-			res, ite);
-	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
+	         res, ite);
+	for (khiter_t it = kh_begin(h); it != kh_end(h); ++it) {
 		if (!kh_exist(h, it))
 			continue;
 		struct alter_path_info_t *alterp = kh_val(h, it);
