@@ -38,13 +38,16 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 		pop_queue(q);
 		int v = node->vertex;
 		int len = node->len;
+		free(node);
 		int path_len = get_in_map(n_nodes, v);
 		if (get_in_map(L, v) != len)
-			goto dijkstra_node_outdated;
+			continue;
 		if (v == target)
 			break;
-		if (len > MAX_RADIUS || path_len > MAX_PATH_LEN)
+		if (len > MAX_RADIUS)
 			break;
+		if (path_len > MAX_PATH_LEN)
+			continue;
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
@@ -63,8 +66,6 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				kh_val(n_nodes, it) = path_len + 1;
 			}
 		}
-dijkstra_node_outdated:
-		free(node);
 	}
 	int res = -1;
 	if (check_in_map(L, target) != 0)
