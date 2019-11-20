@@ -168,7 +168,7 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 				/*fprintf(f, "\t%d -> %d [label=\"%d\"];\n", tmp[i], tmp[j],
 					len);*/
 				//__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
-				uint64_t code = get_edge_code(tmp[i], tmp[j]);
+				uint64_t code = (((uint64_t) tmp[i])) << 32 | tmp[j];
 				khiter_t it = kh_get(long_int, pair_count, code);
 				if (it == kh_end(pair_count)){
 					int ret;
