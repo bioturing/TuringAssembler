@@ -71,12 +71,13 @@ dijkstra_node_outdated:
 	free_queue_content(q);
 	destroy_queue(q);
 
-	if (res != -1){
+	/*if (res != -1){
 		__VERBOSE("PATH FROM %d to %d:\n", source, target);
 		__VERBOSE("DISTANCE %d %d\n", get_in_map(L, target),
 				get_in_map(n_nodes, target));
-	}
+	}*/
 	kh_destroy(int_int, L);
+	kh_destroy(int_int, n_nodes);
 	return res;
 }
 
