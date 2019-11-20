@@ -1,7 +1,7 @@
 #include "cluster_molecules.h"
 #include "helper.h"
 #include "verbose.h"
-#define MAX_RADIUS 20000
+#define MAX_RADIUS 7000
 #define MAX_PATH_LEN 10
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
@@ -67,13 +67,11 @@ dijkstra_node_outdated:
 	free_queue_content(q);
 	destroy_queue(q);
 
-	/*if (res != -1){
-		__VERBOSE("%d\n", get_in_map(L, target));
+	if (res != -1){
 		__VERBOSE("PATH FROM %d to %d:\n", source, target);
-		for (int v = target; v != -1; v = get_in_map(P, v))
-			__VERBOSE("%d ", v);
-		__VERBOSE("\n");
-	}*/
+		__VERBOSE("DISTANCE %d %d\n", get_in_map(L, target),
+				get_in_map(n_nodes, target));
+	}
 	kh_destroy(int_int, L);
 	return res;
 }
