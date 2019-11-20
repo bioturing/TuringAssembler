@@ -82,7 +82,7 @@ dijkstra_node_outdated:
 
 void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct read_path_t *read_sorted_path, khash_t(bcpos) *bx_pos_dict,
-		char **bc_list, int n_bc)
+		struct mm_db_edge_t *mm_edges, char **bc_list, int n_bc)
 {
 	khash_t(long_int) *pair_count = kh_init(long_int);
 	for (int i = 0; i < n_bc; ++i){
@@ -107,7 +107,6 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct mm_hits_t *hits;
 		hits = mm_hits_init();
 
-		struct mm_db_edge_t *mm_edges = mm_index_edges(g, 17, 17);
 
 		while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS
 			&& get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
