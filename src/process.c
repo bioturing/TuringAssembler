@@ -318,10 +318,10 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 		if (n == m){
 			m <<= 1;
 			bx_list = realloc(bx_list, sizeof(char *) * m);
-			bx_list[n] = calloc(19, sizeof(char));
-			memcpy(bx_list[n], bx, sizeof(char) * 19);
-			++n;
 		}
+		bx_list[n] = calloc(19, sizeof(char));
+		memcpy(bx_list[n], bx, sizeof(char) * 19);
+		++n;
 	}
 	fclose(f);
 	bx_list = realloc(bx_list, sizeof(char *) * n);
