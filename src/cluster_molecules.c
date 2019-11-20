@@ -164,20 +164,19 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 		for (int j = 0; j < n; ++j){
 			if (i == j)
 				continue;
-			int len = get_shortest_path(g, tmp[i], tmp[j]);
-			if (len != -1 && len <= MAX_RADIUS){
-				/*fprintf(f, "\t%d -> %d [label=\"%d\"];\n", tmp[i], tmp[j],
-					len);*/
-				//__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
-				uint64_t code = (((uint64_t) tmp[i])) << 32 | tmp[j];
-				khiter_t it = kh_get(long_int, pair_count, code);
-				if (it == kh_end(pair_count)){
-					int ret;
-					it = kh_put(long_int, pair_count, code,
-							&ret);
-					kh_val(pair_count, it) = 0;
-				}
-				++kh_val(pair_count, it);
+			uint64_t code = (((uint64_t) tmp[i])) << 32 | tmp[j];
+			khiter_t it = kh_get(long_int, pair_count, code);
+			if (it == kh_end(pair_count)){
+				int len = get_shortest_path(g, tmp[i], tmp[j]);
+				int ret;
+				it = kh_put(long_int, pair_count, code, &ret);
+				if (len != -1 && len <= MAX_RADIUS)
+					kh_val(pair_count, it) = 1;
+				else
+					kh_val(pair_count, it) = -1;
+			} else {
+				if (kh_val(pair_count, it) != -1)
+					++kh_val(pair_count, it);
 			}
 		}
 	}
