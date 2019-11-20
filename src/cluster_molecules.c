@@ -105,7 +105,7 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 				continue;
 			int len = get_shortest_path(g, tmp[i], tmp[j]);
 			if (len != -1 && len <= MAX_RADIUS){
-				fprintf(f, "%d -> %d [weight=%d];\n", tmp[i], tmp[j],
+				fprintf(f, "\t%d -> %d [weight=\"%d\"];\n", tmp[i], tmp[j],
 					len);
 				//__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
 			}
