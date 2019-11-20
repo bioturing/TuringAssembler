@@ -9,7 +9,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
 	struct dijkstra_node_t wrapper = {
 		.vertex = source,
-		.len = g->edges[source].seq_len
+		.len = 0
 	};
 	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
@@ -63,7 +63,7 @@ dijkstra_node_outdated:
 	}
 	int res = -1;
 	if (check_in_map(L, target) != 0)
-		res = get_in_map(L, target);
+		res = get_in_map(L, target) - g->edges[target].seq_len;
 	free_queue_content(q);
 	destroy_queue(q);
 
