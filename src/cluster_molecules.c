@@ -3,6 +3,7 @@
 #include "verbose.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
+#include "helper.h"
 
 #define MAX_RADIUS 7000
 #define MAX_PATH_LEN 10
@@ -83,9 +84,7 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct read_path_t *read_sorted_path, khash_t(bcpos) *bx_pos_dict,
 		char **bc_list, int n_bc)
 {
-	int **pair_edge_count = calloc(g->n_e, sizeof(int *));
-	for (int i = 0; i < g->n_e; ++i)
-		pair_edge_count[i] = calloc(g->n_e, sizeof(int));
+	khash_t(long_int) *pair_count = kh_init(long_int);
 	for (int i = 0; i < n_bc; ++i){
 		log_debug("Barcode: %s", bc_list[i]);
 		uint64_t bx_encoded = barcode_hash_mini(bc_list[i]);
@@ -120,17 +119,26 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 			mm_hits_cmp(db2, mm_edges, hits, g);
 		}
 		
-		get_sub_graph(opt, g, hits, pair_edge_count);
+		get_sub_graph(opt, g, hits, pair_count);
 		free(buf1);
 		free(buf2);
 	}
-	for (int i = 0; i < g->n_e; ++i)
-		free(pair_edge_count[i]);
-	free(pair_edge_count);
+	FILE *f = fopen(opt->lc, "w");
+	for (khiter_t it = kh_begin(pair_count); it != kh_end(pair_count); ++it){
+		if (!kh_exist(pair_count, it))
+			continue;
+		uint64_t code = kh_key(pair_count, it);
+		int count = kh_val(pair_count, it);
+		int u = code >> 32;
+		int v = code & ((((uint64_t) 1) << 32) - 1);
+		fprintf(f, "%d %d %d\n", u, v, count);
+	}
+	fclose(f);
+	kh_destroy(long_int, pair_count);
 }
 
 void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct mm_hits_t *hits, int **pair_edge_count)
+		struct mm_hits_t *hits, khash_t(long_int) *pair_count)
 {
 	khash_t(set_int) *edges = kh_init(set_int);
 	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
@@ -161,7 +169,15 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 				/*fprintf(f, "\t%d -> %d [label=\"%d\"];\n", tmp[i], tmp[j],
 					len);*/
 				//__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
-				pair_edge_count[tmp[i]][tmp[j]]++;
+				uint64_t code = get_edge_code(tmp[i], tmp[j]);
+				khiter_t it = kh_get(long_int, pair_count, code);
+				if (it == kh_end(pair_count)){
+					int ret;
+					it = kh_put(long_int, pair_count, code,
+							&ret);
+					kh_val(pair_count, it) = 0;
+				}
+				++kh_val(pair_count, it);
 			}
 		}
 	}
