@@ -22,6 +22,7 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/get_buffer.h"
+#include "cluster_molecules.h"
 #include "split_molecules.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
@@ -288,11 +289,49 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	sprintf(path, "%s/cluster_molecules.log", opt->out_dir);
 	init_logger(opt->log_level, path);
 	set_log_stage("Cluster molecules");
+
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, &read_sorted_path);
+	}
+
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 
-	struct mm_hits_t *hits = get_hits_from_barcode(opt);
-	get_sub_graph(opt, &g, hits);
+	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
+	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
+
+	FILE *f = fopen(opt->bx_str, "r");
+	int n = 0;
+	int m = 1;
+	char **bx_list = calloc(1, sizeof(char *));
+	char bx[19];
+	int bx_fre;
+	while (fscanf(f, "%s\t%d\n", bx, &bx_fre)){
+		/*if (hits_count < 10)
+			continue;*/
+		if (n == m){
+			m <<= 1;
+			bx_list = realloc(bx_list, sizeof(char *) * m);
+			bx_list[n] = calloc(19, sizeof(char));
+			memcpy(bx_list[n], bx, sizeof(char) * 19);
+			++n;
+		}
+	}
+	fclose(f);
+	bx_list = realloc(bx_list, sizeof(char *) * n);
+
+	count_edge_links_bc(opt, &g, &read_sorted_path, bx_pos_dict, bx_list, n);
+	for (int i = 0; i < n; ++i)
+		free(bx_list[i]);
+	free(bx_list);
+
+	kh_destroy(bcpos, bx_pos_dict);
 	asm_graph_destroy(&g);
 }
 
