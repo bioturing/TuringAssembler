@@ -2,6 +2,7 @@
 #include "helper.h"
 #include "verbose.h"
 #define MAX_RADIUS 20000
+#define MAX_PATH_LEN 10
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
@@ -13,7 +14,9 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	khash_t(int_int) *L = kh_init(int_int);
+	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(L, source, wrapper.len);
+	put_in_map(n_nodes, source, 0);
 	while (!is_queue_empty(q)){
 		int p = q->front;
 		for (int i = q->front + 1; i < q->back; ++i){
@@ -25,24 +28,25 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 			struct dijkstra_node_t *tmp = q->data[q->front];
 			q->data[q->front] = q->data[p];
 			q->data[p] = tmp;
-			/*swap(q->data + q->front, q->data + p,
-					sizeof(struct dijkstra_node_t *));*/
 		}
 		struct dijkstra_node_t *node = get_queue(q);
 		pop_queue(q);
 		int v = node->vertex;
 		int len = node->len;
+		int path_len = get_in_map(n_nodes, v);
 		if (get_in_map(L, v) != len)
 			goto dijkstra_node_outdated;
 		if (v == target)
 			break;
-		if (len > MAX_RADIUS)
+		if (len > MAX_RADIUS || path_len > MAX_PATH_LEN)
 			break;
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
-			if (check_in_map(L, u) == 0)
+			if (check_in_map(L, u) == 0){
 				put_in_map(L, u, 2e9);
+				put_in_map(n_nodes, u, path_len + 1);
+			}
 			if ((uint32_t) get_in_map(L, u) > len + g->edges[u].seq_len){
 				khiter_t it = kh_get(int_int, L, u);
 				kh_val(L, it) = len + g->edges[u].seq_len;
@@ -50,6 +54,8 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				wrapper.len = len + g->edges[u].seq_len;
 				push_queue(q, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
+				it = kh_get(int_int, n_nodes, u);
+				kh_val(n_nodes, it) = path_len + 1;
 			}
 		}
 dijkstra_node_outdated:
@@ -58,10 +64,17 @@ dijkstra_node_outdated:
 	int res = -1;
 	if (check_in_map(L, target) != 0)
 		res = get_in_map(L, target);
-	kh_destroy(int_int, L);
 	free_queue_content(q);
 	destroy_queue(q);
 
+	/*if (res != -1){
+		__VERBOSE("%d\n", get_in_map(L, target));
+		__VERBOSE("PATH FROM %d to %d:\n", source, target);
+		for (int v = target; v != -1; v = get_in_map(P, v))
+			__VERBOSE("%d ", v);
+		__VERBOSE("\n");
+	}*/
+	kh_destroy(int_int, L);
 	return res;
 }
 
@@ -95,7 +108,7 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 			int len = get_shortest_path(g, tmp[i], tmp[j]);
 			if (len != -1 && len <= MAX_RADIUS){
 				fprintf(f, "%d -> %d;\n", tmp[i], tmp[j]);
-				__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
+				//__VERBOSE("%d %d %d\n", tmp[i], tmp[j], len);
 			}
 		}
 	}
