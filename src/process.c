@@ -314,7 +314,7 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	char **bx_list = calloc(1, sizeof(char *));
 	char bx[19];
 	int bx_fre;
-	while (fscanf(f, "%s\t%d\n", bx, &bx_fre)){
+	while (fscanf(f, "%s\t%d\n", bx, &bx_fre) == 2){
 		if (bx_fre < 10)
 			continue;
 		if (n == m){
