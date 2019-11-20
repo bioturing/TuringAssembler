@@ -315,8 +315,8 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	char bx[19];
 	int bx_fre;
 	while (fscanf(f, "%s\t%d\n", bx, &bx_fre)){
-		/*if (hits_count < 10)
-			continue;*/
+		if (bx_fre < 10)
+			continue;
 		if (n == m){
 			m <<= 1;
 			bx_list = realloc(bx_list, sizeof(char *) * m);

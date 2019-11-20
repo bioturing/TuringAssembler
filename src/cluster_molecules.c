@@ -90,7 +90,9 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 {
 	khash_t(long_int) *pair_count = kh_init(long_int);
 	for (int i = 0; i < n_bc; ++i){
-		log_debug("Barcode: %s", bc_list[i]);
+		if (i % 10000 == 0)
+			log_debug("%d barcodes processed", i + 1);
+		//log_debug("Barcode: %s", bc_list[i]);
 		uint64_t bx_encoded = barcode_hash_mini(bc_list[i]);
 		uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
 
