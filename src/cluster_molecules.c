@@ -324,18 +324,24 @@ void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count)
 	fclose(f);
 }
 
+void add_simple_node(struct simple_graph_t *sg, int u)
+{
+	khiter_t it = kh_get(int_node, sg->nodes, u);
+	if (it == kh_end(sg->nodes)){
+		int ret;
+		struct simple_node_t *snode = calloc(1,
+				sizeof(struct simple_node_t));
+		it = kh_put(int_node, sg->nodes, u, &ret);
+		kh_val(sg->nodes, it) = snode;
+	}
+}
+
 void add_simple_edge(struct simple_graph_t *sg, int u, int v)
 {
 	khiter_t it = kh_get(int_node, sg->nodes, u);
-	struct simple_node_t *snode;
-	if (it == kh_end(sg->nodes)){
-		int ret;
-		snode = calloc(1, sizeof(struct simple_node_t));
-		it = kh_put(int_node, sg->nodes, u, &ret);
-		kh_val(sg->nodes, it) = snode;
-	} else {
-		snode = kh_val(sg->nodes, it);
-	}
+	if (it == kh_end(sg->nodes))
+		log_error("Key not in hash");
+	struct simple_node_t *snode = kh_val(sg->nodes, it);
 	snode->adj = realloc(snode->adj, sizeof(int) * (snode->deg + 1));
 	snode->adj[snode->deg] = v;
 	++snode->deg;
@@ -364,6 +370,8 @@ void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 			continue;
 		int u = code >> 32;
 		int v = code & ((uint32_t) -1);
+		add_simple_node(sg, u);
+		add_simple_node(sg, v);
 		add_simple_edge(sg, u, v);
 	}
 }

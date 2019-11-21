@@ -47,6 +47,7 @@ void print_barcode_graph(struct opt_proc_t *opt);
 void get_barcode_edges_path(struct opt_proc_t *opt);
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count);
+void add_simple_node(struct simple_graph_t *sg, int u);
 void add_simple_edge(struct simple_graph_t *sg, int u, int v);
 void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
