@@ -249,45 +249,34 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 	khash_t(long_int) *all_pairs = kh_init(long_int);
 	get_all_pair_edge_count(opt->in_fasta, all_pairs); // Option -f
 
-	struct simple_graph_t sg;
-	init_simple_graph(&sg);
-	__VERBOSE("%d\n", blist.n_bc);
+	FILE *f = fopen(opt->lc, "w");
+	fprintf(f, "digraph %s{\n", blist.bc_list[0]);
 	for (int i = 0; i < blist.n_bc; ++i){
-		__VERBOSE("%s\n", blist.bc_list[i]);
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
 		khash_t(long_int) *pair_count = kh_init(long_int);
 		get_sub_graph(bc_hit_bundle->g, hits, pair_count);
-		for (khiter_t it = kh_begin(pair_count); it != kh_end(pair_count);
+
+		struct simple_graph_t sg;
+		init_simple_graph(&sg);
+		build_simple_graph(pair_count, all_pairs, &sg);
+
+		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
 				++it){
-			if (!kh_exist(pair_count, it))
+			if (!kh_exist(sg.nodes, it))
 				continue;
-			if (kh_val(pair_count, it) == -1)
-				continue;
-			uint64_t code = kh_key(pair_count, it);
-			khiter_t it2 = kh_get(long_int, all_pairs, code);
-			if (it2 == kh_end(all_pairs))
-				continue;
-			int val = kh_val(all_pairs, it2);
-			if (val < MIN_BARCODE_EDGE_COUNT)
-				continue;
-			int u = code >> 32;
-			int v = code & ((uint32_t) -1);
-			add_simple_edge(&sg, u, v);
-
-			for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
-					++it){
-				if (!kh_exist(sg.nodes, it))
-					continue;
-				int u = kh_key(sg.nodes, it);
-				struct simple_node_t *snode = kh_val(sg.nodes, it);
-				for (int j = 0; j < snode->deg; ++j)
-					__VERBOSE("%d --> %d\n", u, snode->adj[j]);
-			}
+			int u = kh_key(sg.nodes, it);
+			struct simple_node_t *snode = kh_val(sg.nodes, it);
+			for (int j = 0; j < snode->deg; ++j)
+				fprintf(f, "\t%d -> %d\n", u, snode->adj[j]);
 		}
-		kh_destroy(long_int, pair_count);
-	}
 
+		simple_graph_destroy(&sg);
+		kh_destroy(long_int, pair_count);
+
+	}
+	fprintf(f, "}");
+	fclose(f);
 
 	kh_destroy(long_int, all_pairs);
 	bc_hit_bundle_destroy(bc_hit_bundle);
@@ -355,3 +344,35 @@ void init_simple_graph(struct simple_graph_t *sg)
 	sg->nodes = kh_init(int_node);
 }
 
+void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
+		struct simple_graph_t *sg)
+{
+	for (khiter_t it = kh_begin(one_bc); it != kh_end(one_bc); ++it){
+		if (!kh_exist(one_bc, it))
+			continue;
+		if (kh_val(one_bc, it) == -1)
+			continue;
+		uint64_t code = kh_key(one_bc, it);
+		khiter_t it2 = kh_get(long_int, all_bc, code);
+		if (it2 == kh_end(all_bc))
+			continue;
+		int val = kh_val(all_bc, it2);
+		if (val < MIN_BARCODE_EDGE_COUNT)
+			continue;
+		int u = code >> 32;
+		int v = code & ((uint32_t) -1);
+		add_simple_edge(sg, u, v);
+	}
+}
+
+void simple_graph_destroy(struct simple_graph_t *sg)
+{
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+		if (!kh_exist(sg->nodes, it))
+			continue;
+		struct simple_node_t *snode = kh_val(sg->nodes, it);
+		free(snode->adj);
+		free(snode);
+	}
+	kh_destroy(int_node, sg->nodes);
+}
