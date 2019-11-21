@@ -289,6 +289,7 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 				fprintf(f, " --> %d", v);
 			fprintf(f, "\n");
 		}
+		fflush(f);
 		kh_destroy(set_int, not_source);
 
 
@@ -322,6 +323,8 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	int read_count;
 	FILE *f = fopen(bc_count_path, "r");
 	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
+		if (read_count < 10 || read_count > 100)
+			continue;
 		if (n == m){
 			m <<= 1;
 			bc_list = realloc(bc_list, sizeof(char *) * m);
