@@ -251,7 +251,9 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 
 	struct simple_graph_t sg;
 	init_simple_graph(&sg);
+	__VERBOSE("%d\n", blist.n_bc);
 	for (int i = 0; i < blist.n_bc; ++i){
+		__VERBOSE("%s\n", blist.bc_list[i]);
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
 		khash_t(long_int) *pair_count = kh_init(long_int);
