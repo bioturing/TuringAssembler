@@ -202,12 +202,11 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	while (fscanf(f, "%d %d %d\n", &u, &v, &c) == 3){
 		uint64_t code = (((uint64_t) u) << 32) | v;
 		khiter_t it = kh_get(long_int, h_all, code);
-		if (it == kh_end(h_all)){
-			int ret;
-			it = kh_put(long_int, h_all, code, &ret);
-			kh_val(h_all, it) = 0;
-		}
-		++kh_val(h_all, it);
+		if (it != kh_end(h_all))
+			log_error("Something went wrong");
+		int ret;
+		it = kh_put(long_int, h_all, code, &ret);
+		kh_val(h_all, it) = c;
 	}
 	fclose(f);
 
