@@ -249,8 +249,8 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 	khash_t(long_int) *all_pairs = kh_init(long_int);
 	get_all_pair_edge_count(opt->in_fasta, all_pairs); // Option -f
 
-	FILE *f = fopen(opt->lc, "w");
-	fprintf(f, "digraph %s{\n", blist.bc_list[0]);
+	//FILE *f = fopen(opt->lc, "w");
+	//fprintf(f, "digraph %s{\n", blist.bc_list[0]);
 	for (int i = 0; i < blist.n_bc; ++i){
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
@@ -260,8 +260,10 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 		struct simple_graph_t sg;
 		init_simple_graph(&sg);
 		build_simple_graph(pair_count, all_pairs, &sg);
+		find_DAG(&sg);
 
-		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
+
+		/*for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
 				++it){
 			if (!kh_exist(sg.nodes, it))
 				continue;
@@ -269,14 +271,14 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 			struct simple_node_t *snode = kh_val(sg.nodes, it);
 			for (int j = 0; j < snode->deg; ++j)
 				fprintf(f, "\t%d -> %d\n", u, snode->adj[j]);
-		}
+		}*/
 
 		simple_graph_destroy(&sg);
 		kh_destroy(long_int, pair_count);
 
 	}
-	fprintf(f, "}");
-	fclose(f);
+	//fprintf(f, "}");
+	////fclose(f);
 
 	kh_destroy(long_int, all_pairs);
 	bc_hit_bundle_destroy(bc_hit_bundle);
@@ -342,6 +344,7 @@ void add_simple_edge(struct simple_graph_t *sg, int u, int v)
 void init_simple_graph(struct simple_graph_t *sg)
 {
 	sg->nodes = kh_init(int_node);
+	sg->is_loop = kh_init(set_int);
 }
 
 void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
@@ -376,3 +379,46 @@ void simple_graph_destroy(struct simple_graph_t *sg)
 	}
 	kh_destroy(int_node, sg->nodes);
 }
+
+void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
+		khash_t(set_int) *in_dfs)
+{
+	if (check_in_set(in_dfs, u)){
+		put_in_set(sg->is_loop, u);
+		return;
+	}
+	if (check_in_set(visited, u))
+		return;
+	put_in_set(visited, u);
+	put_in_set(in_dfs, u);
+	khiter_t it = kh_get(int_node, sg->nodes, u);
+	struct simple_node_t *snode = kh_val(sg->nodes, it);
+	for (int i = 0; i < snode->deg; ++i){
+		int v = snode->adj[i];
+		check_loop_dfs(sg, v, visited, in_dfs);
+	}
+	erase_from_set(in_dfs, u);
+}
+
+void find_DAG(struct simple_graph_t *sg)
+{
+	khash_t(int_node) *nodes = sg->nodes;
+	khash_t(set_int) *visited = kh_init(set_int);
+	khash_t(set_int) *in_dfs = kh_init(set_int);
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+		if (!kh_exist(nodes, it))
+			continue;
+		int u = kh_key(nodes, it);
+		check_loop_dfs(sg, u, visited, in_dfs);
+	}
+
+	for (khiter_t it = kh_begin(sg->is_loop); it != kh_end(sg->is_loop); ++it){
+		if (!kh_exist(sg->is_loop, it))
+			continue;
+		__VERBOSE("%d\n", kh_key(sg->is_loop, it));
+	}
+
+	kh_destroy(set_int, in_dfs);
+	kh_destroy(set_int, visited);
+}
+

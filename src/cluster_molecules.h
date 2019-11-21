@@ -5,6 +5,8 @@
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
+#include "complex_resolve.h"
+
 KHASH_MAP_INIT_INT64(long_int, int);
 struct dijkstra_node_t{
 	int vertex;
@@ -29,8 +31,10 @@ struct simple_node_t{
 KHASH_MAP_INIT_INT(int_node, struct simple_node_t *);
 
 struct simple_graph_t{
+	khash_t(set_int) *is_loop;
 	khash_t(int_node) *nodes;
 };
+
 void init_simple_graph(struct simple_graph_t *sg);
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
@@ -47,4 +51,7 @@ void add_simple_edge(struct simple_graph_t *sg, int u, int v);
 void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 void simple_graph_destroy(struct simple_graph_t *sg);
+void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
+		khash_t(set_int) *in_dfs);
+void find_DAG(struct simple_graph_t *sg);
 #endif
