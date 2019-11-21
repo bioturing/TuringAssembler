@@ -54,5 +54,5 @@ void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 void simple_graph_destroy(struct simple_graph_t *sg);
 void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
 		khash_t(set_int) *in_dfs);
-void find_DAG(struct simple_graph_t *sg);
+void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g);
 #endif

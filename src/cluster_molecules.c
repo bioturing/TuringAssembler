@@ -260,7 +260,7 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 		struct simple_graph_t sg;
 		init_simple_graph(&sg);
 		build_simple_graph(pair_count, all_pairs, &sg);
-		find_DAG(&sg);
+		find_DAG(&sg, bc_hit_bundle->g);
 
 
 		/*for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
@@ -408,7 +408,7 @@ void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
 	erase_from_set(in_dfs, u);
 }
 
-void find_DAG(struct simple_graph_t *sg)
+void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g)
 {
 	khash_t(int_node) *nodes = sg->nodes;
 	khash_t(set_int) *visited = kh_init(set_int);
@@ -419,6 +419,45 @@ void find_DAG(struct simple_graph_t *sg)
 		int u = kh_key(nodes, it);
 		check_loop_dfs(sg, u, visited, in_dfs);
 	}
+
+	struct queue_t q;
+	init_queue(&q, 1024);
+	kh_destroy(set_int, visited);
+	visited = kh_init(set_int);
+	for (khiter_t it = kh_begin(sg->is_loop); it != kh_end(sg->is_loop); ++it){
+		if (!kh_exist(sg->is_loop, it))
+			continue;
+		int u = kh_key(sg->is_loop, it);
+		int u_rc = g->edges[u].rc_id;
+		push_queue(&q, pointerize(&u, sizeof(int)));
+		if (check_in_set(sg->is_loop, u_rc) == 0)
+			push_queue(&q, pointerize(&u_rc, sizeof(int)));
+		put_in_set(visited, u);
+		put_in_set(visited, u_rc);
+	}
+
+	while (is_queue_empty(&q)){
+		int u = *(int *) get_queue(&q);
+		pop_queue(&q);
+		khiter_t it = kh_get(int_node, sg->nodes, u);
+		struct simple_node_t *snode = kh_val(sg->nodes, it);
+		for (int i = 0; i < snode->deg; ++i){
+			int v = snode->adj[i];
+			if (check_in_set(visited, v) == 0){
+				put_in_set(visited, v);
+				push_queue(&q, pointerize(&v, sizeof(int)));
+			}
+		}
+	}
+	for (khiter_t it = kh_begin(visited); it != kh_end(visited); ++it){
+		if (!kh_exist(visited, it))
+			continue;
+		int u = kh_key(visited, it);
+		int u_rc = g->edges[u].rc_id;
+		put_in_set(sg->is_loop, u);
+		put_in_set(sg->is_loop, u_rc);
+	}
+
 
 	for (khiter_t it = kh_begin(sg->is_loop); it != kh_end(sg->is_loop); ++it){
 		if (!kh_exist(sg->is_loop, it))
