@@ -194,3 +194,44 @@ void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 	free(tmp);
 }
 
+void print_barcode_graph(struct opt_proc_t *opt)
+{
+	khash_t(long_int) *h_all = kh_init(long_int);
+	FILE *f = fopen(opt->in_fasta, "r");
+	int u, v, c;
+	while (fscanf(f, "%d %d %d\n", &u, &v, &c) == 3){
+		uint64_t code = (((uint64_t) u) << 32) | v;
+		khiter_t it = kh_get(long_int, h_all, code);
+		if (it == kh_end(h_all)){
+			int ret;
+			it = kh_put(long_int, h_all, code, &ret);
+			kh_val(h_all, it) = 0;
+		}
+		++kh_val(h_all, it);
+	}
+	fclose(f);
+
+	khash_t(long_int) *h_1 = kh_init(long_int);
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_hits_t *hits = get_hits_from_barcode(opt);
+	get_sub_graph(opt, &g, hits, h_1);
+
+	f = fopen(opt->lc, "w");
+	fprintf(f, "digraph %s{", opt->bx_str);
+	for (khiter_t it = kh_begin(h_1); it != kh_end(h_1); ++it){
+		if (!kh_exist(h_1, it))
+			continue;
+		uint64_t code = kh_key(h_1, it);
+		khiter_t it2 = kh_get(long_int, h_all, code);
+		if (it2 != kh_end(h_all)){
+			int val = kh_val(h_all, it2);
+			int u = code >> 32;
+			int v = code & ((((uint64_t) 1) << 32) - 1);
+			fprintf(f, "\t%d -> %d [label=\"%d\"]\n", u, v, val);
+		}
+	}
+	fprintf(f, "}");
+	fclose(f);
+}
+

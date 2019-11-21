@@ -18,4 +18,5 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct mm_db_edge_t *mm_edges, char **bc_list, int n_bc);
 void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct mm_hits_t *hits, khash_t(long_int) *pair_count);
+void print_barcode_graph(struct opt_proc_t *opt);
 #endif
