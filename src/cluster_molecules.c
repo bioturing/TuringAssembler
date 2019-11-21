@@ -251,6 +251,8 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 
 	FILE *f = fopen(opt->lc, "w");
 	for (int i = 0; i < blist.n_bc; ++i){
+		if ((i + 1) % 10000 == 0)
+			log_debug("Processing %d-th barcode", i + 1);
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
 		khash_t(long_int) *pair_count = kh_init(long_int);
