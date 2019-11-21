@@ -283,6 +283,11 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
+void debug_process(struct opt_proc_t *opt)
+{
+	get_barcode_edges_path(opt);
+}
+
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
 	print_barcode_graph(opt);
