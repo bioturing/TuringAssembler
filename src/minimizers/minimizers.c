@@ -329,10 +329,8 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 	uint64_t km_h, mm_h = 0;
 	int pad = (32 - k - 1)*2;
 
-	for (i = 0; i < l - w + 1; ++i) {
+	for (i = 0; i < l - w -k + 1; ++i) {
 		DEBUG_PRINT("[i = %d]\n", i);
-		if (i + w + k - 1 >= l)
-			break;
 		if (p < i) {
 			km = mm = get_km_i_bin(s, i, k);
 			mm_h = km_h = HASH64(mm);
@@ -380,10 +378,8 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 	uint64_t km_h, mm_h = 0;
 	int pad = (32 - k - 1)*2;
 
-	for (i = 0; i < l - w + 1; ++i) {
+	for (i = 0; i < l - w -k + 1; ++i) {
 		DEBUG_PRINT("[i = %d]\n", i);
-		if (i + w + k - 1 >= l)
-			break;
 		if (p < i) {
 			km = mm = get_km_i_str(s, i, k);
 			mm_h = km_h = HASH64(mm);
