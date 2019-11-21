@@ -266,6 +266,11 @@ struct mm_hits_t *mm_hits_init()
 
 void mm_hits_destroy(struct mm_hits_t *hits)
 {
+	for (khiter_t it = kh_begin(hits->aln); it != kh_end(hits->aln); ++it){
+		if (!kh_exist(hits->aln, it))
+			continue;
+		free(kh_val(hits->aln, it));
+	}
 	kh_destroy(mm_edges, hits->edges);
 	kh_destroy(mm_align, hits->aln);
 	free(hits);
@@ -321,7 +326,7 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 
 	int i, j, p = -1;
 	uint64_t km, mm, c;
-	uint64_t km_h, mm_h;
+	uint64_t km_h, mm_h = 0;
 	int pad = (32 - k - 1)*2;
 
 	for (i = 0; i < l - w + 1; ++i) {
@@ -372,7 +377,7 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 
 	int i, j, p = -1;
 	uint64_t km, mm, c;
-	uint64_t km_h, mm_h;
+	uint64_t km_h, mm_h = 0;
 	int pad = (32 - k - 1)*2;
 
 	for (i = 0; i < l - w + 1; ++i) {
