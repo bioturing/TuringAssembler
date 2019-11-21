@@ -64,14 +64,20 @@ void ust_add_big_kmer(struct read_t *r,
 	int big_ksize = BIG_KSIZE;
 
 	int64_t res = get_first_hash(seq, big_ksize);
-	mini_inc_by_key(res, res);
+	if (mini_inc_by_key(res, res) == -1) {
+		log_warn("TABLE IS FULL");
+		return;
+	}
 
 	for (int i = 1; i < r->len - BIG_KSIZE; i++) {
 		int64_t a0 = get_char(seq, i - 1);
 		int an = get_char(seq, i - 1 + big_ksize);
 		res = (((((res - a0 * five_to_big_ksize_m1) % SM) + SM) % SM) * 5 + an) % SM;
 
-		mini_inc_by_key(res, res);
+		if (mini_inc_by_key(res, res) ==-1){
+			log_warn("TABLE IS FULL");
+			return;
+		}
 	}
 }
 

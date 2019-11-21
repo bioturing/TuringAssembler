@@ -304,7 +304,7 @@ int dfs_partition(struct asm_graph_t *g, int *partition, int i_e, int index_par,
 	if (g->edges[i_e].seq_len >= CONTIG_PARTITION_LEN) {
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[2].n_item);
 //		assert(g->edges[i_e].barcodes[0].n_item <= g->edges[i_e].barcodes[1].n_item);
-//		*total_barcodes += append_barcode_contig(&g->edges[i_e].barcodes[2], uni_bar);//todo 1 all barcode
+		*total_barcodes += append_barcode_contig(&g->edges[i_e].barcodes[2], uni_bar);//todo 1 all barcode
 		return 0;
 	}
 	part_infor->total_len += g->edges[i_e].seq_len;
@@ -520,21 +520,26 @@ void dfs_resolve(struct asm_graph_t *g, int i_e, int partition_index, int *parti
 	}
 }
 
+void find_telomere(struct asm_graph_t *g)
+{
+	int argmax = -1;
+	float max_cov = -1;
+	for (int i = 0; i < g->n_e; i++) {
+		float cov = __get_edge_cov(&g->edges[i], g->ksize);
+		if (cov > max_cov) {
+			max_cov = cov;
+			argmax = i;
+		}
+	}
+	log_info("telomere %d", argmax);
+}
+
 void partition_graph(struct read_path_t *ori_read, struct asm_graph_t *g, int *partition, int n_threads,
                      int mmem, int *n_partition, char *out_dir)
 {
-//	int argmax = -1;
-//	float max_cov = -1;
-//	for (int i = 0; i < g->n_e; i++) {
-//		float cov = __get_edge_cov(&g->edges[i], g->ksize);
-//		if (cov > max_cov) {
-//			max_cov = cov;
-//			argmax = i;
-//		}
-//	}
-//	log_info("telomere %d", argmax);
-//	for (int i = 0; i < (int) g->n_e; i++)
-//		partition[i] = 0;
+	find_telomere(g);
+	for (int i = 0; i < (int) g->n_e; i++)
+		partition[i] = 0;
 //	int count = 0;
 //	char *output_gfa_dir = calloc(PATH_MAX, 1);
 //	struct partition_information *part_infor

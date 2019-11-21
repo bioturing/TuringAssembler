@@ -18,7 +18,7 @@
 #define ASM_BUILD_COVERAGE		0x4
 #define ASM_BUILD_CANDIDATE		0x8
 
-#define BIG_KSIZE 71
+#define BIG_KSIZE 95
 #define SM 1000000007
 
 #define NOT_FOR_SCAFF 0x1
