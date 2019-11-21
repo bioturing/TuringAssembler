@@ -199,7 +199,7 @@ void split_molecules_wrapper(struct opt_proc_t *opt)
 	fclose(fopen(opt->lc, "w"));
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
 	struct read_path_t read_sorted_path;
 	if (opt->lib_type == LIB_TYPE_SORTED) {
@@ -268,8 +268,8 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS) {
 		n_reads++;
-		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
-		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 
 		mm_hits_cmp(db1, mm_edges, hits, g);
 		mm_hits_cmp(db2, mm_edges, hits, g);
@@ -311,7 +311,7 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
 	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
 
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 
 	FILE *f = fopen(opt->bx_str, "r");
 	int n = 0;
@@ -377,7 +377,7 @@ void index_mm_process(struct opt_proc_t *opt)
 	set_log_stage("Minimizers Index");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	mm_index_edges(&g, 17, 17);
+	mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	__VERBOSE("Done indexing\n");
 }
 

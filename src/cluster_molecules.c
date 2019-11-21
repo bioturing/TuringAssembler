@@ -1,10 +1,11 @@
+#include "attribute.h"
 #include "cluster_molecules.h"
 #include "helper.h"
 #include "verbose.h"
+
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
-#include "helper.h"
 
 #define MAX_RADIUS 7000
 #define MAX_PATH_LEN 10
@@ -117,8 +118,8 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 			&& get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 			n_reads++;
 			struct mm_db_t *db1, *db2;
-			db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
-			db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+			db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+			db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 
 			mm_hits_cmp(db1, mm_edges, hits, g);
 			mm_hits_cmp(db2, mm_edges, hits, g);

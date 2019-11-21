@@ -142,12 +142,12 @@ void smart_load_barcode(struct opt_proc_t *opt)
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
-		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
-		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 
 		mm_hits_cmp(db1, mm_edges, hits, &g);
 		mm_hits_cmp(db2, mm_edges, hits, &g);
@@ -197,12 +197,12 @@ struct mm_hits_t *get_hits_from_barcode(struct opt_proc_t *opt)
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
-		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
-		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 
 		mm_hits_cmp(db1, mm_edges, hits, &g);
 		mm_hits_cmp(db2, mm_edges, hits, &g);
