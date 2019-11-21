@@ -303,8 +303,6 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	int read_count;
 	FILE *f = fopen(bc_count_path, "r");
 	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
-		if (read_count < MIN_BC_READ_COUNT || read_count > MAX_BC_READ_COUNT)
-			continue;
 		if (n == m){
 			m <<= 1;
 			bc_list = realloc(bc_list, sizeof(char *) * m);
@@ -313,6 +311,7 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 		memcpy(bc_list[n], bc, sizeof(char) * 19);
 		++n;
 	}
+	fclose(f);
 	bc_list = realloc(bc_list, sizeof(char *) * n);
 	blist->n_bc = n;
 	blist->bc_list = bc_list;
@@ -331,6 +330,7 @@ void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count)
 		it = kh_put(long_int, pair_count, code, &ret);
 		kh_val(pair_count, it) = count;
 	}
+	fclose(f);
 }
 
 void add_simple_edge(struct simple_graph_t *sg, int u, int v)
