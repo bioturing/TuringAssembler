@@ -436,7 +436,7 @@ void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g)
 		put_in_set(visited, u_rc);
 	}
 
-	while (is_queue_empty(&q)){
+	while (!is_queue_empty(&q)){
 		int u = *(int *) get_queue(&q);
 		pop_queue(&q);
 		khiter_t it = kh_get(int_node, sg->nodes, u);
