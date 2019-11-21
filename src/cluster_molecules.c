@@ -280,7 +280,7 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 			if (!kh_exist(sg.nodes, it))
 				continue;
 			int u = kh_key(sg.nodes, it);
-			if (check_in_set(not_source, u))
+			if (check_in_set(not_source, u) || check_in_set(sg.is_loop, u))
 				continue;
 			fprintf(f, "%s: ", blist.bc_list[i]);
 			fprintf(f, "%d", u);
