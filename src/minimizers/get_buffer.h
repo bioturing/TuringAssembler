@@ -3,7 +3,7 @@
 
 #include <zlib.h>
 
-#include "attribute.h"
+#include "../attribute.h"
 
 #define TYPE_FASTQ		0
 #define TYPE_FASTA		1
