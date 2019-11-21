@@ -225,6 +225,8 @@ void print_barcode_graph(struct opt_proc_t *opt)
 		khiter_t it2 = kh_get(long_int, h_all, code);
 		if (it2 != kh_end(h_all)){
 			int val = kh_val(h_all, it2);
+			if (val < 100)
+				continue;
 			int u = code >> 32;
 			int v = code & ((((uint64_t) 1) << 32) - 1);
 			fprintf(f, "\t%d -> %d [label=\"%d\"]\n", u, v, val);
