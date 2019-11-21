@@ -218,7 +218,7 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	get_sub_graph(opt, &g, hits, h_1);
 
 	f = fopen(opt->lc, "w");
-	fprintf(f, "digraph %s{", opt->bx_str);
+	fprintf(f, "digraph %s{\n", opt->bx_str);
 	for (khiter_t it = kh_begin(h_1); it != kh_end(h_1); ++it){
 		if (!kh_exist(h_1, it))
 			continue;
