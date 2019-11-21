@@ -8,11 +8,11 @@
 #include <limits.h>
 #include <inttypes.h>
 
-#include "assembly_graph.h"
+#include "../assembly_graph.h"
 #include "attribute.h"
-#include "utils.h"
+#include "../utils.h"
 #include "minimizers.h"
-#include "log.h"
+#include "../log.h"
 
 
 #ifdef DEBUG

@@ -12,11 +12,24 @@ struct dijkstra_node_t{
 	int len;
 };
 
+struct bc_edges_path_t{
+	char bc[19];
+	int n_e;
+	int *edges;
+};
+
+struct barcode_list_t{
+	int n_bc;
+	char **bc_list;
+};
+
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
 void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct read_path_t *read_sorted_path, khash_t(bcpos) *bx_pos_dict,
 		struct mm_db_edge_t *mm_edges, char **bc_list, int n_bc);
-void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct mm_hits_t *hits, khash_t(long_int) *pair_count);
+void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
+		khash_t(long_int) *pair_count);
 void print_barcode_graph(struct opt_proc_t *opt);
+void get_barcode_edges_path(struct opt_proc_t *opt);
+void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 #endif

@@ -9,6 +9,8 @@
 
 #define MAX_RADIUS 7000
 #define MAX_PATH_LEN 10
+#define MIN_BC_READ_COUNT 10
+#define MAX_BC_READ_COUNT 88
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
@@ -127,7 +129,7 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 			mm_db_destroy(db2);
 		}
 		
-		get_sub_graph(opt, g, hits, pair_count);
+		get_sub_graph(g, hits, pair_count);
 		mm_hits_destroy(hits);
 		free(buf1);
 		free(buf2);
@@ -147,8 +149,8 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 	kh_destroy(long_int, pair_count);
 }
 
-void get_sub_graph(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct mm_hits_t *hits, khash_t(long_int) *pair_count)
+void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
+		khash_t(long_int) *pair_count)
 {
 	khash_t(set_int) *edges = kh_init(set_int);
 	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
@@ -214,8 +216,10 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	khash_t(long_int) *h_1 = kh_init(long_int);
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct mm_hits_t *hits = get_hits_from_barcode(opt);
-	get_sub_graph(opt, &g, hits, h_1);
+	struct bc_hit_bundle_t bc_hit_bundle;
+	get_bc_hit_bundle(opt, &bc_hit_bundle);
+	struct mm_hits_t *hits = get_hits_from_barcode(opt->bx_str, &bc_hit_bundle);
+	get_sub_graph(&g, hits, h_1);
 
 	f = fopen(opt->lc, "w");
 	fprintf(f, "digraph %s{\n", opt->bx_str);
@@ -235,5 +239,50 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	}
 	fprintf(f, "}");
 	fclose(f);
+}
+
+void get_barcode_edges_path(struct opt_proc_t *opt)
+{
+	struct bc_hit_bundle_t *bc_hit_bundle = calloc(1,
+			sizeof(struct bc_hit_bundle_t));
+	get_bc_hit_bundle(opt, bc_hit_bundle);
+	struct barcode_list_t blist;
+	get_barcode_list(opt->bx_str, &blist);
+
+	for (int i = 0; i < blist.n_bc; ++i){
+		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
+				bc_hit_bundle);
+		khash_t(long_int) *pair_count = kh_init(long_int);
+		get_sub_graph(bc_hit_bundle->g, hits, pair_count);
+		kh_destroy(long_int, pair_count);
+	}
+
+
+	bc_hit_bundle_destroy(bc_hit_bundle);
+	free(bc_hit_bundle);
+}
+
+void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
+{
+	int n = 0;
+	int m = 1;
+	char **bc_list = calloc(1, sizeof(char *));
+	char bc[19];
+	int read_count;
+	FILE *f = fopen(bc_count_path, "r");
+	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
+		if (read_count < MIN_BC_READ_COUNT || read_count > MAX_BC_READ_COUNT)
+			continue;
+		if (n == m){
+			m <<= 1;
+			bc_list = realloc(bc_list, sizeof(char *) * m);
+		}
+		bc_list[n] = calloc(19, sizeof(char));
+		memcpy(bc_list[n], bc, sizeof(char) * 19);
+		++n;
+	}
+	bc_list = realloc(bc_list, sizeof(char *) * n);
+	blist->n_bc = n;
+	blist->bc_list = bc_list;
 }
 
