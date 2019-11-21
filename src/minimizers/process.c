@@ -50,7 +50,7 @@ void index_mm_process(struct opt_proc_t *opt)
 	set_log_stage("Minimizers Index");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	mm_index_edges(&g, 17, 17);
+	mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	__VERBOSE("Done indexing\n");
 }
 
