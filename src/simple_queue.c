@@ -63,11 +63,11 @@ void up_heap(struct heap_t *heap)
 {
 	struct queue_t *q = heap->q;
 	int (*cmp)(void *, void *) = heap->cmp;
-	for (int i = q->back - 1; i / 2 >= q->front; i = i / 2){
-		if (cmp(q->data[i], q->data[i / 2]) == -1){
+	for (int i = q->back - 1; (i >> 1) >= q->front; i >>= 1){
+		if (cmp(q->data[i], q->data[i >> 1]) == -1){
 			void *tmp = q->data[i];
-			q->data[i] = q->data[i / 2];
-			q->data[i / 2] = tmp;
+			q->data[i] = q->data[i >> 1];
+			q->data[i >> 1] = tmp;
 		} else {
 			break;
 		}
@@ -80,8 +80,8 @@ void down_heap(struct heap_t *heap)
 	if (is_queue_empty(q))
 		return;
 	int (*cmp)(void *, void *) = heap->cmp;
-	for (int i = q->front; i * 2 < q->back; ){
-		int j = i * 2;
+	for (int i = q->front; (i << 1) < q->back; ){
+		int j = (i << 1);
 		if (j + 1 < q->back && cmp(q->data[j + 1], q->data[j]) == -1)
 			++j;
 		if (cmp(q->data[j], q->data[i]) == -1){
