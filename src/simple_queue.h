@@ -25,5 +25,8 @@ void init_heap(struct heap_t *heap, int (*cmp)(void *, void *));
 void up_heap(struct heap_t *heap);
 void down_heap(struct heap_t *heap);
 void *get_heap(struct heap_t *heap);
+void push_heap(struct heap_t *heap, void *data);
 void pop_heap(struct heap_t *heap);
+int is_heap_empty(struct heap_t *heap);
+void heap_destroy(struct heap_t *heap);
 #endif

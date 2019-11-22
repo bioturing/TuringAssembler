@@ -95,6 +95,12 @@ void down_heap(struct heap_t *heap)
 	}
 }
 
+void push_heap(struct heap_t *heap, void *data)
+{
+	push_queue(heap->q, data);
+	up_heap(heap);
+}
+
 void *get_heap(struct heap_t *heap)
 {
 	return get_queue(heap->q);
@@ -106,4 +112,14 @@ void pop_heap(struct heap_t *heap)
 	down_heap(heap);
 }
 
+int is_heap_empty(struct heap_t *heap)
+{
+	return is_queue_empty(heap->q);
+}
+
+void heap_destroy(struct heap_t *heap)
+{
+	free_queue_content(heap->q);
+	free(heap->q);
+}
 

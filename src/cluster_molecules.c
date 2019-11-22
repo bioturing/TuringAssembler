@@ -26,32 +26,21 @@ int cmp_dijkstra(void *node1, void *node2)
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
-	struct queue_t *q = calloc(1, sizeof(struct queue_t));
+	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
+	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
 		.vertex = source,
 		.len = 0
 	};
-	init_queue(q, 1024);
-	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
+	push_heap(heap, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	khash_t(int_int) *L = kh_init(int_int);
 	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(L, source, wrapper.len);
 	put_in_map(n_nodes, source, 0);
-	while (!is_queue_empty(q)){
-		int p = q->front;
-		for (int i = q->front + 1; i < q->back; ++i){
-			if (((struct dijkstra_node_t *)q->data[p])->len >
-				((struct dijkstra_node_t *)q->data[i])->len)
-				p = i;
-		}
-		if (p != q->front){
-			struct dijkstra_node_t *tmp = q->data[q->front];
-			q->data[q->front] = q->data[p];
-			q->data[p] = tmp;
-		}
-		struct dijkstra_node_t *node = get_queue(q);
-		pop_queue(q);
+	while (!is_heap_empty(heap)){
+		struct dijkstra_node_t *node = get_heap(heap);
+		pop_heap(heap);
 		int v = node->vertex;
 		int len = node->len;
 		free(node);
@@ -76,7 +65,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				kh_val(L, it) = len + g->edges[u].seq_len;
 				wrapper.vertex = u;
 				wrapper.len = len + g->edges[u].seq_len;
-				push_queue(q, pointerize(&wrapper,
+				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
 				it = kh_get(int_int, n_nodes, u);
 				kh_val(n_nodes, it) = path_len + 1;
@@ -86,9 +75,8 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 	int res = -1;
 	if (check_in_map(L, target) != 0)
 		res = get_in_map(L, target) - g->edges[target].seq_len;
-	free_queue_content(q);
-	destroy_queue(q);
-	free(q);
+	heap_destroy(heap);
+	free(heap);
 
 	/*if (res != -1){
 		__VERBOSE("PATH FROM %d to %d:\n", source, target);
