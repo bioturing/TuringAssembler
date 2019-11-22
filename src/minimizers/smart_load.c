@@ -182,7 +182,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
-	struct mm_db_t *db1, *db2;
+	struct mm_db_t *db1 = NULL, *db2 = NULL;
 	struct mm_hits_t *hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
@@ -196,6 +196,8 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 	free(buf1);
 	free(buf2);
+	mm_db_destroy(db1);
+	mm_db_destroy(db2);
 	return hits;
 }
 
@@ -214,6 +216,7 @@ void get_bc_hit_bundle(struct opt_proc_t *opt, struct bc_hit_bundle_t *bc_hit_bu
 	smart_construct_read_index(read_sorted_path, bc_pos_dict); //load the barcode indices
 
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	assert(opt->in_file != NULL);
 	load_asm_graph(g, opt->in_file);
 	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
 			MINIMIZERS_WINDOW);
