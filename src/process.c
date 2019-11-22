@@ -329,7 +329,7 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	char bx[19];
 	int bx_fre;
 	while (fscanf(f, "%s\t%d\n", bx, &bx_fre) == 2){
-		if (bx_fre < 10 || bx_fre > 88)
+		if (bx_fre < 10 || bx_fre > 100)
 			continue;
 		if (n == m){
 			m <<= 1;
