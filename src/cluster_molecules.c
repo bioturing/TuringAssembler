@@ -94,7 +94,7 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 {
 	khash_t(long_int) *pair_count = kh_init(long_int);
 	for (int i = 0; i < n_bc; ++i){
-		if (i % 10000 == 0)
+		if ((i + 1) % 10000 == 0)
 			log_debug("%d barcodes processed", i + 1);
 		//log_debug("Barcode: %s", bc_list[i]);
 		uint64_t bx_encoded = barcode_hash_mini(bc_list[i]);
@@ -342,7 +342,7 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	int read_count;
 	FILE *f = fopen(bc_count_path, "r");
 	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
-		if (read_count < 10 || read_count > 100)
+		if (read_count < MIN_BC_READ_COUNT)
 			continue;
 		if (n == m){
 			m <<= 1;
