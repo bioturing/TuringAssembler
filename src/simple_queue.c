@@ -120,6 +120,7 @@ int is_heap_empty(struct heap_t *heap)
 void heap_destroy(struct heap_t *heap)
 {
 	free_queue_content(heap->q);
+	destroy_queue(heap->q);
 	free(heap->q);
 }
 
