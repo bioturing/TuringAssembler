@@ -60,11 +60,12 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				put_in_map(L, u, 2e9);
 				put_in_map(n_nodes, u, path_len + 1);
 			}
-			if ((uint32_t) get_in_map(L, u) > len + g->edges[u].seq_len){
+			int new_len = len + g->edges[u].seq_len - g->ksize;
+			if ((uint32_t) get_in_map(L, u) > new_len){
 				khiter_t it = kh_get(int_int, L, u);
-				kh_val(L, it) = len + g->edges[u].seq_len;
+				kh_val(L, it) = new_len;
 				wrapper.vertex = u;
-				wrapper.len = len + g->edges[u].seq_len;
+				wrapper.len = new_len;
 				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
 				it = kh_get(int_int, n_nodes, u);
