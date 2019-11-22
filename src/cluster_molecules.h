@@ -1,11 +1,11 @@
 #ifndef __CLUSTER_MOLECULES__
 #define __CLUSTER_MOLECULES__
 #include "assembly_graph.h"
-#include "complex_resolve.h"
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
-#include "complex_resolve.h"
+#include "simple_queue.h"
+#include "khash_operations.h"
 
 KHASH_MAP_INIT_INT64(long_int, int);
 struct dijkstra_node_t{
