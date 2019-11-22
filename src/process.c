@@ -94,14 +94,6 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	log_info("Build graph level 2 time: %.3f", sec_from_prev_time());
 }
 
-struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
-{
-	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
-	test_asm_graph(g0);
-	return g0;
-}
-
 void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 {
 	char *log_file = str_concate(opt->out_dir, "/build_scaffolding_1_2.log");
@@ -123,15 +115,12 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	close_logger();
 }
 
-void build_scaffolding_test_process(struct opt_proc_t *opt)
+void dirty_process(struct opt_proc_t *opt)
 {
 	init_clock();
-	FILE *fp;
-	struct asm_graph_t *g0 = create_and_load_graph(opt);
 
-	scaffolding_test(g0, opt);
+	dirty_code(opt);
 
-	asm_graph_destroy(g0);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)

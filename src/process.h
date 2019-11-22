@@ -18,7 +18,7 @@ void build_3_4_process(struct opt_proc_t *opt);
 void build_3_4_no_bc_rebuild_process(struct opt_proc_t *opt);
 void build_4_5_process(struct opt_proc_t *opt);
 void build_scaffolding_1_2_process(struct opt_proc_t *opt);
-void build_scaffolding_test_process(struct opt_proc_t *opt);
+void dirty_process(struct opt_proc_t *opt);
 void build_barcode_process(struct opt_proc_t *opt);
 void build_barcode_info(struct opt_proc_t *opt);
 void build_barcode_scaffold(struct opt_proc_t *opt);

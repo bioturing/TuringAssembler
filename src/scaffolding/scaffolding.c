@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <barcode_builder.h>
 #include <barcode_resolve2.h>
+#include <minimizers/minimizers.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -20,6 +21,7 @@
 #include "scaffolding/output.h"
 #include "scaffolding/khash.h"
 #include "scaffolding/scaffold.h"
+#include "smart_load.h"
 #include "log.h"
 
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
@@ -716,34 +718,74 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 	}
 }
 
-void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
+struct asm_graph_t *create_and_load_graph(struct opt_proc_t *opt)
 {
-	init_global_params(g);
-//	__VERBOSE("n_e: %ld\n", g->n_e);
-//	for (int i = 0; i < g->n_e; i++)
-//		__VERBOSE("edge %d length %d\n", i, g->edges[i].seq_len);
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g0, opt->in_file);
+	test_asm_graph(g0);
+	return g0;
+}
 
-	struct read_path_t read_sorted_path = parse_read_path_from_opt(opt);
-	khash_t(bcpos) *dict = kh_init(bcpos);
-	construct_read_index(&read_sorted_path, dict);
-	uint64_t *bc = calloc(5000, sizeof(uint64_t));
+void load_list_barcode(int *n_barcodes, char ***barcodes, int **freq)
+{
+	FILE *f = fopen("barcode_frequencies.txt", "r");
 	int n_bc = 0;
-	for (int i = 0; i < g->n_e; i++)
-		if (g->edges[i].barcodes[2].n_item > 3000) {
-			struct barcode_hash_t *buck = &g->edges[i].barcodes[2];
-			for (int l = 0; (uint32_t) l < buck->size; l++) {
-				if (buck->keys[l] != (uint64_t) (-1)) {
-					uint64_t barcode = buck->keys[l];
-					bc[n_bc++] = barcode;
-					if (n_bc > 3000) {
-						break;
-					}
-				}
-			}
-			break;
+	char **list_barcodes = NULL;
+	char *bc = calloc(19, 1);
+	int fre;
+	int *arr_fre = NULL;
+
+
+	while (fscanf(f, "%s", bc) != EOF) {
+		fscanf(f, "%d", &fre);
+//		printf("%s %d\n", bc, fre);
+		list_barcodes = realloc(list_barcodes, (n_bc+1) * sizeof(char*));
+		arr_fre = realloc(arr_fre, (n_bc+1) * sizeof(int));
+		arr_fre[n_bc] = fre;
+		list_barcodes[n_bc] = bc;
+		n_bc++;
+		bc = calloc(19, 1);
+	}
+	*n_barcodes = n_bc;
+	*barcodes = list_barcodes;
+	*freq = arr_fre;
+}
+
+void dirty_code(struct opt_proc_t *opt)
+{
+	FILE* f = fopen("edges_hit.txt", "w");
+//	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	char **barcodes;
+	int *fre;
+	int n_barcodes;
+	struct bc_hit_bundle_t bc_hit_bundle;
+
+	log_info("Start load list barcode");
+	load_list_barcode(&n_barcodes, &barcodes, &fre);
+	log_info("Load list barcode done");
+	get_bc_hit_bundle(opt, &bc_hit_bundle);
+	for (int i = 0; i < n_barcodes; i++) {
+		if (fre[i] > 88 || fre[i] < 10)
+			continue;
+		if (i % 10000 == 0) {
+			log_info("Processed %d/%d barcode", i, n_barcodes);
+		} else {
+			printf("Processed %d/%d barcode\r", i, n_barcodes);
 		}
-	test_same_barcode(&read_sorted_path, dict,
-	                  bc, n_bc);
+		struct mm_hits_t *res = get_hits_from_barcode(barcodes[i], &bc_hit_bundle);
+		fprintf(f, "%s:", barcodes[i]);
+		for (khiter_t it = kh_begin(res->edges); it != kh_end(res->edges); ++it) {
+			if (!kh_exist(res->edges, it))
+				continue;
+			int e = kh_key(res->edges, it);
+			int value = kh_value(res->edges, it);
+//			int aln = kh_key(res->aln, it);
+			fprintf(f, "%d %d,", e, value);
+		}
+		fprintf(f, "\n");
+		free(res);
+	}
+//	asm_graph_destroy(g0);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
