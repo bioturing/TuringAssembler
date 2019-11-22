@@ -7,7 +7,7 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 7000
+#define MAX_RADIUS 10000
 #define MAX_PATH_LEN 50
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
@@ -50,7 +50,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 		if (v == target)
 			break;
 		if (len > MAX_RADIUS)
-			break;
+			continue;
 		if (path_len > MAX_PATH_LEN)
 			continue;
 		int tg = g->edges[v].target;
@@ -61,7 +61,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				put_in_map(n_nodes, u, path_len + 1);
 			}
 			int new_len = len + g->edges[u].seq_len - g->ksize;
-			if ((uint32_t) get_in_map(L, u) > new_len){
+			if (get_in_map(L, u) > new_len){
 				khiter_t it = kh_get(int_int, L, u);
 				kh_val(L, it) = new_len;
 				wrapper.vertex = u;
