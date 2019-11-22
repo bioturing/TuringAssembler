@@ -2,7 +2,7 @@
 #include "cluster_molecules.h"
 #include "helper.h"
 #include "verbose.h"
-
+#include "assembly_graph.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
@@ -220,6 +220,8 @@ void print_barcode_graph(struct opt_proc_t *opt)
 
 	f = fopen(opt->lc, "w");
 	fprintf(f, "digraph %s{\n", opt->bx_str);
+	float unit_cov = get_genome_coverage(&g);
+	khash_t(set_int) *nodes = kh_init(set_int);
 	for (khiter_t it = kh_begin(h_1); it != kh_end(h_1); ++it){
 		if (!kh_exist(h_1, it))
 			continue;
@@ -231,9 +233,26 @@ void print_barcode_graph(struct opt_proc_t *opt)
 				continue;
 			int u = code >> 32;
 			int v = code & ((((uint64_t) 1) << 32) - 1);
+			put_in_set(nodes, u);
+			put_in_set(nodes, v);
 			fprintf(f, "\t%d -> %d [label=\"%d\"]\n", u, v, val);
 		}
 	}
+
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+		if (!kh_exist(nodes, it))
+			continue;
+		int u = kh_key(nodes, it);
+		float cov = __get_edge_cov(g.edges + u, g.ksize);
+		float ratio = cov / unit_cov;
+		if (ratio >= 0.8 && ratio <= 1.2)
+			fprintf(f, "%d [style=\"filled\",fillcolor=green]\n",
+					u);
+		else
+			fprintf(f, "%d [style=\"filled\",fillcolor=violet]\n",
+					u);
+	}
+	kh_destroy(set_int, nodes);
 	fprintf(f, "}");
 	fclose(f);
 }
