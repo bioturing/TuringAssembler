@@ -1,12 +1,11 @@
 #ifndef __CLUSTER_MOLECULES__
 #define __CLUSTER_MOLECULES__
 #include "assembly_graph.h"
-#include "complex_resolve.h"
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
-#include "complex_resolve.h"
-
+#include "simple_queue.h"
+#include "khash_operations.h" 
 KHASH_MAP_INIT_INT64(long_int, int);
 struct dijkstra_node_t{
 	int vertex;
@@ -60,4 +59,5 @@ void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g);
 void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
+int cmp_dijkstra(void *node1, void *node2);
 #endif

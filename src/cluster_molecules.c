@@ -2,44 +2,45 @@
 #include "cluster_molecules.h"
 #include "helper.h"
 #include "verbose.h"
-
+#include "assembly_graph.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
 #define MAX_RADIUS 7000
-#define MAX_PATH_LEN 10
+#define MAX_PATH_LEN 50
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
 
+int cmp_dijkstra(void *node1, void *node2)
+{
+	struct dijkstra_node_t *n1 = node1;
+	struct dijkstra_node_t *n2 = node2;
+	if (n1->len < n2->len)
+		return -1;
+	if (n1->len > n2->len)
+		return 1;
+	return 0;
+}
+
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
-	struct queue_t *q = calloc(1, sizeof(struct queue_t));
+	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
+	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
 		.vertex = source,
 		.len = 0
 	};
-	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
+	push_heap(heap, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	khash_t(int_int) *L = kh_init(int_int);
 	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(L, source, wrapper.len);
 	put_in_map(n_nodes, source, 0);
-	while (!is_queue_empty(q)){
-		int p = q->front;
-		for (int i = q->front + 1; i < q->back; ++i){
-			if (((struct dijkstra_node_t *)q->data[p])->len >
-				((struct dijkstra_node_t *)q->data[i])->len)
-				p = i;
-		}
-		if (p != q->front){
-			struct dijkstra_node_t *tmp = q->data[q->front];
-			q->data[q->front] = q->data[p];
-			q->data[p] = tmp;
-		}
-		struct dijkstra_node_t *node = get_queue(q);
-		pop_queue(q);
+	while (!is_heap_empty(heap)){
+		struct dijkstra_node_t *node = get_heap(heap);
+		pop_heap(heap);
 		int v = node->vertex;
 		int len = node->len;
 		free(node);
@@ -59,12 +60,13 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 				put_in_map(L, u, 2e9);
 				put_in_map(n_nodes, u, path_len + 1);
 			}
-			if ((uint32_t) get_in_map(L, u) > len + g->edges[u].seq_len){
+			int new_len = len + g->edges[u].seq_len - g->ksize;
+			if ((uint32_t) get_in_map(L, u) > new_len){
 				khiter_t it = kh_get(int_int, L, u);
-				kh_val(L, it) = len + g->edges[u].seq_len;
+				kh_val(L, it) = new_len;
 				wrapper.vertex = u;
-				wrapper.len = len + g->edges[u].seq_len;
-				push_queue(q, pointerize(&wrapper,
+				wrapper.len = new_len;
+				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
 				it = kh_get(int_int, n_nodes, u);
 				kh_val(n_nodes, it) = path_len + 1;
@@ -74,9 +76,8 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 	int res = -1;
 	if (check_in_map(L, target) != 0)
 		res = get_in_map(L, target) - g->edges[target].seq_len;
-	free_queue_content(q);
-	destroy_queue(q);
-	free(q);
+	heap_destroy(heap);
+	free(heap);
 
 	/*if (res != -1){
 		__VERBOSE("PATH FROM %d to %d:\n", source, target);
@@ -94,7 +95,7 @@ void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
 {
 	khash_t(long_int) *pair_count = kh_init(long_int);
 	for (int i = 0; i < n_bc; ++i){
-		if (i % 10000 == 0)
+		if ((i + 1) % 10000 == 0)
 			log_debug("%d barcodes processed", i + 1);
 		//log_debug("Barcode: %s", bc_list[i]);
 		uint64_t bx_encoded = barcode_hash_mini(bc_list[i]);
@@ -220,6 +221,8 @@ void print_barcode_graph(struct opt_proc_t *opt)
 
 	f = fopen(opt->lc, "w");
 	fprintf(f, "digraph %s{\n", opt->bx_str);
+	float unit_cov = get_genome_coverage(&g);
+	khash_t(set_int) *nodes = kh_init(set_int);
 	for (khiter_t it = kh_begin(h_1); it != kh_end(h_1); ++it){
 		if (!kh_exist(h_1, it))
 			continue;
@@ -231,9 +234,26 @@ void print_barcode_graph(struct opt_proc_t *opt)
 				continue;
 			int u = code >> 32;
 			int v = code & ((((uint64_t) 1) << 32) - 1);
+			put_in_set(nodes, u);
+			put_in_set(nodes, v);
 			fprintf(f, "\t%d -> %d [label=\"%d\"]\n", u, v, val);
 		}
 	}
+
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+		if (!kh_exist(nodes, it))
+			continue;
+		int u = kh_key(nodes, it);
+		float cov = __get_edge_cov(g.edges + u, g.ksize);
+		float ratio = cov / unit_cov;
+		if (ratio >= 0.8 && ratio <= 1.2)
+			fprintf(f, "%d [style=\"filled\",fillcolor=green]\n",
+					u);
+		else
+			fprintf(f, "%d [style=\"filled\",fillcolor=violet]\n",
+					u);
+	}
+	kh_destroy(set_int, nodes);
 	fprintf(f, "}");
 	fclose(f);
 }
@@ -251,6 +271,8 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 
 	FILE *f = fopen(opt->lc, "w");
 	for (int i = 0; i < blist.n_bc; ++i){
+		if ((i + 1) % 10000 == 0)
+			log_debug("Processing %d-th barcode", i + 1);
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
 		khash_t(long_int) *pair_count = kh_init(long_int);
@@ -278,14 +300,16 @@ void get_barcode_edges_path(struct opt_proc_t *opt)
 			if (!kh_exist(sg.nodes, it))
 				continue;
 			int u = kh_key(sg.nodes, it);
-			if (check_in_set(not_source, u))
+			if (check_in_set(not_source, u) || check_in_set(sg.is_loop, u))
 				continue;
+			fprintf(f, "%s: ", blist.bc_list[i]);
 			fprintf(f, "%d", u);
 			for (int v = get_in_map(sg.next, u); v != -1;
 					v = get_in_map(sg.next, v))
 				fprintf(f, " --> %d", v);
 			fprintf(f, "\n");
 		}
+		fflush(f);
 		kh_destroy(set_int, not_source);
 
 
@@ -319,6 +343,8 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	int read_count;
 	FILE *f = fopen(bc_count_path, "r");
 	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
+		if (read_count < MIN_BC_READ_COUNT)
+			continue;
 		if (n == m){
 			m <<= 1;
 			bc_list = realloc(bc_list, sizeof(char *) * m);
