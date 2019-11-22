@@ -13,6 +13,17 @@
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
 
+int cmp_dijkstra(void *node1, void *node2)
+{
+	struct dijkstra_node_t *n1 = node1;
+	struct dijkstra_node_t *n2 = node2;
+	if (n1->len < n2->len)
+		return -1;
+	if (n1->len > n2->len)
+		return 1;
+	return 0;
+}
+
 int get_shortest_path(struct asm_graph_t *g, int source, int target)
 {
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
@@ -20,6 +31,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 		.vertex = source,
 		.len = 0
 	};
+	init_queue(q, 1024);
 	push_queue(q, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	khash_t(int_int) *L = kh_init(int_int);

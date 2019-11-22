@@ -33,7 +33,6 @@ void get_distance(struct resolve_bulges_bundle_t *bundle);
 int get_next_B_candidate(struct resolve_bulges_bundle_t *bundle);
 int is_complex_closure(struct resolve_bulges_bundle_t *bundle);
 int is_closure_tree(struct resolve_bulges_bundle_t *bundle);
-void free_queue_content(struct queue_t *q);
 
 void add_vertex_to_B(struct resolve_bulges_bundle_t *bundle, int v);
 void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,

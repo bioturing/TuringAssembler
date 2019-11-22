@@ -14,5 +14,16 @@ void pop_queue(struct queue_t *q);
 int is_queue_empty(struct queue_t *q);
 void destroy_queue(struct queue_t *q);
 void *pointerize(void *data, int size);
+void free_queue_content(struct queue_t *q);
 
+struct heap_t{
+	struct queue_t *q;
+	int (*cmp)(void *, void *);
+};
+
+void init_heap(struct heap_t *heap, int (*cmp)(void *, void *));
+void up_heap(struct heap_t *heap);
+void down_heap(struct heap_t *heap);
+void *get_heap(struct heap_t *heap);
+void pop_heap(struct heap_t *heap);
 #endif
