@@ -157,7 +157,7 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 			it = kh_get(long_int, count_link, code);
 			if (it == kh_end(count_link)){
 				int ret;
-				it = kh_put(long_int, count_link, it, &ret);
+				it = kh_put(long_int, count_link, code, &ret);
 				kh_val(count_link, it) = 0;
 			}
 			++kh_val(count_link, it);
