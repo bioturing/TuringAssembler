@@ -81,7 +81,7 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 		if (g->edges[i].seq_len > MAX_RADIUS)
 			continue;
 		if ((i + 1) % 1000 == 0)
-			log_debug("%d edges processed");
+			log_debug("%d/%d edges processed", i + 1, g->n_e);
 		khash_t(int_int) *D = kh_init(int_int);
 		dijkstra(g, i, D);
 		for (khiter_t it = kh_begin(D); it != kh_end(D); ++it){
@@ -166,6 +166,9 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	get_barcode_list(opt->in_fasta, &blist);
 
 	for (int i = 0; i < blist.n_bc; ++i){
+		if (blist.read_count[i] < MIN_BC_READ_COUNT
+			|| blist.read_count[i] > MAX_BC_READ_COUNT)
+			continue;
 		if ((i + 1) % 10000 == 0)
 			log_debug("%d barcodes processed", i + 1);
 		uint64_t bx_encoded = barcode_hash_mini(blist.bc_list[i]);
@@ -405,24 +408,27 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	int n = 0;
 	int m = 1;
 	char **bc_list = calloc(1, sizeof(char *));
+	int *read_count = calloc(1, sizeof(int));
 	char bc[19];
-	int read_count;
+	int count;
 	FILE *f = fopen(bc_count_path, "r");
-	while (fscanf(f, "%s\t%d\n", bc, &read_count) == 2){
-		if (read_count < MIN_BC_READ_COUNT)
-			continue;
+	while (fscanf(f, "%s\t%d\n", bc, &count) == 2){
 		if (n == m){
 			m <<= 1;
 			bc_list = realloc(bc_list, sizeof(char *) * m);
+			read_count = realloc(read_count, sizeof(int) * m);
 		}
 		bc_list[n] = calloc(19, sizeof(char));
 		memcpy(bc_list[n], bc, sizeof(char) * 19);
+		read_count[n] = count;
 		++n;
 	}
 	fclose(f);
 	bc_list = realloc(bc_list, sizeof(char *) * n);
+	read_count = realloc(read_count, sizeof(int) * n);
 	blist->n_bc = n;
 	blist->bc_list = bc_list;
+	blist->read_count = read_count;
 }
 
 void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count)

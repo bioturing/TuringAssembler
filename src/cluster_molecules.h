@@ -21,6 +21,7 @@ struct bc_edges_path_t{
 struct barcode_list_t{
 	int n_bc;
 	char **bc_list;
+	int *read_count;
 };
 
 struct simple_node_t{
