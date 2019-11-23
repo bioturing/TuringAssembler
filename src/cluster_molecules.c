@@ -78,10 +78,10 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target)
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 {
 	for (int i = 0; i < g->n_e; ++i){
-		if (g->edges[i].seq_len > MAX_RADIUS)
-			continue;
 		if ((i + 1) % 1000 == 0 || i + 1 == g->n_e)
 			log_debug("%d/%d edges processed", i + 1, g->n_e);
+		if (g->edges[i].seq_len > MAX_RADIUS)
+			continue;
 		khash_t(int_int) *D = kh_init(int_int);
 		dijkstra(g, i, D);
 		for (khiter_t it = kh_begin(D); it != kh_end(D); ++it){
@@ -90,9 +90,10 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 			int v = i;
 			int u = kh_key(D, it);
 			int val = kh_val(D, it);
-			uint64_t code = (((uint64_t) u) << 32) | v;
+			uint64_t code = (((uint64_t) v) << 32) | u;
 			int ret;
-			kh_put(long_int, distance, code, &ret);
+			khiter_t it = kh_put(long_int, distance, code, &ret);
+			kh_val(distance, it) = val;
 		}
 		kh_destroy(int_int, D);
 	}
@@ -167,11 +168,11 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	get_barcode_list(opt->bx_str, &blist);
 
 	for (int i = 0; i < blist.n_bc; ++i){
+		if ((i + 1) % 10000 == 0)
+			log_debug("%d/%d barcodes processed", i + 1, blist.n_bc);
 		if (blist.read_count[i] < MIN_BC_READ_COUNT
 			|| blist.read_count[i] > MAX_BC_READ_COUNT)
 			continue;
-		if ((i + 1) % 10000 == 0)
-			log_debug("%d barcodes processed", i + 1);
 		uint64_t bx_encoded = barcode_hash_mini(blist.bc_list[i]);
 		uint64_t bx[1] = {bx_encoded};
 
