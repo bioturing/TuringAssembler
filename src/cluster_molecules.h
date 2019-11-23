@@ -39,11 +39,12 @@ struct simple_graph_t{
 void init_simple_graph(struct simple_graph_t *sg);
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
-void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct read_path_t *read_sorted_path, khash_t(bcpos) *bx_pos_dict,
-		struct mm_db_edge_t *mm_edges, char **bc_list, int n_bc);
-void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
-		khash_t(long_int) *pair_count);
+void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance);
+void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
+int get_pair_distance(int v, int u, khash_t(long_int) *distance);
+void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
+		khash_t(long_int) *distance, khash_t(long_int) *count_link);
+void count_edge_links_bc(struct opt_proc_t *opt);
 void print_barcode_graph(struct opt_proc_t *opt);
 void get_barcode_edges_path(struct opt_proc_t *opt);
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);

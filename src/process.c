@@ -331,8 +331,7 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	fclose(f);
 	bx_list = realloc(bx_list, sizeof(char *) * n);
 
-	count_edge_links_bc(opt, &g, &read_sorted_path, bx_pos_dict, mm_edges,
-			bx_list, n);
+	count_edge_links_bc(opt);
 	for (int i = 0; i < n; ++i)
 		free(bx_list[i]);
 	free(bx_list);
