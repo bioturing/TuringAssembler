@@ -7,7 +7,8 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 7000
+#define MAX_RADIUS 10000
+#define MAX_PATH_LEN 50
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
@@ -34,6 +35,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	push_heap(heap, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	put_in_map(distance, source, wrapper.len);
+	khash_t(int_int) *n_nodes = kh_init(int_int);
+	put_in_map(n_nodes, source, 0);
 	while (!is_heap_empty(heap)){
 		struct dijkstra_node_t *node = get_heap(heap);
 		pop_heap(heap);
@@ -42,14 +45,19 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 		free(node);
 		if (get_in_map(distance, v) != len)
 			continue;
+		int path_len = get_in_map(n_nodes, v);
+		if (path_len > MAX_PATH_LEN)
+			continue;
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
 			int new_len = len + g->edges[u].seq_len - g->ksize;
 			if (new_len > MAX_RADIUS)
 				continue;
-			if (check_in_map(distance, u) == 0)
+			if (check_in_map(distance, u) == 0){
 				put_in_map(distance, u, 2e9);
+				put_in_map(n_nodes, v, 0);
+			}
 			if (get_in_map(distance, u) > new_len){
 				khiter_t it = kh_get(int_int, distance, u);
 				kh_val(distance, it) = new_len;
@@ -57,9 +65,12 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 				wrapper.len = new_len;
 				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
+				it = kh_get(int_int, n_nodes, u);
+				kh_val(n_nodes, it) = path_len + 1;
 			}
 		}
 	}
+	kh_destroy(int_int, n_nodes);
 	heap_destroy(heap);
 	free(heap);
 }
@@ -261,20 +272,34 @@ void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
 		for (int j = 0; j < n; ++j){
 			if (i == j)
 				continue;
-			uint64_t code = (((uint64_t) tmp[i])) << 32 | tmp[j];
-			khiter_t it = kh_get(long_int, pair_count, code);
-			if (it == kh_end(pair_count)){
-				int len = get_shortest_path(g, tmp[i], tmp[j]);
-				int ret;
-				it = kh_put(long_int, pair_count, code, &ret);
-				if (len != -1 && len <= MAX_RADIUS)
-					kh_val(pair_count, it) = 1;
-				else
-					kh_val(pair_count, it) = -1;
-			} else {
-				if (kh_val(pair_count, it) != -1)
-					++kh_val(pair_count, it);
+			int v = tmp[i];
+			int u = tmp[j];
+
+			int tg = g->edges[v].target;
+			int sr = g->nodes[g->edges[u].source].rc_id;
+			int ok = 0;
+			for (int h = 0; !ok && h < g->nodes[tg].deg; ++h){
+				for (int k = 0; !ok && k < g->nodes[sr].deg; ++k){
+					int w = g->nodes[tg].adj[h];
+					int t = g->edges[g->nodes[sr].adj[k]].rc_id;
+					if (w == u || t == v){
+						ok = 1;
+						break;
+					}
+					int len = get_shortest_path(g, w, t);
+					if (len == -1)
+						continue;
+					if(len > MAX_RADIUS)
+						log_error("Something went wrong, probably Dijkstra is incorrect");
+					ok = 1;
+				}
 			}
+
+			if (!ok)
+				continue;
+			uint64_t code = (((uint64_t) v) << 32) | u;
+			int ret;
+			kh_put(long_int, pair_count, code, &ret);
 		}
 	}
 	free(tmp);
