@@ -109,8 +109,31 @@ int get_pair_distance(int v, int u, khash_t(long_int) *distance)
 	return kh_val(distance, it);
 }
 
+int check_connected(struct asm_graph_t *g, int v, int u,
+		khash_t(long_int) *distance)
+{
+	int tg = g->edges[v].target;
+	int sr = g->nodes[g->edges[u].source].rc_id;
+	for (int i = 0; i < g->nodes[tg].deg; ++i){
+		for (int j = 0; j < g->nodes[sr].deg; ++j){
+			int w = g->nodes[tg].adj[i];
+			int t = g->edges[g->nodes[sr].adj[j]].rc_id;
+			if (w == u || t == v)
+				return 1;
+			int d = get_pair_distance(w, t, distance);
+			if (d == -1)
+				continue;
+			if(d > MAX_RADIUS)
+				log_error("Something went wrong, probably Dijkstra is incorrect");
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_int) *distance, khash_t(long_int) *count_link)
+		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_int) *count_link)
 {
 	for (int i = 0; i < n_e; ++i){
 		for (int j = 0; j < n_e; ++j){
@@ -118,29 +141,20 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 				continue;
 			int v = edges[i];
 			int u = edges[j];
-			int tg = g->edges[v].target;
-			int sr = g->nodes[g->edges[u].source].rc_id;
-			int ok = 0;
-			for (int h = 0; !ok && h < g->nodes[tg].deg; ++h){
-				for (int k = 0; !ok && k < g->nodes[sr].deg; ++k){
-					int w = g->nodes[tg].adj[h];
-					int t = g->edges[g->nodes[sr].adj[k]].rc_id;
-					if (w == u || t == v){
-						ok = 1;
-						break;
-					}
-					int d = get_pair_distance(w, t, distance);
-					if (d == -1)
-						continue;
-					if(d > MAX_RADIUS)
-						log_error("Something went wrong, probably Dijkstra is incorrect");
-					ok = 1;
-				}
+			uint64_t code = (((uint64_t) v) << 32) | u;
+			int ok;
+			khiter_t it = kh_get(long_int, is_connected, code);
+			if (it == kh_end(is_connected)){
+				ok = check_connected(g, v, u, distance);
+				int ret;
+				it = kh_put(long_int, is_connected, code, &ret);
+				kh_val(is_connected, it) = ok;
+			} else {
+				ok = kh_val(is_connected, it);
 			}
 			if (!ok)
 				continue;
-			uint64_t code = (((uint64_t) v) << 32) | u;
-			khiter_t it = kh_get(long_int, count_link, code);
+			it = kh_get(long_int, count_link, code);
 			if (it == kh_end(count_link)){
 				int ret;
 				it = kh_put(long_int, count_link, it, &ret);
@@ -161,6 +175,7 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	khash_t(bcpos) *bc_pos_dict = bc_hit_bundle.bc_pos_dict;
 
 	khash_t(long_int) *distance = kh_init(long_int);
+	khash_t(long_int) *is_connected = kh_init(long_int);
 	get_all_shortest_paths(bc_hit_bundle.g, distance);
 	struct read_path_t *read_sorted_path = bc_hit_bundle.read_sorted_path;
 
@@ -181,15 +196,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 			log_error("Barcode does not exist");
 		}
 
-		char *buf1, *buf2;
-		uint64_t m_buf1, m_buf2;
-		stream_filter_read(read_sorted_path, bc_pos_dict, bx, 1, &buf1,
-				&buf2, &m_buf1, &m_buf2);
-
-
-		struct read_t r1, r2;
-		int pos1 = 0, pos2 = 0;
-		int n_reads = 0;
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				&bc_hit_bundle);
 
@@ -204,7 +210,7 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		mm_hits_destroy(hits);
 
 		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, distance,
-				link_count);
+				is_connected, link_count);
 		free(edges);
 	}
 	FILE *f = fopen(opt->lc, "w");
@@ -220,6 +226,7 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	}
 	fclose(f);
 	kh_destroy(long_int, link_count);
+	kh_destroy(long_int, is_connected);
 }
 
 void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,

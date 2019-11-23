@@ -44,7 +44,10 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance);
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
 int get_pair_distance(int v, int u, khash_t(long_int) *distance);
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_int) *distance, khash_t(long_int) *count_link);
+		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_int) *count_link);
+int check_connected(struct asm_graph_t *g, int v, int u,
+		khash_t(long_int) *distance);
 void count_edge_links_bc(struct opt_proc_t *opt);
 void print_barcode_graph(struct opt_proc_t *opt);
 void get_barcode_edges_path(struct opt_proc_t *opt);
