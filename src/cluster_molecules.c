@@ -164,7 +164,7 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	struct read_path_t *read_sorted_path = bc_hit_bundle.read_sorted_path;
 
 	struct barcode_list_t blist;
-	get_barcode_list(opt->in_fasta, &blist);
+	get_barcode_list(opt->bx_str, &blist);
 
 	for (int i = 0; i < blist.n_bc; ++i){
 		if (blist.read_count[i] < MIN_BC_READ_COUNT
