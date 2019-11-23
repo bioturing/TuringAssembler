@@ -80,7 +80,7 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 	for (int i = 0; i < g->n_e; ++i){
 		if (g->edges[i].seq_len > MAX_RADIUS)
 			continue;
-		if ((i + 1) % 1000 == 0)
+		if ((i + 1) % 1000 == 0 || i + 1 == g->n_e)
 			log_debug("%d/%d edges processed", i + 1, g->n_e);
 		khash_t(int_int) *D = kh_init(int_int);
 		dijkstra(g, i, D);
@@ -96,6 +96,7 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 		}
 		kh_destroy(int_int, D);
 	}
+	log_debug("Done finding all shortest paths");
 }
 
 int get_pair_distance(int v, int u, khash_t(long_int) *distance)
