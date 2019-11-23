@@ -173,11 +173,11 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	get_bc_hit_bundle(opt, &bc_hit_bundle);
 	struct asm_graph_t *g = bc_hit_bundle.g;
 	khash_t(bcpos) *bc_pos_dict = bc_hit_bundle.bc_pos_dict;
+	struct read_path_t *read_sorted_path = bc_hit_bundle.read_sorted_path;
 
 	khash_t(long_int) *distance = kh_init(long_int);
 	khash_t(long_int) *is_connected = kh_init(long_int);
 	get_all_shortest_paths(bc_hit_bundle.g, distance);
-	struct read_path_t *read_sorted_path = bc_hit_bundle.read_sorted_path;
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -213,6 +213,14 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 				is_connected, link_count);
 		free(edges);
 	}
+
+	barcode_list_destroy(&blist);
+	bc_hit_bundle_destroy(&bc_hit_bundle);
+	kh_destroy(long_int, distance);
+	kh_destroy(long_int, is_connected);
+
+
+
 	FILE *f = fopen(opt->lc, "w");
 	for (khiter_t it = kh_begin(link_count); it != kh_end(link_count); ++it){
 		if (!kh_exist(link_count, it))
@@ -226,7 +234,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	}
 	fclose(f);
 	kh_destroy(long_int, link_count);
-	kh_destroy(long_int, is_connected);
 }
 
 void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
@@ -637,6 +644,13 @@ void get_longest_path(struct simple_graph_t *sg)
 			continue;
 		get_longest_path_dfs(sg, u, done_dfs);
 	}
+}
 
+void barcode_list_destroy(struct barcode_list_t *blist)
+{
+	for (int i = 0; i < blist->n_bc; ++i)
+		free(blist->bc_list[i]);
+	free(blist->bc_list);
+	free(blist->read_count);
 }
 

@@ -40,21 +40,36 @@ struct simple_graph_t{
 void init_simple_graph(struct simple_graph_t *sg);
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
+
 void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance);
+
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
+
 int get_pair_distance(int v, int u, khash_t(long_int) *distance);
+
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
 		khash_t(long_int) *count_link);
+
 int check_connected(struct asm_graph_t *g, int v, int u,
 		khash_t(long_int) *distance);
+
 void count_edge_links_bc(struct opt_proc_t *opt);
+
 void print_barcode_graph(struct opt_proc_t *opt);
+
 void get_barcode_edges_path(struct opt_proc_t *opt);
+
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
+
+void barcode_list_destroy(struct barcode_list_t *blist);
+
 void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count);
+
 void add_simple_node(struct simple_graph_t *sg, int u);
+
 void add_simple_edge(struct simple_graph_t *sg, int u, int v);
+
 void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 void simple_graph_destroy(struct simple_graph_t *sg);
