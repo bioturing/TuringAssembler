@@ -10,6 +10,7 @@ KHASH_MAP_INIT_INT64(long_int, int);
 struct dijkstra_node_t{
 	int vertex;
 	int len;
+	int n_nodes;
 };
 
 struct bc_edges_path_t{
@@ -21,6 +22,7 @@ struct bc_edges_path_t{
 struct barcode_list_t{
 	int n_bc;
 	char **bc_list;
+	int *read_count;
 };
 
 struct simple_node_t{
@@ -39,17 +41,36 @@ struct simple_graph_t{
 void init_simple_graph(struct simple_graph_t *sg);
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
-void count_edge_links_bc(struct opt_proc_t *opt, struct asm_graph_t *g,
-		struct read_path_t *read_sorted_path, khash_t(bcpos) *bx_pos_dict,
-		struct mm_db_edge_t *mm_edges, char **bc_list, int n_bc);
-void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
-		khash_t(long_int) *pair_count);
+
+void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance);
+
+void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
+
+int get_pair_distance(int v, int u, khash_t(long_int) *distance);
+
+void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
+		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_int) *count_link);
+
+int check_connected(struct asm_graph_t *g, int v, int u,
+		khash_t(long_int) *distance);
+
+void count_edge_links_bc(struct opt_proc_t *opt);
+
 void print_barcode_graph(struct opt_proc_t *opt);
+
 void get_barcode_edges_path(struct opt_proc_t *opt);
+
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
+
+void barcode_list_destroy(struct barcode_list_t *blist);
+
 void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count);
+
 void add_simple_node(struct simple_graph_t *sg, int u);
+
 void add_simple_edge(struct simple_graph_t *sg, int u, int v);
+
 void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 void simple_graph_destroy(struct simple_graph_t *sg);
@@ -60,4 +81,5 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
 int cmp_dijkstra(void *node1, void *node2);
+int is_repeat(struct asm_graph_t *g, int e);
 #endif

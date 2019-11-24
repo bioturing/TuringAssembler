@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "simple_queue.h"
+#include "cluster_molecules.h"
 
 void *pointerize(void *data, int size)
 {
@@ -65,14 +66,16 @@ void up_heap(struct heap_t *heap)
 	int (*cmp)(void *, void *) = heap->cmp;
 	int n = q->back - q->front;
 	int p = q->front;
-	for (int i = n - 1, j = (i - 1) >> 1; i > 0; i = j){
+	for (int i = n - 1; i > 0; ){
+		int j = (i - 1) >> 1;
 		if (cmp(q->data[p + i], q->data[p + j]) == -1){
-			void *tmp = q->data[p + j];
+			void *tmp = q->data[p + i];
 			q->data[p + i] = q->data[p + j];
 			q->data[p + j] = tmp;
 		} else {
 			break;
 		}
+		i = j;
 	}
 }
 
@@ -84,7 +87,8 @@ void down_heap(struct heap_t *heap)
 	int (*cmp)(void *, void *) = heap->cmp;
 	int n = q->back - q->front;
 	int p = q->front;
-	for (int i = 0, j = (i << 1) + 1; j < n; i = j){
+	for (int i = 0; (i << 1) + 1 < n; ){
+		int j = (i << 1) + 1;
 		if (j + 1 < n && cmp(q->data[p + j + 1], q->data[p + j]) == -1)
 			++j;
 		if (cmp(q->data[p + j], q->data[p + i]) == -1){
@@ -94,6 +98,7 @@ void down_heap(struct heap_t *heap)
 		} else {
 			break;
 		}
+		i = j;
 	}
 }
 
@@ -110,7 +115,9 @@ void *get_heap(struct heap_t *heap)
 
 void pop_heap(struct heap_t *heap)
 {
-	pop_queue(heap->q);
+	struct queue_t *q = heap->q;
+	q->data[q->front] = q->data[q->back - 1];
+	--q->back;
 	down_heap(heap);
 }
 

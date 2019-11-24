@@ -293,52 +293,7 @@ void cluster_molecules_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, path);
 	set_log_stage("Cluster molecules");
 
-	struct read_path_t read_sorted_path;
-	if (opt->lib_type == LIB_TYPE_SORTED) {
-		read_sorted_path.R1_path = opt->files_1[0];
-		read_sorted_path.R2_path = opt->files_2[0];
-		read_sorted_path.idx_path = opt->files_I[0];
-	} else {
-		log_info("Reads are not sorted. Sort reads by barcode sequence...");
-		sort_read(opt, &read_sorted_path);
-	}
-
-	struct asm_graph_t g;
-	load_asm_graph(&g, opt->in_file);
-
-	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
-	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
-
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
-
-	FILE *f = fopen(opt->bx_str, "r");
-	int n = 0;
-	int m = 1;
-	char **bx_list = calloc(1, sizeof(char *));
-	char bx[19];
-	int bx_fre;
-	while (fscanf(f, "%s\t%d\n", bx, &bx_fre) == 2){
-		if (bx_fre < 10 || bx_fre > 100)
-			continue;
-		if (n == m){
-			m <<= 1;
-			bx_list = realloc(bx_list, sizeof(char *) * m);
-		}
-		bx_list[n] = calloc(19, sizeof(char));
-		memcpy(bx_list[n], bx, sizeof(char) * 19);
-		++n;
-	}
-	fclose(f);
-	bx_list = realloc(bx_list, sizeof(char *) * n);
-
-	count_edge_links_bc(opt, &g, &read_sorted_path, bx_pos_dict, mm_edges,
-			bx_list, n);
-	for (int i = 0; i < n; ++i)
-		free(bx_list[i]);
-	free(bx_list);
-
-	kh_destroy(bcpos, bx_pos_dict);
-	asm_graph_destroy(&g);
+	count_edge_links_bc(opt);
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
