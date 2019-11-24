@@ -10,6 +10,7 @@ KHASH_MAP_INIT_INT64(long_int, int);
 struct dijkstra_node_t{
 	int vertex;
 	int len;
+	int n_nodes;
 };
 
 struct bc_edges_path_t{

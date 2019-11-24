@@ -8,7 +8,7 @@
 #include "minimizers/minimizers.h"
 
 #define MAX_RADIUS 10000
-#define MAX_PATH_LEN 50
+#define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
@@ -21,6 +21,10 @@ int cmp_dijkstra(void *node1, void *node2)
 		return -1;
 	if (n1->len > n2->len)
 		return 1;
+	if (n1->n_nodes < n2->n_nodes)
+		return -1;
+	if (n1->n_nodes > n2->n_nodes)
+		return 1;
 	return 0;
 }
 
@@ -30,43 +34,49 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
 		.vertex = source,
-		.len = g->edges[source].seq_len
+		.len = g->edges[source].seq_len,
+		.n_nodes = 0
 	};
 	push_heap(heap, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
 
 	put_in_map(distance, source, wrapper.len);
 	khash_t(int_int) *n_nodes = kh_init(int_int);
-	put_in_map(n_nodes, source, 0);
+	put_in_map(n_nodes, source, wrapper.n_nodes);
 	while (!is_heap_empty(heap)){
 		struct dijkstra_node_t *node = get_heap(heap);
 		pop_heap(heap);
 		int v = node->vertex;
 		int len = node->len;
+		int path_len = node->n_nodes;
 		free(node);
-		if (get_in_map(distance, v) != len)
+		if (get_in_map(distance, v) != len
+			|| get_in_map(n_nodes, v) != path_len)
 			continue;
-		int path_len = get_in_map(n_nodes, v);
-		if (path_len > MAX_PATH_LEN)
-			continue;
+		//printf("%d %d %d %d\n", source, v, len, path_len);
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
 			int new_len = len + g->edges[u].seq_len - g->ksize;
-			if (new_len > MAX_RADIUS)
+			int new_path_len = path_len + 1;
+			if (new_len > MAX_RADIUS || new_path_len > MAX_PATH_LEN)
 				continue;
 			if (check_in_map(distance, u) == 0){
 				put_in_map(distance, u, 2e9);
-				put_in_map(n_nodes, v, 0);
+				put_in_map(n_nodes, u, 2e9);
 			}
-			if (get_in_map(distance, u) > new_len){
+			int cur_len = get_in_map(distance, u);
+			int cur_path_len = get_in_map(n_nodes, u);
+			if (cur_len > new_len || (cur_len == new_len
+					&& cur_path_len > new_path_len)){
 				khiter_t it = kh_get(int_int, distance, u);
 				kh_val(distance, it) = new_len;
+				it = kh_get(int_int, n_nodes, u);
+				kh_val(n_nodes, it) = new_path_len;
 				wrapper.vertex = u;
 				wrapper.len = new_len;
+				wrapper.n_nodes = new_path_len;
 				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
-				it = kh_get(int_int, n_nodes, u);
-				kh_val(n_nodes, it) = path_len + 1;
 			}
 		}
 	}
@@ -340,7 +350,7 @@ void print_barcode_graph(struct opt_proc_t *opt)
 		khiter_t it2 = kh_get(long_int, h_all, code);
 		if (it2 != kh_end(h_all)){
 			int val = kh_val(h_all, it2);
-			if (val < 100)
+			if (val < 300)
 				continue;
 			int u = code >> 32;
 			int v = code & ((((uint64_t) 1) << 32) - 1);
