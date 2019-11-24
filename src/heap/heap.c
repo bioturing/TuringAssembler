@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "heap.h"
+
 #define __parent(i) i >> 1
 #define __left(i) (i << 1)
 #define __right(i) ((i << 1) + 1)
@@ -9,14 +11,6 @@
 	t = H[i]; \
 	H[i] = H[j]; \
 	H[j] = t;
-
-struct kheap_t {
-    uint64_t *H;
-    uint64_t *key;
-    uint64_t *pos;
-    uint32_t n;
-    uint32_t s;
-};
 
 struct kheap_t *kheap_init(uint32_t n)
 {
@@ -52,14 +46,15 @@ int heapify_up(struct kheap_t *h, uint64_t i)
 	return 1;
 }
 
-void kheap_insert(struct kheap_t *h, uint64_t v)
+int kheap_insert(struct kheap_t *h, uint64_t v)
 {
 	if (h->n + 1 > h->s) { //1-based
 		printf("Heap is too large! exit.\n");
-		exit(1);
+		return 1;
 	}
 	h->H[++h->n] = v;
 	heapify_up(h, h->n); //1-based
+	return 0;
 }
 
 int heapify_down(struct kheap_t *h, uint64_t i)
@@ -75,17 +70,18 @@ int heapify_down(struct kheap_t *h, uint64_t i)
 	return 1;
 }
 
-void kheap_delete(struct kheap_t *h, uint64_t v)
+int kheap_delete(struct kheap_t *h, uint64_t v)
 {
 	if (h->n == 0) {
 		printf("Trying to remove an element in an empty heap! exit.\n");
-		exit(1);
+		return 1;
 	}
 	h->H[v] = h->H[h->n--];
 	heapify_down(h, v);
+	return 0;
 }
 
-int main()
+int heap_unittest()
 {
 	struct kheap_t *h = kheap_init(16);
 	uint32_t i;
