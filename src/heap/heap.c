@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
 #include "heap.h"
 
@@ -15,9 +17,11 @@
 struct kheap_t *kheap_init(uint32_t n)
 {
 	struct kheap_t *h = malloc(sizeof(struct kheap_t));
-	h->H = calloc(n, sizeof(uint64_t));
-	h->key = calloc(n, sizeof(uint64_t));
-	h->pos = calloc(n, sizeof(uint64_t));
+	h->H = calloc(n, sizeof(uint32_t));
+	h->key = calloc(n, sizeof(uint32_t));
+	h->pos = calloc(n, sizeof(uint32_t));
+	h->v_cnt = calloc(n, sizeof(uint32_t));
+	memset(h->v_cnt, 0, n*sizeof(uint32_t));
 	h->n = 0; //1-based
 	h->s = n;
 	return h;
@@ -25,15 +29,15 @@ struct kheap_t *kheap_init(uint32_t n)
 
 void print_heap(struct kheap_t *h)
 {
-	for (uint64_t i = 1 ; i < h->n + 1; ++i) {
+	for (uint32_t i = 1 ; i < h->n + 1; ++i) {
 		printf("%llu ", h->key[h->H[i]]);
 	}
 	printf("\n");
 }
 
-int heapify_up(struct kheap_t *h, uint64_t i)
+int heapify_up(struct kheap_t *h, uint32_t i)
 {
-	uint64_t t, j;
+	uint32_t t, j;
 	if (i == 1)
 		return 0; // nothing to do
 	j = __parent(i);
@@ -46,7 +50,7 @@ int heapify_up(struct kheap_t *h, uint64_t i)
 	return 1;
 }
 
-int kheap_insert(struct kheap_t *h, uint64_t v)
+int kheap_insert(struct kheap_t *h, uint32_t v)
 {
 	if (h->n + 1 > h->s) { //1-based
 		printf("Heap is too large! exit.\n");
@@ -57,20 +61,24 @@ int kheap_insert(struct kheap_t *h, uint64_t v)
 	return 0;
 }
 
-int heapify_down(struct kheap_t *h, uint64_t i)
+int heapify_down(struct kheap_t *h, uint32_t i)
 {
-	if (__left(i) >= (h->n)) //1-based. Reached the leave, do nothing
+	uint32_t t;
+	if (__left(i) > (h->n)) //1-based. Reached the leave, do nothing
 		return 0;
+	uint32_t j = (h->key[h->H[__left(i)]] < h->key[h->H[__right(i)]]) ? __left(i):__right(i);
+	if (__left(i) == (h->n))
+		j = __left(i);
 	if (h->key[h->H[__left(i)]] < h->key[h->H[i]] || h->key[h->H[__right(i)]] < h->key[h->H[i]]) {
-		uint64_t t;
-		uint64_t j = (h->key[h->H[__left(i)]] < h->key[h->H[__right(i)]]) ? __left(i):__right(i);
+		h->pos[h->H[i]] = j;
+		h->pos[h->H[j]] = i;
 		__swap_h(h->H, i, j, t);
 		heapify_down(h, j);
 	}
 	return 1;
 }
 
-int kheap_delete(struct kheap_t *h, uint64_t v)
+int kheap_delete(struct kheap_t *h, uint32_t v)
 {
 	if (h->n == 0) {
 		printf("Trying to remove an element in an empty heap! exit.\n");

@@ -24,6 +24,7 @@
 #include "minimizers/get_buffer.h"
 #include "cluster_molecules.h"
 #include "split_molecules.h"
+#include "kdijkstra.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -746,4 +747,12 @@ void resolve_1_2_process(struct opt_proc_t *opt)
 	free(g0);
 	free(log_file);
 	close_logger();
+}
+
+void shortest_path_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	find_shortest_path(&g, opt->k0);
+	asm_graph_destroy(&g);
 }

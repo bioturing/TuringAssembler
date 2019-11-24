@@ -480,6 +480,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &hits_barcode_process);
 	else if (!strcmp(argv[1], "count_bx"))
 		build_opt_process(argc, argv, &count_bx_process);
+	else if (!strcmp(argv[1], "shortest_path"))
+		build_opt_process(argc, argv, &shortest_path_process);
 	else
 		print_usage();
 	return 0;
