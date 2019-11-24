@@ -81,4 +81,5 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
 int cmp_dijkstra(void *node1, void *node2);
+int is_repeat(struct asm_graph_t *g, int e);
 #endif

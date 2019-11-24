@@ -42,6 +42,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	put_in_map(distance, source, wrapper.len);
 	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(n_nodes, source, wrapper.n_nodes);
+
+	int ignore_rc = !is_repeat(g, source);
 	while (!is_heap_empty(heap)){
 		struct dijkstra_node_t *node = get_heap(heap);
 		pop_heap(heap);
@@ -56,6 +58,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
+			if (u == g->edges[source].rc_id && ignore_rc)
+				continue;
 			int new_len = len + g->edges[u].seq_len - g->ksize;
 			int new_path_len = path_len + 1;
 			if (new_len > MAX_RADIUS || new_path_len > MAX_PATH_LEN)
@@ -687,5 +691,15 @@ void barcode_list_destroy(struct barcode_list_t *blist)
 		free(blist->bc_list[i]);
 	free(blist->bc_list);
 	free(blist->read_count);
+}
+
+int is_repeat(struct asm_graph_t *g, int e)
+{
+	float unit_cov = get_genome_coverage(g);
+	float cov = __get_edge_cov(g->edges + e, g->ksize);
+	float ratio = cov / unit_cov;
+	if (ratio > 1.2)
+		return 1;
+	return 0;
 }
 
