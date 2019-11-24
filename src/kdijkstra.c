@@ -38,6 +38,7 @@ struct dijkstra_t *init_dijkstra(struct asm_graph_t *g)
 	}
 	d->S = calloc(DEFAULT_S_SIZE, sizeof(uint32_t));
 	d->n = 0;
+	d->size = DEFAULT_S_SIZE;
 	return d;
 }
 
@@ -67,11 +68,11 @@ void find_shortest_path(struct asm_graph_t *g, gint_t e)
 	gint_t v = e;
 	while (1) {
 		add_node(d, g, v);
-		v = d->h->H[0];
-		if (d->h->key[v] > MINIMUM_DISTANCE) {
+		log_info("Added v=%llu, d=%d", v, d->h->key[v]);
+		v = d->h->H[1]; //1-based
+		if (d->h->key[v] > MINIMUM_DISTANCE && d->h->key[v] != UINT32_MAX) {
 			break;
 		}
-		log_info("Added v=%llu, d=%d", v, d->h->key[v]);
 		kheap_delete(d->h, 0);
 	}
 }
