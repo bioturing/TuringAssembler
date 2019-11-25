@@ -216,11 +216,11 @@ void mini_expand()
 /**
  * @brief Try expanding the hash table by doubling in size
  */
-int try_expanding()
+inline int try_expanding()
 {
 	if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
-		log_info("Doubling hash table...");
 		pthread_mutex_lock(&h_table->mut);
+		log_info("Doubling hash table...");
 		mini_expand();
 		pthread_mutex_unlock(&h_table->mut);
 		return 0;
@@ -300,7 +300,7 @@ uint64_t mini_get(uint64_t data, uint64_t key)
  * @param data byte array of data
  * @param len length in byte of data
  */
-void mini_inc(uint64_t data, int len)
+inline void mini_inc(uint64_t data, int len)
 {
 	uint64_t key = twang_mix64(data);
 	if (h_table->count > h_table->max_cnt) {
