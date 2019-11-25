@@ -733,17 +733,3 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	asm_graph_destroy(&g1);
 }
 
-void resolve_1_2_process(struct opt_proc_t *opt)
-{
-	char *log_file = str_concate(opt->out_dir, "/resolve_1_2.log");
-	init_logger(opt->log_level, log_file);
-	init_clock();
-	struct asm_graph_t *g0 = create_and_load_graph(opt);
-	log_info("resolve 1_2 process");
-	resolve_1_2(g0,opt);
-	save_graph_info(opt->out_dir, g0, "level_2_huu");
-	asm_graph_destroy(g0);
-	free(g0);
-	free(log_file);
-	close_logger();
-}
