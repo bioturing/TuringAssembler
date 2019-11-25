@@ -216,20 +216,18 @@ void mini_expand()
 /**
  * @brief Try expanding the hash table by doubling in size
  */
-inline int try_expanding()
+inline void try_expanding()
 {
+	pthread_mutex_lock(&h_table->mut);
 	if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
-		pthread_mutex_lock(&h_table->mut);
 		log_info("Doubling hash table...");
 		mini_expand();
-		pthread_mutex_unlock(&h_table->mut);
-		return 0;
 	} else {
 		if ((double)h_table->count > FATAL_LOAD_FACTOR * (h_table->size)) {
 			log_warn("Hash table size reached limit!");
 		}
-		return 1;
 	}
+	pthread_mutex_unlock(&h_table->mut);
 }
 
 
