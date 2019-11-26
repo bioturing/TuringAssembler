@@ -7,8 +7,8 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 1000
-#define MAX_PATH_LEN 10
+#define MAX_RADIUS 10000
+#define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
@@ -30,8 +30,8 @@ int cmp_dijkstra(void *node1, void *node2)
 
 void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 {
-	if (source != 21611)
-		return;
+	/*if (source != 21611)
+		return;*/
 	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
 	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
@@ -91,10 +91,10 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 			}
 		}
 	}
-	for (int i = 21610; i != -1; i = get_in_map(P, i))
+	/*for (int i = 21610; i != -1; i = get_in_map(P, i))
 		__VERBOSE("%d,", i);
 	__VERBOSE("\n");
-	exit(0);
+	exit(0);*/
 	kh_destroy(int_int, n_nodes);
 	heap_destroy(heap);
 	free(heap);
@@ -220,7 +220,10 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
 
+	FILE *bc_log = fopen("bc_log.txt", "w");
 	for (int i = 0; i < blist.n_bc; ++i){
+		if (i > 10)
+			break;
 		if ((i + 1) % 10000 == 0)
 			log_debug("%d/%d barcodes processed", i + 1, blist.n_bc);
 		if (blist.read_count[i] < MIN_BC_READ_COUNT
@@ -249,8 +252,14 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 
 		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, distance,
 				is_connected, link_count);
+
+		fprintf(bc_log, "%s: ", blist.bc_list[i]);
+		for (int i = 0; i < n_e; ++i)
+			fprintf(bc_log, "%d%c", edges[i], i + 1 == n_e ? '\n' : ',');
 		free(edges);
 	}
+	fclose(bc_log);
+	exit(0);
 
 	barcode_list_destroy(&blist);
 	bc_hit_bundle_destroy(&bc_hit_bundle);
