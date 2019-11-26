@@ -30,8 +30,8 @@ int cmp_dijkstra(void *node1, void *node2)
 
 void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 {
-	/*if (source != 30486)
-		return;*/
+	if (source != 21611)
+		return;
 	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
 	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
@@ -91,10 +91,10 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 			}
 		}
 	}
-	/*for (int i =54782; i != -1; i = get_in_map(P, i))
+	for (int i = 21610; i != -1; i = get_in_map(P, i))
 		__VERBOSE("%d,", i);
 	__VERBOSE("\n");
-	exit(0);*/
+	exit(0);
 	kh_destroy(int_int, n_nodes);
 	heap_destroy(heap);
 	free(heap);
