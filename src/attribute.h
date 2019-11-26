@@ -67,6 +67,7 @@ struct opt_proc_t {
 	int lk;
 	int log_level;
 	char *bx_str;
+	int thresh;
 };
 
 struct read_path_t {

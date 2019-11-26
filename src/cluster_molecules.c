@@ -7,8 +7,8 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 10000
-#define MAX_PATH_LEN 30
+#define MAX_RADIUS 1000
+#define MAX_PATH_LEN 10
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
@@ -30,6 +30,8 @@ int cmp_dijkstra(void *node1, void *node2)
 
 void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 {
+	/*if (source != 30486)
+		return;*/
 	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
 	init_heap(heap, &cmp_dijkstra);
 	struct dijkstra_node_t wrapper = {
@@ -43,7 +45,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(n_nodes, source, wrapper.n_nodes);
 
-	int ignore_rc = !is_repeat(g, source);
+	khash_t(int_int) *P = kh_init(int_int);
+	put_in_map(P, source, -1);
 	while (!is_heap_empty(heap)){
 		struct dijkstra_node_t *node = get_heap(heap);
 		pop_heap(heap);
@@ -54,12 +57,11 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 		if (get_in_map(distance, v) != len
 			|| get_in_map(n_nodes, v) != path_len)
 			continue;
-		//printf("%d %d %d %d\n", source, v, len, path_len);
+		printf("%d %d %d %d\n", source, v, len, path_len);
+		//printf("pop %d %d %d\n", v, len, path_len);
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
-			if (u == g->edges[source].rc_id && ignore_rc)
-				continue;
 			int new_len = len + g->edges[u].seq_len - g->ksize;
 			int new_path_len = path_len + 1;
 			if (new_len > MAX_RADIUS || new_path_len > MAX_PATH_LEN)
@@ -67,6 +69,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 			if (check_in_map(distance, u) == 0){
 				put_in_map(distance, u, 2e9);
 				put_in_map(n_nodes, u, 2e9);
+				put_in_map(P, u, -1);
 			}
 			int cur_len = get_in_map(distance, u);
 			int cur_path_len = get_in_map(n_nodes, u);
@@ -81,9 +84,17 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 				wrapper.n_nodes = new_path_len;
 				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
+
+				it = kh_get(int_int, P, u);
+				kh_val(P, it) = v;
+				//printf("push %d %d %d\n", u, new_len, new_path_len);
 			}
 		}
 	}
+	/*for (int i =54782; i != -1; i = get_in_map(P, i))
+		__VERBOSE("%d,", i);
+	__VERBOSE("\n");
+	exit(0);*/
 	kh_destroy(int_int, n_nodes);
 	heap_destroy(heap);
 	free(heap);
@@ -170,7 +181,9 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 			int ok;
 			khiter_t it = kh_get(long_int, is_connected, code);
 			if (it == kh_end(is_connected)){
-				ok = check_connected(g, v, u, distance);
+				ok = check_connected(g, v, u, distance)
+					|| check_connected(g, g->edges[u].rc_id,
+						g->edges[v].rc_id, distance);
 				int ret;
 				it = kh_put(long_int, is_connected, code, &ret);
 				kh_val(is_connected, it) = ok;
@@ -335,40 +348,54 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	}
 	fclose(f);
 
-	khash_t(long_int) *h_1 = kh_init(long_int);
-	struct asm_graph_t g;
-	load_asm_graph(&g, opt->in_file);
 	struct bc_hit_bundle_t bc_hit_bundle;
 	get_bc_hit_bundle(opt, &bc_hit_bundle);
+	struct asm_graph_t *g = bc_hit_bundle.g;
 	struct mm_hits_t *hits = get_hits_from_barcode(opt->bx_str, &bc_hit_bundle);
-	get_sub_graph(&g, hits, h_1);
+
+	khash_t(set_int) *tmp = kh_init(set_int);
+	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
+		if (!kh_exist(hits->edges, it))
+			continue;
+		int ret;
+		int v = kh_key(hits->edges, it);
+		kh_put(set_int, tmp, v, &ret);
+		kh_put(set_int, tmp, g->edges[v].rc_id, &ret);
+	}
+
+	int *edges = calloc(kh_size(tmp), sizeof(int));
+	int n = 0;
+	for (khiter_t it = kh_begin(tmp); it != kh_end(tmp); ++it){
+		if (!kh_exist(tmp, it))
+			continue;
+		edges[n++] = kh_key(tmp, it);
+	}
+	kh_destroy(set_int, tmp);
+
 
 	f = fopen(opt->lc, "w");
 	fprintf(f, "digraph %s{\n", opt->bx_str);
-	float unit_cov = get_genome_coverage(&g);
-	khash_t(set_int) *nodes = kh_init(set_int);
-	for (khiter_t it = kh_begin(h_1); it != kh_end(h_1); ++it){
-		if (!kh_exist(h_1, it))
-			continue;
-		uint64_t code = kh_key(h_1, it);
-		khiter_t it2 = kh_get(long_int, h_all, code);
-		if (it2 != kh_end(h_all)){
-			int val = kh_val(h_all, it2);
-			if (val < 300)
+	float unit_cov = get_genome_coverage(g);
+	for (int i = 0; i < n; ++i){
+		for (int j = 0; j < n; ++j){
+			if (i == j)
 				continue;
-			int u = code >> 32;
-			int v = code & ((((uint64_t) 1) << 32) - 1);
-			put_in_set(nodes, u);
-			put_in_set(nodes, v);
-			fprintf(f, "\t%d -> %d [label=\"%d\"]\n", u, v, val);
+			int v = edges[i];
+			int u = edges[j];
+			uint64_t code = (((uint64_t) v) << 32) | u;
+			khiter_t it = kh_get(long_int, h_all, code);
+			if (it != kh_end(h_all)){
+				int val = kh_val(h_all, it);
+				if (val < opt->thresh)
+					continue;
+				fprintf(f, "\t%d -> %d [label=\"%d\"]\n", v, u, val);
+			}
 		}
 	}
 
-	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
-		if (!kh_exist(nodes, it))
-			continue;
-		int u = kh_key(nodes, it);
-		float cov = __get_edge_cov(g.edges + u, g.ksize);
+	for (int i = 0; i < n; ++i){
+		int u = edges[i];
+		float cov = __get_edge_cov(g->edges + u, g->ksize);
 		float ratio = cov / unit_cov;
 		if (ratio >= 0.8 && ratio <= 1.2)
 			fprintf(f, "%d [style=\"filled\",fillcolor=green]\n",
@@ -377,7 +404,7 @@ void print_barcode_graph(struct opt_proc_t *opt)
 			fprintf(f, "%d [style=\"filled\",fillcolor=violet]\n",
 					u);
 	}
-	kh_destroy(set_int, nodes);
+	free(edges);
 	fprintf(f, "}");
 	fclose(f);
 }
