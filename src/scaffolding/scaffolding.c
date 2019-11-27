@@ -753,7 +753,7 @@ void load_list_barcode(int *n_barcodes, char ***barcodes, int **freq)
 
 void dirty_code(struct opt_proc_t *opt)
 {
-	FILE* f = fopen("edges_hit.txt", "w");
+	FILE *f = fopen("edges_hit.txt", "w");
 //	struct asm_graph_t *g0 = create_and_load_graph(opt);
 	char **barcodes;
 	int *fre;
@@ -786,6 +786,58 @@ void dirty_code(struct opt_proc_t *opt)
 		free(res);
 	}
 //	asm_graph_destroy(g0);
+}
+
+inline int get_nu(const uint32_t *seq, int pos)
+{
+	return (seq[pos >> 4] >> ((pos & 15) << 1)) & 3;
+}
+
+inline void set_nu(uint32_t *seq, int pos, int val)
+{
+	seq[pos >> 4] |= val << ((pos & 15) << 1);
+}
+
+char *concate_seq(struct asm_edge_t *a, struct asm_edge_t *b, int ksize)
+{
+	uint32_t *res = calloc((a->seq_len + b->seq_len - ksize + 15) / 16, 4);
+	for (int i = 0 ;  i < a->seq_len; i++) {
+		set_nu(res, i, get_nu(a->seq, i));
+	}
+	for(int i = ksize; i < b->seq_len; i++) {
+		set_nu(res, i+a->seq_len -ksize, get_nu(b->seq, i));
+	}
+	return  res;
+
+}
+
+struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g)
+{
+	FILE *f = fopen("/home/che/bioturing/data/yeast/list_edge.txt", "r");
+	int a, b;
+
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	int count = 0 ;
+	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
+		count++;
+		printf("%d\n", count);
+		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+		g0->edges[g0->n_e].seq = concate_seq(&g->edges[a], &g->edges[b], g->ksize);
+		g0->edges[g0->n_e].seq_len = g->edges[a].seq_len + g->edges[b].seq_len - g->ksize;
+		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
+		g0->n_e++;
+	}
+	return g0;
+}
+
+void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
+{
+//	init_global_params(g);
+	struct asm_graph_t *g0 = huu_create_new_graph(g);
+	char path[1024];
+	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
+	         opt->out_dir, g->ksize, "pair");
+	write_stupid_fasta(g0, path);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
