@@ -238,6 +238,10 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			opt->n_files = n;
 			opt->files_1 = argv + pos + 1;
 			pos += (n + 1);
+		}else if (!strcmp(argv[pos], "-var")) {
+			n = opt_count_list(argc - pos, argv + pos);
+			opt->var = argv + pos + 1;
+			pos += (n + 1);
 		} else if (!strcmp(argv[pos], "-2")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)

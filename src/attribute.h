@@ -52,7 +52,7 @@ struct opt_proc_t {
 	int split_len;
 	int lib_type;
 	int n_files;
-	char **files_1, **files_2, **files_I;
+	char **files_1, **files_2, **files_I, **var;
 	int metagenomics;
 	char *out_dir;
 	char *in_file;
