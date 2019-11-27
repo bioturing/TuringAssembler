@@ -18,6 +18,22 @@
 #include "minimizers.h"
 #include "../assembly_graph.h"
 #include "get_buffer.h"
+static const char *bit_rep[16] = {
+	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
+	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
+	[ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
+	[12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
+};
+
+#define PRINT_BYTE(byte) printf("%s%s\n", bit_rep[(byte >> 4)& 0x0F], bit_rep[byte & 0x0F]);
+#define PRINT_UINT64(byte) printf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n", bit_rep[(byte >> 60) & 0x0F], bit_rep[(byte >> 56)& 0x0F], \
+								bit_rep[(byte >> 52) & 0x0F], bit_rep[(byte >> 48) & 0x0F], \
+								bit_rep[(byte >> 44) & 0x0F], bit_rep[(byte >> 40) & 0x0F], \
+								bit_rep[(byte >> 36) & 0x0F], bit_rep[(byte >> 32) & 0x0F], \
+								bit_rep[(byte >> 28) & 0x0F], bit_rep[(byte >> 24) & 0x0F], \
+								bit_rep[(byte >> 20) & 0x0F], bit_rep[(byte >> 16) & 0x0F], \
+								bit_rep[(byte >> 12) & 0x0F], bit_rep[(byte >> 8) & 0x0F],  \
+								bit_rep[(byte >> 4) & 0x0F], bit_rep[(uint8_t)byte & 0x0F]);
 
 /**
  * Construct the dictionary index of
@@ -100,6 +116,9 @@ void stream_filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	*size1 = m_buf1;
 	*size2 = m_buf2;
 }
+#define kh_set(kname, hash, key, val) ({int ret; k = kh_put(kname, hash,key,&ret); kh_value(hash,k) = val; ret;})
+// shorthand way to get the key from hashtable or defVal if not found
+#define kh_get_val(kname, hash, key, defVal) ({k=kh_get(kname, hash, key);(k!=kh_end(hash)?kh_val(hash,k):defVal);})
 /**
  * @brief Seeking and loading the barcode sequences into the buffer stream
  * @param opt
@@ -121,8 +140,8 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
 	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
 
-	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
-	if (k == kh_end(bx_pos_dict)) {
+	khint_t k_bx = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k_bx == kh_end(bx_pos_dict)) {
 		log_error("Barcode does not exists!");
 	} else {
 		log_info("Barcode does exist. Getting reads");
@@ -130,30 +149,71 @@ void smart_load_barcode(struct opt_proc_t *opt)
 
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
-	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
-
+	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
+	printf("buf1: %s, buf2: %s", buf1, buf2);
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
 	struct mm_db_t *db1, *db2;
-	struct mm_hits_t *hits;
-	hits = mm_hits_init();
+	struct mm_hits_t *hits1, *hits2, *hits;
+
 
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
+	struct mm_db_edge_t *mm_edges_db = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
+	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
+	khiter_t k;
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
 		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
 		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+		khiter_t k1, k2;
 
-		mm_hits_cmp(db1, mm_edges, hits, &g);
-		mm_hits_cmp(db2, mm_edges, hits, &g);
+		hits1 = mm_hits_init();
+		hits2 = mm_hits_init();
+
+		mm_hits_cmp(db1, mm_edges_db, hits1, &g);
+		mm_hits_cmp(db2, mm_edges_db, hits2, &g);
+
+		log_info("Number of hits on R1: %d", hits1->n);
+		log_info("Number of hits on R2: %d", hits2->n);
+		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1){
+			if (!kh_exist(hits1->edges, k1))
+				continue;
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (!kh_exist(hits2->edges, k2))
+					continue;
+				uint64_t key1 = kh_key(hits1->edges, k1);
+				uint64_t key2 = kh_key(hits2->edges, k2);
+				uint64_t hk = key1 * 100000000 + key2;
+				if (kh_get_val(mm_pw, kh_pw, hk, -1) == -1)
+					kh_set(mm_pw, kh_pw, hk, 1);
+				else
+					kh_set(mm_pw, kh_pw, hk, kh_get_val(mm_pw, kh_pw, hk, -1) + 1);
+
+			}
+		}
+		mm_hits_destroy(hits1);
+		mm_hits_destroy(hits2);
+		mm_db_destroy(db1);
+		mm_db_destroy(db2);
 	}
+	hits = mm_hits_init();
 	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	log_info("Number of singleton hits: %d", kh_size(hits->edges));
-	mm_hits_print(hits, "barcode_hits.csv");
+	for (k = kh_begin(kh_pw); k != kh_end(kh_pw); ++k){
+		if (kh_exist(kh_pw, k)){
+			uint64_t key = kh_key(kh_pw, k);
+			uint64_t u = key / 100000000;
+			uint64_t v = key % 100000000;
+			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
+			if (kh_val(kh_pw, k) > 1) {
+				kh_set(mm_edges, hits->edges, u, 1);
+				kh_set(mm_edges, hits->edges, v, 1);
+			}
+		}
+
+	}
 
 	free(buf1);
 	free(buf2);
@@ -164,14 +224,14 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 	struct read_path_t *read_sorted_path = bc_hit_bundle->read_sorted_path;
 	khash_t(bcpos) *bx_pos_dict = bc_hit_bundle->bc_pos_dict;
 	struct asm_graph_t *g = bc_hit_bundle->g;
-	struct mm_db_edge_t *mm_edges = bc_hit_bundle->mm_edges;
+	struct mm_db_edge_t *mm_edges_db = bc_hit_bundle->mm_edges;
 
 	uint64_t bx_encoded = barcode_hash_mini(bc);
 	uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
 
-	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
-	if (k == kh_end(bx_pos_dict)) {
-		log_error("Barcode %s does not exists!", bc);
+	khint_t k_bx = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k_bx == kh_end(bx_pos_dict)) {
+		log_error("Barcode does not exists!");
 	}
 
 	char *buf1, *buf2;
@@ -182,21 +242,60 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
-	struct mm_db_t *db1 = NULL, *db2 = NULL;
-	struct mm_hits_t *hits = mm_hits_init();
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits1, *hits2, *hits;
+
+	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
+	khiter_t k;
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
 		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
 		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+		khiter_t k1, k2;
 
-		mm_hits_cmp(db1, mm_edges, hits, g);
-		mm_hits_cmp(db2, mm_edges, hits, g);
+		hits1 = mm_hits_init();
+		hits2 = mm_hits_init();
+
+		mm_hits_cmp(db1, mm_edges_db, hits1, g);
+		mm_hits_cmp(db2, mm_edges_db, hits2, g);
+
+		log_info("Number of hits on R1: %d", hits1->n);
+		log_info("Number of hits on R2: %d", hits2->n);
+		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1){
+			if (!kh_exist(hits1->edges, k1))
+				continue;
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (!kh_exist(hits2->edges, k2))
+					continue;
+				uint64_t key1 = kh_key(hits1->edges, k1);
+				uint64_t key2 = kh_key(hits2->edges, k2);
+				uint64_t hk = key1 * 100000000 + key2;
+				if (kh_get_val(mm_pw, kh_pw, hk, -1) == -1)
+					kh_set(mm_pw, kh_pw, hk, 1);
+				else
+					kh_set(mm_pw, kh_pw, hk, kh_get_val(mm_pw, kh_pw, hk, -1) + 1);
+
+			}
+		}
+		mm_hits_destroy(hits1);
+		mm_hits_destroy(hits2);
 		mm_db_destroy(db1);
 		mm_db_destroy(db2);
 	}
-
-	assert(n_reads != 0);
+	hits = mm_hits_init();
+	for (k = kh_begin(kh_pw); k != kh_end(kh_pw); ++k){
+		if (kh_exist(kh_pw, k)){
+			uint64_t key = kh_key(kh_pw, k);
+			uint64_t u = key / 100000000;
+			uint64_t v = key % 100000000;
+			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
+			if (kh_val(kh_pw, k) > 1) {
+				kh_set(mm_edges, hits->edges, u, 1);
+				kh_set(mm_edges, hits->edges, v, 1);
+			}
+		}
+	}
 	free(buf1);
 	free(buf2);
 	return hits;
