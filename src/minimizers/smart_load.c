@@ -260,8 +260,8 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 		mm_hits_cmp(db1, mm_edges_db, hits1, g);
 		mm_hits_cmp(db2, mm_edges_db, hits2, g);
 
-		log_info("Number of hits on R1: %d", hits1->n);
-		log_info("Number of hits on R2: %d", hits2->n);
+		//log_info("Number of hits on R1: %d", hits1->n);
+		//log_info("Number of hits on R2: %d", hits2->n);
 		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1){
 			if (!kh_exist(hits1->edges, k1))
 				continue;
@@ -289,7 +289,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 			uint64_t key = kh_key(kh_pw, k);
 			uint64_t u = key / 100000000;
 			uint64_t v = key % 100000000;
-			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
+			//log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
 			if (kh_val(kh_pw, k) > 1) {
 				kh_set(mm_edges, hits->edges, u, 1);
 				kh_set(mm_edges, hits->edges, v, 1);
