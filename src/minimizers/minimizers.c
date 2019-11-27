@@ -471,8 +471,6 @@ static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 			}
 		}
 	}
-	log_info("Total number of minimizers %d", n_mm);
-	log_info("Total number of singleton minimizers %d (%d%)", single_cnt, single_cnt*100/n_mm);
 
 }
 
@@ -518,7 +516,6 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 			mm_hits_insert(hits, db->mm[i], e, p);
 		}
 	}
-	log_info("Number of singleton: %d/%d", single_ton, db->n);
 	return hits;
 }
 
