@@ -47,6 +47,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 
 	khash_t(int_int) *P = kh_init(int_int);
 	put_in_map(P, source, -1);
+
+	khash_t(set_int) *closed = kh_init(set_int);
 	while (!is_heap_empty(heap)){
 		struct dijkstra_node_t *node = get_heap(heap);
 		pop_heap(heap);
@@ -57,6 +59,9 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 		if (get_in_map(distance, v) != len
 			|| get_in_map(n_nodes, v) != path_len)
 			continue;
+		if (check_in_set(closed, g->edges[v].rc_id))
+			continue;
+		put_in_set(closed, v);
 		printf("%d %d %d %d\n", source, v, len, path_len);
 		//printf("pop %d %d %d\n", v, len, path_len);
 		int tg = g->edges[v].target;
@@ -96,6 +101,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	__VERBOSE("\n");
 	exit(0);*/
 	kh_destroy(int_int, n_nodes);
+	kh_destroy(set_int, closed);
 	heap_destroy(heap);
 	free(heap);
 }
@@ -259,7 +265,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		free(edges);
 	}
 	fclose(bc_log);
-	exit(0);
 
 	barcode_list_destroy(&blist);
 	bc_hit_bundle_destroy(&bc_hit_bundle);
@@ -391,6 +396,8 @@ void print_barcode_graph(struct opt_proc_t *opt)
 				continue;
 			int v = edges[i];
 			int u = edges[j];
+			if (v == g->edges[u].rc_id && is_repeat(g, v) == 0)
+				continue;
 			uint64_t code = (((uint64_t) v) << 32) | u;
 			khiter_t it = kh_get(long_int, h_all, code);
 			if (it != kh_end(h_all)){
