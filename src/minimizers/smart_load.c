@@ -171,12 +171,12 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
 	if (k == kh_end(bx_pos_dict)) {
-		log_error("Barcode does not exists!");
+		log_error("Barcode %s does not exists!", bc);
 	}
 
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
-	stream_filter_read(read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2,
+	stream_filter_read(read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2,
 			&m_buf1, &m_buf2);
 
 	struct read_t r1, r2;
@@ -192,12 +192,13 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 		mm_hits_cmp(db1, mm_edges, hits, g);
 		mm_hits_cmp(db2, mm_edges, hits, g);
+		mm_db_destroy(db1);
+		mm_db_destroy(db2);
 	}
 
+	assert(n_reads != 0);
 	free(buf1);
 	free(buf2);
-	mm_db_destroy(db1);
-	mm_db_destroy(db2);
 	return hits;
 }
 
