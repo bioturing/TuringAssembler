@@ -117,10 +117,8 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 
 void dirty_process(struct opt_proc_t *opt)
 {
-	init_clock();
-
-	dirty_code(opt);
-
+	struct asm_graph_t *g = create_and_load_graph(opt);
+	scaffolding_test(g, opt);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)

@@ -7,6 +7,7 @@
 #include <barcode_builder.h>
 #include <barcode_resolve2.h>
 #include <minimizers/minimizers.h>
+#include <cluster_molecules.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -819,13 +820,22 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g)
 	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 	int count = 0 ;
 	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
+		printf("get path from %d %d", a,b);
 		count++;
+		int *path = NULL;
+		int n_path;
+		int res = get_shortest_path(g, a, b, &path, &n_path);
+		assert(res != -1);
+		for(int i = 0 ; i < n_path; i++) {
+			printf("%d\n", path[i]);
+		}
 		printf("%d\n", count);
 		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
 		g0->edges[g0->n_e].seq = concate_seq(&g->edges[a], &g->edges[b], g->ksize);
 		g0->edges[g0->n_e].seq_len = g->edges[a].seq_len + g->edges[b].seq_len - g->ksize;
 		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
 		g0->n_e++;
+		free(path);
 	}
 	return g0;
 }
