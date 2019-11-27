@@ -121,6 +121,14 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
 		int v = g->nodes[sr].adj[i];
 		for (int j = 0; !found && j < g->nodes[tg].deg; ++j){
 			int u = g->edges[g->nodes[tg].adj[j]].rc_id;
+			if (v == target){
+				(*path) = calloc(2, sizeof(int));
+				*n_path = 2;
+				(*path)[0] = source;
+				(*path)[1] = target;
+				found = 1;
+				break;
+			}
 			khash_t(int_int) *L = kh_init(int_int);
 			khash_t(int_int) *P = kh_init(int_int);
 			dijkstra(g, v, L, P);
