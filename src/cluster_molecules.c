@@ -813,6 +813,9 @@ void get_all_barcode_paths(struct opt_proc_t *opt)
 	for (int i = 0; i < blist.n_bc; ++i){
 		if ((i + 1) % 10000 == 0)
 			log_debug("%d barcodes processed", i + 1);
+		if (blist.read_count[i] < MIN_BC_READ_COUNT
+			|| blist.read_count[i] > MAX_BC_READ_COUNT)
+			continue;
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				bc_hit_bundle);
 		struct simple_graph_t sg;
