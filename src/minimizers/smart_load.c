@@ -171,7 +171,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
 	if (k == kh_end(bx_pos_dict)) {
-		log_error("Barcode does not exists!");
+		log_error("Barcode %s does not exists!", bc);
 	}
 
 	char *buf1, *buf2;
