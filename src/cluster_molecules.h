@@ -41,9 +41,11 @@ struct simple_graph_t{
 
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
-int get_shortest_path(struct asm_graph_t *g, int source, int target);
+int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
+		int *n_path);
 
-void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance);
+void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
+		khash_t(int_int) *trace);
 
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
 

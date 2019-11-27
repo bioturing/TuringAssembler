@@ -29,7 +29,8 @@ int cmp_dijkstra(void *node1, void *node2)
 	return 0;
 }
 
-void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
+void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
+		khash_t(int_int) *trace)
 {
 	/*if (source != 21611)
 		return;*/
@@ -46,8 +47,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	khash_t(int_int) *n_nodes = kh_init(int_int);
 	put_in_map(n_nodes, source, wrapper.n_nodes);
 
-	khash_t(int_int) *P = kh_init(int_int);
-	put_in_map(P, source, -1);
+	put_in_map(trace, source, -1);
 
 	khash_t(set_int) *closed = kh_init(set_int);
 	while (!is_heap_empty(heap)){
@@ -75,7 +75,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 			if (check_in_map(distance, u) == 0){
 				put_in_map(distance, u, 2e9);
 				put_in_map(n_nodes, u, 2e9);
-				put_in_map(P, u, -1);
+				put_in_map(trace, u, -1);
 			}
 			int cur_len = get_in_map(distance, u);
 			int cur_path_len = get_in_map(n_nodes, u);
@@ -91,8 +91,8 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 				push_heap(heap, pointerize(&wrapper,
 					sizeof(struct dijkstra_node_t)));
 
-				it = kh_get(int_int, P, u);
-				kh_val(P, it) = v;
+				it = kh_get(int_int, trace, u);
+				kh_val(trace, it) = v;
 				//printf("push %d %d %d\n", u, new_len, new_path_len);
 			}
 		}
@@ -107,14 +107,44 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance)
 	free(heap);
 }
 
-int get_shortest_path(struct asm_graph_t *g, int source, int target)
+int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
+		int *n_path)
 {
-	khash_t(int_int) *L = kh_init(int_int);
-	dijkstra(g, source, L);
+	int sr = g->edges[source].target;
+	int tg = g->nodes[g->edges[target].source].rc_id;
+
+	struct queue_t q;
+	init_queue(&q, 1024);
 	int res = -1;
-	if (check_in_map(L, target))
-		res = get_in_map(L, target);
-	kh_destroy(int_int, L);
+	int found = 0;
+	for (int i = 0; !found && i < g->nodes[sr].deg; ++i){
+		int v = g->nodes[sr].adj[i];
+		for (int j = 0; !found && j < g->nodes[tg].deg; ++j){
+			int u = g->edges[g->nodes[tg].adj[j]].rc_id;
+			khash_t(int_int) *L = kh_init(int_int);
+			khash_t(int_int) *P = kh_init(int_int);
+			dijkstra(g, v, L, P);
+			if (check_in_map(L, u))
+				res = get_in_map(L, u);
+			if (res != -1 && res <= MAX_RADIUS){
+				for (int i = u; i != -1; i = get_in_map(P, i))
+					push_queue(&q, pointerize(&i, sizeof(int)));
+				*path = calloc(q.back - q.front + 2, sizeof(int));
+				(*path)[0] = source;
+				*n_path = 1;
+				for (int i = q.back - 1; i >= q.front; --i){
+					int w = *(int *)q.data[i];
+					(*path)[(*n_path)++] = w;
+				}
+				(*path)[(*n_path)++] = target;
+				free_queue_content(&q);
+				destroy_queue(&q);
+				found = 1;
+			}
+			kh_destroy(int_int, L);
+			kh_destroy(int_int, P);
+		}
+	}
 	return res;
 }
 
@@ -126,7 +156,8 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 		if (g->edges[i].seq_len > MAX_RADIUS)
 			continue;
 		khash_t(int_int) *D = kh_init(int_int);
-		dijkstra(g, i, D);
+		khash_t(int_int) *P = kh_init(int_int);
+		dijkstra(g, i, D, P);
 		for (khiter_t it = kh_begin(D); it != kh_end(D); ++it){
 			if (!kh_exist(D, it))
 				continue;
@@ -138,6 +169,7 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 			khiter_t it = kh_put(long_int, distance, code, &ret);
 			kh_val(distance, it) = val;
 		}
+		kh_destroy(int_int, P);
 		kh_destroy(int_int, D);
 	}
 	log_debug("Done finding all shortest paths");
@@ -278,63 +310,63 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	kh_destroy(long_int, link_count);
 }
 
-void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
-		khash_t(long_int) *pair_count)
-{
-	khash_t(set_int) *edges = kh_init(set_int);
-	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
-		if (!kh_exist(hits->edges, it))
-			continue;
-		int e = kh_key(hits->edges, it);
-		put_in_set(edges, e);
-		put_in_set(edges, g->edges[e].rc_id);
-	}
-
-	int *tmp = calloc(kh_size(edges), sizeof(int));
-	int n = 0;
-	for (khiter_t it = kh_begin(edges); it != kh_end(edges); ++it){
-		if (!kh_exist(edges, it))
-			continue;
-		tmp[n++] = kh_key(edges, it);
-	}
-	kh_destroy(set_int, edges);
-
-	for (int i = 0; i < n; ++i){
-		for (int j = 0; j < n; ++j){
-			if (i == j)
-				continue;
-			int v = tmp[i];
-			int u = tmp[j];
-
-			int tg = g->edges[v].target;
-			int sr = g->nodes[g->edges[u].source].rc_id;
-			int ok = 0;
-			for (int h = 0; !ok && h < g->nodes[tg].deg; ++h){
-				for (int k = 0; !ok && k < g->nodes[sr].deg; ++k){
-					int w = g->nodes[tg].adj[h];
-					int t = g->edges[g->nodes[sr].adj[k]].rc_id;
-					if (w == u || t == v){
-						ok = 1;
-						break;
-					}
-					int len = get_shortest_path(g, w, t);
-					if (len == -1)
-						continue;
-					if(len > MAX_RADIUS)
-						log_error("Something went wrong, probably Dijkstra is incorrect");
-					ok = 1;
-				}
-			}
-
-			if (!ok)
-				continue;
-			uint64_t code = (((uint64_t) v) << 32) | u;
-			int ret;
-			kh_put(long_int, pair_count, code, &ret);
-		}
-	}
-	free(tmp);
-}
+//void get_sub_graph(struct asm_graph_t *g, struct mm_hits_t *hits,
+//		khash_t(long_int) *pair_count)
+//{
+//	khash_t(set_int) *edges = kh_init(set_int);
+//	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
+//		if (!kh_exist(hits->edges, it))
+//			continue;
+//		int e = kh_key(hits->edges, it);
+//		put_in_set(edges, e);
+//		put_in_set(edges, g->edges[e].rc_id);
+//	}
+//
+//	int *tmp = calloc(kh_size(edges), sizeof(int));
+//	int n = 0;
+//	for (khiter_t it = kh_begin(edges); it != kh_end(edges); ++it){
+//		if (!kh_exist(edges, it))
+//			continue;
+//		tmp[n++] = kh_key(edges, it);
+//	}
+//	kh_destroy(set_int, edges);
+//
+//	for (int i = 0; i < n; ++i){
+//		for (int j = 0; j < n; ++j){
+//			if (i == j)
+//				continue;
+//			int v = tmp[i];
+//			int u = tmp[j];
+//
+//			int tg = g->edges[v].target;
+//			int sr = g->nodes[g->edges[u].source].rc_id;
+//			int ok = 0;
+//			for (int h = 0; !ok && h < g->nodes[tg].deg; ++h){
+//				for (int k = 0; !ok && k < g->nodes[sr].deg; ++k){
+//					int w = g->nodes[tg].adj[h];
+//					int t = g->edges[g->nodes[sr].adj[k]].rc_id;
+//					if (w == u || t == v){
+//						ok = 1;
+//						break;
+//					}
+//					int len = get_shortest_path(g, w, t);
+//					if (len == -1)
+//						continue;
+//					if(len > MAX_RADIUS)
+//						log_error("Something went wrong, probably Dijkstra is incorrect");
+//					ok = 1;
+//				}
+//			}
+//
+//			if (!ok)
+//				continue;
+//			uint64_t code = (((uint64_t) v) << 32) | u;
+//			int ret;
+//			kh_put(long_int, pair_count, code, &ret);
+//		}
+//	}
+//	free(tmp);
+//}
 
 void print_barcode_graph(struct opt_proc_t *opt)
 {
