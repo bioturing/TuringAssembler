@@ -162,7 +162,7 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	load_asm_graph(&g, opt->in_file);
 	struct mm_db_edge_t *mm_edges_db = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
-	khiter_t k;
+	khiter_t ki,k;
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
@@ -201,18 +201,17 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	}
 	hits = mm_hits_init();
 	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	for (k = kh_begin(kh_pw); k != kh_end(kh_pw); ++k){
-		if (kh_exist(kh_pw, k)){
-			uint64_t key = kh_key(kh_pw, k);
+	for (ki = kh_begin(kh_pw); ki != kh_end(kh_pw); ++ki){
+		if (kh_exist(kh_pw, ki)){
+			uint64_t key = kh_key(kh_pw, ki);
 			uint64_t u = key / 100000000;
 			uint64_t v = key % 100000000;
-			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
-			if (kh_val(kh_pw, k) > 1) {
+			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, ki));
+			if (kh_val(kh_pw, ki) > 1) {
 				kh_set(mm_edges, hits->edges, u, 1);
 				kh_set(mm_edges, hits->edges, v, 1);
 			}
 		}
-
 	}
 
 	free(buf1);
@@ -246,7 +245,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 	struct mm_hits_t *hits1, *hits2, *hits;
 
 	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
-	khiter_t k;
+	khiter_t ki, k;
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
@@ -284,13 +283,13 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 		mm_db_destroy(db2);
 	}
 	hits = mm_hits_init();
-	for (k = kh_begin(kh_pw); k != kh_end(kh_pw); ++k){
-		if (kh_exist(kh_pw, k)){
-			uint64_t key = kh_key(kh_pw, k);
+	for (ki = kh_begin(kh_pw); ki != kh_end(kh_pw); ++ki){
+		if (kh_exist(kh_pw, ki)){
+			uint64_t key = kh_key(kh_pw, ki);
 			uint64_t u = key / 100000000;
 			uint64_t v = key % 100000000;
 			//log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
-			if (kh_val(kh_pw, k) > 1) {
+			if (kh_val(kh_pw, ki) > 1) {
 				kh_set(mm_edges, hits->edges, u, 1);
 				kh_set(mm_edges, hits->edges, v, 1);
 			}
