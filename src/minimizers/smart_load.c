@@ -192,12 +192,13 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 		mm_hits_cmp(db1, mm_edges, hits, g);
 		mm_hits_cmp(db2, mm_edges, hits, g);
+		mm_db_destroy(db1);
+		mm_db_destroy(db2);
 	}
 
+	assert(n_reads != 0);
 	free(buf1);
 	free(buf2);
-	mm_db_destroy(db1);
-	mm_db_destroy(db2);
 	return hits;
 }
 
