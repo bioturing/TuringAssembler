@@ -15,11 +15,13 @@
 
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
 KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
+KHASH_MAP_INIT_INT64(mm_pw, uint32_t);                 /* Hash table edge count */
 
 struct mm_align_t {
     uint64_t edge;
     uint32_t pos;
     uint32_t cnt;
+    uint64_t mm;
 };
 
 KHASH_MAP_INIT_INT64(mm_align, struct mm_align_t *);
@@ -43,6 +45,8 @@ struct mm_db_edge_t {
     kh_mm_hash_t *cnt;
     kh_mm_hash_t *p;
 };
+
+
 
 struct mm_hits_t *mm_hits_init();
 void mm_hits_print(struct mm_hits_t *hits, const char *file_path);
