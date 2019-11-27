@@ -12,6 +12,7 @@
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
+#define GET_CODE(a, b) ((((uint64_t) (a)) << 32) | (b))
 
 int cmp_dijkstra(void *node1, void *node2)
 {
@@ -423,81 +424,81 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	fclose(f);
 }
 
-void get_barcode_edges_path(struct opt_proc_t *opt)
-{
-	struct bc_hit_bundle_t *bc_hit_bundle = calloc(1,
-			sizeof(struct bc_hit_bundle_t));
-	get_bc_hit_bundle(opt, bc_hit_bundle);
-	struct barcode_list_t blist;
-	get_barcode_list(opt->bx_str, &blist);
-
-	khash_t(long_int) *all_pairs = kh_init(long_int);
-	get_all_pair_edge_count(opt->in_fasta, all_pairs); // Option -f
-
-	FILE *f = fopen(opt->lc, "w");
-	for (int i = 0; i < blist.n_bc; ++i){
-		if ((i + 1) % 10000 == 0)
-			log_debug("Processing %d-th barcode", i + 1);
-		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
-				bc_hit_bundle);
-		khash_t(long_int) *pair_count = kh_init(long_int);
-		get_sub_graph(bc_hit_bundle->g, hits, pair_count);
-
-		struct simple_graph_t sg;
-		init_simple_graph(&sg);
-		build_simple_graph(pair_count, all_pairs, &sg);
-		find_DAG(&sg, bc_hit_bundle->g);
-		get_longest_path(&sg);
-
-		khash_t(set_int) *not_source = kh_init(set_int);
-		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
-				++it){
-			if (!kh_exist(sg.nodes, it))
-				continue;
-			int u = kh_key(sg.nodes, it);
-			struct simple_node_t *snode = kh_val(sg.nodes, it);
-			for (int j = 0; j < snode->deg; ++j)
-				put_in_set(not_source, snode->adj[j]);
-		}
-
-		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
-				++it){
-			if (!kh_exist(sg.nodes, it))
-				continue;
-			int u = kh_key(sg.nodes, it);
-			if (check_in_set(not_source, u) || check_in_set(sg.is_loop, u))
-				continue;
-			fprintf(f, "%s: ", blist.bc_list[i]);
-			fprintf(f, "%d", u);
-			for (int v = get_in_map(sg.next, u); v != -1;
-					v = get_in_map(sg.next, v))
-				fprintf(f, " --> %d", v);
-			fprintf(f, "\n");
-		}
-		fflush(f);
-		kh_destroy(set_int, not_source);
-
-
-		/*for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
-				++it){
-			if (!kh_exist(sg.nodes, it))
-				continue;
-			int u = kh_key(sg.nodes, it);
-			struct simple_node_t *snode = kh_val(sg.nodes, it);
-			for (int j = 0; j < snode->deg; ++j)
-				fprintf(f, "\t%d -> %d\n", u, snode->adj[j]);
-		}*/
-
-		simple_graph_destroy(&sg);
-		kh_destroy(long_int, pair_count);
-
-	}
-	fclose(f);
-
-	kh_destroy(long_int, all_pairs);
-	bc_hit_bundle_destroy(bc_hit_bundle);
-	free(bc_hit_bundle);
-}
+//void get_barcode_edges_path(struct opt_proc_t *opt)
+//{
+//	struct bc_hit_bundle_t *bc_hit_bundle = calloc(1,
+//			sizeof(struct bc_hit_bundle_t));
+//	get_bc_hit_bundle(opt, bc_hit_bundle);
+//	struct barcode_list_t blist;
+//	get_barcode_list(opt->bx_str, &blist);
+//
+//	khash_t(long_int) *all_pairs = kh_init(long_int);
+//	get_all_pair_edge_count(opt->in_fasta, all_pairs); // Option -f
+//
+//	FILE *f = fopen(opt->lc, "w");
+//	for (int i = 0; i < blist.n_bc; ++i){
+//		if ((i + 1) % 10000 == 0)
+//			log_debug("Processing %d-th barcode", i + 1);
+//		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
+//				bc_hit_bundle);
+//		khash_t(long_int) *pair_count = kh_init(long_int);
+//		get_sub_graph(bc_hit_bundle->g, hits, pair_count);
+//
+//		struct simple_graph_t sg;
+//		init_simple_graph(&sg);
+//		build_simple_graph(pair_count, all_pairs, &sg);
+//		find_DAG(&sg, bc_hit_bundle->g);
+//		get_longest_path(&sg);
+//
+//		khash_t(set_int) *not_source = kh_init(set_int);
+//		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
+//				++it){
+//			if (!kh_exist(sg.nodes, it))
+//				continue;
+//			int u = kh_key(sg.nodes, it);
+//			struct simple_node_t *snode = kh_val(sg.nodes, it);
+//			for (int j = 0; j < snode->deg; ++j)
+//				put_in_set(not_source, snode->adj[j]);
+//		}
+//
+//		for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
+//				++it){
+//			if (!kh_exist(sg.nodes, it))
+//				continue;
+//			int u = kh_key(sg.nodes, it);
+//			if (check_in_set(not_source, u) || check_in_set(sg.is_loop, u))
+//				continue;
+//			fprintf(f, "%s: ", blist.bc_list[i]);
+//			fprintf(f, "%d", u);
+//			for (int v = get_in_map(sg.next, u); v != -1;
+//					v = get_in_map(sg.next, v))
+//				fprintf(f, " --> %d", v);
+//			fprintf(f, "\n");
+//		}
+//		fflush(f);
+//		kh_destroy(set_int, not_source);
+//
+//
+//		/*for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes);
+//				++it){
+//			if (!kh_exist(sg.nodes, it))
+//				continue;
+//			int u = kh_key(sg.nodes, it);
+//			struct simple_node_t *snode = kh_val(sg.nodes, it);
+//			for (int j = 0; j < snode->deg; ++j)
+//				fprintf(f, "\t%d -> %d\n", u, snode->adj[j]);
+//		}*/
+//
+//		simple_graph_destroy(&sg);
+//		kh_destroy(long_int, pair_count);
+//
+//	}
+//	fclose(f);
+//
+//	kh_destroy(long_int, all_pairs);
+//	bc_hit_bundle_destroy(bc_hit_bundle);
+//	free(bc_hit_bundle);
+//}
 
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 {
@@ -566,34 +567,39 @@ void add_simple_edge(struct simple_graph_t *sg, int u, int v)
 	++snode->deg;
 }
 
-void init_simple_graph(struct simple_graph_t *sg)
+void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg)
 {
+	sg->g = g;
 	sg->nodes = kh_init(int_node);
 	sg->is_loop = kh_init(set_int);
 	sg->path_len = kh_init(int_int);
 	sg->next = kh_init(int_int);
 }
 
-void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
+void build_simple_graph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg)
 {
-	for (khiter_t it = kh_begin(one_bc); it != kh_end(one_bc); ++it){
-		if (!kh_exist(one_bc, it))
-			continue;
-		if (kh_val(one_bc, it) == -1)
-			continue;
-		uint64_t code = kh_key(one_bc, it);
-		khiter_t it2 = kh_get(long_int, all_bc, code);
-		if (it2 == kh_end(all_bc))
-			continue;
-		int val = kh_val(all_bc, it2);
-		if (val < MIN_BARCODE_EDGE_COUNT)
-			continue;
-		int u = code >> 32;
-		int v = code & ((uint32_t) -1);
-		add_simple_node(sg, u);
-		add_simple_node(sg, v);
-		add_simple_edge(sg, u, v);
+	int *edges;
+	int n_e;
+	struct asm_graph_t *g = sg->g;
+	hits_to_edges(g, hits, &edges, &n_e);
+	for (int i = 0; i < n_e; ++i){
+		for (int j = 0; j < n_e; ++j){
+			if (i == j)
+				continue;
+			int v = edges[i];
+			int u = edges[j];
+			uint64_t code = GET_CODE(v, u);
+			khiter_t it = kh_get(long_int, all_bc, code);
+			if (it == kh_end(all_bc))
+				continue;
+			int val = kh_val(all_bc, it);
+			if (val < MIN_BARCODE_EDGE_COUNT)
+				continue;
+			add_simple_node(sg, u);
+			add_simple_node(sg, v);
+			add_simple_edge(sg, v, u);
+		}
 	}
 }
 
@@ -744,3 +750,112 @@ int is_repeat(struct asm_graph_t *g, int e)
 	return 0;
 }
 
+void print_graph_component(struct simple_graph_t *sg, FILE *f)
+{
+	khash_t(set_int) *visited = kh_init(set_int);
+	int n_com = 0;
+	int simple_com = 0;
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+		if (!kh_exist(sg->nodes, it))
+			continue;
+		int s = kh_key(sg->nodes, it);
+		if (check_in_set(visited, s))
+			continue;
+		put_in_set(visited, s);
+
+		int has_rc = 0;
+		khash_t(set_int) *component = kh_init(set_int);
+
+		struct queue_t q;
+		init_queue(&q, 1024);
+		push_queue(&q, pointerize(&s, sizeof(int)));
+		while (!is_queue_empty(&q)){
+			int v = *(int *) get_queue(&q);
+			pop_queue(&q);
+
+			if (check_in_set(component, sg->g->edges[v].rc_id))
+				has_rc = 1;
+			put_in_set(component, v);
+			khiter_t it = kh_get(int_node, sg->nodes, v);
+			struct simple_node_t *node = kh_val(sg->nodes, it);
+			for (int i = 0; i < node->deg; ++i){
+				int u = node->adj[i];
+				if (check_in_set(visited, u))
+					continue;
+				put_in_set(visited, u);
+				push_queue(&q, pointerize(&u, sizeof(int)));
+			}
+		}
+		kh_destroy(set_int, component);
+		destroy_queue(&q);
+
+		++n_com;
+		if (has_rc == 0)
+			++simple_com;
+	}
+	kh_destroy(set_int, visited);
+	fprintf(f, "No components:%d, no simple components: %d\n", n_com, simple_com);
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+		if (!kh_exist(sg->nodes, it))
+			continue;
+		int s = kh_key(sg->nodes, it);
+		khiter_t it = kh_get(int_node, sg->nodes, s);
+		struct simple_node_t *nodes = kh_val(sg->nodes, it);
+		for (int i = 0; i < nodes->deg; ++i)
+			fprintf(f, "%d %d\n", s, nodes->adj[i]);
+	}
+}
+
+void get_all_barcode_paths(struct opt_proc_t *opt)
+{
+	struct bc_hit_bundle_t *bc_hit_bundle = calloc(1,
+			sizeof(struct bc_hit_bundle_t));
+	get_bc_hit_bundle(opt, bc_hit_bundle);
+
+	struct barcode_list_t blist;
+	get_barcode_list(opt->bx_str, &blist);
+
+	khash_t(long_int) *all_bc = kh_init(long_int);
+	get_all_pair_edge_count(opt->in_fasta, all_bc);
+
+	FILE *f = fopen(opt->lc, "w");
+	for (int i = 0; i < blist.n_bc; ++i){
+		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
+				bc_hit_bundle);
+		struct simple_graph_t sg;
+		init_simple_graph(bc_hit_bundle->g, &sg);
+		build_simple_graph(hits, all_bc, &sg);
+
+		fprintf(f, "%s\n", blist.bc_list[i]);
+		print_graph_component(&sg, f);
+
+	}
+	fclose(f);
+
+	bc_hit_bundle_destroy(bc_hit_bundle);
+	free(bc_hit_bundle);
+}
+
+void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
+		int *n_e)
+{
+	khash_t(set_int) *tmp = kh_init(set_int);
+	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
+		if (!kh_exist(hits->edges, it))
+			continue;
+		int e = kh_key(hits->edges, it);
+		int rc = g->edges[e].rc_id;
+		put_in_set(tmp, e);
+		put_in_set(tmp, rc);
+	}
+
+	*edges = calloc(kh_size(tmp), sizeof(int));
+	*n_e = 0;
+	for (khiter_t it = kh_begin(tmp); it != kh_end(tmp); ++it){
+		if (!kh_exist(tmp, it))
+			continue;
+		int e = kh_key(tmp, it);
+		(*edges)[(*n_e)++] = e;
+	}
+	kh_destroy(set_int, tmp);
+}

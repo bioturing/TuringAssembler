@@ -32,13 +32,14 @@ struct simple_node_t{
 KHASH_MAP_INIT_INT(int_node, struct simple_node_t *);
 
 struct simple_graph_t{
+	struct asm_graph_t *g;
 	khash_t(set_int) *is_loop;
 	khash_t(int_int) *path_len;
 	khash_t(int_int) *next;
 	khash_t(int_node) *nodes;
 };
 
-void init_simple_graph(struct simple_graph_t *sg);
+void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
 int get_shortest_path(struct asm_graph_t *g, int source, int target);
 
@@ -61,6 +62,8 @@ void print_barcode_graph(struct opt_proc_t *opt);
 
 void get_barcode_edges_path(struct opt_proc_t *opt);
 
+void get_all_barcode_paths(struct opt_proc_t *opt);
+
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 
 void barcode_list_destroy(struct barcode_list_t *blist);
@@ -71,7 +74,7 @@ void add_simple_node(struct simple_graph_t *sg, int u);
 
 void add_simple_edge(struct simple_graph_t *sg, int u, int v);
 
-void build_simple_graph(khash_t(long_int) *one_bc, khash_t(long_int) *all_bc,
+void build_simple_graph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 void simple_graph_destroy(struct simple_graph_t *sg);
 void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
@@ -82,4 +85,9 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 void get_longest_path(struct simple_graph_t *sg);
 int cmp_dijkstra(void *node1, void *node2);
 int is_repeat(struct asm_graph_t *g, int e);
+
+void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
+		int *n_e);
+
+void print_graph_component(struct simple_graph_t *sg, FILE *f);
 #endif
