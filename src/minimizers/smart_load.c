@@ -176,7 +176,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
-	stream_filter_read(read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2,
+	stream_filter_read(read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2,
 			&m_buf1, &m_buf2);
 
 	struct read_t r1, r2;
