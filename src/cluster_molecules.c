@@ -228,8 +228,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 
 	FILE *bc_log = fopen("bc_log.txt", "w");
 	for (int i = 0; i < blist.n_bc; ++i){
-		if (i > 10)
-			break;
 		if ((i + 1) % 10000 == 0)
 			log_debug("%d/%d barcodes processed", i + 1, blist.n_bc);
 		if (blist.read_count[i] < MIN_BC_READ_COUNT
