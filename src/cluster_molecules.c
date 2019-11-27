@@ -217,8 +217,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	struct bc_hit_bundle_t bc_hit_bundle;
 	get_bc_hit_bundle(opt, &bc_hit_bundle);
 	struct asm_graph_t *g = bc_hit_bundle.g;
-	khash_t(bcpos) *bc_pos_dict = bc_hit_bundle.bc_pos_dict;
-	struct read_path_t *read_sorted_path = bc_hit_bundle.read_sorted_path;
 
 	khash_t(long_int) *distance = kh_init(long_int);
 	khash_t(long_int) *is_connected = kh_init(long_int);
@@ -234,13 +232,6 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		if (blist.read_count[i] < MIN_BC_READ_COUNT
 			|| blist.read_count[i] > MAX_BC_READ_COUNT)
 			continue;
-		uint64_t bx_encoded = barcode_hash_mini(blist.bc_list[i]);
-		uint64_t bx[1] = {bx_encoded};
-
-		khint_t k = kh_get(bcpos, bc_pos_dict, bx_encoded);
-		if (k == kh_end(bc_pos_dict)) {
-			log_error("Barcode does not exist");
-		}
 
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				&bc_hit_bundle);
