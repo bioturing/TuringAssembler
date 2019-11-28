@@ -915,11 +915,17 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 	for (int i = 2; i <= MAX_PATH_LEN; ++i){
 		khash_t(long_int) *L_cur = kh_init(long_int);
 		for (int j = 0; j < g->n_e; ++j){
+			if ((j + 1) % 10000 == 0)
+				log_debug("%d-th iteration: %d edges processed",
+						i, j + 1);
 			int v = j;
 			if (g->edges[v].seq_len > MAX_RADIUS)
 				continue;
-			for (int k = 0; k < g->n_e; ++k){
-				int u = k;
+			int *edges;
+			int n_e;
+			bfs_nearby(g, v, i, &edges, &n_e);
+			for (int k = 0; k < n_e; ++k){
+				int u = edges[k];
 				if (g->edges[u].seq_len > MAX_RADIUS)
 					continue;
 				uint64_t code = GET_CODE(v, u);
@@ -931,7 +937,8 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 						GET_CODE(w, u));
 					if (it == kh_end(L_pre))
 						continue;
-					int new_len = kh_val(L_pre, it) + g->edges[v].seq_len;
+					int new_len = kh_val(L_pre, it) + g->edges[v].seq_len
+						- g->ksize;
 					min_len = min(min_len, new_len);
 				}
 				if (min_len > MAX_RADIUS)
@@ -948,9 +955,58 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 				}
 				kh_val(L_all, it) = min(kh_val(L_all, it), min_len);
 			}
+			free(edges);
 		}
 		kh_destroy(long_int, L_pre);
 		L_pre = L_cur;
 	}
 	kh_destroy(long_int, L_pre);
+
+	/*for (khiter_t it = kh_begin(L_all); it != kh_end(L_all); ++it){
+		if (!kh_exist(L_all, it))
+			continue;
+		uint64_t code = kh_key(L_all, it);
+		int val = kh_val(L_all, it);
+		int v = code >> 32;
+		int u = code & ((uint32_t) -1);
+		printf("%d %d %d %d %d\n", v, u, g->edges[v].rc_id,
+				g->edges[u].rc_id, val);
+	}*/
+}
+
+void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int *n_e)
+{
+	khash_t(int_int) *L = kh_init(int_int);
+	struct queue_t q;
+	init_queue(&q, 1024);
+	push_queue(&q, pointerize(&source, sizeof(int)));
+	put_in_map(L, source, 1);
+	while (!is_queue_empty(&q)){
+		int v = *(int *) get_queue(&q);
+		free(get_queue(&q));
+		pop_queue(&q);
+
+		int len = get_in_map(L, v);
+		if (len > radius)
+			break;
+		int tg = g->edges[v].target;
+		for (int i = 0; i < g->nodes[tg].deg; ++i){
+			int u = g->nodes[tg].adj[i];
+			if (check_in_map(L, u))
+				continue;
+			push_queue(&q, pointerize(&u, sizeof(int)));
+			put_in_map(L, u, len + 1);
+		}
+	}
+	free_queue_content(&q);
+	destroy_queue(&q);
+
+	*edges = calloc(kh_size(L), sizeof(int));
+	*n_e = 0;
+	for (khiter_t it = kh_begin(L); it != kh_end(L); ++it){
+		if (!kh_exist(L, it))
+			continue;
+		(*edges)[(*n_e)++] = kh_key(L, it);
+	}
+	kh_destroy(int_int, L);
 }
