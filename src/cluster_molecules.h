@@ -48,6 +48,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
 		khash_t(int_int) *trace);
 
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
+void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distance);
 
 int get_pair_distance(int v, int u, khash_t(long_int) *distance);
 
