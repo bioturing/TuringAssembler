@@ -18,6 +18,8 @@
 #include "minimizers.h"
 #include "../assembly_graph.h"
 #include "get_buffer.h"
+
+#define RATIO_OF_CONFIDENT 0.5
 static const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
 	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
@@ -150,7 +152,6 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
 	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
-	printf("buf1: %s, buf2: %s", buf1, buf2);
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
@@ -163,6 +164,7 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	struct mm_db_edge_t *mm_edges_db = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
 	khiter_t ki,k;
+	hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
@@ -176,42 +178,45 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		mm_hits_cmp(db1, mm_edges_db, hits1, &g);
 		mm_hits_cmp(db2, mm_edges_db, hits2, &g);
 
-		log_info("Number of hits on R1: %d", hits1->n);
-		log_info("Number of hits on R2: %d", hits2->n);
-		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1){
-			if (!kh_exist(hits1->edges, k1))
-				continue;
-			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
-				if (!kh_exist(hits2->edges, k2))
-					continue;
-				uint64_t key1 = kh_key(hits1->edges, k1);
-				uint64_t key2 = kh_key(hits2->edges, k2);
-				uint64_t hk = key1 * 100000000 + key2;
-				if (kh_get_val(mm_pw, kh_pw, hk, -1) == -1)
-					kh_set(mm_pw, kh_pw, hk, 1);
-				else
-					kh_set(mm_pw, kh_pw, hk, kh_get_val(mm_pw, kh_pw, hk, -1) + 1);
-
+		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+		if (hits1->n > 0) {
+			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
+				if (kh_exist(hits1->edges, k1)) {
+					if (kh_val(hits1->edges, k1) > max) {
+						max = kh_val(hits1->edges, k1);
+						er1 = kh_key(hits1->edges, k1);
+					}
+				}
 			}
+		}
+
+		if (max < RATIO_OF_CONFIDENT * hits1->n)
+			er1 = UINT64_MAX;
+		max = 0;
+		if (hits2->n > 0) {
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (kh_exist(hits2->edges, k2))
+					if (kh_val(hits2->edges, k2) > max) {
+						max = kh_val(hits2->edges, k2);
+						er2 = kh_key(hits2->edges, k2);
+					}
+			}
+		}
+		if (max < RATIO_OF_CONFIDENT * hits2->n)
+			er2 = UINT64_MAX;
+
+		if (er1 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er1, 1);
+		if (er2 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g.edges[er1].rc_id != er2) {
+			//log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			printf("%lu %lu\n", er1, er2);
 		}
 		mm_hits_destroy(hits1);
 		mm_hits_destroy(hits2);
 		mm_db_destroy(db1);
 		mm_db_destroy(db2);
-	}
-	hits = mm_hits_init();
-	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	for (ki = kh_begin(kh_pw); ki != kh_end(kh_pw); ++ki){
-		if (kh_exist(kh_pw, ki)){
-			uint64_t key = kh_key(kh_pw, ki);
-			uint64_t u = key / 100000000;
-			uint64_t v = key % 100000000;
-			log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, ki));
-			if (kh_val(kh_pw, ki) > 1) {
-				kh_set(mm_edges, hits->edges, u, 1);
-				kh_set(mm_edges, hits->edges, v, 1);
-			}
-		}
 	}
 
 	free(buf1);
@@ -246,6 +251,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
 	khiter_t ki, k;
+	hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
@@ -259,44 +265,46 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 		mm_hits_cmp(db1, mm_edges_db, hits1, g);
 		mm_hits_cmp(db2, mm_edges_db, hits2, g);
 
-		//log_info("Number of hits on R1: %d", hits1->n);
-		//log_info("Number of hits on R2: %d", hits2->n);
-		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1){
-			if (!kh_exist(hits1->edges, k1))
-				continue;
-			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
-				if (!kh_exist(hits2->edges, k2))
-					continue;
-				uint64_t key1 = kh_key(hits1->edges, k1);
-				uint64_t key2 = kh_key(hits2->edges, k2);
-				uint64_t hk = key1 * 100000000 + key2;
-				if (kh_get_val(mm_pw, kh_pw, hk, -1) == -1)
-					kh_set(mm_pw, kh_pw, hk, 1);
-				else
-					kh_set(mm_pw, kh_pw, hk, kh_get_val(mm_pw, kh_pw, hk, -1) + 1);
-
+		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+		if (hits1->n > 0) {
+			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
+				if (kh_exist(hits1->edges, k1)) {
+					if (kh_val(hits1->edges, k1) > max) {
+						max = kh_val(hits1->edges, k1);
+						er1 = kh_key(hits1->edges, k1);
+					}
+				}
 			}
+		}
+
+		if (max < RATIO_OF_CONFIDENT * hits1->n)
+			er1 = UINT64_MAX;
+		max = 0;
+		if (hits2->n > 0) {
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (kh_exist(hits2->edges, k2))
+					if (kh_val(hits2->edges, k2) > max) {
+						max = kh_val(hits2->edges, k2);
+						er2 = kh_key(hits2->edges, k2);
+					}
+			}
+		}
+		if (max < RATIO_OF_CONFIDENT * hits2->n)
+			er2 = UINT64_MAX;
+
+		if (er1 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er1, 1);
+		if (er2 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
+			//log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			printf("%llu %llu\n", er1, er2);
 		}
 		mm_hits_destroy(hits1);
 		mm_hits_destroy(hits2);
 		mm_db_destroy(db1);
 		mm_db_destroy(db2);
 	}
-	hits = mm_hits_init();
-	for (ki = kh_begin(kh_pw); ki != kh_end(kh_pw); ++ki){
-		if (kh_exist(kh_pw, ki)){
-			uint64_t key = kh_key(kh_pw, ki);
-			uint64_t u = key / 100000000;
-			uint64_t v = key % 100000000;
-			//log_info("Read pair that mapped to u->v: %lu -> %lu: %d", u, v, kh_val(kh_pw, k));
-			if (kh_val(kh_pw, ki) > 1) {
-				kh_set(mm_edges, hits->edges, u, 1);
-				kh_set(mm_edges, hits->edges, v, 1);
-			}
-		}
-	}
-	free(buf1);
-	free(buf2);
 	return hits;
 }
 
