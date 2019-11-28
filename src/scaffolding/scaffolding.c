@@ -799,43 +799,75 @@ inline void set_nu(uint32_t *seq, int pos, int val)
 	seq[pos >> 4] |= val << ((pos & 15) << 1);
 }
 
-char *concate_seq(struct asm_edge_t *a, struct asm_edge_t *b, int ksize)
+char *concate_seq(struct asm_graph_t *g, int n_path, int *path, int ksize, int *ret_len)
 {
-	uint32_t *res = calloc((a->seq_len + b->seq_len - ksize + 15) / 16, 4);
-	for (int i = 0 ;  i < a->seq_len; i++) {
-		set_nu(res, i, get_nu(a->seq, i));
+	int total_len = ksize;
+	for (int i = 0; i < n_path; i++) {
+		int a = path[i];
+		total_len += g->edges[a].seq_len -ksize;
 	}
-	for(int i = ksize; i < b->seq_len; i++) {
-		set_nu(res, i+a->seq_len -ksize, get_nu(b->seq, i));
+	uint32_t *res = calloc((total_len + 15) / 16, 4);
+	int cur_len = g->edges[path[0]].seq_len;
+	for (int i = 0 ;  i < cur_len; i++) {
+		set_nu(res, i, get_nu(g->edges[path[0]].seq, i));
 	}
-	return  res;
 
+	for(int i = 1; i < n_path; i++) {
+		struct asm_edge_t *a = &g->edges[path[i]];
+		for (int j = ksize; j < a->seq_len; j++) {
+			set_nu(res, cur_len + j-ksize, get_nu(a->seq, j));
+		}
+		cur_len += a->seq_len - ksize;
+	}
+	assert(cur_len == total_len);
+	*ret_len = total_len;
+	return  res;
 }
 
-struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g)
+struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 {
-	FILE *f = fopen("/home/che/bioturing/data/yeast/list_edge.txt", "r");
+	FILE *f = fopen(path, "r");
 	int a, b;
 
 	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 	int count = 0 ;
 	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
-		printf("get path from %d %d", a,b);
+		printf("get path from %d %d\n", a,b);
 		count++;
 		int *path = NULL;
 		int n_path;
 		int res = get_shortest_path(g, a, b, &path, &n_path);
-		assert(res != -1);
+		if (res == -1) {
+			int t_b = g->edges[a].rc_id;
+			int t_a = g->edges[b].rc_id;
+			b = t_b;
+			a = t_a;
+			res = get_shortest_path(g, a, b, &path, &n_path);
+		}
+		assert(res <= 1975);
+		if (res == -1)
+			continue;
+//		assert(res != -1);
 		for(int i = 0 ; i < n_path; i++) {
 			printf("%d\n", path[i]);
 		}
 		printf("%d\n", count);
 		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
-		g0->edges[g0->n_e].seq = concate_seq(&g->edges[a], &g->edges[b], g->ksize);
-		g0->edges[g0->n_e].seq_len = g->edges[a].seq_len + g->edges[b].seq_len - g->ksize;
+		int total_len;
+		g0->edges[g0->n_e].seq = concate_seq(g, n_path, path, g->ksize, &total_len);
+		g0->edges[g0->n_e].seq_len = total_len;
 		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
+		g0->edges[g0->n_e].n_holes = 0;
 		g0->n_e++;
 		free(path);
+	}
+	for (int i = 0; i < g->n_e; i++) {
+		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+		g0->edges[g0->n_e].seq = g->edges[i].seq;
+		g0->edges[g0->n_e].seq_len = g->edges[i].seq_len;
+		g0->edges[g0->n_e].count = g->edges[i].count;
+		g0->edges[g0->n_e].n_holes = 0;
+		g0->n_e++;
 	}
 	return g0;
 }
@@ -843,8 +875,9 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g)
 void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 //	init_global_params(g);
-	struct asm_graph_t *g0 = huu_create_new_graph(g);
+	struct asm_graph_t *g0 = huu_create_new_graph(g, opt->var[0]);
 	char path[1024];
+	log_warn("done create new graph");
 	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
 	         opt->out_dir, g->ksize, "pair");
 	write_stupid_fasta(g0, path);

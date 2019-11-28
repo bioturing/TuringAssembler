@@ -7,7 +7,7 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 10000
+#define MAX_RADIUS 1975
 #define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
@@ -63,7 +63,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
 		if (check_in_set(closed, g->edges[v].rc_id))
 			continue;
 		put_in_set(closed, v);
-		printf("%d %d %d %d\n", source, v, len, path_len);
+//		printf("%d %d %d %d\n", source, v, len, path_len);
 		//printf("pop %d %d %d\n", v, len, path_len);
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
@@ -127,6 +127,7 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
 				(*path)[0] = source;
 				(*path)[1] = target;
 				found = 1;
+				res = 0;
 				break;
 			}
 			khash_t(int_int) *L = kh_init(int_int);
@@ -148,6 +149,8 @@ int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
 				free_queue_content(&q);
 				destroy_queue(&q);
 				found = 1;
+			} else if (res > MAX_RADIUS) {
+				return -1;
 			}
 			kh_destroy(int_int, L);
 			kh_destroy(int_int, P);
