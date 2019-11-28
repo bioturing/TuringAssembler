@@ -63,7 +63,7 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
 		if (check_in_set(closed, g->edges[v].rc_id))
 			continue;
 		put_in_set(closed, v);
-		printf("%d %d %d %d\n", source, v, len, path_len);
+		//printf("%d %d %d %d\n", source, v, len, path_len);
 		//printf("pop %d %d %d\n", v, len, path_len);
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
