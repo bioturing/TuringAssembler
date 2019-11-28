@@ -228,9 +228,7 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 			int ok;
 			khiter_t it = kh_get(long_int, is_connected, code);
 			if (it == kh_end(is_connected)){
-				ok = check_connected(g, v, u, distance)
-					|| check_connected(g, g->edges[u].rc_id,
-						g->edges[v].rc_id, distance);
+				ok = check_connected(g, v, u, distance);
 				int ret;
 				it = kh_put(long_int, is_connected, code, &ret);
 				kh_val(is_connected, it) = ok;
@@ -260,7 +258,8 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 
 	khash_t(long_int) *distance = kh_init(long_int);
 	khash_t(long_int) *is_connected = kh_init(long_int);
-	get_all_shortest_paths(bc_hit_bundle.g, distance);
+	//get_all_shortest_paths(bc_hit_bundle.g, distance);
+	get_all_shortest_paths_dp(bc_hit_bundle.g, distance);
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -894,4 +893,118 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 		(*edges)[(*n_e)++] = e;
 	}
 	kh_destroy(set_int, tmp);
+}
+
+void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distance)
+{
+	khash_t(long_int) *L_all = distance;
+	khash_t(long_int) *L_pre = kh_init(long_int);
+	for (int i = 0; i < g->n_e; ++i){
+		int v = i;
+		if (g->edges[v].seq_len > MAX_RADIUS)
+			continue;
+		int ret;
+		khiter_t it = kh_put(long_int, L_pre, GET_CODE(v, v), &ret);
+		kh_val(L_pre, it) = g->edges[v].seq_len;
+
+		it = kh_put(long_int, L_all, GET_CODE(v, v), &ret);
+		kh_val(L_all, it) = g->edges[v].seq_len;
+	}
+	for (int i = 2; i <= MAX_PATH_LEN; ++i){
+		khash_t(long_int) *L_cur = kh_init(long_int);
+		for (int j = 0; j < g->n_e; ++j){
+			if ((j + 1) % 10000 == 0)
+				log_debug("%d-th iteration: %d edges processed",
+						i, j + 1);
+			int v = j;
+			if (g->edges[v].seq_len > MAX_RADIUS)
+				continue;
+			int *edges;
+			int n_e;
+			bfs_nearby(g, v, i, &edges, &n_e);
+			for (int k = 0; k < n_e; ++k){
+				int u = edges[k];
+				if (g->edges[u].seq_len > MAX_RADIUS)
+					continue;
+				uint64_t code = GET_CODE(v, u);
+				int tg = g->edges[v].target;
+				int min_len = 1e9;
+				for (int h = 0; h < g->nodes[tg].deg; ++h){
+					int w = g->nodes[tg].adj[h];
+					khiter_t it = kh_get(long_int, L_pre,
+						GET_CODE(w, u));
+					if (it == kh_end(L_pre))
+						continue;
+					int new_len = kh_val(L_pre, it) + g->edges[v].seq_len
+						- g->ksize;
+					min_len = min(min_len, new_len);
+				}
+				if (min_len > MAX_RADIUS)
+					continue;
+				int ret;
+				khiter_t it = kh_put(long_int, L_cur, code, &ret);
+				kh_val(L_cur, it) = min_len;
+
+				it = kh_get(long_int, L_all, GET_CODE(v, u));
+				if (it == kh_end(L_all)){
+					int ret;
+					it = kh_put(long_int, L_all, code, &ret);
+					kh_val(L_all, it) = 1e9;
+				}
+				kh_val(L_all, it) = min(kh_val(L_all, it), min_len);
+			}
+			free(edges);
+		}
+		kh_destroy(long_int, L_pre);
+		L_pre = L_cur;
+	}
+	kh_destroy(long_int, L_pre);
+
+	/*for (khiter_t it = kh_begin(L_all); it != kh_end(L_all); ++it){
+		if (!kh_exist(L_all, it))
+			continue;
+		uint64_t code = kh_key(L_all, it);
+		int val = kh_val(L_all, it);
+		int v = code >> 32;
+		int u = code & ((uint32_t) -1);
+		printf("%d %d %d %d %d\n", v, u, g->edges[v].rc_id,
+				g->edges[u].rc_id, val);
+	}*/
+}
+
+void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int *n_e)
+{
+	khash_t(int_int) *L = kh_init(int_int);
+	struct queue_t q;
+	init_queue(&q, 1024);
+	push_queue(&q, pointerize(&source, sizeof(int)));
+	put_in_map(L, source, 1);
+	while (!is_queue_empty(&q)){
+		int v = *(int *) get_queue(&q);
+		free(get_queue(&q));
+		pop_queue(&q);
+
+		int len = get_in_map(L, v);
+		if (len > radius)
+			break;
+		int tg = g->edges[v].target;
+		for (int i = 0; i < g->nodes[tg].deg; ++i){
+			int u = g->nodes[tg].adj[i];
+			if (check_in_map(L, u))
+				continue;
+			push_queue(&q, pointerize(&u, sizeof(int)));
+			put_in_map(L, u, len + 1);
+		}
+	}
+	free_queue_content(&q);
+	destroy_queue(&q);
+
+	*edges = calloc(kh_size(L), sizeof(int));
+	*n_e = 0;
+	for (khiter_t it = kh_begin(L); it != kh_end(L); ++it){
+		if (!kh_exist(L, it))
+			continue;
+		(*edges)[(*n_e)++] = kh_key(L, it);
+	}
+	kh_destroy(int_int, L);
 }
