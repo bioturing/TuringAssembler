@@ -228,9 +228,7 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 			int ok;
 			khiter_t it = kh_get(long_int, is_connected, code);
 			if (it == kh_end(is_connected)){
-				ok = check_connected(g, v, u, distance)
-					|| check_connected(g, g->edges[u].rc_id,
-						g->edges[v].rc_id, distance);
+				ok = check_connected(g, v, u, distance);
 				int ret;
 				it = kh_put(long_int, is_connected, code, &ret);
 				kh_val(is_connected, it) = ok;
