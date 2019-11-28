@@ -21,7 +21,7 @@
 #define DEBUG_MM
 #endif
 
-#define MOLECULE_MARGIN 10000
+#define MOLECULE_MARGIN 6000
 
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
