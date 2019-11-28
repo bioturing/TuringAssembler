@@ -430,17 +430,17 @@ struct mm_db_edge_t *mm_db_edge_init()
  */
 void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
 {
-	khiter_t k, k_h;
+	khiter_t k, ki, k_h;
 
-	k = kh_get(mm_hash, db->cnt, mm);
-	if (k == kh_end(db->cnt)) {
+	ki = kh_get(mm_hash, db->cnt, mm);
+	if (ki == kh_end(db->cnt)) {
 		kh_set(mm_hash, db->cnt, mm, 1);
 		kh_set(mm_hash, db->h, mm, e);
 		kh_set(mm_hash, db->p, mm, p);
 	} else {
 		k_h = kh_get(mm_hash, db->h, mm);
 		//if (e != kh_value(db->h, k_h)) // Allow multiple mapped on one edge minimizer to be single-ton
-		kh_value(db->cnt, k)++;
+		kh_value(db->cnt, ki)++;
 	}
 
 }
@@ -511,8 +511,8 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 			single_ton++;
 			p = kh_get_val(mm_hash, db_e->p, db->mm[i], -1);
 			e = kh_get_val(mm_hash, db_e->h, db->mm[i], -1);
-			//if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
-			//	continue;
+			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
+				continue;
 			mm_hits_insert(hits, db->mm[i], e, p);
 		}
 	}
