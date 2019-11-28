@@ -7,7 +7,7 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 
-#define MAX_RADIUS 10000
+#define MAX_RADIUS 4000
 #define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
