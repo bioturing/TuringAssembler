@@ -304,15 +304,25 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		struct shortest_path_info_t *wrapper = kh_val(spath_info, it);
 		int v = code >> 32;
 		int u = code & ((uint32_t) -1);
-		fprintf(all_paths, "%d to %d: ", v, u);
-		int i = v;
-		while (i != -1){
-			fprintf(all_paths, "%d,", i);
-			uint64_t new_code = GET_CODE(i, u);
-			khiter_t it2 = kh_get(long_spath, spath_info, new_code);
-			i = kh_val(spath_info, it2)->trace;
+
+		int source = g->nodes[g->edges[v].source].rc_id;
+		int target = g->edges[u].target;
+		for (int i = 0; i < g->nodes[source].deg; ++i){
+			int w = g->edges[g->nodes[source].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[target].deg; ++j){
+				int t = g->nodes[target].adj[j];
+				fprintf(all_paths, "%d to %d: ", w, t);
+				int p = v;
+				while (p != -1){
+					fprintf(all_paths, "%d,", p);
+					uint64_t new_code = GET_CODE(p, u);
+					khiter_t it2 = kh_get(long_spath, spath_info, new_code);
+					p = kh_val(spath_info, it2)->trace;
+				}
+				fprintf(all_paths, "\n");
+
+			}
 		}
-		fprintf(all_paths, "\n");
 	}
 	fclose(all_paths);
 
