@@ -734,3 +734,16 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	asm_graph_destroy(&g1);
 }
 
+void find_the_shortest_path(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	int *path;
+	int n_path;
+	get_shortest_path(&g, opt->k0, opt->k1, &path, &n_path);
+	for (int i = 0; i < n_path; ++i) {
+		printf("%d,", path[i]);
+	}
+	printf("\n");
+	asm_graph_destroy(&g);
+}
