@@ -5,19 +5,19 @@
 
 #define KHASH_MAP_OPERATIONS(name, key_type, val_type)\
 \
-static int kh_##name##_key_exist(khash_t(name) *h, key_type k)\
+static int kh_##name##_exist(khash_t(name) *h, key_type k)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	return it != kh_end(h);\
 }\
 \
-static val_type kh_##name##_get_val(khash_t(name) *h, key_type k)\
+static val_type kh_##name##_get(khash_t(name) *h, key_type k)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	assert(it != kh_end(h));\
 	return kh_val(h, it);\
 }\
-static void kh_##name##_set_val(khash_t(name) *h, key_type k, val_type v)\
+static void kh_##name##_set(khash_t(name) *h, key_type k, val_type v)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	if (it == kh_end(h)){\
@@ -29,13 +29,13 @@ static void kh_##name##_set_val(khash_t(name) *h, key_type k, val_type v)\
 
 #define KHASH_SET_OPERATIONS(name, key_type)\
 \
-static int kh_##name##_key_exist(khash_t(name) *h, key_type k)\
+static int kh_##name##_exist(khash_t(name) *h, key_type k)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	return it != kh_end(h);\
 }\
 \
-static void kh_##name##_add_key(khash_t(name) *h, key_type k)\
+static void kh_##name##_add(khash_t(name) *h, key_type k)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	if (it == kh_end(h)){\

@@ -13,19 +13,13 @@ struct shortest_path_info_t{
 };
 
 KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
-KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *)
+KHASH_SET_INIT_INT64(set_long);
 
-struct dijkstra_node_t{
-	int vertex;
-	int len;
-	int n_nodes;
-};
-
-struct bc_edges_path_t{
-	char bc[19];
-	int n_e;
-	int *edges;
-};
+KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *);
+KHASH_SET_OPERATIONS(set_int, int);
+KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
+KHASH_MAP_OPERATIONS(int_int, int, int);
+KHASH_SET_OPERATIONS(set_long, uint64_t);
 
 struct barcode_list_t{
 	int n_bc;
@@ -49,13 +43,6 @@ struct simple_graph_t{
 
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
-int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
-		int *n_path);
-
-void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
-		khash_t(int_int) *trace);
-
-void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
 void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
 
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
