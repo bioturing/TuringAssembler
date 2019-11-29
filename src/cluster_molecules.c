@@ -6,194 +6,25 @@
 #include "minimizers/count_barcodes.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
+#include "log.h"
 
 #define MAX_RADIUS 4000
-#define MAX_PATH_LEN 50
+#define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
 #define GET_CODE(a, b) ((((uint64_t) (a)) << 32) | (b))
 
-int cmp_dijkstra(void *node1, void *node2)
+int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info)
 {
-	struct dijkstra_node_t *n1 = node1;
-	struct dijkstra_node_t *n2 = node2;
-	if (n1->len < n2->len)
+	uint64_t code = GET_CODE(v, u);
+	if (kh_long_spath_exist(spath_info, code) == 0)
 		return -1;
-	if (n1->len > n2->len)
-		return 1;
-	if (n1->n_nodes < n2->n_nodes)
-		return -1;
-	if (n1->n_nodes > n2->n_nodes)
-		return 1;
-	return 0;
-}
-
-void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
-		khash_t(int_int) *trace)
-{
-	/*if (source != 21611)
-		return;*/
-	struct heap_t *heap = calloc(1, sizeof(struct heap_t));
-	init_heap(heap, &cmp_dijkstra);
-	struct dijkstra_node_t wrapper = {
-		.vertex = source,
-		.len = g->edges[source].seq_len,
-		.n_nodes = 0
-	};
-	push_heap(heap, pointerize(&wrapper, sizeof(struct dijkstra_node_t)));
-
-	put_in_map(distance, source, wrapper.len);
-	khash_t(int_int) *n_nodes = kh_init(int_int);
-	put_in_map(n_nodes, source, wrapper.n_nodes);
-
-	put_in_map(trace, source, -1);
-
-	khash_t(set_int) *closed = kh_init(set_int);
-	while (!is_heap_empty(heap)){
-		struct dijkstra_node_t *node = get_heap(heap);
-		pop_heap(heap);
-		int v = node->vertex;
-		int len = node->len;
-		int path_len = node->n_nodes;
-		free(node);
-		if (get_in_map(distance, v) != len
-			|| get_in_map(n_nodes, v) != path_len)
-			continue;
-		if (check_in_set(closed, g->edges[v].rc_id))
-			continue;
-		put_in_set(closed, v);
-		//printf("%d %d %d %d\n", source, v, len, path_len);
-		//printf("pop %d %d %d\n", v, len, path_len);
-		int tg = g->edges[v].target;
-		for (int i = 0; i < g->nodes[tg].deg; ++i){
-			int u = g->nodes[tg].adj[i];
-			int new_len = len + g->edges[u].seq_len - g->ksize;
-			int new_path_len = path_len + 1;
-			if (new_len > MAX_RADIUS || new_path_len > MAX_PATH_LEN)
-				continue;
-			if (check_in_map(distance, u) == 0){
-				put_in_map(distance, u, 2e9);
-				put_in_map(n_nodes, u, 2e9);
-				put_in_map(trace, u, -1);
-			}
-			int cur_len = get_in_map(distance, u);
-			int cur_path_len = get_in_map(n_nodes, u);
-			if (cur_len > new_len || (cur_len == new_len
-					&& cur_path_len > new_path_len)){
-				khiter_t it = kh_get(int_int, distance, u);
-				kh_val(distance, it) = new_len;
-				it = kh_get(int_int, n_nodes, u);
-				kh_val(n_nodes, it) = new_path_len;
-				wrapper.vertex = u;
-				wrapper.len = new_len;
-				wrapper.n_nodes = new_path_len;
-				push_heap(heap, pointerize(&wrapper,
-					sizeof(struct dijkstra_node_t)));
-
-				it = kh_get(int_int, trace, u);
-				kh_val(trace, it) = v;
-				//printf("push %d %d %d\n", u, new_len, new_path_len);
-			}
-		}
-	}
-	/*for (int i = 21610; i != -1; i = get_in_map(P, i))
-		__VERBOSE("%d,", i);
-	__VERBOSE("\n");
-	exit(0);*/
-	kh_destroy(int_int, n_nodes);
-	kh_destroy(set_int, closed);
-	heap_destroy(heap);
-	free(heap);
-}
-
-int get_shortest_path(struct asm_graph_t *g, int source, int target, int **path,
-		int *n_path)
-{
-	int sr = g->edges[source].target;
-	int tg = g->nodes[g->edges[target].source].rc_id;
-
-	struct queue_t q;
-	init_queue(&q, 1024);
-	int res = -1;
-	int found = 0;
-	for (int i = 0; !found && i < g->nodes[sr].deg; ++i){
-		int v = g->nodes[sr].adj[i];
-		for (int j = 0; !found && j < g->nodes[tg].deg; ++j){
-			int u = g->edges[g->nodes[tg].adj[j]].rc_id;
-			if (v == target){
-				(*path) = calloc(2, sizeof(int));
-				*n_path = 2;
-				(*path)[0] = source;
-				(*path)[1] = target;
-				found = 1;
-				break;
-			}
-			khash_t(int_int) *L = kh_init(int_int);
-			khash_t(int_int) *P = kh_init(int_int);
-			dijkstra(g, v, L, P);
-			if (check_in_map(L, u))
-				res = get_in_map(L, u);
-			if (res != -1 && res <= MAX_RADIUS){
-				for (int i = u; i != -1; i = get_in_map(P, i))
-					push_queue(&q, pointerize(&i, sizeof(int)));
-				*path = calloc(q.back - q.front + 2, sizeof(int));
-				(*path)[0] = source;
-				*n_path = 1;
-				for (int i = q.back - 1; i >= q.front; --i){
-					int w = *(int *)q.data[i];
-					(*path)[(*n_path)++] = w;
-				}
-				(*path)[(*n_path)++] = target;
-				free_queue_content(&q);
-				destroy_queue(&q);
-				found = 1;
-			}
-			kh_destroy(int_int, L);
-			kh_destroy(int_int, P);
-		}
-	}
-	return res;
-}
-
-void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
-{
-	for (int i = 0; i < g->n_e; ++i){
-		if ((i + 1) % 1000 == 0 || i + 1 == g->n_e)
-			log_debug("%d/%d edges processed", i + 1, g->n_e);
-		if (g->edges[i].seq_len > MAX_RADIUS)
-			continue;
-		khash_t(int_int) *D = kh_init(int_int);
-		khash_t(int_int) *P = kh_init(int_int);
-		dijkstra(g, i, D, P);
-		for (khiter_t it = kh_begin(D); it != kh_end(D); ++it){
-			if (!kh_exist(D, it))
-				continue;
-			int v = i;
-			int u = kh_key(D, it);
-			int val = kh_val(D, it);
-			uint64_t code = (((uint64_t) v) << 32) | u;
-			int ret;
-			khiter_t it = kh_put(long_int, distance, code, &ret);
-			kh_val(distance, it) = val;
-		}
-		kh_destroy(int_int, P);
-		kh_destroy(int_int, D);
-	}
-	log_debug("Done finding all shortest paths");
-}
-
-int get_pair_distance(int v, int u, khash_t(long_int) *distance)
-{
-	uint64_t code = (((uint64_t) v) << 32) | u;
-	khiter_t it = kh_get(long_int, distance, code);
-	if (it == kh_end(distance))
-		return -1;
-	return kh_val(distance, it);
+	return kh_long_spath_get(spath_info, code)->len;
 }
 
 int check_connected(struct asm_graph_t *g, int v, int u,
-		khash_t(long_int) *distance)
+		khash_t(long_spath) *spath_info)
 {
 	int tg = g->edges[v].target;
 	int sr = g->nodes[g->edges[u].source].rc_id;
@@ -203,7 +34,7 @@ int check_connected(struct asm_graph_t *g, int v, int u,
 			int t = g->edges[g->nodes[sr].adj[j]].rc_id;
 			if (w == u || t == v)
 				return 1;
-			int d = get_pair_distance(w, t, distance);
+			int d = get_pair_distance(w, t, spath_info);
 			if (d == -1)
 				continue;
 			if(d > MAX_RADIUS)
@@ -215,7 +46,7 @@ int check_connected(struct asm_graph_t *g, int v, int u,
 }
 
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_spath) *spath_info, khash_t(long_int) *is_connected,
 		khash_t(long_int) *count_link)
 {
 	for (int i = 0; i < n_e; ++i){
@@ -224,26 +55,20 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 				continue;
 			int v = edges[i];
 			int u = edges[j];
-			uint64_t code = (((uint64_t) v) << 32) | u;
+			uint64_t code = GET_CODE(v, u);
 			int ok;
-			khiter_t it = kh_get(long_int, is_connected, code);
-			if (it == kh_end(is_connected)){
-				ok = check_connected(g, v, u, distance);
-				int ret;
-				it = kh_put(long_int, is_connected, code, &ret);
-				kh_val(is_connected, it) = ok;
+			if (kh_long_int_exist(is_connected, code)){
+				ok = kh_long_int_get(is_connected, code);
 			} else {
-				ok = kh_val(is_connected, it);
+				ok = check_connected(g, v, u, spath_info);
+				kh_long_int_set(is_connected, code, ok);
 			}
 			if (!ok)
 				continue;
-			it = kh_get(long_int, count_link, code);
-			if (it == kh_end(count_link)){
-				int ret;
-				it = kh_put(long_int, count_link, code, &ret);
-				kh_val(count_link, it) = 0;
-			}
-			++kh_val(count_link, it);
+			int cur_count = 0;
+			if (kh_long_int_exist(count_link, code))
+				cur_count = kh_long_int_get(count_link, code);
+			kh_long_int_set(count_link, code, cur_count + 1);
 		}
 	}
 }
@@ -256,10 +81,9 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	get_bc_hit_bundle(opt, &bc_hit_bundle);
 	struct asm_graph_t *g = bc_hit_bundle.g;
 
-	khash_t(long_int) *distance = kh_init(long_int);
+	khash_t(long_spath) *spath_info = kh_init(long_spath);
 	khash_t(long_int) *is_connected = kh_init(long_int);
-	//get_all_shortest_paths(bc_hit_bundle.g, distance);
-	get_all_shortest_paths_dp(bc_hit_bundle.g, distance);
+	get_all_shortest_paths_dp(bc_hit_bundle.g, spath_info);
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -277,15 +101,10 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 
 		int *edges = calloc(kh_size(hits->edges), sizeof(int));
 		int n_e = 0;
-		for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges);
-				++it){
-			if (!kh_exist(hits->edges, it))
-				continue;
-			edges[n_e++] = kh_key(hits->edges, it);
-		}
+		hits_to_edges(g, hits, &edges, &n_e);
 		mm_hits_destroy(hits);
 
-		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, distance,
+		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, spath_info,
 				is_connected, link_count);
 
 		fprintf(bc_log, "%s: ", blist.bc_list[i]);
@@ -295,9 +114,55 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	}
 	fclose(bc_log);
 
+	log_info("Writing all shortest paths");
+	FILE *all_paths = fopen("all_shortest_paths.txt", "w");
+	khash_t(set_long) *mark = kh_init(set_long);
+	for (int v = 0; v < g->n_e; ++v){
+		int tg = g->edges[v].target;
+		for (int i = 0; i < g->nodes[tg].deg; ++i){
+			int u = g->nodes[tg].adj[i];
+			kh_set_long_add(mark, GET_CODE(v, u));
+			fprintf(all_paths, "%d to %d: %d,%d\n", v, u, v, u);
+		}
+	}
+	for (khiter_t it = kh_begin(spath_info); it != kh_end(spath_info); ++it){
+		if (!kh_exist(spath_info, it))
+			continue;
+		uint64_t code = kh_key(spath_info, it);
+		struct shortest_path_info_t *wrapper = kh_val(spath_info, it);
+		int v = code >> 32;
+		int u = code & ((uint32_t) -1);
+
+		int source = g->nodes[g->edges[v].source].rc_id;
+		int target = g->edges[u].target;
+		for (int i = 0; i < g->nodes[source].deg; ++i){
+			int w = g->edges[g->nodes[source].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[target].deg; ++j){
+				int t = g->nodes[target].adj[j];
+				uint64_t new_code = GET_CODE(w, t);
+				if (kh_set_long_exist(mark, new_code))
+					continue;
+				kh_set_long_add(mark, new_code);
+				fprintf(all_paths, "%d to %d: ", w, t);
+				fprintf(all_paths, "%d,", w);
+				int p = v;
+				while (p != -1){
+					fprintf(all_paths, "%d,", p);
+					uint64_t new_code = GET_CODE(p, u);
+					khiter_t it2 = kh_get(long_spath, spath_info, new_code);
+					p = kh_val(spath_info, it2)->trace;
+				}
+				fprintf(all_paths, "%d\n", t);
+
+			}
+		}
+	}
+	kh_destroy(set_long, mark);
+	fclose(all_paths);
+
 	barcode_list_destroy(&blist);
 	bc_hit_bundle_destroy(&bc_hit_bundle);
-	kh_destroy(long_int, distance);
+	kh_destroy(long_spath, spath_info);
 	kh_destroy(long_int, is_connected);
 
 
@@ -620,15 +485,55 @@ void build_simple_graph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
 			int v = edges[i];
 			int u = edges[j];
 			uint64_t code = GET_CODE(v, u);
+			uint64_t code_rc = GET_CODE(g->edges[u].rc_id,
+					g->edges[v].rc_id);
+			int val = 0;
 			khiter_t it = kh_get(long_int, all_bc, code);
-			if (it == kh_end(all_bc))
-				continue;
-			int val = kh_val(all_bc, it);
+			if (it != kh_end(all_bc))
+				val = max(val, kh_val(all_bc, it));
+
+			it = kh_get(long_int, all_bc, code_rc);
+			if (it != kh_end(all_bc))
+				val = max(val, kh_val(all_bc, it));
+
 			if (val < MIN_BARCODE_EDGE_COUNT)
 				continue;
 			add_simple_node(sg, u);
 			add_simple_node(sg, v);
 			add_simple_edge(sg, v, u);
+		}
+	}
+}
+
+void build_simple_bigraph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
+		struct simple_graph_t *sg)
+{
+	int *edges;
+	int n_e;
+	struct asm_graph_t *g = sg->g;
+	hits_to_edges(g, hits, &edges, &n_e);
+	for (int i = 0; i < n_e - 1; ++i){
+		for (int j = i + 1; j < n_e; ++j){
+			int v = edges[i];
+			int u = edges[j];
+			uint64_t code = GET_CODE(v, u);
+			uint64_t code_rc = GET_CODE(g->edges[u].rc_id,
+					g->edges[v].rc_id);
+			int val = 0;
+			khiter_t it = kh_get(long_int, all_bc, code);
+			if (it != kh_end(all_bc))
+				val = max(val, kh_val(all_bc, it));
+
+			it = kh_get(long_int, all_bc, code_rc);
+			if (it != kh_end(all_bc))
+				val = max(val, kh_val(all_bc, it));
+
+			if (val < MIN_BARCODE_EDGE_COUNT)
+				continue;
+			add_simple_node(sg, u);
+			add_simple_node(sg, v);
+			add_simple_edge(sg, v, u);
+			add_simple_edge(sg, u, v);
 		}
 	}
 }
@@ -676,54 +581,21 @@ void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g)
 		int u = kh_key(nodes, it);
 		check_loop_dfs(sg, u, visited, in_dfs);
 	}
-
-	struct queue_t q;
-	init_queue(&q, 1024);
 	kh_destroy(set_int, visited);
-	visited = kh_init(set_int);
-	for (khiter_t it = kh_begin(sg->is_loop); it != kh_end(sg->is_loop); ++it){
-		if (!kh_exist(sg->is_loop, it))
-			continue;
-		int u = kh_key(sg->is_loop, it);
-		int u_rc = g->edges[u].rc_id;
-		push_queue(&q, pointerize(&u, sizeof(int)));
-		if (check_in_set(sg->is_loop, u_rc) == 0)
-			push_queue(&q, pointerize(&u_rc, sizeof(int)));
-		put_in_set(visited, u);
-		put_in_set(visited, u_rc);
-	}
+	kh_destroy(set_int, in_dfs);
 
-	while (!is_queue_empty(&q)){
-		int u = *(int *) get_queue(&q);
-		pop_queue(&q);
-		khiter_t it = kh_get(int_node, sg->nodes, u);
-		struct simple_node_t *snode = kh_val(sg->nodes, it);
-		for (int i = 0; i < snode->deg; ++i){
-			int v = snode->adj[i];
-			if (check_in_set(visited, v) == 0){
-				put_in_set(visited, v);
-				push_queue(&q, pointerize(&v, sizeof(int)));
-			}
-		}
-	}
-	for (khiter_t it = kh_begin(visited); it != kh_end(visited); ++it){
-		if (!kh_exist(visited, it))
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+		if (!kh_exist(nodes, it))
 			continue;
-		int u = kh_key(visited, it);
-		int u_rc = g->edges[u].rc_id;
-		put_in_set(sg->is_loop, u);
-		put_in_set(sg->is_loop, u_rc);
+		int v = kh_key(nodes, it);
+		put_in_set(sg->is_loop, v);
 	}
-
 
 	/*for (khiter_t it = kh_begin(sg->is_loop); it != kh_end(sg->is_loop); ++it){
 		if (!kh_exist(sg->is_loop, it))
 			continue;
 		__VERBOSE("%d\n", kh_key(sg->is_loop, it));
 	}*/
-
-	kh_destroy(set_int, in_dfs);
-	kh_destroy(set_int, visited);
 }
 
 void get_longest_path_dfs(struct simple_graph_t *sg, int u,
@@ -784,15 +656,12 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 {
 	struct asm_graph_t *g = sg->g;
 	khash_t(set_int) *visited = kh_init(set_int);
-	int n_com = 0;
-	int simple_com = 0;
 	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
 		if (!kh_exist(sg->nodes, it))
 			continue;
 		int s = kh_key(sg->nodes, it);
 		if (check_in_set(visited, s))
 			continue;
-		put_in_set(visited, s);
 
 		int has_rc = 0;
 		int has_loop = 0;
@@ -801,9 +670,9 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 		struct queue_t q;
 		init_queue(&q, 1024);
 		push_queue(&q, pointerize(&s, sizeof(int)));
+		put_in_set(visited, s);
 		while (!is_queue_empty(&q)){
 			int v = *(int *) get_queue(&q);
-
 			free(get_queue(&q));
 			pop_queue(&q);
 
@@ -813,33 +682,31 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				has_loop = 1;
 			put_in_set(component, v);
 			khiter_t it = kh_get(int_node, sg->nodes, v);
-			if (it != kh_end(sg->nodes)){
-				struct simple_node_t *node = kh_val(sg->nodes, it);
-				for (int i = 0; i < node->deg; ++i){
-					int u = node->adj[i];
-					if (check_in_set(visited, u))
-						continue;
-					if (kh_get(int_node, sg->nodes, u)
-						== kh_end(sg->nodes))
-						continue;
-					put_in_set(visited, u);
-					push_queue(&q, pointerize(&u, sizeof(int)));
-				}
+			if (it == kh_end(sg->nodes))
+				log_error("Something went wrong, %d is not in list of nodes",
+						v);
+			struct simple_node_t *node = kh_val(sg->nodes, it);
+			for (int i = 0; i < node->deg; ++i){
+				int u = node->adj[i];
+				if (check_in_set(visited, u))
+					continue;
+				put_in_set(visited, u);
+				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 
 			it = kh_get(int_node, sg->nodes, g->edges[v].rc_id);
-			if (it != kh_end(sg->nodes)){
-				struct simple_node_t *node = kh_val(sg->nodes, it);
-				for (int i = 0; i < node->deg; ++i){
-					int u = g->edges[node->adj[i]].rc_id;
-					if (check_in_set(visited, u))
-						continue;
-					if (kh_get(int_node, sg->nodes, u)
-						== kh_end(sg->nodes))
-						continue;
-					put_in_set(visited, u);
-					push_queue(&q, pointerize(&u, sizeof(int)));
-				}
+			if (it == kh_end(sg->nodes))
+				log_error("Something went wrong, %d is not in list of nodes",
+						g->edges[v].rc_id);
+			node = kh_val(sg->nodes, it);
+			for (int i = 0; i < node->deg; ++i){
+				int u = g->edges[node->adj[i]].rc_id;
+				if (kh_get(int_node, sg->nodes, u) == kh_end(sg->nodes))
+					continue;
+				if (check_in_set(visited, u))
+					continue;
+				put_in_set(visited, u);
+				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
 		if (!has_loop && !has_rc && kh_size(component) > 1){
@@ -852,8 +719,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				khiter_t it = kh_get(int_node, sg->nodes, s);
 				struct simple_node_t *snode = kh_val(sg->nodes, it);
 				for (int i = 0; i < snode->deg; ++i)
-					if (check_in_set(component, snode->adj[i]))
-						fprintf(f, "\t%d -> %d\n", s, snode->adj[i]);
+					fprintf(f, "\t%d -> %d\n", s, snode->adj[i]);
 				float unit_cov = get_genome_coverage(sg->g);
 				float cov = __get_edge_cov(g->edges + s, g->ksize);
 				float ratio = cov / unit_cov;
@@ -897,8 +763,15 @@ void get_simple_components(struct opt_proc_t *opt)
 		struct simple_graph_t sg;
 		init_simple_graph(bc_hit_bundle->g, &sg);
 		build_simple_graph(hits, all_bc, &sg);
-		//find_DAG(&sg, g);
-		print_graph_component(&sg, blist.bc_list[i], f);
+		find_DAG(&sg, g);
+
+		struct simple_graph_t bi_sg;
+		init_simple_graph(bc_hit_bundle->g, &bi_sg);
+		build_simple_bigraph(hits, all_bc, &bi_sg);
+		print_graph_component(&bi_sg, blist.bc_list[i], f);
+
+		simple_graph_destroy(&sg);
+		simple_graph_destroy(&bi_sg);
 	}
 	fclose(f);
 
@@ -915,8 +788,8 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 			continue;
 		int e = kh_key(hits->edges, it);
 		int rc = g->edges[e].rc_id;
-		put_in_set(tmp, e);
-		put_in_set(tmp, rc);
+		kh_set_int_add(tmp, e);
+		kh_set_int_add(tmp, rc);
 	}
 
 	*edges = calloc(kh_size(tmp), sizeof(int));
@@ -930,20 +803,21 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 	kh_destroy(set_int, tmp);
 }
 
-void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distance)
+void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info)
 {
-	khash_t(long_int) *L_all = distance;
 	khash_t(long_int) *L_pre = kh_init(long_int);
 	for (int i = 0; i < g->n_e; ++i){
 		int v = i;
 		if (g->edges[v].seq_len > MAX_RADIUS)
 			continue;
-		int ret;
-		khiter_t it = kh_put(long_int, L_pre, GET_CODE(v, v), &ret);
-		kh_val(L_pre, it) = g->edges[v].seq_len;
+		kh_long_int_set(L_pre, GET_CODE(v, v), g->edges[v].seq_len);
 
-		it = kh_put(long_int, L_all, GET_CODE(v, v), &ret);
-		kh_val(L_all, it) = g->edges[v].seq_len;
+		struct shortest_path_info_t *wrapper = calloc(1,
+				sizeof(struct shortest_path_info_t));
+		wrapper->len = g->edges[v].seq_len;
+		wrapper->trace = -1;
+
+		kh_long_spath_set(spath_info, GET_CODE(v, v), wrapper);
 	}
 	for (int i = 2; i <= MAX_PATH_LEN; ++i){
 		khash_t(long_int) *L_cur = kh_init(long_int);
@@ -964,29 +838,37 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 				uint64_t code = GET_CODE(v, u);
 				int tg = g->edges[v].target;
 				int min_len = 1e9;
+				int next = -1;
 				for (int h = 0; h < g->nodes[tg].deg; ++h){
 					int w = g->nodes[tg].adj[h];
-					khiter_t it = kh_get(long_int, L_pre,
-						GET_CODE(w, u));
-					if (it == kh_end(L_pre))
+					uint64_t code = GET_CODE(w, u);
+					if (kh_long_int_exist(L_pre, code)
+						== 0)
 						continue;
-					int new_len = kh_val(L_pre, it) + g->edges[v].seq_len
-						- g->ksize;
-					min_len = min(min_len, new_len);
+					int new_len = kh_long_int_get(L_pre, code)
+						+ g->edges[v].seq_len - g->ksize;
+					if (min_len > new_len){
+						min_len = new_len;
+						next = w;
+					}
 				}
 				if (min_len > MAX_RADIUS)
 					continue;
-				int ret;
-				khiter_t it = kh_put(long_int, L_cur, code, &ret);
-				kh_val(L_cur, it) = min_len;
+				kh_long_int_set(L_cur, code, min_len);
 
-				it = kh_get(long_int, L_all, GET_CODE(v, u));
-				if (it == kh_end(L_all)){
-					int ret;
-					it = kh_put(long_int, L_all, code, &ret);
-					kh_val(L_all, it) = 1e9;
+				struct shortest_path_info_t *wrapper;
+				if (kh_long_spath_exist(spath_info, code)){
+					wrapper = kh_long_spath_get(spath_info, code);
+				} else {
+					wrapper = calloc(1, sizeof(struct shortest_path_info_t));
+					wrapper->len = 1e9;
+					wrapper->trace = 0;
+					kh_long_spath_set(spath_info, code, wrapper);
 				}
-				kh_val(L_all, it) = min(kh_val(L_all, it), min_len);
+				if (wrapper->len > min_len){
+					wrapper->len = min_len;
+					wrapper->trace = next;
+				}
 			}
 			free(edges);
 		}
@@ -994,17 +876,6 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 		L_pre = L_cur;
 	}
 	kh_destroy(long_int, L_pre);
-
-	/*for (khiter_t it = kh_begin(L_all); it != kh_end(L_all); ++it){
-		if (!kh_exist(L_all, it))
-			continue;
-		uint64_t code = kh_key(L_all, it);
-		int val = kh_val(L_all, it);
-		int v = code >> 32;
-		int u = code & ((uint32_t) -1);
-		printf("%d %d %d %d %d\n", v, u, g->edges[v].rc_id,
-				g->edges[u].rc_id, val);
-	}*/
 }
 
 void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int *n_e)
@@ -1013,22 +884,22 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 	struct queue_t q;
 	init_queue(&q, 1024);
 	push_queue(&q, pointerize(&source, sizeof(int)));
-	put_in_map(L, source, 1);
+	kh_int_int_set(L, source, 1);
 	while (!is_queue_empty(&q)){
 		int v = *(int *) get_queue(&q);
 		free(get_queue(&q));
 		pop_queue(&q);
 
-		int len = get_in_map(L, v);
+		int len = kh_int_int_get(L, v);
 		if (len > radius)
 			break;
 		int tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[tg].deg; ++i){
 			int u = g->nodes[tg].adj[i];
-			if (check_in_map(L, u))
+			if (kh_int_int_exist(L, u))
 				continue;
 			push_queue(&q, pointerize(&u, sizeof(int)));
-			put_in_map(L, u, len + 1);
+			kh_int_int_set(L, u, len + 1);
 		}
 	}
 	free_queue_content(&q);
