@@ -5,8 +5,15 @@
 #include "sort_read.h"
 #include "get_buffer.h"
 #include "simple_queue.h"
-#include "khash_operations.h" 
+#include "khash_operations.h"
 KHASH_MAP_INIT_INT64(long_int, int);
+struct shortest_path_info_t{
+	int len;
+	int trace;
+};
+
+KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
+
 struct dijkstra_node_t{
 	int vertex;
 	int len;
@@ -48,16 +55,16 @@ void dijkstra(struct asm_graph_t *g, int source, khash_t(int_int) *distance,
 		khash_t(int_int) *trace);
 
 void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance);
-void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distance);
+void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
 
-int get_pair_distance(int v, int u, khash_t(long_int) *distance);
+int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
 
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_spath) *spath_info, khash_t(long_int) *is_connected,
 		khash_t(long_int) *count_link);
 
 int check_connected(struct asm_graph_t *g, int v, int u,
-		khash_t(long_int) *distance);
+		khash_t(long_spath) *spath_info);
 
 void count_edge_links_bc(struct opt_proc_t *opt);
 

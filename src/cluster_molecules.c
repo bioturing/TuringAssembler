@@ -183,17 +183,17 @@ void get_all_shortest_paths(struct asm_graph_t *g, khash_t(long_int) *distance)
 	log_debug("Done finding all shortest paths");
 }
 
-int get_pair_distance(int v, int u, khash_t(long_int) *distance)
+int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info)
 {
 	uint64_t code = (((uint64_t) v) << 32) | u;
-	khiter_t it = kh_get(long_int, distance, code);
-	if (it == kh_end(distance))
+	khiter_t it = kh_get(long_spath, spath_info, code);
+	if (it == kh_end(spath_info))
 		return -1;
-	return kh_val(distance, it);
+	return kh_val(spath_info, it)->len;
 }
 
 int check_connected(struct asm_graph_t *g, int v, int u,
-		khash_t(long_int) *distance)
+		khash_t(long_spath) *spath_info)
 {
 	int tg = g->edges[v].target;
 	int sr = g->nodes[g->edges[u].source].rc_id;
@@ -203,7 +203,7 @@ int check_connected(struct asm_graph_t *g, int v, int u,
 			int t = g->edges[g->nodes[sr].adj[j]].rc_id;
 			if (w == u || t == v)
 				return 1;
-			int d = get_pair_distance(w, t, distance);
+			int d = get_pair_distance(w, t, spath_info);
 			if (d == -1)
 				continue;
 			if(d > MAX_RADIUS)
@@ -215,7 +215,7 @@ int check_connected(struct asm_graph_t *g, int v, int u,
 }
 
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_int) *distance, khash_t(long_int) *is_connected,
+		khash_t(long_spath) *spath_info, khash_t(long_int) *is_connected,
 		khash_t(long_int) *count_link)
 {
 	for (int i = 0; i < n_e; ++i){
@@ -228,7 +228,7 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 			int ok;
 			khiter_t it = kh_get(long_int, is_connected, code);
 			if (it == kh_end(is_connected)){
-				ok = check_connected(g, v, u, distance);
+				ok = check_connected(g, v, u, spath_info);
 				int ret;
 				it = kh_put(long_int, is_connected, code, &ret);
 				kh_val(is_connected, it) = ok;
@@ -256,10 +256,10 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	get_bc_hit_bundle(opt, &bc_hit_bundle);
 	struct asm_graph_t *g = bc_hit_bundle.g;
 
-	khash_t(long_int) *distance = kh_init(long_int);
+	khash_t(long_spath) *spath_info = kh_init(long_spath);
 	khash_t(long_int) *is_connected = kh_init(long_int);
 	//get_all_shortest_paths(bc_hit_bundle.g, distance);
-	get_all_shortest_paths_dp(bc_hit_bundle.g, distance);
+	get_all_shortest_paths_dp(bc_hit_bundle.g, spath_info);
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -285,7 +285,7 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		}
 		mm_hits_destroy(hits);
 
-		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, distance,
+		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, spath_info,
 				is_connected, link_count);
 
 		fprintf(bc_log, "%s: ", blist.bc_list[i]);
@@ -295,9 +295,30 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 	}
 	fclose(bc_log);
 
+	log_info("Writing all shortest paths");
+	FILE *all_paths = fopen("all_shortest_paths.txt", "w");
+	for (khiter_t it = kh_begin(spath_info); it != kh_end(spath_info); ++it){
+		if (!kh_exist(spath_info, it))
+			continue;
+		uint64_t code = kh_key(spath_info, it);
+		struct shortest_path_info_t *wrapper = kh_val(spath_info, it);
+		int v = code >> 32;
+		int u = code & ((uint32_t) -1);
+		fprintf(all_paths, "%d to %d: ", v, u);
+		int i = v;
+		while (i != -1){
+			fprintf(all_paths, "%d,", i);
+			uint64_t new_code = GET_CODE(i, u);
+			khiter_t it2 = kh_get(long_spath, spath_info, new_code);
+			i = kh_val(spath_info, it2)->trace;
+		}
+		fprintf(all_paths, "\n");
+	}
+	fclose(all_paths);
+
 	barcode_list_destroy(&blist);
 	bc_hit_bundle_destroy(&bc_hit_bundle);
-	kh_destroy(long_int, distance);
+	kh_destroy(long_spath, spath_info);
 	kh_destroy(long_int, is_connected);
 
 
@@ -930,9 +951,9 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 	kh_destroy(set_int, tmp);
 }
 
-void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distance)
+void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info)
 {
-	khash_t(long_int) *L_all = distance;
+	khash_t(long_int) *trace = kh_init(long_int);
 	khash_t(long_int) *L_pre = kh_init(long_int);
 	for (int i = 0; i < g->n_e; ++i){
 		int v = i;
@@ -942,8 +963,16 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 		khiter_t it = kh_put(long_int, L_pre, GET_CODE(v, v), &ret);
 		kh_val(L_pre, it) = g->edges[v].seq_len;
 
-		it = kh_put(long_int, L_all, GET_CODE(v, v), &ret);
-		kh_val(L_all, it) = g->edges[v].seq_len;
+		struct shortest_path_info_t *wrapper = calloc(1,
+				sizeof(struct shortest_path_info_t));
+		wrapper->len = g->edges[v].seq_len;
+		wrapper->trace = -1;
+
+		it = kh_put(long_spath, spath_info, GET_CODE(v, v), &ret);
+		kh_val(spath_info, it) = wrapper;
+
+		it = kh_put(long_int, trace, GET_CODE(v, v), &ret);
+		kh_val(trace, it) = -1;
 	}
 	for (int i = 2; i <= MAX_PATH_LEN; ++i){
 		khash_t(long_int) *L_cur = kh_init(long_int);
@@ -964,6 +993,7 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 				uint64_t code = GET_CODE(v, u);
 				int tg = g->edges[v].target;
 				int min_len = 1e9;
+				int next = -1;
 				for (int h = 0; h < g->nodes[tg].deg; ++h){
 					int w = g->nodes[tg].adj[h];
 					khiter_t it = kh_get(long_int, L_pre,
@@ -972,7 +1002,10 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 						continue;
 					int new_len = kh_val(L_pre, it) + g->edges[v].seq_len
 						- g->ksize;
-					min_len = min(min_len, new_len);
+					if (min_len > new_len){
+						min_len = new_len;
+						next = w;
+					}
 				}
 				if (min_len > MAX_RADIUS)
 					continue;
@@ -980,13 +1013,22 @@ void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_int) *distanc
 				khiter_t it = kh_put(long_int, L_cur, code, &ret);
 				kh_val(L_cur, it) = min_len;
 
-				it = kh_get(long_int, L_all, GET_CODE(v, u));
-				if (it == kh_end(L_all)){
+				struct shortest_path_info_t *wrapper = calloc(1,
+						sizeof(struct shortest_path_info_t));
+				it = kh_get(long_spath, spath_info, GET_CODE(v, u));
+				if (it == kh_end(spath_info)){
 					int ret;
-					it = kh_put(long_int, L_all, code, &ret);
-					kh_val(L_all, it) = 1e9;
+					it = kh_put(long_spath, spath_info, code, &ret);
+					wrapper->len = 1e9;
+					wrapper->trace = 0;
+					kh_val(spath_info, it) = wrapper;
+				} else {
+					wrapper = kh_val(spath_info, it);
 				}
-				kh_val(L_all, it) = min(kh_val(L_all, it), min_len);
+				if (wrapper->len > min_len){
+					wrapper->len = min_len;
+					wrapper->trace = next;
+				}
 			}
 			free(edges);
 		}
