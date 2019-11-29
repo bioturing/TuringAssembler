@@ -279,7 +279,7 @@ void debug_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, path);
 	set_log_stage("Debug process");
 	//get_barcode_edges_path(opt);
-	get_all_barcode_paths(opt);
+	get_simple_components(opt);
 }
 
 void print_barcode_graph_process(struct opt_proc_t *opt)

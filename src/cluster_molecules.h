@@ -65,7 +65,7 @@ void print_barcode_graph(struct opt_proc_t *opt);
 
 void get_barcode_edges_path(struct opt_proc_t *opt);
 
-void get_all_barcode_paths(struct opt_proc_t *opt);
+void get_simple_components(struct opt_proc_t *opt);
 
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 
@@ -93,5 +93,5 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 		int *n_e);
 
 void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int *n_e);
-void print_graph_component(struct simple_graph_t *sg, FILE *f);
+void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f);
 #endif

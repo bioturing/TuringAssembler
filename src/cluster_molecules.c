@@ -780,8 +780,9 @@ int is_repeat(struct asm_graph_t *g, int e)
 	return 0;
 }
 
-void print_graph_component(struct simple_graph_t *sg, FILE *f)
+void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 {
+	struct asm_graph_t *g = sg->g;
 	khash_t(set_int) *visited = kh_init(set_int);
 	int n_com = 0;
 	int simple_com = 0;
@@ -794,6 +795,7 @@ void print_graph_component(struct simple_graph_t *sg, FILE *f)
 		put_in_set(visited, s);
 
 		int has_rc = 0;
+		int has_loop = 0;
 		khash_t(set_int) *component = kh_init(set_int);
 
 		struct queue_t q;
@@ -801,46 +803,81 @@ void print_graph_component(struct simple_graph_t *sg, FILE *f)
 		push_queue(&q, pointerize(&s, sizeof(int)));
 		while (!is_queue_empty(&q)){
 			int v = *(int *) get_queue(&q);
+
+			free(get_queue(&q));
 			pop_queue(&q);
 
-			if (check_in_set(component, sg->g->edges[v].rc_id))
+			if (check_in_set(component, g->edges[v].rc_id))
 				has_rc = 1;
+			if (check_in_set(sg->is_loop, v))
+				has_loop = 1;
 			put_in_set(component, v);
 			khiter_t it = kh_get(int_node, sg->nodes, v);
-			struct simple_node_t *node = kh_val(sg->nodes, it);
-			for (int i = 0; i < node->deg; ++i){
-				int u = node->adj[i];
-				if (check_in_set(visited, u))
-					continue;
-				put_in_set(visited, u);
-				push_queue(&q, pointerize(&u, sizeof(int)));
+			if (it != kh_end(sg->nodes)){
+				struct simple_node_t *node = kh_val(sg->nodes, it);
+				for (int i = 0; i < node->deg; ++i){
+					int u = node->adj[i];
+					if (check_in_set(visited, u))
+						continue;
+					if (kh_get(int_node, sg->nodes, u)
+						== kh_end(sg->nodes))
+						continue;
+					put_in_set(visited, u);
+					push_queue(&q, pointerize(&u, sizeof(int)));
+				}
 			}
+
+			it = kh_get(int_node, sg->nodes, g->edges[v].rc_id);
+			if (it != kh_end(sg->nodes)){
+				struct simple_node_t *node = kh_val(sg->nodes, it);
+				for (int i = 0; i < node->deg; ++i){
+					int u = g->edges[node->adj[i]].rc_id;
+					if (check_in_set(visited, u))
+						continue;
+					if (kh_get(int_node, sg->nodes, u)
+						== kh_end(sg->nodes))
+						continue;
+					put_in_set(visited, u);
+					push_queue(&q, pointerize(&u, sizeof(int)));
+				}
+			}
+		}
+		if (!has_loop && !has_rc && kh_size(component) > 1){
+			fprintf(f, "digraph %s{\n", bc);
+			for (khiter_t it = kh_begin(component); it != kh_end(component);
+					++it){
+				if (!kh_exist(component, it))
+					continue;
+				int s = kh_key(component, it);
+				khiter_t it = kh_get(int_node, sg->nodes, s);
+				struct simple_node_t *snode = kh_val(sg->nodes, it);
+				for (int i = 0; i < snode->deg; ++i)
+					if (check_in_set(component, snode->adj[i]))
+						fprintf(f, "\t%d -> %d\n", s, snode->adj[i]);
+				float unit_cov = get_genome_coverage(sg->g);
+				float cov = __get_edge_cov(g->edges + s, g->ksize);
+				float ratio = cov / unit_cov;
+				if (ratio >= 0.8 && ratio <= 1.2)
+					fprintf(f, "\t%d [style=\"filled\",fillcolor=green]\n",
+							s);
+				else
+					fprintf(f, "\t%d [style=\"filled\",fillcolor=violet]\n",
+							s);
+			}
+			fprintf(f, "}\n");
 		}
 		kh_destroy(set_int, component);
 		destroy_queue(&q);
-
-		++n_com;
-		if (has_rc == 0)
-			++simple_com;
 	}
 	kh_destroy(set_int, visited);
-	fprintf(f, "No components:%d, no simple components: %d\n", n_com, simple_com);
-	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
-		if (!kh_exist(sg->nodes, it))
-			continue;
-		int s = kh_key(sg->nodes, it);
-		khiter_t it = kh_get(int_node, sg->nodes, s);
-		struct simple_node_t *nodes = kh_val(sg->nodes, it);
-		for (int i = 0; i < nodes->deg; ++i)
-			fprintf(f, "%d %d\n", s, nodes->adj[i]);
-	}
 }
 
-void get_all_barcode_paths(struct opt_proc_t *opt)
+void get_simple_components(struct opt_proc_t *opt)
 {
 	struct bc_hit_bundle_t *bc_hit_bundle = calloc(1,
 			sizeof(struct bc_hit_bundle_t));
 	get_bc_hit_bundle(opt, bc_hit_bundle);
+	struct asm_graph_t *g = bc_hit_bundle->g;
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -860,10 +897,8 @@ void get_all_barcode_paths(struct opt_proc_t *opt)
 		struct simple_graph_t sg;
 		init_simple_graph(bc_hit_bundle->g, &sg);
 		build_simple_graph(hits, all_bc, &sg);
-
-		fprintf(f, "%s\n", blist.bc_list[i]);
-		print_graph_component(&sg, f);
-
+		//find_DAG(&sg, g);
+		print_graph_component(&sg, blist.bc_list[i], f);
 	}
 	fclose(f);
 
@@ -1008,3 +1043,4 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 	}
 	kh_destroy(int_int, L);
 }
+
