@@ -13,6 +13,7 @@ struct shortest_path_info_t{
 };
 
 KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
+KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *)
 
 struct dijkstra_node_t{
 	int vertex;
