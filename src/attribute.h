@@ -17,8 +17,8 @@
 #define KMCP			"KMCP"
 #define KMCS			"KMCS"
 
-#define MINIMIZERS_WINDOW       21
-#define MINIMIZERS_KMER       21
+#define MINIMIZERS_WINDOW       17
+#define MINIMIZERS_KMER       17
 
 #define LIB_TYPE_SORTED		0
 #define LIB_TYPE_BIOT		1

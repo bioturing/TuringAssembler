@@ -8,7 +8,7 @@
 #include "minimizers/minimizers.h"
 
 #define MAX_RADIUS 4000
-#define MAX_PATH_LEN 30
+#define MAX_PATH_LEN 50
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
