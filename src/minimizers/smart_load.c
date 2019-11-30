@@ -19,7 +19,9 @@
 #include "../assembly_graph.h"
 #include "get_buffer.h"
 
-#define RATIO_OF_CONFIDENT 0.5
+#define RATIO_OF_CONFIDENT 0.85
+#define MIN_NUMBER_SINGLETON 2
+
 static const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
 	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
@@ -189,8 +191,9 @@ void smart_load_barcode(struct opt_proc_t *opt)
 				}
 			}
 		}
+		log_info("read: %s, hits ratio %d/%d", r1.name, max, hits1->n);
 
-		if (max < RATIO_OF_CONFIDENT * hits1->n)
+		if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
 			er1 = UINT64_MAX;
 		max = 0;
 		if (hits2->n > 0) {
@@ -202,7 +205,8 @@ void smart_load_barcode(struct opt_proc_t *opt)
 					}
 			}
 		}
-		if (max < RATIO_OF_CONFIDENT * hits2->n)
+		log_info("read: %s, hits ratio %d/%d", r2.name, max, hits2->n);
+		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
 			er2 = UINT64_MAX;
 
 		if (er1 != UINT64_MAX)
@@ -210,7 +214,7 @@ void smart_load_barcode(struct opt_proc_t *opt)
 		if (er2 != UINT64_MAX)
 			kh_set(mm_edges, hits->edges, er2, 1);
 		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g.edges[er1].rc_id != er2) {
-			//log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
 			printf("%lu %lu\n", er1, er2);
 		}
 		mm_hits_destroy(hits1);
@@ -277,7 +281,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 			}
 		}
 
-		if (max < RATIO_OF_CONFIDENT * hits1->n)
+		if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
 			er1 = UINT64_MAX;
 		max = 0;
 		if (hits2->n > 0) {
@@ -289,7 +293,7 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 					}
 			}
 		}
-		if (max < RATIO_OF_CONFIDENT * hits2->n)
+		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
 			er2 = UINT64_MAX;
 
 		if (er1 != UINT64_MAX)
