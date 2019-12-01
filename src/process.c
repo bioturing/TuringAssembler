@@ -115,10 +115,30 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	close_logger();
 }
 
+void write_neo4j_create(struct asm_graph_t *g)
+{
+	FILE *out = fopen("/home/che/bioturing/data/yeast/neo4j/listnode.tsv", "w");
+	fprintf(out, "ID\n");
+	for (int i = 0; i < g->n_e; i++){
+		fprintf(out, "%d\n", i);
+	}
+	fclose(out);
+	out = fopen("/home/che/bioturing/data/yeast/neo4j/reverse_edge.tsv", "w");
+	fprintf(out, "i,i_rc\n");
+	for (int i = 0; i < g->n_e; i++){
+		int rc_id = g->edges[i].rc_id;
+		if (rc_id < i)
+			continue;
+		fprintf(out, "%d,%d\n", i, rc_id);
+	}
+	fclose(out);
+}
+
 void dirty_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = create_and_load_graph(opt);
-	scaffolding_test(g, opt);
+	dirty(g, opt);
+	write_neo4j_create(g);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)

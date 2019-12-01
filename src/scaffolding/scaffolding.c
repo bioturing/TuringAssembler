@@ -752,43 +752,6 @@ void load_list_barcode(int *n_barcodes, char ***barcodes, int **freq)
 	*freq = arr_fre;
 }
 
-void dirty_code(struct opt_proc_t *opt)
-{
-	FILE *f = fopen("edges_hit.txt", "w");
-//	struct asm_graph_t *g0 = create_and_load_graph(opt);
-	char **barcodes;
-	int *fre;
-	int n_barcodes;
-	struct bc_hit_bundle_t bc_hit_bundle;
-
-	log_info("Start load list barcode");
-	load_list_barcode(&n_barcodes, &barcodes, &fre);
-	log_info("Load list barcode done");
-	get_bc_hit_bundle(opt, &bc_hit_bundle);
-	for (int i = 0; i < n_barcodes; i++) {
-		if (fre[i] > 88 || fre[i] < 10)
-			continue;
-		if (i % 10000 == 0) {
-			log_info("Processed %d/%d barcode", i, n_barcodes);
-		} else {
-			printf("Processed %d/%d barcode\r", i, n_barcodes);
-		}
-		struct mm_hits_t *res = get_hits_from_barcode(barcodes[i], &bc_hit_bundle);
-		fprintf(f, "%s:", barcodes[i]);
-		for (khiter_t it = kh_begin(res->edges); it != kh_end(res->edges); ++it) {
-			if (!kh_exist(res->edges, it))
-				continue;
-			int e = kh_key(res->edges, it);
-			int value = kh_value(res->edges, it);
-//			int aln = kh_key(res->aln, it);
-			fprintf(f, "%d %d,", e, value);
-		}
-		fprintf(f, "\n");
-		free(res);
-	}
-//	asm_graph_destroy(g0);
-}
-
 inline int get_nu(const uint32_t *seq, int pos)
 {
 	return (seq[pos >> 4] >> ((pos & 15) << 1)) & 3;
@@ -831,6 +794,7 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 
 	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 	int count = 0 ;
+	FILE *out = fopen("have_path.txt","w");
 	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
 		printf("get path from %d %d\n", a,b);
 		count++;
@@ -844,9 +808,9 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 			a = t_a;
 			res = get_shortest_path(g, a, b, &path, &n_path);
 		}
-		assert(res <= 1975);
 		if (res == -1)
 			continue;
+		fprintf(out, "%d %d\n", a,b);
 //		assert(res != -1);
 		for(int i = 0 ; i < n_path; i++) {
 			printf("%d\n", path[i]);
@@ -861,6 +825,7 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 		g0->n_e++;
 		free(path);
 	}
+	fclose(out);
 	for (int i = 0; i < g->n_e; i++) {
 		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
 		g0->edges[g0->n_e].seq = g->edges[i].seq;
@@ -872,15 +837,15 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 	return g0;
 }
 
-void scaffolding_test(struct asm_graph_t *g, struct opt_proc_t *opt)
+void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 //	init_global_params(g);
-	struct asm_graph_t *g0 = huu_create_new_graph(g, opt->var[0]);
-	char path[1024];
-	log_warn("done create new graph");
-	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
-	         opt->out_dir, g->ksize, "pair");
-	write_stupid_fasta(g0, path);
+//	struct asm_graph_t *g0 = huu_create_new_graph(g, opt->var[0]);
+//	char path[1024];
+//	log_warn("done create new graph");
+//	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
+//	         opt->out_dir, g->ksize, "pair");
+//	write_stupid_fasta(g0, path);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
