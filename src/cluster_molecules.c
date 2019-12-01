@@ -292,6 +292,7 @@ void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg)
 	sg->g = g;
 	sg->nodes = kh_init(int_node);
 	sg->is_loop = kh_init(set_int);
+	sg->is_complex = kh_init(set_int);
 	sg->path_len = kh_init(int_int);
 	sg->next = kh_init(int_int);
 }
@@ -364,6 +365,9 @@ void simple_graph_destroy(struct simple_graph_t *sg)
 		free(snode);
 	}
 	kh_destroy(int_node, sg->nodes);
+	kh_destroy(set_int, sg->is_loop);
+	kh_destroy(int_int, sg->path_len);
+	kh_destroy(int_int, sg->next);
 }
 
 void check_loop_dfs(struct simple_graph_t *sg, int v, khash_t(set_int) *visited,
@@ -385,8 +389,9 @@ void check_loop_dfs(struct simple_graph_t *sg, int v, khash_t(set_int) *visited,
 	kh_set_int_erase(in_dfs, v);
 }
 
-void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g)
+void find_DAG(struct simple_graph_t *sg)
 {
+	struct asm_graph_t *g = sg->g;
 	khash_t(int_node) *nodes = sg->nodes;
 	khash_t(set_int) *visited = kh_init(set_int);
 	khash_t(set_int) *in_dfs = kh_init(set_int);
@@ -398,13 +403,6 @@ void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g)
 	}
 	kh_destroy(set_int, visited);
 	kh_destroy(set_int, in_dfs);
-
-	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
-		if (!kh_exist(nodes, it))
-			continue;
-		int v = kh_key(nodes, it);
-		put_in_set(sg->is_loop, v);
-	}
 }
 
 void get_longest_path_dfs(struct simple_graph_t *sg, int v,
@@ -440,6 +438,118 @@ void get_longest_path(struct simple_graph_t *sg)
 			continue;
 		get_longest_path_dfs(sg, v, done_dfs);
 	}
+}
+
+void filter_complex_regions(struct simple_graph_t *sg)
+{
+	struct asm_graph_t *g = sg->g;
+	khash_t(int_node) *nodes = sg->nodes;
+	khash_t(set_int) *visited = kh_init(set_int);
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+		if (!kh_exist(nodes, it))
+			continue;
+		int v = kh_key(nodes, it);
+		if (kh_set_int_exist(visited, v))
+			continue;
+
+		struct queue_t q;
+		init_queue(&q, 1024);
+		push_queue(&q, pointerize(&v, sizeof(int)));
+
+		khash_t(set_int) *component = kh_init(set_int);
+		int has_rc = 0;
+		int has_loop = 0;
+		int n_source = 0;
+		int n_sink = 0;
+		while (!is_queue_empty(&q)){
+			int v = *(int *) get_queue(&q);
+			free(get_queue(&q));
+			pop_queue(&q);
+
+			if (kh_set_int_exist(component, g->edges[v].rc_id))
+				has_rc = 1;
+			if (kh_set_int_exist(sg->is_loop, v))
+				has_loop = 1;
+			int target = g->edges[v].target;
+			int source = g->nodes[g->edges[v].source].rc_id;
+			if (g->nodes[source].deg == 0)
+				++n_source;
+			if (g->nodes[target].deg == 0)
+				++n_sink;
+			kh_set_int_add(component, v);
+
+			struct simple_node_t *snode = kh_int_node_get(sg->nodes,
+					v);
+
+			for (int i = 0; i < snode->deg; ++i){
+				int u = snode->adj[i];
+				if (kh_set_int_exist(visited, u))
+					continue;
+				kh_set_int_add(visited, u);
+				push_queue(&q, pointerize(&u, sizeof(int)));
+			}
+		}
+		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1)
+			continue;
+		for (khiter_t it = kh_begin(component); it != kh_end(component);
+				++it){
+			if (!kh_exist(component, it))
+				continue;
+			int v = kh_key(component, it);
+			kh_set_int_add(sg->is_complex, it);
+		}
+		kh_destroy(set_int, component);
+	}
+	kh_destroy(set_int, visited);
+}
+
+void create_barcode_molecules(struct opt_proc_t *opt)
+{
+	struct bc_hit_bundle_t bc_hit_bundle;
+	get_bc_hit_bundle(opt, &bc_hit_bundle);
+	struct asm_graph_t *g = bc_hit_bundle.g;
+
+	struct barcode_list_t blist;
+	get_barcode_list(opt->bx_str, &blist);
+
+	khash_t(long_int) *all_pairs = kh_init(long_int);
+	load_pair_edge_count(opt->in_fasta, all_pairs);
+
+	for (int i = 0; i < blist.n_bc; ++i){
+		if ((i + 1) % 10000 == 0)
+			log_debug("%d/%d barcodes processed", i + 1, blist.n_bc);
+		if (blist.read_count[i] < MIN_BC_READ_COUNT)
+			continue;
+
+		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
+				&bc_hit_bundle);
+
+		int *edges = calloc(kh_size(hits->edges), sizeof(int));
+		int n_e = 0;
+		hits_to_edges(g, hits, &edges, &n_e);
+		mm_hits_destroy(hits);
+
+		struct simple_graph_t sg;
+		init_simple_graph(g, &sg);
+		build_simple_graph(hits, all_pairs, &sg);
+		find_DAG(&sg);
+
+		struct simple_graph_t bi_sg;
+		init_simple_graph(g, &bi_sg);
+		build_simple_bigraph(hits, all_pairs, &bi_sg);
+		filter_complex_regions(&bi_sg);
+
+		simple_graph_destroy(&sg);
+		simple_graph_destroy(&bi_sg);
+
+
+		free(edges);
+	}
+
+	kh_destroy(long_int, all_pairs);
+	barcode_list_destroy(&blist);
+	bc_hit_bundle_destroy(&bc_hit_bundle);
+
 }
 
 void barcode_list_destroy(struct barcode_list_t *blist)
@@ -566,7 +676,7 @@ void get_simple_components(struct opt_proc_t *opt)
 		struct simple_graph_t sg;
 		init_simple_graph(bc_hit_bundle->g, &sg);
 		build_simple_graph(hits, all_bc, &sg);
-		find_DAG(&sg, g);
+		find_DAG(&sg);
 
 		struct simple_graph_t bi_sg;
 		init_simple_graph(bc_hit_bundle->g, &bi_sg);

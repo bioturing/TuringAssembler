@@ -37,6 +37,7 @@ KHASH_MAP_OPERATIONS(int_node, int, struct simple_node_t *);
 struct simple_graph_t{
 	struct asm_graph_t *g;
 	khash_t(set_int) *is_loop;
+	khash_t(set_int) *is_complex;
 	khash_t(int_int) *path_len;
 	khash_t(int_int) *next;
 	khash_t(int_node) *nodes;
@@ -79,11 +80,14 @@ void build_simple_bigraph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
 void simple_graph_destroy(struct simple_graph_t *sg);
 void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
 		khash_t(set_int) *in_dfs);
-void find_DAG(struct simple_graph_t *sg, struct asm_graph_t *g);
+void find_DAG(struct simple_graph_t *sg);
+void filter_complex_regions(struct simple_graph_t *bi_sg);
 void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
-int cmp_dijkstra(void *node1, void *node2);
+
+void create_barcode_molecules(struct opt_proc_t *opt);
+
 int is_repeat(struct asm_graph_t *g, int e);
 
 void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
