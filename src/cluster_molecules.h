@@ -7,19 +7,19 @@
 #include "simple_queue.h"
 #include "khash_operations.h"
 KHASH_MAP_INIT_INT64(long_int, int);
+KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
+
 struct shortest_path_info_t{
 	int len;
 	int trace;
 };
 
 KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
-KHASH_SET_INIT_INT64(set_long);
-
 KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *);
-KHASH_SET_OPERATIONS(set_int, int);
-KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
-KHASH_MAP_OPERATIONS(int_int, int, int);
+
+KHASH_SET_INIT_INT64(set_long);
 KHASH_SET_OPERATIONS(set_long, uint64_t);
+
 
 struct barcode_list_t{
 	int n_bc;
@@ -32,6 +32,7 @@ struct simple_node_t{
 	int *adj;
 };
 KHASH_MAP_INIT_INT(int_node, struct simple_node_t *);
+KHASH_MAP_OPERATIONS(int_node, int, struct simple_node_t *);
 
 struct simple_graph_t{
 	struct asm_graph_t *g;
@@ -66,8 +67,6 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 
 void barcode_list_destroy(struct barcode_list_t *blist);
 
-void get_all_pair_edge_count(char *file_path, khash_t(long_int) *pair_count);
-
 void add_simple_node(struct simple_graph_t *sg, int u);
 
 void add_simple_edge(struct simple_graph_t *sg, int u, int v);
@@ -92,4 +91,6 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 
 void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int *n_e);
 void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f);
+
+void load_pair_edge_count(char *path, khash_t(long_int) *h_all);
 #endif
