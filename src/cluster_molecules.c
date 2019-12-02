@@ -454,6 +454,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 		struct queue_t q;
 		init_queue(&q, 1024);
 		push_queue(&q, pointerize(&v, sizeof(int)));
+		kh_set_int_add(visited, v);
 
 		khash_t(set_int) *component = kh_init(set_int);
 		int has_rc = 0;
@@ -465,20 +466,18 @@ void filter_complex_regions(struct simple_graph_t *sg)
 			free(get_queue(&q));
 			pop_queue(&q);
 
+			struct simple_node_t *snode = kh_int_node_get(sg->nodes,
+					v);
+			if (snode->deg == 0)
+				++n_sink;
+			if (snode->rv_deg == 0)
+				++n_source;
 			if (kh_set_int_exist(component, g->edges[v].rc_id))
 				has_rc = 1;
 			if (kh_set_int_exist(sg->is_loop, v))
 				has_loop = 1;
-			int target = g->edges[v].target;
-			int source = g->nodes[g->edges[v].source].rc_id;
-			if (g->nodes[source].deg == 0)
-				++n_source;
-			if (g->nodes[target].deg == 0)
-				++n_sink;
 			kh_set_int_add(component, v);
 
-			struct simple_node_t *snode = kh_int_node_get(sg->nodes,
-					v);
 			for (int i = 0; i < snode->deg + snode->rv_deg; ++i){
 				int u = i < snode->deg ? snode->adj[i] :
 					snode->rv_adj[i - snode->deg];
@@ -496,7 +495,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 			if (!kh_exist(component, it))
 				continue;
 			int v = kh_key(component, it);
-			kh_set_int_add(sg->is_complex, it);
+			kh_set_int_add(sg->is_complex, v);
 		}
 		kh_destroy(set_int, component);
 	}
