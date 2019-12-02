@@ -579,6 +579,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 
 	FILE *f = fopen(opt->lc, "w");
 	int new_n_e = 0;
+	int *mark = calloc(n_e, sizeof(int));
 	for (int i = 0; i < n_e; ++i){
 		int source = i;
 		if (kh_set_int_exist(sg.is_complex, source))
@@ -593,12 +594,14 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		int len = strlen(seq);
 		--mul[source];
 		--mul[g->edges[source].rc_id];
+		mark[source] = mark[g->edges[source].rc_id] = 1;
 
 		int prev = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
 				v = kh_int_int_get(sg.next, v)){
 			--mul[v];
 			--mul[g->edges[v].rc_id];
+			mark[v] = mark[g->edges[v].rc_id] = 1;
 			fill_gap(g, prev, v, spath, &sg, &seq);
 			prev = v;
 		}
@@ -611,6 +614,8 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
 		if (mul[e] == 0)
+			continue;
+		if (mark[e])
 			continue;
 		if (e > e_rc)
 			continue;
@@ -625,6 +630,8 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	fclose(f);
 
 	simple_graph_destroy(&sg);
+	free(mark);
+	free(mul);
 	free(edges);
 	kh_destroy(long_int, all_pairs);
 	kh_destroy(long_spath, spath);
