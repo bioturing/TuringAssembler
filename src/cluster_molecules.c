@@ -494,13 +494,66 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 	}
 }
 
+void extract_shortest_path(struct simple_graph_t *sg, khash_t(long_spath) *spath,
+		int v, int u, int **path, int *n_v)
+{
+	struct simple_node_t *nv = kh_int_node_get(sg->nodes, v);
+	struct simple_node_t *nu = kh_int_node_get(sg->nodes, u);
+	int w = -1;
+	int t = -1;
+	for (int i = 0; w == -1 && i < nv->deg; ++i){
+		int tmpw = nv->adj[i];
+		for (int j = 0; t == -1 && j < nu->rv_deg; ++j){
+			int tmpt = nu->rv_adj[j];
+			uint64_t code = GET_CODE(tmpw, tmpt);
+			if (tmpw != u && tmpt != v
+				&& kh_long_spath_exist(spath, code)){
+				w = tmpw;
+				t = tmpt;
+			}
+		}
+	}
+
+	*path = calloc(MAX_PAIR_LEN + 2, sizeof(int));
+	*n_v = 1;
+	(*path)[0] = v;
+	if (w != -1){
+		int i = w;
+		while (i != -1){
+			(*path)[(*n_v)++] = i;
+			uint64_t code = GET_CODE(i, t);
+			i = kh_long_spath_get(spath, code)->trace;
+		}
+	}
+	(*path)[(*n_v)++] = u;
+}
+
+void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
+		struct simple_graph_t *sg, char **seq)
+{
+	int len = strlen(*seq);
+	int *path;
+	int n_v;
+	extract_shortest_path(sg, spath, v, u, &path, &n_v);
+	for (int i = 1; i < n_v; ++i){
+		int w = path[i];
+		char *tmp;
+		decode_seq(&tmp, g->edges[w].seq, g->edges[w].seq_len);
+		*seq = realloc(*seq, len + g->edges[w].seq_len - g->ksize + 1);
+		strcpy(*seq + len, tmp + g->ksize);
+		len += g->edges[w].seq_len - g->ksize;
+		free(tmp);
+	}
+	free(path);
+}
+
 void create_barcode_molecules(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 
-	struct barcode_list_t blist;
-	get_barcode_list(opt->bx_str, &blist);
+	khash_t(long_spath) *spath = kh_init(long_spath);
+	get_all_shortest_paths_dp(g, spath);
 
 	khash_t(long_int) *all_pairs = kh_init(long_int);
 	load_pair_edge_count(opt->in_fasta, all_pairs);
@@ -538,23 +591,16 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		char *seq;
 		decode_seq(&seq, g->edges[source].seq, g->edges[source].seq_len);
 		int len = strlen(seq);
+		--mul[source];
+		--mul[g->edges[source].rc_id];
 
+		int prev = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
 				v = kh_int_int_get(sg.next, v)){
 			--mul[v];
 			--mul[g->edges[v].rc_id];
-			char *tmp;
-			decode_seq(&tmp, g->edges[v].seq, g->edges[v].seq_len);
-			int new_len = len + strlen(tmp) + 100;
-			seq = realloc(seq, new_len + 1);
-			char *N = calloc(101, sizeof(char));
-			for (int i = 0; i < 100; ++i)
-				N[i] = 'N';
-			strcpy(seq + len, N);
-			strcpy(seq + len + 100, tmp);
-			len = new_len;
-			free(tmp);
-			free(N);
+			fill_gap(g, prev, v, spath, &sg, &seq);
+			prev = v;
 		}
 		fprintf(f, ">SEQ_%d_%d\n%s\n", new_n_e, new_n_e + 1, seq);
 		new_n_e += 2;
@@ -580,9 +626,8 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 
 	simple_graph_destroy(&sg);
 	free(edges);
-
 	kh_destroy(long_int, all_pairs);
-	barcode_list_destroy(&blist);
+	kh_destroy(long_spath, spath);
 
 	asm_graph_destroy(g);
 	free(g);

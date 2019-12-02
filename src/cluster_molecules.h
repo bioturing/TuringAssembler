@@ -48,6 +48,8 @@ struct simple_graph_t{
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
 void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
+void extract_shortest_path(struct simple_graph_t *sg, khash_t(long_spath) *spath,
+		int v, int u, int **path, int *n_v);
 
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
 
@@ -96,4 +98,6 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f);
 
 void load_pair_edge_count(char *path, khash_t(long_int) *h_all);
 void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f);
+void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
+		struct simple_graph_t *sg, char **seq);
 #endif
