@@ -732,7 +732,6 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 	log_info("Aligning reads on two heads of each contigs using BWA");
 	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
-	close_logger();
 	asm_graph_destroy(&g);
 }
 
