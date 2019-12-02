@@ -297,13 +297,10 @@ void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg)
 	sg->next = kh_init(int_int);
 }
 
-void build_simple_graph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
+void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg)
 {
-	int *edges;
-	int n_e;
 	struct asm_graph_t *g = sg->g;
-	hits_to_edges(g, hits, &edges, &n_e);
 	for (int i = 0; i < n_e; ++i){
 		for (int j = 0; j < n_e; ++j){
 			if (i == j)
@@ -324,16 +321,12 @@ void build_simple_graph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
 			add_simple_edge(sg, v, u);
 		}
 	}
-	free(edges);
 }
 
-void build_simple_bigraph(struct mm_hits_t *hits, khash_t(long_int) *all_bc,
+void build_simple_bigraph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg)
 {
-	int *edges;
-	int n_e;
 	struct asm_graph_t *g = sg->g;
-	hits_to_edges(g, hits, &edges, &n_e);
 	for (int i = 0; i < n_e - 1; ++i){
 		for (int j = i + 1; j < n_e; ++j){
 			int v = edges[i];
@@ -541,19 +534,19 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		struct mm_hits_t *hits = get_hits_from_barcode(blist.bc_list[i],
 				&bc_hit_bundle);
 
-		int *edges = calloc(kh_size(hits->edges), sizeof(int));
-		int n_e = 0;
+		int *edges;
+		int n_e;
 		hits_to_edges(g, hits, &edges, &n_e);
 		mm_hits_destroy(hits);
 
 		struct simple_graph_t sg;
 		init_simple_graph(g, &sg);
-		build_simple_graph(hits, all_pairs, &sg);
+		build_simple_graph(edges, n_e, all_pairs, &sg);
 		find_DAG(&sg);
 
 		struct simple_graph_t bi_sg;
 		init_simple_graph(g, &bi_sg);
-		build_simple_bigraph(hits, all_pairs, &bi_sg);
+		build_simple_bigraph(edges, n_e, all_pairs, &bi_sg);
 		filter_complex_regions(&bi_sg);
 		print_simple_graph(&bi_sg, edges, n_e, f);
 
@@ -695,14 +688,18 @@ void get_simple_components(struct opt_proc_t *opt)
 				bc_hit_bundle);
 		struct simple_graph_t sg;
 		init_simple_graph(bc_hit_bundle->g, &sg);
-		build_simple_graph(hits, all_bc, &sg);
+		int *edges;
+		int n_e;
+		hits_to_edges(g, hits, &edges, &n_e);
+		build_simple_graph(edges, n_e, all_bc, &sg);
 		find_DAG(&sg);
 
 		struct simple_graph_t bi_sg;
 		init_simple_graph(bc_hit_bundle->g, &bi_sg);
-		build_simple_bigraph(hits, all_bc, &bi_sg);
+		build_simple_bigraph(edges, n_e, all_bc, &bi_sg);
 		print_graph_component(&bi_sg, blist.bc_list[i], f);
 
+		free(edges);
 		simple_graph_destroy(&sg);
 		simple_graph_destroy(&bi_sg);
 	}
