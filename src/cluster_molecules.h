@@ -64,8 +64,6 @@ void print_barcode_graph(struct opt_proc_t *opt);
 
 void get_barcode_edges_path(struct opt_proc_t *opt);
 
-void get_simple_components(struct opt_proc_t *opt);
-
 void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist);
 
 void barcode_list_destroy(struct barcode_list_t *blist);
