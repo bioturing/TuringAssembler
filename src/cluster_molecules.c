@@ -285,6 +285,11 @@ void add_simple_edge(struct simple_graph_t *sg, int v, int u)
 	snode->adj = realloc(snode->adj, sizeof(int) * (snode->deg + 1));
 	snode->adj[snode->deg] = u;
 	++snode->deg;
+
+	snode = kh_int_node_get(sg->nodes, u);
+	snode->rv_adj = realloc(snode->rv_adj, sizeof(int) * (snode->rv_deg + 1));
+	snode->rv_adj[snode->rv_deg] = v;
+	++snode->rv_deg;
 }
 
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg)
@@ -355,6 +360,7 @@ void simple_graph_destroy(struct simple_graph_t *sg)
 			continue;
 		struct simple_node_t *snode = kh_val(sg->nodes, it);
 		free(snode->adj);
+		free(snode->rv_adj);
 		free(snode);
 	}
 	kh_destroy(int_node, sg->nodes);
@@ -473,9 +479,9 @@ void filter_complex_regions(struct simple_graph_t *sg)
 
 			struct simple_node_t *snode = kh_int_node_get(sg->nodes,
 					v);
-
-			for (int i = 0; i < snode->deg; ++i){
-				int u = snode->adj[i];
+			for (int i = 0; i < snode->deg + snode->rv_deg; ++i){
+				int u = i < snode->deg ? snode->adj[i] :
+					snode->rv_adj[i - snode->deg];
 				if (kh_set_int_exist(visited, u))
 					continue;
 				kh_set_int_add(visited, u);
@@ -545,14 +551,10 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		build_simple_graph(edges, n_e, all_pairs, &sg);
 		find_DAG(&sg);
 
-		struct simple_graph_t bi_sg;
-		init_simple_graph(g, &bi_sg);
-		build_simple_bigraph(edges, n_e, all_pairs, &bi_sg);
-		filter_complex_regions(&bi_sg);
+		filter_complex_regions(&sg);
 		print_simple_graph(&sg, edges, n_e, f);
 
 		simple_graph_destroy(&sg);
-		simple_graph_destroy(&bi_sg);
 
 
 		free(edges);

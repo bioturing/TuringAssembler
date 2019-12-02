@@ -30,6 +30,8 @@ struct barcode_list_t{
 struct simple_node_t{
 	int deg;
 	int *adj;
+	int rv_deg;
+	int *rv_adj;
 };
 KHASH_MAP_INIT_INT(int_node, struct simple_node_t *);
 KHASH_MAP_OPERATIONS(int_node, int, struct simple_node_t *);
@@ -75,8 +77,6 @@ void add_simple_edge(struct simple_graph_t *sg, int u, int v);
 void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 
-void build_simple_bigraph(int *edges, int n_e, khash_t(long_int) *all_bc,
-		struct simple_graph_t *sg);
 void simple_graph_destroy(struct simple_graph_t *sg);
 void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
 		khash_t(set_int) *in_dfs);
