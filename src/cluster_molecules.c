@@ -535,9 +535,12 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 			continue;
 		if (mul[source] == 0)
 			continue;
-		char *seq = calloc(1, sizeof(char));
-		int len = 0;
-		for (int v = source; v != -1; v = kh_int_int_get(sg.next, v)){
+		char *seq;
+		decode_seq(&seq, g->edges[source].seq, g->edges[source].seq_len);
+		int len = strlen(seq);
+
+		for (int v = kh_int_int_get(sg.next, source); v != -1;
+				v = kh_int_int_get(sg.next, v)){
 			--mul[v];
 			--mul[g->edges[v].rc_id];
 			char *tmp;
