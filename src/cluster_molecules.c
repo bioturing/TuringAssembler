@@ -301,6 +301,8 @@ void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg)
 {
 	struct asm_graph_t *g = sg->g;
+	for (int i = 0; i < n_e; ++i)
+		add_simple_node(sg, edges[i]);
 	for (int i = 0; i < n_e; ++i){
 		for (int j = 0; j < n_e; ++j){
 			if (i == j)
@@ -316,8 +318,6 @@ void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 
 			if (val < MIN_BARCODE_EDGE_COUNT)
 				continue;
-			add_simple_node(sg, u);
-			add_simple_node(sg, v);
 			add_simple_edge(sg, v, u);
 		}
 	}
@@ -327,6 +327,8 @@ void build_simple_bigraph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg)
 {
 	struct asm_graph_t *g = sg->g;
+	for (int i = 0; i < n_e; ++i)
+		add_simple_node(sg, edges[i]);
 	for (int i = 0; i < n_e - 1; ++i){
 		for (int j = i + 1; j < n_e; ++j){
 			int v = edges[i];
@@ -340,8 +342,6 @@ void build_simple_bigraph(int *edges, int n_e, khash_t(long_int) *all_bc,
 
 			if (val < MIN_BARCODE_EDGE_COUNT)
 				continue;
-			add_simple_node(sg, u);
-			add_simple_node(sg, v);
 			add_simple_edge(sg, v, u);
 			add_simple_edge(sg, u, v);
 		}
@@ -482,7 +482,8 @@ void filter_complex_regions(struct simple_graph_t *sg)
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
-		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1)
+		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1
+				&& kh_size(component) > 1)
 			continue;
 		for (khiter_t it = kh_begin(component); it != kh_end(component);
 				++it){
