@@ -496,9 +496,8 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 
 void create_barcode_molecules(struct opt_proc_t *opt)
 {
-	struct bc_hit_bundle_t bc_hit_bundle;
-	get_bc_hit_bundle(opt, &bc_hit_bundle);
-	struct asm_graph_t *g = bc_hit_bundle.g;
+	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g, opt->in_file);
 
 	struct barcode_list_t blist;
 	get_barcode_list(opt->bx_str, &blist);
@@ -577,14 +576,13 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	fclose(f);
 
 	simple_graph_destroy(&sg);
-
-
 	free(edges);
 
 	kh_destroy(long_int, all_pairs);
 	barcode_list_destroy(&blist);
-	bc_hit_bundle_destroy(&bc_hit_bundle);
 
+	asm_graph_destroy(g);
+	free(g);
 }
 
 void barcode_list_destroy(struct barcode_list_t *blist)
