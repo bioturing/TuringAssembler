@@ -517,10 +517,60 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	find_DAG(&sg);
 
 	filter_complex_regions(&sg);
-	//get_longest_path(&sg);
+	get_longest_path(&sg);
+
+	float unit_cov = get_genome_coverage(g);
+	int *mul = calloc(n_e, sizeof(int));
+	for (int i = 0; i < n_e; ++i)
+		mul[i] = (int) __get_edge_cov(g->edges + i, g->ksize) / unit_cov;
 
 	FILE *f = fopen(opt->lc, "w");
-	print_simple_graph(&sg, edges, n_e, f);
+	int new_n_e = 0;
+	for (int i = 0; i < n_e; ++i){
+		int source = i;
+		struct simple_node_t *snode = kh_int_node_get(sg.nodes, source);
+		if (snode->rv_deg != 0)
+			continue;
+		if (mul[source] == 0)
+			continue;
+		char *seq = calloc(1, sizeof(char));
+		int len = 0;
+		for (int v = source; v != -1; v = kh_int_int_get(sg.next, v)){
+			--mul[v];
+			--mul[g->edges[v].rc_id];
+			char *tmp;
+			decode_seq(&tmp, g->edges[v].seq, g->edges[v].seq_len);
+			int new_len = len + strlen(tmp) + 100;
+			seq = realloc(seq, new_len + 1);
+			char *N = calloc(101, sizeof(char));
+			for (int i = 0; i < 100; ++i)
+				N[i] = 'N';
+			strcpy(seq + len, N);
+			strcpy(seq + len + 100, tmp);
+			len = new_len;
+			free(tmp);
+			free(N);
+		}
+		fprintf(f, ">%d_%d\n%s\n", new_n_e, new_n_e + 1, seq);
+		new_n_e += 2;
+		free(seq);
+	}
+
+	for (int i = 0; i < n_e; ++i){
+		int e = i;
+		int e_rc = g->edges[e].rc_id;
+		if (mul[e] == 0)
+			continue;
+		if (e > e_rc)
+			continue;
+		char *seq;
+		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		fprintf(f, ">%d_%d\n%s\n", new_n_e, new_n_e + 1, seq);
+		free(seq);
+		new_n_e += 2;
+	}
+
+	//print_simple_graph(&sg, edges, n_e, f);
 	fclose(f);
 
 	simple_graph_destroy(&sg);
