@@ -503,6 +503,22 @@ void filter_complex_regions(struct simple_graph_t *sg)
 	kh_destroy(set_int, visited);
 }
 
+void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
+{
+	for (int i = 0; i < n_e; ++i){
+		int v = edges[i];
+		if (kh_set_int_exist(sg->is_complex, v))
+			continue;
+		struct simple_node_t *snode = kh_int_node_get(sg->nodes, v);
+		for (int j = 0; j < snode->deg; ++j){
+			int u = snode->adj[j];
+			if (kh_set_int_exist(sg->is_complex, u))
+				continue;
+			fprintf(f, "%d %d\n", v, u);
+		}
+	}
+}
+
 void create_barcode_molecules(struct opt_proc_t *opt)
 {
 	struct bc_hit_bundle_t bc_hit_bundle;
@@ -515,6 +531,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	khash_t(long_int) *all_pairs = kh_init(long_int);
 	load_pair_edge_count(opt->in_fasta, all_pairs);
 
+	FILE *f = fopen(opt->lc, "w");
 	for (int i = 0; i < blist.n_bc; ++i){
 		if ((i + 1) % 10000 == 0)
 			log_debug("%d/%d barcodes processed", i + 1, blist.n_bc);
@@ -538,13 +555,16 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		init_simple_graph(g, &bi_sg);
 		build_simple_bigraph(hits, all_pairs, &bi_sg);
 		filter_complex_regions(&bi_sg);
+		print_simple_graph(&bi_sg, edges, n_e, f);
 
 		simple_graph_destroy(&sg);
 		simple_graph_destroy(&bi_sg);
 
 
 		free(edges);
+		break;
 	}
+	fclose(f);
 
 	kh_destroy(long_int, all_pairs);
 	barcode_list_destroy(&blist);

@@ -97,4 +97,5 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f);
 
 void load_pair_edge_count(char *path, khash_t(long_int) *h_all);
+void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f);
 #endif
