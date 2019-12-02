@@ -549,7 +549,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		init_simple_graph(g, &bi_sg);
 		build_simple_bigraph(edges, n_e, all_pairs, &bi_sg);
 		filter_complex_regions(&bi_sg);
-		print_simple_graph(&bi_sg, edges, n_e, f);
+		print_simple_graph(&sg, edges, n_e, f);
 
 		simple_graph_destroy(&sg);
 		simple_graph_destroy(&bi_sg);
