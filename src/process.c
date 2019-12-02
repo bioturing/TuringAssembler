@@ -716,9 +716,13 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
+	gint_t le_idx = get_longest_edge(&g);
+	if (le_idx != -1) {
+		log_info("Longest edge %ld_%ld, length %u",
+		         le_idx, g.edges[le_idx].rc_id, get_edge_len(g.edges + le_idx));
+	}
 	char fasta_path[MAX_PATH];
-	struct read_path_t read_path, read_sorted_path;
-	sort_read(opt, &read_sorted_path);
+	struct read_path_t read_path;
 	read_path.R1_path = opt->files_1[0];
 	read_path.R2_path = opt->files_2[0];
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
