@@ -721,6 +721,7 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 		log_info("Longest edge %ld_%ld, length %u",
 		         le_idx, g.edges[le_idx].rc_id, get_edge_len(g.edges + le_idx));
 	}
+	save_graph_info(opt->out_dir, &g, "from_fasta");
 	char fasta_path[MAX_PATH];
 	struct read_path_t read_path;
 	read_path.R1_path = opt->files_1[0];
