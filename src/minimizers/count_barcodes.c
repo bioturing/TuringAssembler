@@ -47,7 +47,7 @@ static const uint64_t primes[16] = { 49157, 98317, 196613, 393241, 786433, 15728
 #define FATAL_LOAD_FACTOR 0.9
 #define KEY_LEN 8
 
-
+pthread_mutex_t h_table_mut;
 
 struct readbc_t {
     uint64_t barcode;
@@ -69,7 +69,6 @@ struct mini_hash_t {
     uint64_t count;
     uint64_t max_cnt;
     int prime_index;
-    pthread_mutex_t mut;
 };
 
 /**
@@ -96,7 +95,6 @@ void destroy_mini_hash(struct mini_hash_t *h_table)
 {
 	free(h_table->h);
 	free(h_table->key);
-	pthread_mutex_destroy(&h_table->mut);
 	free(h_table);
 }
 
@@ -218,16 +216,16 @@ void mini_expand()
  */
 inline void try_expanding()
 {
-	pthread_mutex_lock(&h_table->mut);
-	if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
-		log_info("Doubling hash table...");
-		mini_expand();
-	} else {
-		if ((double)h_table->count > FATAL_LOAD_FACTOR * (h_table->size)) {
-			log_warn("Hash table size reached limit!");
+	if (h_table->count == h_table->max_cnt) {
+		if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
+			log_info("Doubling hash table...");
+			mini_expand();
+		} else {
+			if ((double)h_table->count > FATAL_LOAD_FACTOR * (h_table->size)) {
+				log_warn("Hash table size reached limit!");
+			}
 		}
 	}
-	pthread_mutex_unlock(&h_table->mut);
 }
 
 
@@ -301,8 +299,10 @@ uint64_t mini_get(uint64_t data, uint64_t key)
 inline void mini_inc(uint64_t data, int len)
 {
 	uint64_t key = twang_mix64(data);
-	if (h_table->count > h_table->max_cnt) {
+	if(atomic_bool_CAS64(&h_table->count, h_table->max_cnt, h_table->max_cnt)){
+		pthread_mutex_lock(&h_table_mut);
 		try_expanding();
+		pthread_mutex_unlock(&h_table_mut);
 	}
 	mini_inc_by_key(data, key);
 }
@@ -347,7 +347,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
  */
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
-	h_table = init_mini_hash(0);
+	h_table = init_mini_hash(15);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
