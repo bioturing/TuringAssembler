@@ -1,8 +1,7 @@
 #ifndef __SCAFFOLDING_H__
 #define __SCAFFOLDING_H__
 
-#include <bits/types/FILE.h>
-
+#include <stdio.h>
 struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt);
 void dirty_code(struct opt_proc_t *opt);
 void scaffolding(FILE *out_file, struct asm_graph_t *g,
