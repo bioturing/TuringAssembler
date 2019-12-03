@@ -792,6 +792,8 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 {
 	FILE *f = fopen(path, "r");
 	int a, b;
+	khash_t(long_spath) *spath = kh_init(long_spath);
+	get_all_shortest_paths_dp(g, spath);
 
 	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 	int count = 0 ;
@@ -801,13 +803,13 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 		count++;
 		int *path = NULL;
 		int n_path;
-		int res = get_shortest_path(g, a, b, &path, &n_path);
+		int res = extract_shortest_path(g, spath, a, b, &path, &n_path);
 		if (res == -1) {
 			int t_b = g->edges[a].rc_id;
 			int t_a = g->edges[b].rc_id;
 			b = t_b;
 			a = t_a;
-			res = get_shortest_path(g, a, b, &path, &n_path);
+			res = extract_shortest_path(g, spath, a, b, &path, &n_path);
 		}
 		if (res == -1)
 			continue;
