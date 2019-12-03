@@ -24,6 +24,7 @@
 #include "scaffolding/scaffold.h"
 #include "smart_load.h"
 #include "log.h"
+#include "yeast_analyze_utils.h"
 
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_put_table = PTHREAD_MUTEX_INITIALIZER;
@@ -812,10 +813,10 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 			continue;
 		fprintf(out, "%d %d\n", a,b);
 //		assert(res != -1);
-		for(int i = 0 ; i < n_path; i++) {
-			printf("%d\n", path[i]);
-		}
-		printf("%d\n", count);
+//		for(int i = 0 ; i < n_path; i++) {
+//			printf("%d\n", path[i]);
+//		}
+//		printf("%d\n", count);
 		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
 		int total_len;
 		g0->edges[g0->n_e].seq = concate_seq(g, n_path, path, g->ksize, &total_len);
@@ -837,6 +838,34 @@ struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
 	return g0;
 }
 
+int compare(const void *a, const void *b)
+{
+	int *x = *(int (*)[3]) a;
+	int *y= *(int (*)[3]) b;
+	if (x[0] < y[0] || (x[0] == y[0]  && x[1] < y[1])) return -1;
+	if (x[0] == y[0]  && x[1] == y[1]) return 0;
+	return 1;
+}
+
+void filter_xxx(struct asm_graph_t *g)
+{
+	FILE *in = fopen("/home/che/bioturing/data/yeast/metadata/all_shortest_paths.txt", "r");
+	FILE *out = fopen("res.txt" ,"w");
+	int a, b;
+	char *tmp = calloc(1000,1), n_tmp;
+	fprintf(out, "a,b\n");
+	while (fscanf(in, "%d to %d:\n", &a, &b) != EOF) {
+		fgets(tmp, 10000, in);
+		if (g->edges[a].seq_len > 1000 && g->edges[b].seq_len > 1000) {
+			fprintf(out, "%d,%d\n",a,b);
+		}
+		fflush(out);
+	}
+	fclose(out);
+	fclose(in);
+
+}
+
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 //	init_global_params(g);
@@ -846,6 +875,41 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 //	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
 //	         opt->out_dir, g->ksize, "pair");
 //	write_stupid_fasta(g0, path);
+	filter_xxx(g);
+	return;
+	int (*a)[2], n;
+	load_ground_truth_file(&a, &n);
+	log_info("No. pair ground truth is: %d", n);
+	FILE *out = fopen("out.txt", "w");
+	int (*share_bc_list)[3] = NULL, n_share = 0;
+	load_share_barcode_file(&share_bc_list, &n_share);
+	qsort(share_bc_list, n_share, sizeof(int[3]), compare);
+	FILE *outout = fopen("tmp.txt","w");
+	for(int l = 0 ; l < n_share; l++)
+		fprintf(outout, "%d %d %d\n", share_bc_list[l][0], share_bc_list[l][1], share_bc_list[l][2]);
+	fclose(outout);
+	for (int i = 0; i < n; i++) {
+//		printf("%d\r", i);
+		int *path = NULL;
+		int n_path;
+		int x = a[i][0], y = a[i][1];
+		int distance = get_shortest_path(g, x, y, &path, &n_path);
+		if (distance == -1) {
+			log_warn("distance is -1");
+		}
+		int share_bx  = get_share_barcode_fromfile(a[i], share_bc_list, n_share);
+		struct info_pair *t = calloc(1, sizeof( struct info_pair));
+		t->x = x;
+		t->y = y;
+		t->len_x = g->edges[x].seq_len;
+		t->len_y = g->edges[y].seq_len;
+		t->n_shortest = n_path;
+		t->len_shortest = distance;
+		t->share_bx = share_bx;
+		free(path);
+		write_pair_info(out, t);
+	}
+	fclose(out);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)

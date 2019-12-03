@@ -135,6 +135,7 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 		if (g->edges[e].source == -1)
 			continue;
 		int len = get_edge_len(&g->edges[e]);
+		log_debug("count %d seqlen %d nhole %d ksize %d", g->edges[e].count, g->edges[e].seq_len, g->edges[e].n_holes, g->ksize);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		if (len < 1000)
 			continue;

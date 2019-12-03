@@ -138,7 +138,7 @@ void dirty_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = create_and_load_graph(opt);
 	dirty(g, opt);
-	write_neo4j_create(g);
+//	write_neo4j_create(g);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
