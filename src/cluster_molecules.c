@@ -687,7 +687,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		g_new->n_e++;
 	}
 
-	save_graph_info(opt->out_dir, g_new, "hihi");
+	write_stupid_fasta(g_new, "graph_hihi.fasta");
 
 	//print_simple_graph(&sg, edges, n_e, f);
 	fclose(f);
