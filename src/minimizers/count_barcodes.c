@@ -62,17 +62,12 @@ struct readsort_bundle_t {
     struct dqueue_t *q;
     char prefix[MAX_PATH];
     int64_t sm;
-    struct mini_hash_t *h_table;
+    struct mini_hash_t **h_table_ptr;
 };
 
 void destroy_worker_bundles(struct readsort_bundle_t *bundles, int n)
 {
-	for (int i = 0; i < n; ++i) {
-		if (bundles[i].h_table != NULL) {
-			destroy_mini_hash(bundles[i].h_table);
-			bundles[i].h_table = NULL;
-		}
-	}
+	destroy_mini_hash(*bundles[0].h_table_ptr);
 	free(bundles);
 }
 
@@ -81,24 +76,23 @@ void destroy_worker_bundles(struct readsort_bundle_t *bundles, int n)
  * @param p_index index of the prime number table
  * @return
  */
-struct mini_hash_t *init_mini_hash(uint32_t p_index)
+void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 {
 	struct mini_hash_t *table = calloc(1, sizeof(struct mini_hash_t));
 	table->prime_index = p_index;
 	uint32_t h_size = primes[table->prime_index];
-	table->h = calloc(h_size, sizeof(uint64_t));
+	table->h = calloc(h_size, sizeof(uint32_t));
 	table->key = calloc(h_size, sizeof(uint64_t));
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
 	table->count = 0;
-	return table;
+	*h_table = table;
 }
 
 void destroy_mini_hash(struct mini_hash_t *h_table)
 {
 	free(h_table->h);
 	free(h_table->key);
-	free(h_table);
 }
 
 uint64_t barcode_hash_mini(char *s)
@@ -177,14 +171,15 @@ uint64_t twang_unmix64(uint64_t key) {
  * when the load factor reach MAX_LOAD_FACTOR (0.65 by default)
  * key must be hashed by MurMurHash64
  */
-struct mini_hash_t *mini_expand(struct mini_hash_t *h_table)
+void mini_expand(struct mini_hash_t **new_table_ptr)
 {
 	uint32_t i;
 	uint32_t slot, prev;
-	uint64_t val, key, data;
-	uint32_t log_size = 1<<16;
-	assert(h_table->h != NULL);
-	struct mini_hash_t *new_table = init_mini_hash(h_table->prime_index + 1);
+	uint64_t key, data;
+	uint32_t log_size = 1<<16, val;
+	struct mini_hash_t *new_table;
+	struct mini_hash_t *h_table = *new_table_ptr;
+	init_mini_hash(&new_table, h_table->prime_index + 1);
 	assert(h_table->h != NULL);
 	for (i = 0; i < h_table->size; ++i) {
 		if (!((i + 1) % log_size)) {
@@ -206,36 +201,31 @@ struct mini_hash_t *mini_expand(struct mini_hash_t *h_table)
 				slot++;
 			}
 		}
+		assert(data != 0);
 		new_table->key[slot] = data;
 		new_table->h[slot] = val;
 		new_table->count++;
 	}
 	destroy_mini_hash(h_table);
-	return new_table;
+	*new_table_ptr = new_table;
 }
 
 /**
  * @brief Try expanding the hash table by doubling in size
  */
-inline struct mini_hash_t *try_expanding(struct mini_hash_t *h_table)
+inline void try_expanding(struct mini_hash_t **h_table)
 {
-	struct mini_hash_t *new_table = NULL;
-	if (h_table->count == h_table->max_cnt) {
-		if (h_table->prime_index < N_PRIMES_NUMBER - 1) {
+	struct mini_hash_t *table = *h_table;
+	if (table->count == table->max_cnt) {
+		if (table->prime_index < N_PRIMES_NUMBER - 1) {
 			log_info("Doubling hash table...");
-			assert(h_table->h != NULL);
-			new_table = mini_expand(h_table);
-			assert(new_table->h != NULL);
+			mini_expand(h_table);
 		} else {
-			if ((double)h_table->count > FATAL_LOAD_FACTOR * (h_table->size)) {
+			if ((double)table->count > FATAL_LOAD_FACTOR * (table->size)) {
 				log_warn("Hash table size reached limit!");
 			}
 		}
 	}
-	if (new_table != NULL)
-		return(new_table);
-	else
-		return(h_table);
 }
 
 
@@ -250,31 +240,34 @@ int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 		return -1;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
-	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
+	uint64_t prev = atomic_val_CAS32(h_table->h + slot, 0, 1);
 	if (!prev) { // slot is empty -> fill in
 		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
 		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)) {
-		atomic_add_and_fetch64(h_table->h + slot, 1);
+		atomic_add_and_fetch32(h_table->h + slot, 1);
 	} else { //linear probing
 		uint32_t i;
 		for (i = slot + 1; i < h_table->size && prev &&
 		                   !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			prev = atomic_val_CAS64(h_table->h + i, 0, 1);
+			prev = atomic_val_CAS32(h_table->h + i, 0, 1);
 			if (prev == 0) {
 				break;
 			}
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				prev = atomic_val_CAS64(h_table->h + i, 0, 1);
+				prev = atomic_val_CAS32(h_table->h + i, 0, 1);
+				if (prev == 0) {
+					break;
+				}
 			}
 		}
 		if (!prev) { //room at probe is empty -> fill in
-			atomic_bool_CAS64(h_table->key + i, 0, data); //TODO: check return
+			assert(atomic_bool_CAS64(h_table->key + i, 0, data));
 			atomic_add_and_fetch64(&(h_table->count), 1);
 		} else {
-			atomic_add_and_fetch64(h_table->h + i, 1);
+			atomic_add_and_fetch32(h_table->h + i, 1);
 		}
 	}
 	return 0;
@@ -312,9 +305,7 @@ inline void mini_inc(struct mini_hash_t **h_table, uint64_t data)
 	uint64_t key = twang_mix64(data);
 	if(atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
 		pthread_mutex_lock(&h_table_mut);
-		assert(table->h != NULL);
-		*h_table = try_expanding(table);
-		assert((*h_table)->h != NULL);
+		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
 	}
 	mini_inc_by_key(*h_table, data, key);
@@ -339,6 +330,8 @@ void mini_print(struct mini_hash_t *h_table, size_t bx_size, char *out_dir)
 		if (h_table->h[i] != 0) {
 			j = bx_size;
 			uint64_t ret = h_table->key[i];
+			if (h_table->h[i] == 1 && h_table->key[i] == 0)
+				log_error("Caught!");
 			assert(ret != 0);
 			while (j) {
 				c = ret % 5;
@@ -360,7 +353,8 @@ static inline void *biot_buffer_iterator_simple(void *data);
  */
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
-	struct mini_hash_t *h_table = init_mini_hash(15);
+	struct mini_hash_t *h_table;
+	init_mini_hash(&h_table, 7);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -377,7 +371,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	int i;
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
-		worker_bundles[i].h_table = h_table;
+		worker_bundles[i].h_table_ptr = &h_table;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -399,7 +393,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 		pthread_join(worker_threads[i], NULL);
 
 	free_fastq_pair(producer_bundles, opt->n_files);
-	mini_print(worker_bundles[0].h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
+	mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
 	destroy_worker_bundles(worker_bundles, opt->n_threads);
 }
 
@@ -446,7 +440,7 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				mini_inc(&bundle->h_table, barcode);
+				mini_inc(bundle->h_table_ptr, barcode);
 			} else {
 				//read doesn't have barcode
 			}
