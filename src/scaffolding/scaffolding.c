@@ -142,7 +142,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		if (value != 0) {
 			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf.n_item;
 			int cnt1 = g->edges[i_contig].barcodes_scaf.n_item;
-			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash);
+			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash, i_edge, i_contig);
 			new_candidate_edge->score.m2_score = value;
 			(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 			++*n_local_edges;
