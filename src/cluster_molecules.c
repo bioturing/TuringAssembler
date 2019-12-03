@@ -1,3 +1,4 @@
+#include <scaffolding/scaffolding.h>
 #include "attribute.h"
 #include "cluster_molecules.h"
 #include "helper.h"
@@ -7,6 +8,8 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/minimizers.h"
 #include "log.h"
+#include "process.h"
+#include "utils.h"
 
 #define MAX_RADIUS 4000
 #define MAX_PATH_LEN 30
@@ -562,9 +565,48 @@ void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 	free(path);
 }
 
+void add_path_to_edges(khash_t(long_spath) *spath, struct asm_graph_t *g, struct asm_graph_t *g_new,
+			int n_contig_path, int *contig_path, double avg_cov)
+{
+	int *total_path = calloc(1, sizeof(int)), n_total_path = 1;
+	total_path[0] = contig_path[0];
+	for(int i = 1; i < n_contig_path; i++) {
+		int a = contig_path[i-1], b = contig_path[i];
+		int *shortest_path = NULL;
+		int n_shortest_path;
+		int res = extract_shortest_path(g, spath, a, b, &shortest_path, &n_shortest_path);
+		assert(shortest_path[0] == a && shortest_path[n_shortest_path-1] ==b);
+		if (res == -1) {
+			int t_b = g->edges[a].rc_id;
+			int t_a = g->edges[b].rc_id;
+			b = t_b;
+			a = t_a;
+			res = extract_shortest_path(g, spath, a, b, &shortest_path, &n_shortest_path);
+		}
+		if (res == -1) {
+			log_error("it is wrong");
+			assert(0);
+		}
+		total_path = realloc(total_path, (n_total_path + n_shortest_path-1)* sizeof(int));
+		COPY_ARR(shortest_path+1, total_path + n_total_path, n_shortest_path-1);
+		n_total_path+=n_shortest_path-1;
+		free(shortest_path);
+	}
+
+	g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
+	int total_len, total_count;
+	g_new->edges[g_new->n_e].seq = concate_seq(g, n_total_path, total_path, g->ksize, &total_len, &total_count, avg_cov);
+	g_new->edges[g_new->n_e].seq_len = total_len;
+	g_new->edges[g_new->n_e].count = total_count;
+	g_new->edges[g_new->n_e].n_holes = 0;
+	g_new->n_e++;
+}
+
 void create_barcode_molecules(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	struct asm_graph_t *g_new = calloc(1, sizeof(struct asm_graph_t));
+
 	load_asm_graph(g, opt->in_file);
 
 	khash_t(long_spath) *spath = kh_init(long_spath);
@@ -595,6 +637,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	FILE *f = fopen(opt->lc, "w");
 	int new_n_e = 0;
 	int *mark = calloc(n_e, sizeof(int));
+	double global_cov = get_genome_coverage_h(g);
 	for (int i = 0; i < n_e; ++i){
 		int source = i;
 		if (kh_set_int_exist(sg.is_complex, source))
@@ -611,21 +654,23 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		--mul[g->edges[source].rc_id];
 		mark[source] = mark[g->edges[source].rc_id] = 1;
 
-		int prev = source;
+		int *path = calloc(1, sizeof(int)), n_path = 1;
+		path[0] = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
 				v = kh_int_int_get(sg.next, v)){
 			--mul[v];
 			--mul[g->edges[v].rc_id];
 			mark[v] = mark[g->edges[v].rc_id] = 1;
-			fill_gap(g, prev, v, spath, &sg, &seq);
-			prev = v;
+			path = realloc(path, (n_path+1) *sizeof(int));
+			path[n_path] = v;
+			n_path++;
 		}
-		fprintf(f, ">SEQ_%d_%d\n%s\n", new_n_e, new_n_e + 1, seq);
+		add_path_to_edges(spath, g, g_new, n_path, path, global_cov);
 		new_n_e += 2;
 		free(seq);
 	}
 
-	for (int i = 0; i < n_e; ++i){
+	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
 		if (mul[e] == 0)
@@ -634,12 +679,15 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 			continue;
 		if (e > e_rc)
 			continue;
-		char *seq;
-		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
-		fprintf(f, ">SEQ_%d_%d\n%s\n", new_n_e, new_n_e + 1, seq);
-		free(seq);
-		new_n_e += 2;
+		g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
+		g_new->edges[g_new->n_e].seq = g->edges[i].seq;
+		g_new->edges[g_new->n_e].seq_len = g->edges[i].seq_len;
+		g_new->edges[g_new->n_e].count = g->edges[i].count;
+		g_new->edges[g_new->n_e].n_holes = 0;
+		g_new->n_e++;
 	}
+
+	save_graph_info(opt->out_dir, g_new, "hihi");
 
 	//print_simple_graph(&sg, edges, n_e, f);
 	fclose(f);

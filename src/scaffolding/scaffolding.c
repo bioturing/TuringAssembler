@@ -763,13 +763,33 @@ inline void set_nu(uint32_t *seq, int pos, int val)
 	seq[pos >> 4] |= val << ((pos & 15) << 1);
 }
 
-char *concate_seq(struct asm_graph_t *g, int n_path, int *path, int ksize, int *ret_len)
+char *concate_seq(struct asm_graph_t *g, int n_path, int *path, int ksize, int *ret_len,
+			int *total_count, double global_avg_cov)
 {
 	int total_len = ksize;
+	double local_cov, sum_cov = 0, sum_len = 0;
+	for (int i = 0; i < n_path; i++) {
+		int i_e  = path[i];
+		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
+		if (cov > 1.5*global_avg_cov)
+			continue;
+		sum_cov += (g->edges[i].seq_len-ksize+1) *cov;
+		sum_len += (g->edges[i].seq_len-ksize+1);
+	}
+	local_cov = sum_cov/sum_len;
+	int t_count = 0;
 	for (int i = 0; i < n_path; i++) {
 		int a = path[i];
 		total_len += g->edges[a].seq_len -ksize;
 	}
+
+	for (int i = 0; i < n_path; i++) {
+		int i_e  = path[i];
+		int tmp = (g->edges[i_e].seq_len-ksize+1) * local_cov;
+		t_count += tmp;
+		g->edges[i_e].count -= tmp;
+	}
+
 	uint32_t *res = calloc((total_len + 15) / 16, 4);
 	int cur_len = g->edges[path[0]].seq_len;
 	for (int i = 0 ;  i < cur_len; i++) {
@@ -785,60 +805,61 @@ char *concate_seq(struct asm_graph_t *g, int n_path, int *path, int ksize, int *
 	}
 	assert(cur_len == total_len);
 	*ret_len = total_len;
+	*total_count = t_count;
 	return  res;
 }
 
-struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
-{
-	FILE *f = fopen(path, "r");
-	int a, b;
-	khash_t(long_spath) *spath = kh_init(long_spath);
-	get_all_shortest_paths_dp(g, spath);
-
-	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
-	int count = 0 ;
-	FILE *out = fopen("have_path.txt","w");
-	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
-		printf("get path from %d %d\n", a,b);
-		count++;
-		int *path = NULL;
-		int n_path;
-		int res = extract_shortest_path(g, spath, a, b, &path, &n_path);
-		if (res == -1) {
-			int t_b = g->edges[a].rc_id;
-			int t_a = g->edges[b].rc_id;
-			b = t_b;
-			a = t_a;
-			res = extract_shortest_path(g, spath, a, b, &path, &n_path);
-		}
-		if (res == -1)
-			continue;
-		fprintf(out, "%d %d\n", a,b);
-//		assert(res != -1);
-//		for(int i = 0 ; i < n_path; i++) {
-//			printf("%d\n", path[i]);
+//struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
+//{
+//	FILE *f = fopen(path, "r");
+//	int a, b;
+//	khash_t(long_spath) *spath = kh_init(long_spath);
+//	get_all_shortest_paths_dp(g, spath);
+//
+//	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+//	int count = 0 ;
+//	FILE *out = fopen("have_path.txt","w");
+//	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
+//		printf("get path from %d %d\n", a,b);
+//		count++;
+//		int *path = NULL;
+//		int n_path;
+//		int res = extract_shortest_path(g, spath, a, b, &path, &n_path);
+//		if (res == -1) {
+//			int t_b = g->edges[a].rc_id;
+//			int t_a = g->edges[b].rc_id;
+//			b = t_b;
+//			a = t_a;
+//			res = extract_shortest_path(g, spath, a, b, &path, &n_path);
 //		}
-//		printf("%d\n", count);
-		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
-		int total_len;
-		g0->edges[g0->n_e].seq = concate_seq(g, n_path, path, g->ksize, &total_len);
-		g0->edges[g0->n_e].seq_len = total_len;
-		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
-		g0->edges[g0->n_e].n_holes = 0;
-		g0->n_e++;
-		free(path);
-	}
-	fclose(out);
-	for (int i = 0; i < g->n_e; i++) {
-		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
-		g0->edges[g0->n_e].seq = g->edges[i].seq;
-		g0->edges[g0->n_e].seq_len = g->edges[i].seq_len;
-		g0->edges[g0->n_e].count = g->edges[i].count;
-		g0->edges[g0->n_e].n_holes = 0;
-		g0->n_e++;
-	}
-	return g0;
-}
+//		if (res == -1)
+//			continue;
+//		fprintf(out, "%d %d\n", a,b);
+////		assert(res != -1);
+////		for(int i = 0 ; i < n_path; i++) {
+////			printf("%d\n", path[i]);
+////		}
+////		printf("%d\n", count);
+//		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+//		int total_len;
+//		g0->edges[g0->n_e].seq = concate_seq(g, n_path, path, g->ksize, &total_len);
+//		g0->edges[g0->n_e].seq_len = total_len;
+//		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
+//		g0->edges[g0->n_e].n_holes = 0;
+//		g0->n_e++;
+//		free(path);
+//	}
+//	fclose(out);
+//	for (int i = 0; i < g->n_e; i++) {
+//		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+//		g0->edges[g0->n_e].seq = g->edges[i].seq;
+//		g0->edges[g0->n_e].seq_len = g->edges[i].seq_len;
+//		g0->edges[g0->n_e].count = g->edges[i].count;
+//		g0->edges[g0->n_e].n_holes = 0;
+//		g0->n_e++;
+//	}
+//	return g0;
+//}
 
 int compare(const void *a, const void *b)
 {
