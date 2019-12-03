@@ -30,32 +30,36 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bi
 	return 1;
 }
 
-float get_bc_score(int count_share, int size0, int size1, float avg_bin_hash)
+float get_bc_score(int count_share, int size0, int size1, float avg_bin_hash, int src, int des)
 {
 //	if (MIN(size0, size1) < avg_bin_hash/15)
 //		return 0;
+	if (size0 < 100 || size1 < 100){
+		log_warn("Two edges %d %d have low no. of barcode %d %d", src, des, size0, size1);
+		return 0;
+	}
 	return 1.0*count_share/MIN(size0 , size1);
 }
 
-float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
-		float edge1_cov, float avg_bin_hash)
-{
-	int cnt0 = 0, cnt1 = 0, res2 = 0;
-	float ratio0 = edge0_cov / global_genome_coverage, ratio1 = edge1_cov / global_genome_coverage;
-
-	for (uint32_t i = 0; i < buck0->size; ++i) {
-		if ((buck0->keys[i]) != (uint64_t)(-1)){
-			uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
-			if (tmp != BARCODE_HASH_END(buck1) && buck1->keys[tmp] != (uint64_t)(-1)) {
-				res2++;
-			}
-		}
-	}
-	log_trace("res %d cnt0 %d cnt1 %d ", res2, cnt0, cnt1 );
-	cnt0 = buck0->n_item;
-	cnt1 = buck1->n_item;
-	return get_bc_score(res2, cnt0, cnt1, avg_bin_hash);
-}
+//float get_share_barcode(struct barcode_hash_t *buck0, struct barcode_hash_t *buck1, float edge0_cov,
+//		float edge1_cov, float avg_bin_hash)
+//{
+//	int cnt0 = 0, cnt1 = 0, res2 = 0;
+//	float ratio0 = edge0_cov / global_genome_coverage, ratio1 = edge1_cov / global_genome_coverage;
+//
+//	for (uint32_t i = 0; i < buck0->size; ++i) {
+//		if ((buck0->keys[i]) != (uint64_t)(-1)){
+//			uint32_t tmp = barcode_hash_get(buck1, buck0->keys[i]);
+//			if (tmp != BARCODE_HASH_END(buck1) && buck1->keys[tmp] != (uint64_t)(-1)) {
+//				res2++;
+//			}
+//		}
+//	}
+//	log_trace("res %d cnt0 %d cnt1 %d ", res2, cnt0, cnt1 );
+//	cnt0 = buck0->n_item;
+//	cnt1 = buck1->n_item;
+//	return get_bc_score(res2, cnt0, cnt1, avg_bin_hash);
+//}
 
 float get_share_mate(struct asm_graph_t *g, int i0, int i1)
 {

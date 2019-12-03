@@ -330,7 +330,7 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	char *log_file = str_concate(opt->out_dir, "/build_barcode_scaffold.log");
 	init_logger(opt->log_level, log_file);
 	struct asm_graph_t g;
-	struct read_path_t read_sorted_path, read_path;
+	struct read_path_t read_sorted_path;
 
 	load_asm_graph(&g, opt->in_file);
 	char fasta_path[MAX_PATH];
@@ -341,15 +341,13 @@ void build_barcode_scaffold(struct opt_proc_t *opt)
 	} else {
 		log_info("Read library is not sorted (type %d). Sorting reads by barcodes", opt->lib_type);
 		sort_read(opt, &read_sorted_path);
-		read_path.R1_path = opt->files_1[0];
-		read_path.R2_path = opt->files_2[0];
 	}
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	log_info("Aligning reads on two heads of each contigs using BWA");
-	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 	close_logger();
