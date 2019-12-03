@@ -296,8 +296,7 @@ void debug_process(struct opt_proc_t *opt)
 	sprintf(path, "%s/debug.log", opt->out_dir);
 	init_logger(opt->log_level, path);
 	set_log_stage("Debug process");
-	//get_barcode_edges_path(opt);
-	get_all_barcode_paths(opt);
+	create_barcode_molecules(opt);
 }
 
 void print_barcode_graph_process(struct opt_proc_t *opt)
@@ -735,7 +734,22 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
-	build_barcode_read(opt, &g);
+	gint_t le_idx = get_longest_edge(&g);
+	if (le_idx != -1) {
+		log_info("Longest edge %ld_%ld, length %u",
+		         le_idx, g.edges[le_idx].rc_id, get_edge_len(g.edges + le_idx));
+	}
+	save_graph_info(opt->out_dir, &g, "from_fasta");
+	char fasta_path[MAX_PATH];
+	struct read_path_t read_path;
+	read_path.R1_path = opt->files_1[0];
+	read_path.R2_path = opt->files_2[0];
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g, fasta_path);
+	log_info("Aligning reads on two heads of each contigs using BWA");
+	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 }
@@ -751,4 +765,3 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 	asm_graph_destroy(&g1);
 }
-

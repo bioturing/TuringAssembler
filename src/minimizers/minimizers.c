@@ -21,7 +21,7 @@
 #define DEBUG_MM
 #endif
 
-#define MOLECULE_MARGIN 10000
+#define MOLECULE_MARGIN 6000
 
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
@@ -170,22 +170,16 @@ static inline char *uin32t2seq(uint32_t *s, int l)
 	return seq;
 }
 
-void mm_print(struct mm_db_t *db)
+void mm_print(uint64_t mm, int k)
 {
 	int i, j, pad;
-	uint64_t km;
 	uint8_t c;
-	for (i = 0 ; i < db->n; ++i) {
-		km = db->mm[i];
-		printf("km[%d]:", i);
-		PRINT_UINT64(km);
-		for (j = 0 ; j < db->k; ++j) {
-			pad = (62 - 2*j); /* 64 bits/number and 2bits/char */
-			c = (km & ((uint64_t)3 << pad)) >> pad;
-			printf("%c", nt4_char[c]);
-		}
-		printf("\n");
+	for (j = 0 ; j < k; ++j) {
+		pad = (62 - 2*j); /* 64 bits/number and 2bits/char */
+		c = (mm & ((uint64_t)3 << pad)) >> pad;
+		printf("%c", nt4_char[c]);
 	}
+	printf("\n");
 }
 
 void mm_db_insert(struct mm_db_t *db, uint64_t km, uint32_t p)
@@ -227,13 +221,14 @@ void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint64_t e, uint32_t p)
 	k = kh_get(mm_align, hits->aln, mm);
 	// Add the alignment object of each minimizers hit
 	if (k == kh_end(hits->aln)) {
-		k = kh_put(mm_align, hits->aln, e, &miss);
+		k = kh_put(mm_align, hits->aln, mm, &miss);
 		kh_value(hits->aln, k) = init_mm_align();
 	}
 	aln = kh_value(hits->aln, k);
 	aln->cnt++;
 	aln->edge = e;
 	aln->pos  = p; // Single-ton minimizers so the pos and edge ID doens't change
+	aln->mm = mm;
 
 	hits->n++;
 }
@@ -431,17 +426,17 @@ struct mm_db_edge_t *mm_db_edge_init()
  */
 void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
 {
-	khiter_t k, k_h;
+	khiter_t k, ki, k_h;
 
-	k = kh_get(mm_hash, db->cnt, mm);
-	if (k == kh_end(db->cnt)) {
+	ki = kh_get(mm_hash, db->cnt, mm);
+	if (ki == kh_end(db->cnt)) {
 		kh_set(mm_hash, db->cnt, mm, 1);
 		kh_set(mm_hash, db->h, mm, e);
 		kh_set(mm_hash, db->p, mm, p);
 	} else {
 		k_h = kh_get(mm_hash, db->h, mm);
 		//if (e != kh_value(db->h, k_h)) // Allow multiple mapped on one edge minimizer to be single-ton
-		kh_value(db->cnt, k)++;
+		kh_value(db->cnt, ki)++;
 	}
 
 }
@@ -472,8 +467,6 @@ static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 			}
 		}
 	}
-	log_info("Total number of minimizers %d", n_mm);
-	log_info("Total number of singleton minimizers %d (%d%)", single_cnt, single_cnt*100/n_mm);
 
 }
 
@@ -507,14 +500,16 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 	khiter_t k;
 	uint32_t i, p;
 	uint64_t e;
+	int single_ton = 0;
 	for (i = 0; i < db->n; ++i) {
 		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
 		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
+			single_ton++;
 			p = kh_get_val(mm_hash, db_e->p, db->mm[i], -1);
 			e = kh_get_val(mm_hash, db_e->h, db->mm[i], -1);
 			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
 				continue;
-			mm_hits_insert(hits, db->mm[i], kh_get_val(mm_hash, db_e->h, db->mm[i], -1), p);
+			mm_hits_insert(hits, db->mm[i], e, p);
 		}
 	}
 	return hits;
