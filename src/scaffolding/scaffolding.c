@@ -407,10 +407,8 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 	int distance = get_edge_len(&g->edges[last]);
 	log_trace("scascore %d %d %f", last, des, score->bc_score);
 	while (1) {
-		if (distance > global_distance)
-			break;
-		int src = get_last_n(path, is_left, i);
 		i++;
+		int src = get_last_n(path, is_left, i);
 		if (src == -1)
 			break;
 		if (is_left)
@@ -418,8 +416,16 @@ struct pair_contigs_score *get_score(struct asm_graph_t *g, struct scaffold_path
 		struct pair_contigs_score *tmp_score = get_score_edge(edges_score, src, des);
 		second_score->bc_score += tmp_score->bc_score;
 		log_trace("more %d %f ", src, second_score->bc_score);
+//		if (tmp_score->bc_score ==0) {
+//			log_trace("TERMINATE");
+//			score->bc_score = 0;
+//			return score;
+//		}
+
 		distance += get_edge_len(&g->edges[src]);
 		free(tmp_score);
+		if (distance > global_distance)
+			break;
 	}
 	if (i != 0)
 		score->bc_score += second_score->bc_score / (i * 3);
