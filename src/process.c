@@ -53,6 +53,8 @@ void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 	set_time_now();
 	resolve_local_graph_operation(g0, g);
 	// remove_tips(g0, g);
+	asm_resolve_simple_bulges_ite(g);
+	asm_resolve_complex_bulges_ite(g);
 	test_asm_graph(g);
 	log_info("Build graph level 1 time: %.3f", sec_from_prev_time());
 }
@@ -192,7 +194,7 @@ void resolve_complex_bulges_process(struct opt_proc_t *opt)
 	set_log_stage("Resolve complex bulges");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	asm_resolve_complex_bulges_ite(opt, &g);
+	asm_resolve_complex_bulges_ite(&g);
 
 	save_graph_info(opt->out_dir, &g, "level_3");
 	asm_graph_destroy(&g);
@@ -206,7 +208,7 @@ void resolve_bulges_process(struct opt_proc_t *opt)
 	set_log_stage("Resolve bulges");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	asm_resolve_simple_bulges_ite(opt, &g);
+	asm_resolve_simple_bulges_ite(&g);
 
 	save_graph_info(opt->out_dir, &g, "level_2");
 	asm_graph_destroy(&g);
@@ -271,8 +273,8 @@ void resolve_local_process(struct opt_proc_t *opt)
 	asm_resolve_dump_jungle_ite(opt, &g0);
 	do_some_resolve_bridge(&g0);*/
 	//resolve_1_2(&g0, opt);
-	asm_resolve_simple_bulges_ite(opt, &g0);
-	asm_resolve_complex_bulges_ite(opt, &g0);
+	asm_resolve_simple_bulges_ite(&g0);
+	asm_resolve_complex_bulges_ite(&g0);
 	char path[1024];
 	sprintf(path, "%s/graph_k_%d_level_2.bin", opt->out_dir, g0.ksize);
 	struct asm_graph_t g1;

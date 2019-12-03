@@ -64,6 +64,6 @@ void add_vertex_to_B_dfs(struct resolve_bulges_bundle_t *bundle, int v,
 		khash_t(set_int) *in_queue, struct queue_t *q, int depth);
 void supress_bulge(struct resolve_bulges_bundle_t *bundle);
 int resolve_bulges(struct asm_graph_t *g);
-int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g);
+int asm_resolve_complex_bulges_ite(struct asm_graph_t *g);
 int get_adj_node(struct asm_graph_t *g, int v, int id);
 #endif
