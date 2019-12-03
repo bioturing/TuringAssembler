@@ -65,6 +65,11 @@ struct readsort_bundle_t {
     struct mini_hash_t **h_table_ptr;
 };
 
+struct h_bundle_t {
+    uint64_t *slot_ptr;
+    void *arg;
+};
+
 void destroy_worker_bundles(struct readsort_bundle_t *bundles, int n)
 {
 	destroy_mini_hash(*bundles[0].h_table_ptr);
@@ -81,7 +86,7 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 	struct mini_hash_t *table = calloc(1, sizeof(struct mini_hash_t));
 	table->prime_index = p_index;
 	uint32_t h_size = primes[table->prime_index];
-	table->h = calloc(h_size, sizeof(uint32_t));
+	table->h = calloc(h_size, sizeof(uint64_t));
 	table->key = calloc(h_size, sizeof(uint64_t));
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
@@ -175,8 +180,8 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 {
 	uint32_t i;
 	uint32_t slot, prev;
-	uint64_t key, data;
-	uint32_t log_size = 1<<16, val;
+	uint64_t key, data, val;
+	uint32_t log_size = 1<<16;
 	struct mini_hash_t *new_table;
 	struct mini_hash_t *h_table = *new_table_ptr;
 	init_mini_hash(&new_table, h_table->prime_index + 1);
@@ -228,48 +233,55 @@ inline void try_expanding(struct mini_hash_t **h_table)
 	}
 }
 
+static void *add_and_fetch(void *arg)
+{
+	struct h_bundle_t *data = (struct h_bundle_t *)arg;
+	if (!atomic_bool_CAS64(data->slot_ptr, UINT64_MAX, 1)) // new entry
+		atomic_add_and_fetch64(data->slot_ptr, 1); // old entry
+	return NULL;
+}
 
 /**
  * Increase the the count of one barcode by 1
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
  */
-int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
+int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key, void * (*func)(void *), void *arg)
 {
 	if (h_table->count > h_table->max_cnt) // Return for counting big kmer
 		return -1;
+	uint32_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
-	uint64_t prev = atomic_val_CAS32(h_table->h + slot, 0, 1);
-	if (!prev) { // slot is empty -> fill in
-		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
+	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, UINT64_MAX);
+	struct h_bundle_t bundle;
+	bundle.arg = arg;
+	if (prev == 0) { // slot is empty -> fill in
+		assert(atomic_bool_CAS64(h_table->key + slot, 0, data));
 		atomic_add_and_fetch64(&(h_table->count), 1);
-	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)) {
-		atomic_add_and_fetch32(h_table->h + slot, 1);
-	} else { //linear probing
-		uint32_t i;
+	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) {
+		//linear probing
 		for (i = slot + 1; i < h_table->size && prev &&
 		                   !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			prev = atomic_val_CAS32(h_table->h + i, 0, 1);
-			if (prev == 0) {
+			prev = atomic_val_CAS64(h_table->h + i, 0, UINT64_MAX);
+			if (prev == 0)
 				break;
-			}
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				prev = atomic_val_CAS32(h_table->h + i, 0, 1);
-				if (prev == 0) {
+				prev = atomic_val_CAS64(h_table->h + i, 0, UINT64_MAX);
+				if (prev == 0)
 					break;
-				}
 			}
 		}
-		if (!prev) { //room at probe is empty -> fill in
+		if (prev == 0) { //room at probe is empty -> fill in
 			assert(atomic_bool_CAS64(h_table->key + i, 0, data));
 			atomic_add_and_fetch64(&(h_table->count), 1);
-		} else {
-			atomic_add_and_fetch32(h_table->h + i, 1);
 		}
+		slot = i;
 	}
+	bundle.slot_ptr = h_table->h + slot;
+	func((void *)&bundle);
 	return 0;
 }
 
@@ -299,7 +311,7 @@ uint64_t mini_get(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
  * @param data byte array of data
  * @param len length in byte of data
  */
-inline void mini_inc(struct mini_hash_t **h_table, uint64_t data)
+inline void mini_inc(struct mini_hash_t **h_table, uint64_t data, void *(*func)(void *), void *arg)
 {
 	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
@@ -308,7 +320,7 @@ inline void mini_inc(struct mini_hash_t **h_table, uint64_t data)
 		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
 	}
-	mini_inc_by_key(*h_table, data, key);
+	mini_inc_by_key(*h_table, data, key, func, arg);
 }
 
 /**
@@ -354,7 +366,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, 7);
+	init_mini_hash(&h_table, 5);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -413,6 +425,8 @@ static inline void *biot_buffer_iterator_simple(void *data)
 	char *R1_buf, *R2_buf;
 	int pos1, pos2, rc1, rc2, input_format;
 
+	void *(*h_func)(void *) = add_and_fetch;
+
 	while (1) {
 		ext_buf = d_dequeue_in(q);
 		if (!ext_buf)
@@ -440,7 +454,7 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				mini_inc(bundle->h_table_ptr, barcode);
+				mini_inc(bundle->h_table_ptr, barcode, h_func, NULL);
 			} else {
 				//read doesn't have barcode
 			}
