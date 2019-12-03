@@ -494,17 +494,17 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 	}
 }
 
-void extract_shortest_path(struct simple_graph_t *sg, khash_t(long_spath) *spath,
+void extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v)
 {
-	struct simple_node_t *nv = kh_int_node_get(sg->nodes, v);
-	struct simple_node_t *nu = kh_int_node_get(sg->nodes, u);
+	int source = g->edges[v].target;
+	int target = g->nodes[g->edges[u].source].rc_id;
 	int w = -1;
 	int t = -1;
-	for (int i = 0; w == -1 && i < nv->deg; ++i){
-		int tmpw = nv->adj[i];
-		for (int j = 0; t == -1 && j < nu->rv_deg; ++j){
-			int tmpt = nu->rv_adj[j];
+	for (int i = 0; w == -1 && i < g->nodes[source].deg; ++i){
+		int tmpw = g->nodes[source].adj[i];
+		for (int j = 0; t == -1 && j < g->nodes[target].deg; ++j){
+			int tmpt = g->edges[g->nodes[target].adj[j]].rc_id;
 			uint64_t code = GET_CODE(tmpw, tmpt);
 			if (tmpw != u && tmpt != v
 				&& kh_long_spath_exist(spath, code)){
@@ -534,7 +534,7 @@ void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 	int len = strlen(*seq);
 	int *path;
 	int n_v;
-	extract_shortest_path(sg, spath, v, u, &path, &n_v);
+	extract_shortest_path(g, spath, v, u, &path, &n_v);
 	for (int i = 1; i < n_v; ++i){
 		int w = path[i];
 		char *tmp;
