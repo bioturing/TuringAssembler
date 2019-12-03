@@ -5,13 +5,22 @@
 #ifndef SKIPPING_COUNT_BARCODES_H
 #define SKIPPING_COUNT_BARCODES_H
 
-
 #include <stdint.h>
+
+struct mini_hash_t {
+    uint64_t *h;
+    uint64_t *key;
+    uint64_t size;
+    uint64_t count;
+    uint64_t max_cnt;
+    int prime_index;
+};
 
 void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path);
 uint64_t barcode_hash_mini(char *s);
-struct mini_hash_t *init_mini_hash(uint32_t p_index );
-void mini_inc_by_key(uint64_t data, uint64_t key);
-uint64_t mini_get(uint64_t data, uint64_t key);
+struct mini_hash_t *init_mini_hash(uint32_t p_index);
+void destroy_mini_hash(struct mini_hash_t *h_table);
+int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key);
+uint64_t mini_get(struct mini_hash_t *h_table, uint64_t data, uint64_t key);
 
 #endif //SKIPPING_COUNT_BARCODES_H
