@@ -48,7 +48,7 @@ struct simple_graph_t{
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
 void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
-void extract_shortest_path(struct simple_graph_t *sg, khash_t(long_spath) *spath,
+int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v);
 
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);

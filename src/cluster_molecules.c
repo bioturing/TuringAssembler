@@ -494,38 +494,52 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 	}
 }
 
-void extract_shortest_path(struct simple_graph_t *sg, khash_t(long_spath) *spath,
+int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v)
 {
-	struct simple_node_t *nv = kh_int_node_get(sg->nodes, v);
-	struct simple_node_t *nu = kh_int_node_get(sg->nodes, u);
+	int source = g->edges[v].target;
+	int target = g->nodes[g->edges[u].source].rc_id;
 	int w = -1;
 	int t = -1;
-	for (int i = 0; w == -1 && i < nv->deg; ++i){
-		int tmpw = nv->adj[i];
-		for (int j = 0; t == -1 && j < nu->rv_deg; ++j){
-			int tmpt = nu->rv_adj[j];
+	for (int i = 0; w == -1 && i < g->nodes[source].deg; ++i){
+		int tmpw = g->nodes[source].adj[i];
+		if (tmpw == u){
+			*n_v = 2;
+			*path = calloc(2, sizeof(int));
+			(*path)[0] = v;
+			(*path)[1] = u;
+			return 2;
+		}
+	}
+
+	for (int i = 0; w == -1 && i < g->nodes[source].deg; ++i){
+		int tmpw = g->nodes[source].adj[i];
+		for (int j = 0; t == -1 && j < g->nodes[target].deg; ++j){
+			int tmpt = g->edges[g->nodes[target].adj[j]].rc_id;
 			uint64_t code = GET_CODE(tmpw, tmpt);
-			if (tmpw != u && tmpt != v
-				&& kh_long_spath_exist(spath, code)){
+			if (kh_long_spath_exist(spath, code)){
 				w = tmpw;
 				t = tmpt;
 			}
 		}
 	}
 
+	if (w == -1){
+		*path = NULL;
+		*n_v = 0;
+		return -1;
+	}
 	*path = calloc(MAX_PAIR_LEN + 2, sizeof(int));
 	*n_v = 1;
 	(*path)[0] = v;
-	if (w != -1){
-		int i = w;
-		while (i != -1){
-			(*path)[(*n_v)++] = i;
-			uint64_t code = GET_CODE(i, t);
-			i = kh_long_spath_get(spath, code)->trace;
-		}
+	int i = w;
+	while (i != -1){
+		(*path)[(*n_v)++] = i;
+		uint64_t code = GET_CODE(i, t);
+		i = kh_long_spath_get(spath, code)->trace;
 	}
 	(*path)[(*n_v)++] = u;
+	return *n_v;
 }
 
 void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
@@ -534,7 +548,7 @@ void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 	int len = strlen(*seq);
 	int *path;
 	int n_v;
-	extract_shortest_path(sg, spath, v, u, &path, &n_v);
+	extract_shortest_path(g, spath, v, u, &path, &n_v);
 	for (int i = 1; i < n_v; ++i){
 		int w = path[i];
 		char *tmp;
@@ -579,6 +593,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 
 	FILE *f = fopen(opt->lc, "w");
 	int new_n_e = 0;
+	int *mark = calloc(n_e, sizeof(int));
 	for (int i = 0; i < n_e; ++i){
 		int source = i;
 		if (kh_set_int_exist(sg.is_complex, source))
@@ -593,12 +608,14 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		int len = strlen(seq);
 		--mul[source];
 		--mul[g->edges[source].rc_id];
+		mark[source] = mark[g->edges[source].rc_id] = 1;
 
 		int prev = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
 				v = kh_int_int_get(sg.next, v)){
 			--mul[v];
 			--mul[g->edges[v].rc_id];
+			mark[v] = mark[g->edges[v].rc_id] = 1;
 			fill_gap(g, prev, v, spath, &sg, &seq);
 			prev = v;
 		}
@@ -611,6 +628,8 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
 		if (mul[e] == 0)
+			continue;
+		if (mark[e])
 			continue;
 		if (e > e_rc)
 			continue;
@@ -625,6 +644,8 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	fclose(f);
 
 	simple_graph_destroy(&sg);
+	free(mark);
+	free(mul);
 	free(edges);
 	kh_destroy(long_int, all_pairs);
 	kh_destroy(long_spath, spath);
