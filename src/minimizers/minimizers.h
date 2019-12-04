@@ -46,8 +46,6 @@ struct mm_db_edge_t {
     kh_mm_hash_t *p;
 };
 
-
-
 struct mm_hits_t *mm_hits_init();
 void mm_hits_print(struct mm_hits_t *hits, const char *file_path);
 struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l);

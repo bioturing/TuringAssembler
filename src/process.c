@@ -364,7 +364,7 @@ void count_bx_process(struct opt_proc_t *opt)
 {
 	struct read_path_t read_path;
 	__VERBOSE("Counting barcode frequencies\n");
-	count_bx_freq(opt, &read_path);
+	count_bx_freq(opt);
 	__VERBOSE("Done counting\n");
 }
 

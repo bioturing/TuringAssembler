@@ -12,7 +12,10 @@
 #include "attribute.h"
 #include "../utils.h"
 #include "minimizers.h"
+#include "count_barcodes.h"
 #include "../log.h"
+#include "atomic.h"
+#include "fastq_producer.h"
 
 
 #ifdef DEBUG
@@ -22,6 +25,17 @@
 #endif
 
 #define MOLECULE_MARGIN 6000
+#define MIN_READS_TO_HITS 10
+#define MAX_READS_TO_HITS 88
+#define EMPTY_BX UINT64_MAX
+
+struct minimizer_bundle_t {
+    struct dqueue_t *q;
+    struct mini_hash_t **bx_table;
+    struct mini_hash_t **rp_table;
+    struct asm_grapgh_t *g;
+    struct mm_db_edge_t *mm_edges;
+};
 
 const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
@@ -531,3 +545,185 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	fclose(f);
 }
 
+/*void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_bundle_t *bundle)
+{
+	int pos1 = 0, pos2 = 0;
+	int n_reads = 0;
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits1, *hits2, *hits;
+	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)()
+	struct asm_graph_t *g = bundle->g;
+	struct mm_db_edge_t *mm_edges_db = bundle->mm_edges;
+	struct mini_hash_t *rp_table = *(bundle->rp_table);
+
+	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
+	khiter_t ki, k;
+	hits = mm_hits_init();
+
+	n_reads++;
+	db1 = mm_index_char_str(r1, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+	db2 = mm_index_char_str(r2, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+	khiter_t k1, k2;
+	hits1 = mm_hits_init();
+	hits2 = mm_hits_init();
+	mm_hits_cmp(db1, mm_edges_db, hits1, g);
+	mm_hits_cmp(db2, mm_edges_db, hits2, g);
+
+	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+	if (hits1->n > 0) {
+		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
+			if (kh_exist(hits1->edges, k1)) {
+				if (kh_val(hits1->edges, k1) > max) {
+					max = kh_val(hits1->edges, k1);
+					er1 = kh_key(hits1->edges, k1);
+				}
+			}
+		}
+	}
+
+	if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
+		er1 = UINT64_MAX;
+	max = 0;
+	if (hits2->n > 0) {
+		for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+			if (kh_exist(hits2->edges, k2))
+				if (kh_val(hits2->edges, k2) > max) {
+					max = kh_val(hits2->edges, k2);
+					er2 = kh_key(hits2->edges, k2);
+				}
+		}
+	}
+	if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
+		er2 = UINT64_MAX;
+
+	if (er1 != UINT64_MAX)
+		kh_set(mm_edges, hits->edges, er1, 1);
+	if (er2 != UINT64_MAX)
+		kh_set(mm_edges, hits->edges, er2, 1);
+	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
+		printf("%llu %llu\n", er1, er2);
+	}
+	mm_hits_destroy(hits1);
+	mm_hits_destroy(hits2);
+	mm_db_destroy(db1);
+	mm_db_destroy(db2);
+}*/
+/*
+* @brief Worker for counting barcode
+* @param data
+* @return
+*/
+//static inline void *minimizer_iterator(void *data)
+//{
+//	struct minimizer_bundle_t *bundle = (struct minimizer_bundle_t *) data;
+//	struct dqueue_t *q = bundle->q;
+//	struct read_t read1, read2, readbc;
+//	struct pair_buffer_t *own_buf, *ext_buf;
+//	own_buf = init_trip_buffer();
+//
+//	char *R1_buf, *R2_buf;
+//	int pos1, pos2, rc1, rc2, input_format;
+//
+//	while (1) {
+//		ext_buf = d_dequeue_in(q);
+//		if (!ext_buf)
+//			break;
+//		d_enqueue_out(q, own_buf);
+//		own_buf = ext_buf;
+//		pos1 = pos2 = 0;
+//		R1_buf = ext_buf->R1_buf;
+//		R2_buf = ext_buf->R2_buf;
+//		input_format = ext_buf->input_format;
+//
+//		while (1) {
+//			rc1 = input_format == TYPE_FASTQ ?
+//			      get_read_from_fq(&read1, R1_buf, &pos1) :
+//			      get_read_from_fa(&read1, R1_buf, &pos1);
+//
+//			rc2 = input_format == TYPE_FASTQ ?
+//			      get_read_from_fq(&read2, R2_buf, &pos2) :
+//			      get_read_from_fa(&read2, R2_buf, &pos2);
+//
+//			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+//				log_error("Wrong format file");
+//
+//			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
+//			//TODO: this assumes bx only came from one type of library
+//			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
+//			if (barcode != (uint64_t) -1) {
+//				// any main stuff goes here
+//				uint64_t *slot = mini_put(bundle->bx_table, barcode);
+//			} else {
+//				//read doesn't have barcode
+//			}
+//			if (rc1 == READ_END)
+//				break;
+//		}
+//	}
+//	return NULL;
+//}
+
+//void mm_hit_all_barcodes(struct opt_proc_t *opt)
+//{
+//	uint64_t i;
+//	struct mini_hash_t *bx_table, *rp_table;
+//	bx_table = count_bx_freq(opt); //count barcode freq
+//	for (i = 0; i < bx_table->size; ++i) {
+//		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
+//			struct mini_hash_t *h;
+//			init_mini_hash(&h, 0);
+//			bx_table->h[i] = h;
+//		} else {
+//			bx_table->h[i] = EMPTY_BX;
+//		}
+//	}
+//
+//	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+//	assert(opt->in_file != NULL);
+//	load_asm_graph(g, opt->in_file);
+//	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
+//	                                               MINIMIZERS_WINDOW);
+//	init_mini_hash(&rp_table, 16);
+//
+//	pthread_attr_t attr;
+//	pthread_attr_init(&attr);
+//	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+//	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+//
+//	void *(*buffer_iterator)(void *) = minimizer_iterator;
+//	struct producer_bundle_t *producer_bundles = NULL;
+//	//TODO: implement for sorted library
+//	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
+//	                                   opt->files_1, opt->files_2);
+//
+//	struct minimizer_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
+//	worker_bundles = malloc(opt->n_threads * sizeof(struct minimizer_bundle_t));
+//
+//	for (i = 0; i < opt->n_threads; ++i) {
+//		worker_bundles[i].q = producer_bundles->q;
+//		worker_bundles[i].bx_table = &bx_table;
+//		worker_bundles[i].mm_edges = mm_edges;
+//		worker_bundles[i].rp_table = &rp_table;
+//		worker_bundles[i].g = g;
+//	}
+//
+//	pthread_t *producer_threads, *worker_threads;
+//	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+//	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+//
+//	for (i = 0; i < opt->n_files; ++i)
+//		pthread_create(producer_threads + i, &attr, fastq_producer,
+//		               producer_bundles + i);
+//
+//	for (i = 0; i < opt->n_threads; ++i)
+//		pthread_create(worker_threads + i, &attr, buffer_iterator,
+//		               worker_bundles + i);
+//
+//	for (i = 0; i < opt->n_files; ++i)
+//		pthread_join(producer_threads[i], NULL);
+//
+//	for (i = 0; i < opt->n_threads; ++i)
+//		pthread_join(worker_threads[i], NULL);
+//
+//	free_fastq_pair(producer_bundles, opt->n_files);
+//}
