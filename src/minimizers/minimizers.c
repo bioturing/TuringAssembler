@@ -29,6 +29,52 @@
 #define MAX_READS_TO_HITS 88
 #define EMPTY_BX UINT64_MAX
 
+/* Credit for
+ * https://graphics.stanford.edu/~seander/bithacks.html
+ * and Knuth's TAOCP fas1
+ */
+int __leftmost(uint64_t v)
+{
+	// uint64_t v;          // Input value to find position with rank r.
+	unsigned int r=1;      // Input: bit's desired rank [1-64].
+	unsigned int s;      // Output: Resulting position of bit with rank r [1-64]
+	uint64_t a, b, c, d; // Intermediate temporaries for bit count.
+	unsigned int t;      // Bit count temporary.
+
+	// Do a normal parallel bit count for a 64-bit integer,
+	// but store all intermediate steps.
+	// a = (v & 0x5555...) + ((v >> 1) & 0x5555...);
+	a =  v - ((v >> 1) & ~0UL/3);
+	// b = (a & 0x3333...) + ((a >> 2) & 0x3333...);
+	b = (a & ~0UL/5) + ((a >> 2) & ~0UL/5);
+	// c = (b & 0x0f0f...) + ((b >> 4) & 0x0f0f...);
+	c = (b + (b >> 4)) & ~0UL/0x11;
+	// d = (c & 0x00ff...) + ((c >> 8) & 0x00ff...);
+	d = (c + (c >> 8)) & ~0UL/0x101;
+	t = (d >> 32) + (d >> 48);
+	// Now do branchless select!
+	s  = 64;
+	// if (r > t) {s -= 32; r -= t;}
+	s -= ((t - r) & 256) >> 3; r -= (t & ((t - r) >> 8));
+	t  = (d >> (s - 16)) & 0xff;
+	// if (r > t) {s -= 16; r -= t;}
+	s -= ((t - r) & 256) >> 4; r -= (t & ((t - r) >> 8));
+	t  = (c >> (s - 8)) & 0xf;
+	// if (r > t) {s -= 8; r -= t;}
+	s -= ((t - r) & 256) >> 5; r -= (t & ((t - r) >> 8));
+	t  = (b >> (s - 4)) & 0x7;
+	// if (r > t) {s -= 4; r -= t;}
+	s -= ((t - r) & 256) >> 6; r -= (t & ((t - r) >> 8));
+	t  = (a >> (s - 2)) & 0x3;
+	// if (r > t) {s -= 2; r -= t;}
+	s -= ((t - r) & 256) >> 7; r -= (t & ((t - r) >> 8));
+	t  = (v >> (s - 1)) & 0x1;
+	// if (r > t) s--;
+	s -= ((t - r) & 256) >> 8;
+	//s = 65 - s;
+	return s;
+}
+
 struct minimizer_bundle_t {
     struct dqueue_t *q;
     struct mini_hash_t **bx_table;
@@ -384,43 +430,51 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 
 	int i, j, p = -1;
 	uint64_t km, mm, c;
-	uint64_t km_h, mm_h = 0;
-	uint64_t *km2 = calloc(l, 8);
+	uint64_t km_h, mm_h;
 	int pad = (32 - k - 1)*2;
 
-	km2[0] = get_km_i_str(s, 0, k);
-	for(int i =  1 ; i < l-k+1; i++) {
-		c = (uint64_t) nt4_table[s[i + k - 1]];
-		km2[i] = km2[i-1]| (c << (pad +2));
-	}
-	for(int i =  1 ; i < l-k+1; i++) {
-		km2[i] = HASH64(km2[i]);
-	}
-
-	for (i = 0; i < l - w -k + 1; ++i) {
+	mm_h = km_h = HASH64(k);
+	for (i = 0; i < l - w + 1; ++i) {
 		DEBUG_PRINT("[i = %d]\n", i);
+		if (i + w + k - 1 >= l)
+			break;
 		if (p < i) {
+			km = mm = get_km_i_str(s, i, k);
+			mm_h = km_h = HASH64(mm);
 			p = i;
 			for (j = 0; j < w; ++j) {
-				if (km2[i+j] < mm_h) {
-					mm_h = km2[i+j];
+				c = (uint64_t) nt4_table[s[i + j + k - 1]];
+				km |= ((uint64_t) c << (pad + 2));
+				km_h = HASH64(km);
+				if (km_h < mm_h) {
+					mm = km;
+					mm_h = km_h;
 					p = i + j;
-					mm_db_insert(db, km2[i+j], p);
+					mm_db_insert(db, km, p);
 				}
+				km <<= 2;
 			}
 			DEBUG_PRINT("[1]minimizers at window %d: %d\n", i, p);
+
+			continue;
 		} else {
-			if (km2[i+w-1] < mm_h){
+			c = (uint64_t) nt4_table[s[i + w + k - 2]];
+			km |= ((uint64_t) c << (pad + 2));
+			km_h = HASH64(km);
+			if (km_h < mm_h){
 				p = i + w - 1;
-				mm_h = km2[i+w-1];
-				mm_db_insert(db, km2[i+w-1], p);
+				mm = km;
+				mm_h = km_h;
+				mm_db_insert(db, km, p);
 				DEBUG_PRINT("[2]minimizers at window %d: %d\n", i, p);
 			}
+			km <<= 2;
 		}
 	}
 	//mm_print(db);
 	return db;
 }
+
 
 struct mm_db_edge_t *mm_db_edge_init()
 {
@@ -545,10 +599,36 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	fclose(f);
 }
 
+void print_all_hits(struct mini_hash_t *hits_table)
+{
+	uint64_t i, j, k, c;
+	char bx[18 + 1];
+	char nt5[5] = "ACGTN";
+	for (i = 0; i < hits_table->size; ++i) {
+		if (hits_table->h[i] != EMPTY_BX && hits_table->key[i] != 0) {
+			uint64_t ret = hits_table->key[i];
+			struct mini_hash_t *hits = (struct mini_hash_t *)(hits_table->h[i]);
+			k = 18;
+			while (k) {
+				c = ret % 5;
+				bx[--k] = nt5[c];
+				ret = (ret - c) / 5;
+			}
+			bx[18] = '\0';
+			printf("%s ", bx);
+			for (j = 0; j < hits->size; ++j) {
+				if (hits->h[j] != 0)
+					printf("%lu ", hits->key[j]);
+			}
+			printf("\n");
+		}
+	}
+}
+
 void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_bundle_t *bundle)
 {
 	struct mm_db_t *db1, *db2;
-	struct mm_hits_t *hits1, *hits2, *hits;
+	struct mm_hits_t *hits1, *hits2;
 	uint64_t *slot = mini_put(bundle->bx_table, bx);
 	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)(*slot);
 	struct asm_graph_t *g = bundle->g;
@@ -575,8 +655,9 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 		}
 	}
 
-	if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
+	if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON) {
 		er1 = UINT64_MAX;
+	}
 	max = 0;
 	if (hits2->n > 0) {
 		for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
@@ -587,13 +668,18 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 				}
 		}
 	}
-	if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
+	if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON) {
 		er2 = UINT64_MAX;
+	}
 
-	if (er1 != UINT64_MAX)
-		mini_put(&bx_table1, er1);
-	if (er2 != UINT64_MAX)
-		mini_put(&bx_table1, er2);
+	if (er1 != UINT64_MAX) {
+		slot = mini_put(&bx_table1, er1);
+		atomic_add_and_fetch64(slot, 1);
+	}
+	if (er2 != UINT64_MAX) {
+		slot = mini_put(&bx_table1, er2);
+		atomic_add_and_fetch64(slot, 1);
+	}
 	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
 		uint64_t pair = ((er1 & (uint64_t)UINT32_MAX) << 32) | ((er2 & (uint64_t)UINT32_MAX));
 		mini_put(&rp_table, pair);
@@ -615,6 +701,7 @@ static inline void *minimizer_iterator(void *data)
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2, readbc;
 	struct pair_buffer_t *own_buf, *ext_buf;
+	uint64_t *slot;
 	own_buf = init_trip_buffer();
 
 	char *R1_buf, *R2_buf;
@@ -648,7 +735,9 @@ static inline void *minimizer_iterator(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				mm_align(read1, read2, barcode, bundle);
+				slot = mini_put(bundle->bx_table, barcode);
+				if (*slot != EMPTY_BX)
+					mm_align(read1, read2, barcode, bundle);
 			} else {
 				//read doesn't have barcode
 			}
@@ -667,7 +756,8 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 	for (i = 0; i < bx_table->size; ++i) {
 		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
 			struct mini_hash_t *h;
-			init_mini_hash(&h, 0);
+			int p = __leftmost(bx_table->h[i]);
+			init_mini_hash(&h, p > 4 ? p - 4:0);
 			bx_table->h[i] = (uint64_t)h;
 		} else {
 			bx_table->h[i] = EMPTY_BX;
@@ -720,6 +810,6 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
-
+	print_all_hits(bx_table);
 	free_fastq_pair(producer_bundles, opt->n_files);
 }
