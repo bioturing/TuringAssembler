@@ -561,8 +561,8 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	hits = mm_hits_init();
 
 	n_reads++;
-	db1 = mm_index_char_str(r1, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
-	db2 = mm_index_char_str(r2, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+	db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+	db2 = mm_index_char_str(.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 	khiter_t k1, k2;
 	hits1 = mm_hits_init();
 	hits2 = mm_hits_init();
@@ -607,123 +607,124 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	mm_hits_destroy(hits2);
 	mm_db_destroy(db1);
 	mm_db_destroy(db2);
-}*/
-/*
+}
+
+*//*
 * @brief Worker for counting barcode
 * @param data
 * @return
-*/
-//static inline void *minimizer_iterator(void *data)
-//{
-//	struct minimizer_bundle_t *bundle = (struct minimizer_bundle_t *) data;
-//	struct dqueue_t *q = bundle->q;
-//	struct read_t read1, read2, readbc;
-//	struct pair_buffer_t *own_buf, *ext_buf;
-//	own_buf = init_trip_buffer();
-//
-//	char *R1_buf, *R2_buf;
-//	int pos1, pos2, rc1, rc2, input_format;
-//
-//	while (1) {
-//		ext_buf = d_dequeue_in(q);
-//		if (!ext_buf)
-//			break;
-//		d_enqueue_out(q, own_buf);
-//		own_buf = ext_buf;
-//		pos1 = pos2 = 0;
-//		R1_buf = ext_buf->R1_buf;
-//		R2_buf = ext_buf->R2_buf;
-//		input_format = ext_buf->input_format;
-//
-//		while (1) {
-//			rc1 = input_format == TYPE_FASTQ ?
-//			      get_read_from_fq(&read1, R1_buf, &pos1) :
-//			      get_read_from_fa(&read1, R1_buf, &pos1);
-//
-//			rc2 = input_format == TYPE_FASTQ ?
-//			      get_read_from_fq(&read2, R2_buf, &pos2) :
-//			      get_read_from_fa(&read2, R2_buf, &pos2);
-//
-//			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-//				log_error("Wrong format file");
-//
-//			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
-//			//TODO: this assumes bx only came from one type of library
-//			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
-//			if (barcode != (uint64_t) -1) {
-//				// any main stuff goes here
-//				uint64_t *slot = mini_put(bundle->bx_table, barcode);
-//			} else {
-//				//read doesn't have barcode
-//			}
-//			if (rc1 == READ_END)
-//				break;
-//		}
-//	}
-//	return NULL;
-//}
+*//*
+static inline void *minimizer_iterator(void *data)
+{
+	struct minimizer_bundle_t *bundle = (struct minimizer_bundle_t *) data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2, readbc;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_trip_buffer();
 
-//void mm_hit_all_barcodes(struct opt_proc_t *opt)
-//{
-//	uint64_t i;
-//	struct mini_hash_t *bx_table, *rp_table;
-//	bx_table = count_bx_freq(opt); //count barcode freq
-//	for (i = 0; i < bx_table->size; ++i) {
-//		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
-//			struct mini_hash_t *h;
-//			init_mini_hash(&h, 0);
-//			bx_table->h[i] = h;
-//		} else {
-//			bx_table->h[i] = EMPTY_BX;
-//		}
-//	}
-//
-//	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
-//	assert(opt->in_file != NULL);
-//	load_asm_graph(g, opt->in_file);
-//	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
-//	                                               MINIMIZERS_WINDOW);
-//	init_mini_hash(&rp_table, 16);
-//
-//	pthread_attr_t attr;
-//	pthread_attr_init(&attr);
-//	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
-//	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-//
-//	void *(*buffer_iterator)(void *) = minimizer_iterator;
-//	struct producer_bundle_t *producer_bundles = NULL;
-//	//TODO: implement for sorted library
-//	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
-//	                                   opt->files_1, opt->files_2);
-//
-//	struct minimizer_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
-//	worker_bundles = malloc(opt->n_threads * sizeof(struct minimizer_bundle_t));
-//
-//	for (i = 0; i < opt->n_threads; ++i) {
-//		worker_bundles[i].q = producer_bundles->q;
-//		worker_bundles[i].bx_table = &bx_table;
-//		worker_bundles[i].mm_edges = mm_edges;
-//		worker_bundles[i].rp_table = &rp_table;
-//		worker_bundles[i].g = g;
-//	}
-//
-//	pthread_t *producer_threads, *worker_threads;
-//	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
-//	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
-//
-//	for (i = 0; i < opt->n_files; ++i)
-//		pthread_create(producer_threads + i, &attr, fastq_producer,
-//		               producer_bundles + i);
-//
-//	for (i = 0; i < opt->n_threads; ++i)
-//		pthread_create(worker_threads + i, &attr, buffer_iterator,
-//		               worker_bundles + i);
-//
-//	for (i = 0; i < opt->n_files; ++i)
-//		pthread_join(producer_threads[i], NULL);
-//
-//	for (i = 0; i < opt->n_threads; ++i)
-//		pthread_join(worker_threads[i], NULL);
-//
-//	free_fastq_pair(producer_bundles, opt->n_files);
-//}
+	char *R1_buf, *R2_buf;
+	int pos1, pos2, rc1, rc2, input_format;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf)
+			break;
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		R1_buf = ext_buf->R1_buf;
+		R2_buf = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read1, R1_buf, &pos1) :
+			      get_read_from_fa(&read1, R1_buf, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read2, R2_buf, &pos2) :
+			      get_read_from_fa(&read2, R2_buf, &pos2);
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				log_error("Wrong format file");
+
+			*//* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n *//*
+			//TODO: this assumes bx only came from one type of library
+			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
+			if (barcode != (uint64_t) -1) {
+				// any main stuff goes here
+				uint64_t *slot = mini_put(bundle->bx_table, barcode);
+			} else {
+				//read doesn't have barcode
+			}
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+	return NULL;
+}
+
+void mm_hit_all_barcodes(struct opt_proc_t *opt)
+{
+	uint64_t i;
+	struct mini_hash_t *bx_table, *rp_table;
+	bx_table = count_bx_freq(opt); //count barcode freq
+	for (i = 0; i < bx_table->size; ++i) {
+		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
+			struct mini_hash_t *h;
+			init_mini_hash(&h, 0);
+			bx_table->h[i] = h;
+		} else {
+			bx_table->h[i] = EMPTY_BX;
+		}
+	}
+
+	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	assert(opt->in_file != NULL);
+	load_asm_graph(g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
+	                                               MINIMIZERS_WINDOW);
+	init_mini_hash(&rp_table, 16);
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	void *(*buffer_iterator)(void *) = minimizer_iterator;
+	struct producer_bundle_t *producer_bundles = NULL;
+	//TODO: implement for sorted library
+	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
+	                                   opt->files_1, opt->files_2);
+
+	struct minimizer_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
+	worker_bundles = malloc(opt->n_threads * sizeof(struct minimizer_bundle_t));
+
+	for (i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].bx_table = &bx_table;
+		worker_bundles[i].mm_edges = mm_edges;
+		worker_bundles[i].rp_table = &rp_table;
+		worker_bundles[i].g = g;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_producer,
+		               producer_bundles + i);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, buffer_iterator,
+		               worker_bundles + i);
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, opt->n_files);
+}*/

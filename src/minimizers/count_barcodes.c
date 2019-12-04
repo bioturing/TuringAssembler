@@ -40,7 +40,6 @@
  http://br.endernet.org/~akrowne/
  http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
  */
-
 static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
                                    12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739,
                                    6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
@@ -49,6 +48,8 @@ static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
 
 #define MAX_LOAD_FACTOR 0.65
 #define FATAL_LOAD_FACTOR 0.9
+
+#define MINIHASH_END (uint64_t *)UINT64_MAX
 #define KEY_LEN 8
 
 pthread_mutex_t h_table_mut;
@@ -174,7 +175,7 @@ uint64_t twang_unmix64(uint64_t key) {
 void mini_expand(struct mini_hash_t **new_table_ptr)
 {
 	uint32_t i;
-	uint32_t slot, prev;
+	uint64_t *slot;
 	uint64_t key, data, val;
 	uint32_t log_size = 1<<16;
 	struct mini_hash_t *new_table;
@@ -186,25 +187,13 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 			log_info("Copied %d elements", log_size);
 			log_size <<= 1;
 		}
-		if (!h_table->h[i])
+		if (h_table->key[i] == 0)
 			continue;
 		val = h_table->h[i];
 		data = h_table->key[i];
 		key = twang_mix64(data);
-		slot = prev = key % new_table->size;
-		while (new_table->key[slot] != 0 && slot < new_table->size) {
-			slot++;
-		}
-		if (slot == new_table->size) {
-			slot = 0;
-			while (new_table->key[slot] != 0 && slot < prev) {
-				slot++;
-			}
-		}
-		assert(data != 0);
-		new_table->key[slot] = data;
-		new_table->h[slot] = val;
-		new_table->count++;
+		slot = mini_put_by_key(new_table, data, key);
+		*slot = val;
 	}
 	destroy_mini_hash(h_table);
 	*new_table_ptr = new_table;
@@ -228,56 +217,41 @@ inline void try_expanding(struct mini_hash_t **h_table)
 	}
 }
 
-static void *add_and_fetch(void *arg)
-{
-	struct h_bundle_t *data = (struct h_bundle_t *)arg;
-	if (!atomic_bool_CAS64(data->slot_ptr, UINT64_MAX, 1)) // new entry
-		atomic_add_and_fetch64(data->slot_ptr, 1); // old entry
-	return NULL;
-}
-
 /**
  * Increase the the count of one barcode by 1
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
  */
-int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key, void * (*func)(void *), void *arg)
+uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
 	if (h_table->count > h_table->max_cnt) // Return for counting big kmer
-		return -1;
+		return MINIHASH_END;
 	uint32_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
-	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, UINT64_MAX);
-	struct h_bundle_t bundle;
-	bundle.arg = arg;
-	if (prev == 0) { // slot is empty -> fill in
-		assert(atomic_bool_CAS64(h_table->key + slot, 0, data));
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, data);
+	if (is_empty) { // slot is empty -> fill in
 		atomic_add_and_fetch64(&(h_table->count), 1);
-	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) {
+	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
-		for (i = slot + 1; i < h_table->size && prev &&
-		                   !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			prev = atomic_val_CAS64(h_table->h + i, 0, UINT64_MAX);
-			if (prev == 0)
+		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+			if (is_empty)
 				break;
 		}
 		if (i == h_table->size) {
-			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				prev = atomic_val_CAS64(h_table->h + i, 0, UINT64_MAX);
-				if (prev == 0)
+			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+				is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+				if (is_empty)
 					break;
 			}
 		}
-		if (prev == 0) { //room at probe is empty -> fill in
-			assert(atomic_bool_CAS64(h_table->key + i, 0, data));
+		assert(!atomic_bool_CAS64(&i, slot, slot));
+		if (is_empty) //room at probe is empty -> fill in
 			atomic_add_and_fetch64(&(h_table->count), 1);
-		}
 		slot = i;
 	}
-	bundle.slot_ptr = h_table->h + slot;
-	func((void *)&bundle);
-	return 0;
+	return h_table->h + slot;
 }
 
 /**
@@ -287,18 +261,22 @@ int mini_inc_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key, vo
  * @return count of data
  */
 
-uint64_t mini_get(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
+uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 {
 	uint64_t mask = h_table->size;
+	uint64_t key = twang_mix64(data);
 	uint64_t slot = key % mask;
-	while (h_table->key[slot] != data && h_table->key[slot] != 0 && slot != h_table->size) {
-		printf("slot %lu . h_table key %lu \n", slot, h_table->key[slot]);
-		slot++;
+	uint64_t i = 0;
+	if (h_table->key[slot] == 0)
+		return MINIHASH_END;
+	for (i = slot + 1; h_table->key[i] != data && i < h_table->size; ++i) {}
+	if (i == h_table->size) {
+		for (i = 0; h_table->key[i] != data && i < slot;  ++i) {}
 	}
-	if (slot == h_table->size) slot = 0;
-	//It is guarantee have this key
-	while (h_table->key[slot] != data && h_table->key[slot] != 0) slot++;
-	return h_table->h[slot];
+	if (i == slot)
+		return MINIHASH_END;
+	else
+		return h_table->h + slot;
 }
 
 /**
@@ -306,7 +284,7 @@ uint64_t mini_get(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
  * @param data byte array of data
  * @param len length in byte of data
  */
-inline void mini_inc(struct mini_hash_t **h_table, uint64_t data, void *(*func)(void *), void *arg)
+uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
 	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
@@ -315,7 +293,7 @@ inline void mini_inc(struct mini_hash_t **h_table, uint64_t data, void *(*func)(
 		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
 	}
-	mini_inc_by_key(*h_table, data, key, func, arg);
+	return mini_put_by_key(*h_table, data, key);
 }
 
 /**
@@ -337,8 +315,6 @@ void mini_print(struct mini_hash_t *h_table, size_t bx_size, char *out_dir)
 		if (h_table->h[i] != 0) {
 			j = bx_size;
 			uint64_t ret = h_table->key[i];
-			if (h_table->h[i] == 1 && h_table->key[i] == 0)
-				log_error("Caught!");
 			assert(ret != 0);
 			while (j) {
 				c = ret % 5;
@@ -361,7 +337,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, 5);
+	init_mini_hash(&h_table, 3);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -420,8 +396,6 @@ static inline void *biot_buffer_iterator_simple(void *data)
 	char *R1_buf, *R2_buf;
 	int pos1, pos2, rc1, rc2, input_format;
 
-	void *(*h_func)(void *) = add_and_fetch;
-
 	while (1) {
 		ext_buf = d_dequeue_in(q);
 		if (!ext_buf)
@@ -449,7 +423,8 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				mini_inc(bundle->h_table_ptr, barcode, h_func, NULL);
+				uint64_t *slot = mini_put(bundle->h_table_ptr, barcode);
+				atomic_add_and_fetch64(slot, 1);
 			} else {
 				//read doesn't have barcode
 			}
