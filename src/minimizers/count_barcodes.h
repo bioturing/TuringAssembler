@@ -6,6 +6,7 @@
 #define SKIPPING_COUNT_BARCODES_H
 
 #include <stdint.h>
+#include "../cluster_molecules.h"
 
 struct mini_hash_t {
     uint64_t *h;
@@ -32,5 +33,6 @@ uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data);
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key);
 uint64_t get_barcode_biot(char *s, struct read_t *r);
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data);
+khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc, int n_bc);
 
 #endif //SKIPPING_COUNT_BARCODES_H

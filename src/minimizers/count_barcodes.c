@@ -54,13 +54,6 @@ static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
 
 pthread_mutex_t h_table_mut;
 
-struct readbc_t {
-    uint64_t barcode;
-    int64_t offset;
-    int len1;
-    int len2;
-};
-
 struct h_bundle_t {
     uint64_t *slot_ptr;
     void *arg;
@@ -433,4 +426,36 @@ static inline void *biot_buffer_iterator_simple(void *data)
 		}
 	}
 	return NULL;
+}
+
+khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc, int n_bc)
+{
+	khash_t(long_int) *res = kh_init(long_int);
+	for (int i = 0; i < n_bc; ++i){
+		struct mini_hash_t *wrapper = bc + i;
+		int *edges = calloc(wrapper->size, sizeof(uint64_t));
+		int n_e = 0;
+		for (int j = 0; j < wrapper->size; ++j){
+			if (wrapper->h[j] == 0)
+				continue;
+			edges[n_e++] = wrapper->key[j];
+		}
+
+		for (int j = 0; j < n_e; ++j){
+			for (int k = j + 1; k < n_e; ++k){
+				int e1 = edges[j];
+				int e2 = edges[k];
+				if (e1 > e2){
+					int tmp = e1;
+					e1 = e2;
+					e2 = tmp;
+				}
+				uint64_t code = GET_CODE(e1, e2);
+				int cur_count = kh_long_int_try_get(res, code, 0);
+				kh_long_int_set(res, code, cur_count + 1);
+			}
+		}
+		free(edges);
+	}
+	return res;
 }

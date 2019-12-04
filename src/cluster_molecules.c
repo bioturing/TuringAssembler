@@ -16,7 +16,6 @@
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
-#define GET_CODE(a, b) ((((uint64_t) (a)) << 32) | (b))
 
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info)
 {
