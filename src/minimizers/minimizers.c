@@ -25,9 +25,8 @@
 #endif
 
 #define MOLECULE_MARGIN 6000
-#define MIN_READS_TO_HITS 10
+#define MIN_READS_TO_HITS 0
 #define MAX_READS_TO_HITS 88
-#define EMPTY_BX UINT64_MAX
 
 /* Credit for
  * https://graphics.stanford.edu/~seander/bithacks.html
@@ -629,8 +628,9 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 {
 	struct mm_db_t *db1, *db2;
 	struct mm_hits_t *hits1, *hits2;
-	uint64_t *slot = mini_put(bundle->bx_table, bx);
-	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)(*slot);
+	uint64_t *h_slot = mini_put(bundle->bx_table, bx);
+	uint64_t *slot;
+	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)(*h_slot);
 	struct asm_graph_t *g = bundle->g;
 	struct mm_db_edge_t *mm_edges_db = bundle->mm_edges;
 	struct mini_hash_t *rp_table = *(bundle->rp_table);
@@ -681,8 +681,10 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 		atomic_add_and_fetch64(slot, 1);
 	}
 	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
-		uint64_t pair = ((er1 & (uint64_t)UINT32_MAX) << 32) | ((er2 & (uint64_t)UINT32_MAX));
-		mini_put(&rp_table, pair);
+		uint64_t pair = GET_CODE(er1, er2);
+		uint64_t *s = mini_put(bundle->rp_table, pair);
+		atomic_add_and_fetch64(s, 1);
+
 	}
 	mm_hits_destroy(hits1);
 	mm_hits_destroy(hits2);
@@ -748,6 +750,20 @@ static inline void *minimizer_iterator(void *data)
 	return NULL;
 }
 
+void print_read_pairs(struct mini_hash_t *h_table)
+{
+	uint64_t i;
+	FILE *fp = fopen("bc_hits_read_pairs.txt", "w");
+	for (i = 0; i < h_table->size; ++i) {
+		if (h_table->h[i] == 0)
+			continue;
+		uint64_t u = h_table->key[i] >> 32;
+		uint64_t v = h_table->key[i] & 0x00000000ffffffff;
+		fprintf(fp,"%lu %lu %lu\n", u, v, h_table->h[i]);
+	}
+	fclose(fp);
+}
+
 void mm_hit_all_barcodes(struct opt_proc_t *opt)
 {
 	uint64_t i;
@@ -810,6 +826,9 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
+
 	print_all_hits(bx_table);
+	count_edge_link_shared_bc(bx_table);
+	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);
 }

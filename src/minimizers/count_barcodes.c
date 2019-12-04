@@ -428,11 +428,13 @@ static inline void *biot_buffer_iterator_simple(void *data)
 	return NULL;
 }
 
-khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc, int n_bc)
+khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 {
 	khash_t(long_int) *res = kh_init(long_int);
-	for (int i = 0; i < n_bc; ++i){
-		struct mini_hash_t *wrapper = bc + i;
+	for (int i = 0; i < bc->size; ++i){
+		if (bc->h[i] == EMPTY_BX)
+			continue;
+		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i];
 		int *edges = calloc(wrapper->size, sizeof(uint64_t));
 		int n_e = 0;
 		for (int j = 0; j < wrapper->size; ++j){
@@ -445,17 +447,19 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc, int n_bc)
 			for (int k = j + 1; k < n_e; ++k){
 				int e1 = edges[j];
 				int e2 = edges[k];
-				if (e1 > e2){
-					int tmp = e1;
-					e1 = e2;
-					e2 = tmp;
-				}
-				uint64_t code = GET_CODE(e1, e2);
+				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1) ;
 				int cur_count = kh_long_int_try_get(res, code, 0);
 				kh_long_int_set(res, code, cur_count + 1);
 			}
 		}
 		free(edges);
 	}
+	FILE *fp = fopen("bc_hits_edge_pairs.txt", "w");
+	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
+		if (kh_exist(res, k)) {
+			fprintf(fp, "%lu %lu %d\n", kh_key(res, k) >> 32, kh_key(res, k) & 0x00000000ffffffff, kh_value(res, k));
+		}
+	}
+	fclose(fp);
 	return res;
 }

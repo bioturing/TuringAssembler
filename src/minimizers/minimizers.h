@@ -15,6 +15,7 @@
 
 #define RATIO_OF_CONFIDENT 0.85
 #define MIN_NUMBER_SINGLETON 2
+#define EMPTY_BX UINT64_MAX
 
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
 KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
