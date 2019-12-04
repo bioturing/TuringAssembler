@@ -593,10 +593,17 @@ void add_path_to_edges(khash_t(long_spath) *spath, struct asm_graph_t *g, struct
 		free(shortest_path);
 	}
 
-	g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
 	int total_len, total_count;
-	g_new->edges[g_new->n_e].seq = concate_seq(g, n_total_path, total_path, g->ksize, &total_len, &total_count, avg_cov);
+	uint32_t *seq;
+	int ret = concate_edge(g, n_total_path, total_path, g->ksize, &total_len, &total_count,
+						    avg_cov, &seq);
+	if (ret == -1) {
+		return;
+	}
+	g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
+	g_new->edges[g_new->n_e].seq = seq;
 	g_new->edges[g_new->n_e].seq_len = total_len;
+	assert(total_count >0);
 	g_new->edges[g_new->n_e].count = total_count;
 	g_new->edges[g_new->n_e].n_holes = 0;
 	g_new->n_e++;
@@ -604,10 +611,11 @@ void add_path_to_edges(khash_t(long_spath) *spath, struct asm_graph_t *g, struct
 
 void create_barcode_molecules(struct opt_proc_t *opt)
 {
+	assert(opt->metagenomics == 0);
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	struct asm_graph_t *g_new = calloc(1, sizeof(struct asm_graph_t));
-
 	load_asm_graph(g, opt->in_file);
+	g_new->ksize = g->ksize;
 
 	khash_t(long_spath) *spath = kh_init(long_spath);
 	get_all_shortest_paths_dp(g, spath);
@@ -630,13 +638,9 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	get_longest_path(&sg);
 
 	float unit_cov = get_genome_coverage(g);
-	int *mul = calloc(n_e, sizeof(int));
-	for (int i = 0; i < n_e; ++i)
-		mul[i] = (int) (__get_edge_cov(g->edges + i, g->ksize) / unit_cov + 0.5);
 
 	FILE *f = fopen(opt->lc, "w");
-	int new_n_e = 0;
-	int *mark = calloc(n_e, sizeof(int));
+//	int *mark = calloc(n_e, sizeof(int));
 	double global_cov = get_genome_coverage_h(g);
 	for (int i = 0; i < n_e; ++i){
 		int source = i;
@@ -645,38 +649,30 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 		struct simple_node_t *snode = kh_int_node_get(sg.nodes, source);
 		if (snode->rv_deg != 0)
 			continue;
-		if (mul[source] == 0)
+		if (__get_edge_cov(&g->edges[source], g->ksize) <= 0.5*unit_cov)
 			continue;
-		char *seq;
-		decode_seq(&seq, g->edges[source].seq, g->edges[source].seq_len);
-		int len = strlen(seq);
-		--mul[source];
-		--mul[g->edges[source].rc_id];
-		mark[source] = mark[g->edges[source].rc_id] = 1;
+//		mark[source] = mark[g->edges[source].rc_id] = 1;
 
 		int *path = calloc(1, sizeof(int)), n_path = 1;
 		path[0] = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
 				v = kh_int_int_get(sg.next, v)){
-			--mul[v];
-			--mul[g->edges[v].rc_id];
-			mark[v] = mark[g->edges[v].rc_id] = 1;
+//			mark[v] = mark[g->edges[v].rc_id] = 1;
 			path = realloc(path, (n_path+1) *sizeof(int));
 			path[n_path] = v;
 			n_path++;
 		}
 		add_path_to_edges(spath, g, g_new, n_path, path, global_cov);
-		new_n_e += 2;
-		free(seq);
 	}
 
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
-		if (mul[e] == 0)
+		if (__get_edge_cov(&g->edges[i], g->ksize) <= 0.5 * global_cov)
 			continue;
-		if (mark[e])
-			continue;
+		assert(g->edges[i].count >0);
+//		if (mark[e])
+//			continue;
 		if (e > e_rc)
 			continue;
 		g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
@@ -693,8 +689,7 @@ void create_barcode_molecules(struct opt_proc_t *opt)
 	fclose(f);
 
 	simple_graph_destroy(&sg);
-	free(mark);
-	free(mul);
+//	free(mark);
 	free(edges);
 	kh_destroy(long_int, all_pairs);
 	kh_destroy(long_spath, spath);

@@ -135,7 +135,6 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 		if (g->edges[e].source == -1)
 			continue;
 		int len = get_edge_len(&g->edges[e]);
-		log_debug("count %d seqlen %d nhole %d ksize %d", g->edges[e].count, g->edges[e].seq_len, g->edges[e].n_holes, g->ksize);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		if (len < 1000)
 			continue;
@@ -829,9 +828,6 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 
 void write_stupid_fasta(struct asm_graph_t *g, const char *path)
 {
-	gint_t *id_edge, *cc_size;
-	id_edge = malloc(g->n_e * sizeof(gint_t));
-
 	FILE *fp = xfopen(path, "w");
 	char *seq = NULL;
 	uint32_t seq_len = 0;
@@ -839,6 +835,9 @@ void write_stupid_fasta(struct asm_graph_t *g, const char *path)
 	gint_t e, e_rc;
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
+		double cov = __get_edge_cov(&g->edges[e], g->ksize);
+		assert(cov > 0);
+		assert(g->edges[e].count > 0);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
 			__get_edge_cov(g->edges + e, g->ksize));
@@ -853,7 +852,6 @@ void write_stupid_fasta(struct asm_graph_t *g, const char *path)
 	}
 	fclose(fp);
 	free(seq);
-	free(id_edge);
 }
 
 void write_gfa(struct asm_graph_t *g, const char *path)
