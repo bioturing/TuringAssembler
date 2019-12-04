@@ -104,12 +104,13 @@ void count_edge_links_bc(struct opt_proc_t *opt)
 		hits_to_edges(g, hits, &edges, &n_e);
 		mm_hits_destroy(hits);
 
-		/*get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, spath_info,
-				is_connected, link_count);*/
+		get_edge_links_by_distance(bc_hit_bundle.g, edges, n_e, spath_info,
+				is_connected, link_count);
 
 		fprintf(bc_log, "%s: ", blist.bc_list[i]);
 		for (int i = 0; i < n_e; ++i)
-			fprintf(bc_log, "%d%c", edges[i], i + 1 == n_e ? '\n' : ',');
+			fprintf(bc_log, "%d,", edges[i]);
+		fprintf(bc_log, "\n");
 		free(edges);
 	}
 	fclose(bc_log);
