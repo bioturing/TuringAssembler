@@ -1,4 +1,4 @@
-#include <scaffolding/scaffolding.h>
+#include "scaffolding/scaffolding.h"
 #include "attribute.h"
 #include "cluster_molecules.h"
 #include "helper.h"

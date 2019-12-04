@@ -10,7 +10,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stddef.h>
-#include "khash.h"
+#include "../khash.h"
 #include "../assembly_graph.h"
 
 #define RATIO_OF_CONFIDENT 0.85

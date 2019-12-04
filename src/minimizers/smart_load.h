@@ -4,7 +4,7 @@
 
 #ifndef SRC_SMART_LOAD_H
 #define SRC_SMART_LOAD_H
-#include "khash.h"
+#include "../khash.h"
 #include "../radix_sort.h"
 #include "../attribute.h"
 #include "../assembly_graph.h"
