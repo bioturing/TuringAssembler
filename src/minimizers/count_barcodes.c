@@ -435,7 +435,7 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 		if (bc->h[i] == EMPTY_BX)
 			continue;
 		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i];
-		int *edges = calloc(wrapper->size, sizeof(uint64_t));
+		int *edges = calloc(wrapper->size, sizeof(int));
 		int n_e = 0;
 		for (int j = 0; j < wrapper->size; ++j){
 			if (wrapper->h[j] == 0)
@@ -447,7 +447,7 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 			for (int k = j + 1; k < n_e; ++k){
 				int e1 = edges[j];
 				int e2 = edges[k];
-				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1) ;
+				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
 				int cur_count = kh_long_int_try_get(res, code, 0);
 				kh_long_int_set(res, code, cur_count + 1);
 			}
@@ -462,4 +462,15 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 	}
 	fclose(fp);
 	return res;
+}
+
+int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2)
+{
+	if (e1 > e2){
+		int tmp = e1;
+		e1 = e2;
+		e2 = tmp;
+	}
+	uint64_t code = GET_CODE(e1, e2);
+	return kh_long_int_try_get(all_count, code, 0);
 }
