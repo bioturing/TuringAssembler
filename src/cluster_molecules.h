@@ -101,4 +101,5 @@ void load_pair_edge_count(char *path, khash_t(long_int) *h_all);
 void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f);
 void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 		struct simple_graph_t *sg, char **seq);
+void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges);
 #endif

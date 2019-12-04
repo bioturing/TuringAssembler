@@ -932,3 +932,42 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 	kh_destroy(int_int, L);
 }
 
+void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges)
+{
+	for (int v = 0; v < g->n_e; ++v){
+		int target = g->edges[v].target;
+		for (int i = 0; i < g->nodes[target].deg; ++i){
+			int u = g->nodes[target].adj[i];
+			uint64_t code = GET_CODE(v, u);
+			kh_long_int_set(pair_edges, code, 0);
+		}
+	}
+
+	khash_t(long_spath) *spath = kh_init(long_spath);
+	get_all_shortest_paths_dp(g, spath);
+	for (khiter_t it = kh_begin(spath); it != kh_end(spath); ++it){
+		if (!kh_exist(spath, it))
+			continue;
+		uint64_t code = kh_key(spath, it);
+		int len = kh_val(spath, it)->len;
+		if (len > MAX_RADIUS)
+			log_error("Something went wrong when finding all the sohrtest paths");
+		int v = code >> 32;
+		int u = (uint32_t) code & -1;
+		int source = g->nodes[g->edges[v].source].rc_id;
+		int target = g->edges[u].target;
+		for (int i = 0; i < g->nodes[source].deg; ++i){
+			int w = g->edges[g->nodes[source].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[target].deg; ++j){
+				int t = g->nodes[target].adj[j];
+				uint64_t old_code = GET_CODE(w, t);
+				int old_len = kh_long_int_try_get(pair_edges,
+						old_code, 1e9);
+				if (old_len > len)
+					kh_long_int_set(pair_edges, old_code,
+							len);
+			}
+		}
+	}
+	kh_destroy(long_spath, spath);
+}
