@@ -829,6 +829,7 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 
 	print_all_hits(bx_table);
 	count_edge_link_shared_bc(bx_table);
+	print_read_pairs(rp_table);
 	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);
 }
