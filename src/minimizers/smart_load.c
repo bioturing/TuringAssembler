@@ -19,9 +19,6 @@
 #include "../assembly_graph.h"
 #include "get_buffer.h"
 
-#define RATIO_OF_CONFIDENT 0.85
-#define MIN_NUMBER_SINGLETON 2
-
 static const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
 	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",

@@ -13,6 +13,9 @@
 #include "khash.h"
 #include "../assembly_graph.h"
 
+#define RATIO_OF_CONFIDENT 0.85
+#define MIN_NUMBER_SINGLETON 2
+
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
 KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
 KHASH_MAP_INIT_INT64(mm_pw, uint32_t);                 /* Hash table edge count */
@@ -54,5 +57,6 @@ struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w);
 void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits, struct asm_graph_t *g);
 void mm_db_destroy(struct mm_db_t *db);
 void mm_hits_destroy(struct mm_hits_t *hits);
+void mm_hit_all_barcodes(struct opt_proc_t *opt);
 
 #endif //SKIPPING_MINIMIZERS_H

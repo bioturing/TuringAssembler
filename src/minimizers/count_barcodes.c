@@ -105,7 +105,7 @@ uint64_t barcode_hash_mini(char *s)
 	return ret;
 }
 
-inline uint64_t get_barcode_biot(char *s, struct read_t *r)
+uint64_t get_barcode_biot(char *s, struct read_t *r)
 {
 	if (s == NULL) {
 		r->seq = r->qual = NULL;
@@ -337,7 +337,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, 3);
+	init_mini_hash(&h_table, 16);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);

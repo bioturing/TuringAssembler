@@ -30,7 +30,7 @@ void destroy_mini_hash(struct mini_hash_t *h_table);
 void destroy_worker_bundles(struct readsort_bundle1_t *bundles, int n);
 uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data);
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key);
-inline uint64_t get_barcode_biot(char *s, struct read_t *r);
+uint64_t get_barcode_biot(char *s, struct read_t *r);
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data);
 
 #endif //SKIPPING_COUNT_BARCODES_H

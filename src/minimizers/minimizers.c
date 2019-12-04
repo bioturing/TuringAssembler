@@ -9,13 +9,13 @@
 #include <inttypes.h>
 
 #include "../assembly_graph.h"
-#include "attribute.h"
+#include "../attribute.h"
 #include "../utils.h"
 #include "minimizers.h"
 #include "count_barcodes.h"
 #include "../log.h"
-#include "atomic.h"
-#include "fastq_producer.h"
+#include "../atomic.h"
+#include "../fastq_producer.h"
 
 
 #ifdef DEBUG
@@ -33,7 +33,7 @@ struct minimizer_bundle_t {
     struct dqueue_t *q;
     struct mini_hash_t **bx_table;
     struct mini_hash_t **rp_table;
-    struct asm_grapgh_t *g;
+    struct asm_graph_t *g;
     struct mm_db_edge_t *mm_edges;
 };
 
@@ -545,24 +545,18 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	fclose(f);
 }
 
-/*void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_bundle_t *bundle)
+void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_bundle_t *bundle)
 {
-	int pos1 = 0, pos2 = 0;
-	int n_reads = 0;
 	struct mm_db_t *db1, *db2;
 	struct mm_hits_t *hits1, *hits2, *hits;
-	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)()
+	uint64_t *slot = mini_put(bundle->bx_table, bx);
+	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)(*slot);
 	struct asm_graph_t *g = bundle->g;
 	struct mm_db_edge_t *mm_edges_db = bundle->mm_edges;
 	struct mini_hash_t *rp_table = *(bundle->rp_table);
 
-	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
-	khiter_t ki, k;
-	hits = mm_hits_init();
-
-	n_reads++;
 	db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
-	db2 = mm_index_char_str(.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+	db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
 	khiter_t k1, k2;
 	hits1 = mm_hits_init();
 	hits2 = mm_hits_init();
@@ -597,11 +591,12 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 		er2 = UINT64_MAX;
 
 	if (er1 != UINT64_MAX)
-		kh_set(mm_edges, hits->edges, er1, 1);
+		mini_put(&bx_table1, er1);
 	if (er2 != UINT64_MAX)
-		kh_set(mm_edges, hits->edges, er2, 1);
+		mini_put(&bx_table1, er2);
 	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
-		printf("%llu %llu\n", er1, er2);
+		uint64_t pair = ((er1 & (uint64_t)UINT32_MAX) << 32) | ((er2 & (uint64_t)UINT32_MAX));
+		mini_put(&rp_table, pair);
 	}
 	mm_hits_destroy(hits1);
 	mm_hits_destroy(hits2);
@@ -609,11 +604,11 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	mm_db_destroy(db2);
 }
 
-*//*
+/*
 * @brief Worker for counting barcode
 * @param data
 * @return
-*//*
+*/
 static inline void *minimizer_iterator(void *data)
 {
 	struct minimizer_bundle_t *bundle = (struct minimizer_bundle_t *) data;
@@ -648,12 +643,12 @@ static inline void *minimizer_iterator(void *data)
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				log_error("Wrong format file");
 
-			*//* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n *//*
+			//* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n *//*
 			//TODO: this assumes bx only came from one type of library
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
 			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				uint64_t *slot = mini_put(bundle->bx_table, barcode);
+				mm_align(read1, read2, barcode, bundle);
 			} else {
 				//read doesn't have barcode
 			}
@@ -673,7 +668,7 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
 			struct mini_hash_t *h;
 			init_mini_hash(&h, 0);
-			bx_table->h[i] = h;
+			bx_table->h[i] = (uint64_t)h;
 		} else {
 			bx_table->h[i] = EMPTY_BX;
 		}
@@ -727,4 +722,4 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 		pthread_join(worker_threads[i], NULL);
 
 	free_fastq_pair(producer_bundles, opt->n_files);
-}*/
+}
