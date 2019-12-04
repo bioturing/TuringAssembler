@@ -40,10 +40,12 @@
  http://br.endernet.org/~akrowne/
  http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
  */
-static const uint64_t primes[16] = { 49157, 98317, 196613, 393241, 786433, 1572869, 3145739,
-				   6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
-                                   805306457, 1610612741};
-#define N_PRIMES_NUMBER 16
+
+static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
+                                   12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739,
+                                   6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
+                                   805306457, 1610612741 };
+#define N_PRIMES_NUMBER 26
 
 #define MAX_LOAD_FACTOR 0.65
 #define FATAL_LOAD_FACTOR 0.9
@@ -58,19 +60,12 @@ struct readbc_t {
     int len2;
 };
 
-struct readsort_bundle_t {
-    struct dqueue_t *q;
-    char prefix[MAX_PATH];
-    int64_t sm;
-    struct mini_hash_t **h_table_ptr;
-};
-
 struct h_bundle_t {
     uint64_t *slot_ptr;
     void *arg;
 };
 
-void destroy_worker_bundles(struct readsort_bundle_t *bundles, int n)
+void destroy_worker_bundles(struct readsort_bundle1_t *bundles, int n)
 {
 	destroy_mini_hash(*bundles[0].h_table_ptr);
 	free(bundles);
@@ -109,7 +104,7 @@ uint64_t barcode_hash_mini(char *s)
 	return ret;
 }
 
-static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
+inline uint64_t get_barcode_biot(char *s, struct read_t *r)
 {
 	if (s == NULL) {
 		r->seq = r->qual = NULL;
@@ -363,7 +358,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
  * @param opt
  * @param r_path
  */
-void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
+struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
 	init_mini_hash(&h_table, 5);
@@ -378,8 +373,8 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 	                                   opt->files_1, opt->files_2);
 	buffer_iterator = biot_buffer_iterator_simple;
-	struct readsort_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
-	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));
+	struct readsort_bundle1_t *worker_bundles; //use an arbitrary structure for worker bundle
+	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle1_t));
 	int i;
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
@@ -406,7 +401,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 
 	free_fastq_pair(producer_bundles, opt->n_files);
 	mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
-	destroy_worker_bundles(worker_bundles, opt->n_threads);
+	return h_table;
 }
 
 /**
@@ -416,7 +411,7 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
  */
 static inline void *biot_buffer_iterator_simple(void *data)
 {
-	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *) data;
+	struct readsort_bundle1_t *bundle = (struct readsort_bundle1_t *) data;
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2, readbc;
 	struct pair_buffer_t *own_buf, *ext_buf;

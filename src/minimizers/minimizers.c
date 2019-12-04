@@ -12,7 +12,10 @@
 #include "attribute.h"
 #include "../utils.h"
 #include "minimizers.h"
+#include "count_barcodes.h"
 #include "../log.h"
+#include "atomic.h"
+#include "fastq_producer.h"
 
 
 #ifdef DEBUG
@@ -533,5 +536,60 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 		}
 	}
 	fclose(f);
+}
+
+/*
+* @brief Worker for counting barcode
+* @param data
+* @return
+*/
+static inline void *minimizer_iterator(void *data)
+{
+	struct readsort_bundle1_t *bundle = (struct readsort_bundle_t *) data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2, readbc;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_trip_buffer();
+
+	char *R1_buf, *R2_buf;
+	int pos1, pos2, rc1, rc2, input_format;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf)
+			break;
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		R1_buf = ext_buf->R1_buf;
+		R2_buf = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read1, R1_buf, &pos1) :
+			      get_read_from_fa(&read1, R1_buf, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read2, R2_buf, &pos2) :
+			      get_read_from_fa(&read2, R2_buf, &pos2);
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
+				log_error("Wrong format file");
+
+			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
+			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
+			if (barcode != (uint64_t) -1) {
+				// any main stuff goes here
+				uint64_t *slot = mini_put(bundle->h_table_ptr, barcode);
+				atomic_add_and_fetch64(slot, 1);
+			} else {
+				//read doesn't have barcode
+			}
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+	return NULL;
 }
 
