@@ -7,6 +7,7 @@
 #include <barcode_builder.h>
 #include <barcode_resolve2.h>
 #include <minimizers/minimizers.h>
+#include <cluster_molecules.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -23,6 +24,7 @@
 #include "scaffolding/scaffold.h"
 #include "smart_load.h"
 #include "log.h"
+#include "yeast_analyze_utils.h"
 
 static pthread_mutex_t lock_id = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t lock_put_table = PTHREAD_MUTEX_INITIALIZER;
@@ -751,41 +753,201 @@ void load_list_barcode(int *n_barcodes, char ***barcodes, int **freq)
 	*freq = arr_fre;
 }
 
-void dirty_code(struct opt_proc_t *opt)
+inline int get_nu(const uint32_t *seq, int pos)
 {
-	FILE* f = fopen("edges_hit.txt", "w");
-//	struct asm_graph_t *g0 = create_and_load_graph(opt);
-	char **barcodes;
-	int *fre;
-	int n_barcodes;
-	struct bc_hit_bundle_t bc_hit_bundle;
+	return (seq[pos >> 4] >> ((pos & 15) << 1)) & 3;
+}
 
-	log_info("Start load list barcode");
-	load_list_barcode(&n_barcodes, &barcodes, &fre);
-	log_info("Load list barcode done");
-	get_bc_hit_bundle(opt, &bc_hit_bundle);
-	for (int i = 0; i < n_barcodes; i++) {
-		if (fre[i] > 88 || fre[i] < 10)
+inline void set_nu(uint32_t *seq, int pos, int val)
+{
+	seq[pos >> 4] |= val << ((pos & 15) << 1);
+}
+
+int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize, int *ret_len,
+		   int *total_count, double global_avg_cov, uint32_t **res_seq)
+{
+	int total_len = ksize;
+	double local_cov, sum_cov = 0, sum_len = 0;
+	for (int i = 0; i < n_path; i++) {
+		int i_e  = path[i];
+		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
+		assert(cov >= 0);
+		if (cov > 1.5*global_avg_cov)
 			continue;
-		if (i % 10000 == 0) {
-			log_info("Processed %d/%d barcode", i, n_barcodes);
-		} else {
-			printf("Processed %d/%d barcode\r", i, n_barcodes);
-		}
-		struct mm_hits_t *res = get_hits_from_barcode(barcodes[i], &bc_hit_bundle);
-		fprintf(f, "%s:", barcodes[i]);
-		for (khiter_t it = kh_begin(res->edges); it != kh_end(res->edges); ++it) {
-			if (!kh_exist(res->edges, it))
-				continue;
-			int e = kh_key(res->edges, it);
-			int value = kh_value(res->edges, it);
-//			int aln = kh_key(res->aln, it);
-			fprintf(f, "%d %d,", e, value);
-		}
-		fprintf(f, "\n");
-		free(res);
+		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
+		sum_len += (g->edges[i_e].seq_len-ksize);
 	}
-//	asm_graph_destroy(g0);
+	if (sum_len ==0) {
+//		assert(sum_len != 0 && "all edge in path is repeat");
+		local_cov = global_avg_cov;
+	} else
+		local_cov = sum_cov/sum_len;
+	if (local_cov < 0.5 * global_avg_cov)
+		return -1;
+	log_warn("global %lf local %lf", global_avg_cov, local_cov);
+	int t_count = 0;
+	for (int i = 0; i < n_path; i++) {
+		int a = path[i];
+		total_len += g->edges[a].seq_len - ksize;
+	}
+
+	for (int i = 0; i < n_path; i++) {
+		int i_e  = path[i];
+		int i_e_rc = g->edges[i_e].rc_id;
+		double cov_be4 = __get_edge_cov(&g->edges[i_e], ksize);
+		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
+		t_count += tmp;
+		g->edges[i_e].count -= tmp;
+		g->edges[i_e_rc].count -= tmp;
+		double cov_after = __get_edge_cov(&g->edges[i_e], ksize);
+		log_warn("cov_be4 %lf loc_cov %lf cov_after %lf", cov_be4, local_cov, cov_after);
+	}
+
+	uint32_t *res = calloc((total_len + 15) / 16, 4);
+	int cur_len = g->edges[path[0]].seq_len;
+	for (int i = 0 ;  i < cur_len; i++) {
+		set_nu(res, i, get_nu(g->edges[path[0]].seq, i));
+	}
+
+	for(int i = 1; i < n_path; i++) {
+		struct asm_edge_t *a = &g->edges[path[i]];
+		for (int j = ksize; j < a->seq_len; j++) {
+			set_nu(res, cur_len + j-ksize, get_nu(a->seq, j));
+		}
+		cur_len += a->seq_len - ksize;
+	}
+	assert(cur_len == total_len);
+	*ret_len = total_len;
+	*total_count = t_count;
+	assert(total_count > 0);
+	*res_seq = res;
+	return 0;
+}
+
+//struct asm_graph_t* huu_create_new_graph(struct asm_graph_t *g, char *path)
+//{
+//	FILE *f = fopen(path, "r");
+//	int a, b;
+//	khash_t(long_spath) *spath = kh_init(long_spath);
+//	get_all_shortest_paths_dp(g, spath);
+//
+//	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+//	int count = 0 ;
+//	FILE *out = fopen("have_path.txt","w");
+//	while (fscanf(f, "%d %d\n", &a, &b) != EOF){
+//		printf("get path from %d %d\n", a,b);
+//		count++;
+//		int *path = NULL;
+//		int n_path;
+//		int res = extract_shortest_path(g, spath, a, b, &path, &n_path);
+//		if (res == -1) {
+//			int t_b = g->edges[a].rc_id;
+//			int t_a = g->edges[b].rc_id;
+//			b = t_b;
+//			a = t_a;
+//			res = extract_shortest_path(g, spath, a, b, &path, &n_path);
+//		}
+//		if (res == -1)
+//			continue;
+//		fprintf(out, "%d %d\n", a,b);
+////		assert(res != -1);
+////		for(int i = 0 ; i < n_path; i++) {
+////			printf("%d\n", path[i]);
+////		}
+////		printf("%d\n", count);
+//		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+//		int total_len;
+//		g0->edges[g0->n_e].seq = concate_seq(g, n_path, path, g->ksize, &total_len);
+//		g0->edges[g0->n_e].seq_len = total_len;
+//		g0->edges[g0->n_e].count = g->edges[a].count + g->edges[b].count;
+//		g0->edges[g0->n_e].n_holes = 0;
+//		g0->n_e++;
+//		free(path);
+//	}
+//	fclose(out);
+//	for (int i = 0; i < g->n_e; i++) {
+//		g0->edges = realloc(g0->edges, (g0->n_e+1) * sizeof(struct asm_edge_t));
+//		g0->edges[g0->n_e].seq = g->edges[i].seq;
+//		g0->edges[g0->n_e].seq_len = g->edges[i].seq_len;
+//		g0->edges[g0->n_e].count = g->edges[i].count;
+//		g0->edges[g0->n_e].n_holes = 0;
+//		g0->n_e++;
+//	}
+//	return g0;
+//}
+
+int compare(const void *a, const void *b)
+{
+	int *x = *(int (*)[3]) a;
+	int *y= *(int (*)[3]) b;
+	if (x[0] < y[0] || (x[0] == y[0]  && x[1] < y[1])) return -1;
+	if (x[0] == y[0]  && x[1] == y[1]) return 0;
+	return 1;
+}
+
+void filter_xxx(struct asm_graph_t *g)
+{
+	FILE *in = fopen("/home/che/bioturing/data/yeast/metadata/all_shortest_paths.txt", "r");
+	FILE *out = fopen("res.txt" ,"w");
+	int a, b;
+	char *tmp = calloc(1000,1), n_tmp;
+	fprintf(out, "a,b\n");
+	while (fscanf(in, "%d to %d:\n", &a, &b) != EOF) {
+		fgets(tmp, 10000, in);
+		if (g->edges[a].seq_len > 1000 && g->edges[b].seq_len > 1000) {
+			fprintf(out, "%d,%d\n",a,b);
+		}
+		fflush(out);
+	}
+	fclose(out);
+	fclose(in);
+
+}
+
+void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
+{
+//	init_global_params(g);
+//	struct asm_graph_t *g0 = huu_create_new_graph(g, opt->var[0]);
+//	char path[1024];
+//	log_warn("done create new graph");
+//	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
+//	         opt->out_dir, g->ksize, "pair");
+//	write_stupid_fasta(g0, path);
+	filter_xxx(g);
+	return;
+	int (*a)[2], n;
+	load_ground_truth_file(&a, &n);
+	log_info("No. pair ground truth is: %d", n);
+	FILE *out = fopen("out.txt", "w");
+	int (*share_bc_list)[3] = NULL, n_share = 0;
+	load_share_barcode_file(&share_bc_list, &n_share);
+	qsort(share_bc_list, n_share, sizeof(int[3]), compare);
+	FILE *outout = fopen("tmp.txt","w");
+	for(int l = 0 ; l < n_share; l++)
+		fprintf(outout, "%d %d %d\n", share_bc_list[l][0], share_bc_list[l][1], share_bc_list[l][2]);
+	fclose(outout);
+	for (int i = 0; i < n; i++) {
+//		printf("%d\r", i);
+		int *path = NULL;
+		int n_path;
+		int x = a[i][0], y = a[i][1];
+		int distance = get_shortest_path(g, x, y, &path, &n_path);
+		if (distance == -1) {
+			log_warn("distance is -1");
+		}
+		int share_bx  = get_share_barcode_fromfile(a[i], share_bc_list, n_share);
+		struct info_pair *t = calloc(1, sizeof( struct info_pair));
+		t->x = x;
+		t->y = y;
+		t->len_x = g->edges[x].seq_len;
+		t->len_y = g->edges[y].seq_len;
+		t->n_shortest = n_path;
+		t->len_shortest = distance;
+		t->share_bx = share_bx;
+		free(path);
+		write_pair_info(out, t);
+	}
+	fclose(out);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)

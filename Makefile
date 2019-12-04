@@ -65,11 +65,14 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/score.c 						\
       src/scaffolding/scaffolding.c 						\
       src/scaffolding/scaffold.c 						\
+	  src/scaffolding/yeast_analyze_utils.c\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
       src/main.c \
       src/log.c 					\
+      src/build_hash_table.c\
+      src/resolve_big.c \
       src/unit_test.c \
       src/minimizers/minimizers.c \
       src/minimizers/smart_load.c \

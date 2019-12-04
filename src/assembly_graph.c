@@ -805,9 +805,39 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 			continue;
 		gint_t cc_id = id_edge[e];
 		if (cc_size[cc_id] < MIN_CONNECT_SIZE ||
-			g->edges[e].seq_len < MIN_NOTICE_LEN)
+		    g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
 		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
+		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
+		        (long long)e, (long long)e_rc, (long long)len,
+		        __get_edge_cov(g->edges + e, g->ksize));
+		gint_t k = 0;
+		while (k < len) {
+			gint_t l = __min(80, len - k);
+			memcpy(buf, seq + k, l);
+			buf[l] = '\0';
+			fprintf(fp, "%s\n", buf);
+			k += l;
+		}
+	}
+	fclose(fp);
+	free(seq);
+	free(id_edge);
+	free(cc_size);
+}
+
+void write_stupid_fasta(struct asm_graph_t *g, const char *path)
+{
+	FILE *fp = xfopen(path, "w");
+	char *seq = NULL;
+	uint32_t seq_len = 0;
+	char *buf = alloca(81);
+	gint_t e, e_rc;
+	for (e = 0; e < g->n_e; ++e) {
+		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
+		double cov = __get_edge_cov(&g->edges[e], g->ksize);
+		assert(cov > 0);
+		assert(g->edges[e].count > 0);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
 			__get_edge_cov(g->edges + e, g->ksize));
@@ -822,8 +852,6 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 	}
 	fclose(fp);
 	free(seq);
-	free(id_edge);
-	free(cc_size);
 }
 
 void write_gfa(struct asm_graph_t *g, const char *path)

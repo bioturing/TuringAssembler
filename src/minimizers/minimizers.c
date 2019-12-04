@@ -371,41 +371,37 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 	int i, j, p = -1;
 	uint64_t km, mm, c;
 	uint64_t km_h, mm_h = 0;
+	uint64_t *km2 = calloc(l, 8);
 	int pad = (32 - k - 1)*2;
+
+	km2[0] = get_km_i_str(s, 0, k);
+	for(int i =  1 ; i < l-k+1; i++) {
+		c = (uint64_t) nt4_table[s[i + k - 1]];
+		km2[i] = km2[i-1]| (c << (pad +2));
+	}
+	for(int i =  1 ; i < l-k+1; i++) {
+		km2[i] = HASH64(km2[i]);
+	}
 
 	for (i = 0; i < l - w -k + 1; ++i) {
 		DEBUG_PRINT("[i = %d]\n", i);
 		if (p < i) {
-			km = mm = get_km_i_str(s, i, k);
-			mm_h = km_h = HASH64(mm);
 			p = i;
 			for (j = 0; j < w; ++j) {
-				c = (uint64_t) nt4_table[s[i + j + k - 1]];
-				km |= ((uint64_t) c << (pad + 2));
-				km_h = HASH64(km);
-				if (km_h < mm_h) {
-					mm = km;
-					mm_h = km_h;
+				if (km2[i+j] < mm_h) {
+					mm_h = km2[i+j];
 					p = i + j;
-					mm_db_insert(db, km, p);
+					mm_db_insert(db, km2[i+j], p);
 				}
-				km <<= 2;
 			}
 			DEBUG_PRINT("[1]minimizers at window %d: %d\n", i, p);
-
-			continue;
 		} else {
-			c = (uint64_t) nt4_table[s[i + w + k - 2]];
-			km |= ((uint64_t) c << (pad + 2));
-			km_h = HASH64(km);
-			if (km_h < mm_h){
+			if (km2[i+w-1] < mm_h){
 				p = i + w - 1;
-				mm = km;
-				mm_h = km_h;
-				mm_db_insert(db, km, p);
+				mm_h = km2[i+w-1];
+				mm_db_insert(db, km2[i+w-1], p);
 				DEBUG_PRINT("[2]minimizers at window %d: %d\n", i, p);
 			}
-			km <<= 2;
 		}
 	}
 	//mm_print(db);
