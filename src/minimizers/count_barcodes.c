@@ -428,6 +428,11 @@ static inline void *biot_buffer_iterator_simple(void *data)
 	return NULL;
 }
 
+/**
+ * @brief: Create the hash table of share-barcode count of every edge pair u-v
+ * @param: edge hits of all barcodes. See @function mm_hit_all_barcodes
+ * @return: khash, key = (uint64_t)(e1|e2), e1 < e2, value: share barcode count
+ */
 khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 {
 	khash_t(long_int) *res = kh_init(long_int);
@@ -464,13 +469,15 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 	return res;
 }
 
+/**
+ * @brief Query share barcode of a pair e1-e2
+ * @param all_count
+ * @param e1
+ * @param e2
+ * @return share barcode count
+ */
 int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2)
 {
-	if (e1 > e2){
-		int tmp = e1;
-		e1 = e2;
-		e2 = tmp;
-	}
-	uint64_t code = GET_CODE(e1, e2);
+	uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
 	return kh_long_int_try_get(all_count, code, 0);
 }

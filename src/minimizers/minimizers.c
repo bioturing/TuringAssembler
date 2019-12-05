@@ -764,7 +764,7 @@ void print_read_pairs(struct mini_hash_t *h_table)
 	fclose(fp);
 }
 
-void mm_hit_all_barcodes(struct opt_proc_t *opt)
+struct mini_hash_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 {
 	uint64_t i;
 	struct mini_hash_t *bx_table, *rp_table;
@@ -832,4 +832,5 @@ void mm_hit_all_barcodes(struct opt_proc_t *opt)
 	print_read_pairs(rp_table);
 	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);
+	return bx_table;
 }
