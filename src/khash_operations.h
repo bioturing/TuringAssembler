@@ -56,6 +56,7 @@ static void kh_##name##_erase(khash_t(name) *h, key_type k)\
 	kh_del(name, h, it);\
 }
 
+
 KHASH_SET_INIT_INT(set_int);
 KHASH_SET_OPERATIONS(set_int, int);
 

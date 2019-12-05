@@ -66,6 +66,7 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/scaffolding.c 						\
       src/scaffolding/scaffold.c 						\
 	  src/scaffolding/yeast_analyze_utils.c\
+	  src/barcode_graph.c\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\

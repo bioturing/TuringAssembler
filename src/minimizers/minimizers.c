@@ -309,6 +309,10 @@ void mm_db_destroy(struct mm_db_t *db)
 	free(db);
 }
 
+/**
+ * Init the hits result
+ * @return hits hitted result of one barcode
+ */
 struct mm_hits_t *mm_hits_init()
 {
 	struct mm_hits_t *hits = calloc(1, sizeof(struct mm_hits_t));
@@ -318,6 +322,10 @@ struct mm_hits_t *mm_hits_init()
 	return hits;
 }
 
+/**
+ * Destroy the the hits result
+ * @param hits hitted result of one barcode
+ */
 void mm_hits_destroy(struct mm_hits_t *hits)
 {
 	for (khiter_t it = kh_begin(hits->aln); it != kh_end(hits->aln); ++it){
@@ -330,6 +338,13 @@ void mm_hits_destroy(struct mm_hits_t *hits)
 	free(hits);
 }
 
+/**
+ * Get the i kmer of the encoded DNA sequence s
+ * @param s DNA sequence s
+ * @param i pos
+ * @param k k size
+ * @return encoded kmer
+ */
 static inline uint64_t get_km_i_bin(uint32_t *s, int i, int k)
 {
 	uint64_t km, c;
@@ -345,6 +360,13 @@ static inline uint64_t get_km_i_bin(uint32_t *s, int i, int k)
 	return km;
 }
 
+/**
+ * Get the i kmer of the DNA sequence s
+ * @param s DNA sequence s
+ * @param i pos
+ * @param k k size
+ * @return encoded kmer
+ */
 static inline uint64_t get_km_i_str(char *s, int i, int k)
 {
 	uint64_t km, c;
@@ -360,6 +382,12 @@ static inline uint64_t get_km_i_str(char *s, int i, int k)
 	return km;
 }
 
+/**
+ * Helper function that dump the true DNA sequence of an encoded sequence s
+ * @param s binary encoded sequence s
+ * @param l length of the encoded sequence s
+ * @return true DNA sequence
+ */
 static inline char *mm_dump_seq(uint64_t s, uint32_t l)
 {
 	char *seq = calloc(l, sizeof(char));
@@ -372,6 +400,15 @@ static inline char *mm_dump_seq(uint64_t s, uint32_t l)
 
 #define HASH64(k) MurmurHash3_x64_64((uint8_t *)&k, sizeof(uint64_t)/sizeof(uint8_t))
 #define DEBUG_PRINT
+
+/**
+ * The core function that index minimizers for a given string s
+ * @param s encoded DNA sequence s as binary format
+ * @param k k size for minimizer indexing
+ * @param w window size for minimizer indexing
+ * @param l length of the DNA sequence s
+ * @return minimizer collection of the string s
+ */
 
 struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 {
@@ -422,6 +459,14 @@ struct mm_db_t * mm_index_bin_str(uint32_t *s, int k, int w, int l)
 	return db;
 }
 
+/**
+ * The core function that index minimizers for a given string s
+ * @param s DNA sequence s
+ * @param k k size for minimizer indexing
+ * @param w window size for minimizer indexing
+ * @param l length of the DNA sequence s
+ * @return minimizer collection of the string s
+ */
 struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 {
 	struct mm_db_t *db = mm_db_init();
@@ -432,7 +477,8 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 	uint64_t km_h, mm_h;
 	int pad = (32 - k - 1)*2;
 
-	mm_h = km_h = HASH64(k);
+	uint64_t tmp = (uint64_t)k;
+	mm_h = km_h = HASH64(tmp);
 	for (i = 0; i < l - w + 1; ++i) {
 		DEBUG_PRINT("[i = %d]\n", i);
 		if (i + w + k - 1 >= l)
@@ -474,7 +520,10 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 	return db;
 }
 
-
+/**
+ * Init the minimizers database of all edges in the assembly graph
+ * @return db edges minimizers database collection
+ */
 struct mm_db_edge_t *mm_db_edge_init()
 {
 	struct mm_db_edge_t *db = calloc(1, sizeof(struct mm_db_edge_t));
@@ -508,6 +557,10 @@ void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_
 
 }
 
+/**
+ * Destroy minimizers database of all edegs
+ * @param db minimizers database of all edges in the assembly graph
+ */
 void mm_db_edge_destroy(struct mm_db_edge_t *db)
 {
 	kh_destroy(mm_hash, db->h);
@@ -516,6 +569,11 @@ void mm_db_edge_destroy(struct mm_db_edge_t *db)
 	free(db);
 }
 
+/**
+ * A debug function that print the statistic of number of singleton minimizers
+ * @param db minimizers database of all edges in the assembly graph
+ * @param k_size ksize for minimizers construction
+ */
 static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 {
 	khiter_t k_cnt, k_h, k;
@@ -537,6 +595,13 @@ static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 
 }
 
+/**
+ * The core function to index all minimizers of all edges in the assembly graph
+ * @param g ptr assembly graph struct
+ * @param k k size for minimizers indexing
+ * @param w window size for minimizers indexing
+ * @return k_hash table key: minimizer, value: edge ID, pos
+ */
 struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
 	int j, e;
 	struct mm_db_edge_t *mm_db_e = mm_db_edge_init();
@@ -582,6 +647,11 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 	return hits;
 }
 
+/**
+ * A debug function that prints hitted edges IDs to load to Bandage.
+ * @param hits hitted result of one barcode
+ * @param file_path destination file to print
+ */
 void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 {
 	FILE *f = fopen(file_path, "w");
@@ -598,6 +668,10 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	fclose(f);
 }
 
+/**
+ * A debug function that print all hitted edges IDS of each barcode. each barcode one a line
+ * @param hits_table the hash table that store hitted results. key: encoded barcode, value: hash table of edges IDS
+ */
 void print_all_hits(struct mini_hash_t *hits_table)
 {
 	uint64_t i, j, k, c;
@@ -624,6 +698,13 @@ void print_all_hits(struct mini_hash_t *hits_table)
 	}
 }
 
+/**
+ * The core function to align R1 and R2 onto the edges of the assembly graph by using minimizers k-21, w-21
+ * @param r1 read1 struct, which includes seq, seq.len, name
+ * @param r2 read1 struct, which includes seq, seq.len, name
+ * @param bx uint64_t encoded barcode
+ * @param bundle return bundle, which include barcode count table and read pair table
+ */
 void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_bundle_t *bundle)
 {
 	struct mm_db_t *db1, *db2;
@@ -682,7 +763,6 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 		uint64_t pair = GET_CODE(er1, er2);
 		uint64_t *s = mini_put(bundle->rp_table, pair);
 		atomic_add_and_fetch64(s, 1);
-
 	}
 	mm_hits_destroy(hits1);
 	mm_hits_destroy(hits2);
@@ -690,9 +770,9 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 	mm_db_destroy(db2);
 }
 
-/*
-* @brief Worker for counting barcode
-* @param data
+/**
+* @brief Worker function to align reads by using minimizers
+* @param data ptr of minimizer_bundle_t
 * @return
 */
 static inline void *minimizer_iterator(void *data)
@@ -748,6 +828,13 @@ static inline void *minimizer_iterator(void *data)
 	return NULL;
 }
 
+/**
+ * Print all read pair that R1 is aligned on e1, R2 is aligned on e2, e1 != e2
+ * @param h_table hash table that store key as (uint64_t)(e1|e2). e1 is stored as the most significant bits
+ * e2 is stored as the least significant bits
+ * File format: e1 e2 count
+ * Caution: e1 and e2 are from different strands
+ */
 void print_read_pairs(struct mini_hash_t *h_table)
 {
 	uint64_t i;
@@ -762,6 +849,16 @@ void print_read_pairs(struct mini_hash_t *h_table)
 	fclose(fp);
 }
 
+/**
+ * The core function that map all reads onto the edges of the assembly graph
+ * We count the barcode frequencies first. Then only map reads from high quality barcodes that
+ * nreads < MAX_READS_TO_HITS and nreads > MIN_READS_TO_HITS.
+ * For each high-quality barcode, we create a hash table to store all hitted edges. The size of the hash table
+ * was determined as the closest prime number of the closest power of 2 of nreads
+ * This function calls @function  minimizer_iterator as the worker
+ * @param opt
+ * @return minimizer bundle that contains barcode hit tables and read pair hit table
+ */
 struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 {
 	uint64_t i;
@@ -793,7 +890,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 
 	void *(*buffer_iterator)(void *) = minimizer_iterator;
 	struct producer_bundle_t *producer_bundles = NULL;
-	//TODO: implement for sorted library
+	//TODO: implement for ust library
 	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 	                                   opt->files_1, opt->files_2);
 
@@ -826,7 +923,6 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 
-	print_all_hits(bx_table);
 	print_read_pairs(rp_table);
 	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);

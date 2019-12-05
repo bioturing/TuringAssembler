@@ -1,6 +1,11 @@
 #ifndef __CLUSTER_MOLECULES__
 #define __CLUSTER_MOLECULES__
 #include "assembly_graph.h"
+#define MAX_RADIUS 5000
+#define MAX_PATH_LEN 30
+#define MIN_BC_READ_COUNT 10
+#define MAX_BC_READ_COUNT 88
+#define MIN_BARCODE_EDGE_COUNT 100
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
@@ -9,14 +14,6 @@
 #define GET_CODE(a, b) ((((uint64_t) (a)) << 32) | (b))
 KHASH_MAP_INIT_INT64(long_int, int);
 KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
-
-struct shortest_path_info_t{
-	int len;
-	int trace;
-};
-
-KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
-KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *);
 
 KHASH_SET_INIT_INT64(set_long);
 KHASH_SET_OPERATIONS(set_long, uint64_t);
@@ -56,11 +53,29 @@ struct paths_bundle_t{
 	int n_paths;
 };
 
+struct shortest_path_info_t{
+	int sum_seq;
+	int n_e;
+	int *path;
+};
+
+struct len_info_t{
+	int v;
+	int sum_seq;
+	int len;
+};
+
+KHASH_MAP_INIT_INT64(long_spath, struct shortest_path_info_t *);
+KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *);
+
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
-void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
-int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
-		int v, int u, int **path, int *n_v);
+//void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
+/*int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
+		int v, int u, int **path, int *n_v);*/
+
+struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
+		int t, khash_t(long_spath) *stored);
 
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
 
@@ -71,7 +86,7 @@ void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
 int check_connected(struct asm_graph_t *g, int v, int u,
 		khash_t(long_spath) *spath_info);
 
-void count_edge_links_bc(struct opt_proc_t *opt);
+//void count_edge_links_bc(struct opt_proc_t *opt);
 
 void print_barcode_graph(struct opt_proc_t *opt);
 
@@ -100,7 +115,7 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
 
-void create_barcode_molecules(struct opt_proc_t *opt);
+void create_barcode_molecules(int *edges, int n_e, struct asm_graph_t *g);
 
 int is_repeat(struct asm_graph_t *g, int e);
 
@@ -117,4 +132,5 @@ void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges);
 void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 		struct paths_bundle_t *path_bundle);
+int check_adj_edges(struct asm_graph_t *g, int v, int u);
 #endif

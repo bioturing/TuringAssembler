@@ -8,6 +8,7 @@
 #include <barcode_resolve2.h>
 #include <minimizers/minimizers.h>
 #include <cluster_molecules.h>
+#include <barcode_graph.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -784,7 +785,7 @@ int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize, int *r
 		local_cov = sum_cov/sum_len;
 	if (local_cov < 0.5 * global_avg_cov)
 		return -1;
-	log_warn("global %lf local %lf", global_avg_cov, local_cov);
+//	log_warn("global %lf local %lf", global_avg_cov, local_cov);
 	int t_count = 0;
 	for (int i = 0; i < n_path; i++) {
 		int a = path[i];
@@ -800,7 +801,7 @@ int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize, int *r
 		g->edges[i_e].count -= tmp;
 		g->edges[i_e_rc].count -= tmp;
 		double cov_after = __get_edge_cov(&g->edges[i_e], ksize);
-		log_warn("cov_be4 %lf loc_cov %lf cov_after %lf", cov_be4, local_cov, cov_after);
+//		log_warn("cov_be4 %lf loc_cov %lf cov_after %lf", cov_be4, local_cov, cov_after);
 	}
 
 	uint32_t *res = calloc((total_len + 15) / 16, 4);
@@ -901,7 +902,6 @@ void filter_xxx(struct asm_graph_t *g)
 	}
 	fclose(out);
 	fclose(in);
-
 }
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
@@ -913,8 +913,8 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 //	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
 //	         opt->out_dir, g->ksize, "pair");
 //	write_stupid_fasta(g0, path);
-	filter_xxx(g);
-	return;
+
+/*
 	int (*a)[2], n;
 	load_ground_truth_file(&a, &n);
 	log_info("No. pair ground truth is: %d", n);
@@ -948,6 +948,20 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 		write_pair_info(out, t);
 	}
 	fclose(out);
+ */
+	init_logger(opt->log_level, "zzz.log");
+	get_list_contig(opt, g);
+	/*int *edges = calloc(626, sizeof(int));
+	int n = 0;
+	FILE *f = fopen("graph.dot", "r");
+	for (int i = 0; i < 313; ++i){
+		int v, u;
+		fscanf(f, "%d %d\n", &v, &u);
+		edges[n++] = v;
+		edges[n++] = u;
+	}
+	create_barcode_molecules(edges, n, g);
+	fclose(f);*/
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)

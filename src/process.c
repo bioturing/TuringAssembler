@@ -290,29 +290,29 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
-void debug_process(struct opt_proc_t *opt)
-{
-	char path[1024];
-	sprintf(path, "%s/debug.log", opt->out_dir);
-	init_logger(opt->log_level, path);
-	set_log_stage("Debug process");
-	create_barcode_molecules(opt);
-}
+//void debug_process(struct opt_proc_t *opt)
+//{
+//	char path[1024];
+//	sprintf(path, "%s/debug.log", opt->out_dir);
+//	init_logger(opt->log_level, path);
+//	set_log_stage("Debug process");
+//	create_barcode_molecules(opt);
+//}
 
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
 	print_barcode_graph(opt);
 }
 
-void cluster_molecules_process(struct opt_proc_t *opt)
-{
-	char path[1024];
-	sprintf(path, "%s/cluster_molecules.log", opt->out_dir);
-	init_logger(opt->log_level, path);
-	set_log_stage("Cluster molecules");
-
-	count_edge_links_bc(opt);
-}
+//void cluster_molecules_process(struct opt_proc_t *opt)
+//{
+//	char path[1024];
+//	sprintf(path, "%s/cluster_molecules.log", opt->out_dir);
+//	init_logger(opt->log_level, path);
+//	set_log_stage("Cluster molecules");
+//
+//	count_edge_links_bc(opt);
+//}
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
