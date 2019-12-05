@@ -263,7 +263,7 @@ uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 		h_table->key[i] = 0;
 		return (uint64_t *)EMPTY_BX;
 	} else {
-		*slot--;
+		(*slot)--;
 		return slot;
 	}
 }
