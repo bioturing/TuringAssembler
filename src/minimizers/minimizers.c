@@ -630,10 +630,8 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 	struct mm_hits_t *hits1, *hits2;
 	uint64_t *h_slot = mini_put(bundle->bx_table, bx);
 	uint64_t *slot;
-	struct mini_hash_t *bx_table1 = (struct mini_hash_t *)(*h_slot);
 	struct asm_graph_t *g = bundle->g;
 	struct mm_db_edge_t *mm_edges_db = bundle->mm_edges;
-	struct mini_hash_t *rp_table = *(bundle->rp_table);
 
 	db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
 	db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
@@ -673,11 +671,11 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 	}
 
 	if (er1 != UINT64_MAX) {
-		slot = mini_put(&bx_table1, er1);
+		slot = mini_put((struct mini_hash_t **)h_slot, er1);
 		atomic_add_and_fetch64(slot, 1);
 	}
 	if (er2 != UINT64_MAX) {
-		slot = mini_put(&bx_table1, er2);
+		slot = mini_put((struct mini_hash_t **)h_slot, er2);
 		atomic_add_and_fetch64(slot, 1);
 	}
 	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
