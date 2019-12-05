@@ -429,7 +429,8 @@ static inline void *biot_buffer_iterator_simple(void *data)
  * @param: edge hits of all barcodes. See @function mm_hit_all_barcodes
  * @return: khash, key = (uint64_t)(e1|e2), e1 < e2, value: share barcode count
  */
-khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
+khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
+		struct mini_hash_t *bc)
 {
 	khash_t(long_int) *res = kh_init(long_int);
 	for (int i = 0; i < bc->size; ++i){
@@ -455,6 +456,24 @@ khash_t(long_int) *count_edge_link_shared_bc(struct mini_hash_t *bc)
 		}
 		free(edges);
 	}
+
+	khash_t(long_int) *tmp = kh_init(long_int);
+	for (khiter_t it = kh_begin(res); it != kh_end(res); ++it){
+		if (!kh_exist(res, it))
+			continue;
+		uint64_t code = kh_key(res, it);
+		int v = code >> 32;
+		int u = (uint64_t) code & (-1);
+		int v_rc = g->edges[v].rc_id;
+		int u_rc = g->edges[u].rc_id;
+		uint64_t code_rc = v_rc < u_rc ? GET_CODE(v_rc, u_rc) : GET_CODE(u_rc, v_rc);
+		int sum_cnt = kh_val(res, it) + kh_long_int_try_get(res, code_rc, 0);
+		kh_long_int_set(tmp, code, sum_cnt);
+		kh_long_int_set(tmp, code_rc, sum_cnt);
+	}
+	kh_destroy(long_int, res);
+	res = tmp;
+
 	FILE *fp = fopen("bc_hits_edge_pairs.txt", "w");
 	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
 		if (kh_exist(res, k)) {
