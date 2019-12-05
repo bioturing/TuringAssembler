@@ -1000,3 +1000,60 @@ void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges)
 	}
 	kh_destroy(long_spath, spath);
 }
+
+void build_graph_from_edges_list(int *edges, int n_e, struct asm_graph_t *g,
+		struct simple_graph_t *sg)
+{
+	init_simple_graph(g, sg);
+	for (int i = 0; i < n_e; i += 2){
+		int v = edges[i];
+		int u = edges[i + 1];
+		add_simple_node(sg, v);
+		add_simple_node(sg, u);
+		add_simple_edge(sg, v, u);
+	}
+}
+
+void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
+		struct paths_bundle_t *path_bundle)
+{
+	struct simple_graph_t sg;
+	build_graph_from_edges_list(edges, n_e, g, &sg);
+	find_DAG(&sg);
+	filter_complex_regions(&sg);
+	get_longest_path(&sg);
+
+
+	float unit_cov = get_genome_coverage(g);
+	for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes); ++it){
+		if (!kh_exist(sg.nodes, it))
+			continue;
+		int source = kh_key(sg.nodes, it);
+		struct simple_node_t *snode = kh_val(sg.nodes, it);
+		if (kh_set_int_exist(sg.is_complex, source))
+			continue;
+		if (snode->rv_deg != 0)
+			continue;
+		if (__get_edge_cov(&g->edges[source], g->ksize) <= 0.5 * unit_cov)
+			continue;
+
+		int *path = calloc(1, sizeof(int));
+		int n_e = 1;
+		path[0] = source;
+		for (int v = kh_int_int_get(sg.next, source); v != -1;
+				v = kh_int_int_get(sg.next, v)){
+			path = realloc(path, (n_e + 1) * sizeof(int));
+			path[n_e] = v;
+			n_e++;
+		}
+		path_bundle->paths = realloc(path_bundle->paths,
+				sizeof(struct simple_path_t) * (path_bundle->n_paths + 1));
+		struct simple_path_t new_path = {
+			.edges = path,
+			.n_e = n_e
+		};
+		path_bundle->paths[path_bundle->n_paths] = new_path;
+		++path_bundle->n_paths;
+	}
+}
+

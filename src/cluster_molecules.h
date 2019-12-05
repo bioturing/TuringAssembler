@@ -46,6 +46,16 @@ struct simple_graph_t{
 	khash_t(int_node) *nodes;
 };
 
+struct simple_path_t{
+	int *edges;
+	int n_e;
+};
+
+struct paths_bundle_t{
+	struct simple_path_t *paths;
+	int n_paths;
+};
+
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
 void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
@@ -78,6 +88,9 @@ void add_simple_edge(struct simple_graph_t *sg, int u, int v);
 void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 		struct simple_graph_t *sg);
 
+void build_graph_from_edges_list(int *edges, int n_e, struct asm_graph_t *g,
+		struct simple_graph_t *sg);
+
 void simple_graph_destroy(struct simple_graph_t *sg);
 void check_loop_dfs(struct simple_graph_t *sg, int u, khash_t(set_int) *visited,
 		khash_t(set_int) *in_dfs);
@@ -102,4 +115,6 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 		struct simple_graph_t *sg, char **seq);
 void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges);
+void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
+		struct paths_bundle_t *path_bundle);
 #endif
