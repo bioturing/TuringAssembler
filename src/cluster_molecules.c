@@ -501,27 +501,33 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v)
 {
-	int source = g->edges[v].target;
-	int target = g->nodes[g->edges[u].source].rc_id;
-	int w = -1;
-	int t = -1;
-	for (int i = 0; w == -1 && i < g->nodes[source].deg; ++i){
-		int tmpw = g->nodes[source].adj[i];
-		if (tmpw == u){
+	int v_tg = g->edges[v].target;
+	for (int i = 0; i < g->nodes[v_tg].deg; ++i){
+		int w = g->nodes[v_tg].adj[i];
+		if (w == u){
 			*n_v = 2;
 			*path = calloc(2, sizeof(int));
 			(*path)[0] = v;
 			(*path)[1] = u;
-			return 2;
+			return 0;
 		}
 	}
 
-	for (int i = 0; w == -1 && i < g->nodes[source].deg; ++i){
-		int tmpw = g->nodes[source].adj[i];
-		for (int j = 0; t == -1 && j < g->nodes[target].deg; ++j){
-			int tmpt = g->edges[g->nodes[target].adj[j]].rc_id;
+	int u_sr = g->nodes[g->edges[u].source].rc_id;
+	int w = -1;
+	int t = -1;
+	int min_len = 1e9;
+
+	for (int i = 0; i < g->nodes[v_tg].deg; ++i){
+		int tmpw = g->nodes[v_tg].adj[i];
+		for (int j = 0; j < g->nodes[u_sr].deg; ++j){
+			int tmpt = g->edges[g->nodes[u_sr].adj[j]].rc_id;
 			uint64_t code = GET_CODE(tmpw, tmpt);
-			if (kh_long_spath_exist(spath, code)){
+			if (kh_long_spath_exist(spath, code) == 0)
+				continue;
+			int len = kh_long_spath_get(spath, code)->len;
+			if (min_len > len){
+				min_len = len;
 				w = tmpw;
 				t = tmpt;
 			}
@@ -533,7 +539,7 @@ int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		*n_v = 0;
 		return -1;
 	}
-	*path = calloc(MAX_PAIR_LEN + 2, sizeof(int));
+	*path = calloc(MAX_PATH_LEN + 2, sizeof(int));
 	*n_v = 1;
 	(*path)[0] = v;
 	int i = w;
@@ -543,7 +549,7 @@ int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		i = kh_long_spath_get(spath, code)->trace;
 	}
 	(*path)[(*n_v)++] = u;
-	return *n_v;
+	return min_len;
 }
 
 void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
