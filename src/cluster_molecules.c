@@ -498,6 +498,16 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 	}
 }
 
+/**
+ * Get the shortest path that goes from v to u such that:
+ * 	+ The total length of the sequences between v and u (not inclusive) <= MAX_RADIUS
+ * 	+ The number of edges between v and u (not inclusive) <= MAX_PATH_LEN
+ * @param g: The assembly graph
+ * @param spath: The result structure from the function get_all_shortest_paths_dp
+ * @param v, u: The query
+ * @param path: The result path
+ * @param n_v: path len
+ */
 int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v)
 {
@@ -826,6 +836,19 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 	kh_destroy(set_int, tmp);
 }
 
+/**
+ * Get all shortest paths between all the edges in the assembly graph.
+ * 	Every path p goes from v to u satisfies these two conditions:
+ * 		+ The sum of sequences between v and u (inclusive) is <= MAX_RADIUS
+ * 		+ The number of edges between v and u (inclusive) is <= MAX_PATH_LEN
+ * 	The result is stored in the structure khash_t(long_spath) *spath_info, inwhich
+ * 		keys are uint64_t integers that encode v and u (v = key >> 32, u = key & -1)
+ * 		and values are pairs of values (len, trace) where len is the length of the
+ * 		shortest path from v to u and trace is the next edge on that path.
+ * 		If trace is -1 indicates the path's end.
+ * @param g: the assembly graph
+ * @param spath_info the result structure
+ */
 void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info)
 {
 	khash_t(long_int) *L_pre = kh_init(long_int);
