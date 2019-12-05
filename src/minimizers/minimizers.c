@@ -764,9 +764,10 @@ void print_read_pairs(struct mini_hash_t *h_table)
 	fclose(fp);
 }
 
-struct mini_hash_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
+struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 {
 	uint64_t i;
+	struct mm_bundle_t *mm_bundle = calloc(1, sizeof(struct mm_bundle_t));
 	struct mini_hash_t *bx_table, *rp_table;
 	bx_table = count_bx_freq(opt); //count barcode freq
 	for (i = 0; i < bx_table->size; ++i) {
@@ -828,9 +829,12 @@ struct mini_hash_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 		pthread_join(worker_threads[i], NULL);
 
 	print_all_hits(bx_table);
-	count_edge_link_shared_bc(bx_table);
 	print_read_pairs(rp_table);
 	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);
-	return bx_table;
+
+	//Compile the return bundle
+	mm_bundle->bx_table = bx_table;
+	mm_bundle->rp_table = rp_table;
+	return mm_bundle;
 }
