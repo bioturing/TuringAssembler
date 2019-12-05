@@ -248,7 +248,41 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 }
 
 /**
- * @brief This function only for Huu purpose, not safe for concurrency purpose
+ * @param data  barcode encoded as an uint64_t number
+ * @param key   hash(data)
+ */
+uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
+{
+	uint32_t i;
+	uint64_t mask = h_table->size;
+	uint64_t slot = key % mask;
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, 0);
+	if (is_empty) { // slot is empty -> fill in
+		return (uint64_t *)EMPTY_BX;
+	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
+		//linear probing
+		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+			if (is_empty)
+				break;
+		}
+		if (i == h_table->size) {
+			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+				is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+				if (is_empty)
+					break;
+			}
+		}
+		assert(!atomic_bool_CAS64(&i, slot, slot));
+		if (is_empty) //room at probe is empty -> fill in
+			return (uint64_t *)EMPTY_BX;
+		slot = i;
+	}
+	return h_table->h + slot;
+}
+
+/**
+ * @brief
  * @param data
  * @param key
  * @return count of data
@@ -257,15 +291,8 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 {
 	uint64_t key = twang_mix64(data);
-	uint64_t *slot = mini_put_by_key(h_table, data, key);
-	if (*slot == 0) {
-		uint64_t i = slot - h_table->h;
-		h_table->key[i] = 0;
-		return (uint64_t *)EMPTY_BX;
-	} else {
-		(*slot)--;
-		return slot;
-	}
+	uint64_t *slot = mini_get_by_key(h_table, data, key);
+	return slot;
 }
 
 /**
