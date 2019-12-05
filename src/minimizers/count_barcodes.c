@@ -256,20 +256,16 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 {
-	uint64_t mask = h_table->size;
 	uint64_t key = twang_mix64(data);
-	uint64_t slot = key % mask;
-	uint64_t i = 0;
-	if (h_table->key[slot] == 0)
-		return MINIHASH_END;
-	for (i = slot + 1; h_table->key[i] != data && i < h_table->size; ++i) {}
-	if (i == h_table->size) {
-		for (i = 0; h_table->key[i] != data && i < slot;  ++i) {}
+	uint64_t *slot = mini_put_by_key(h_table, data, key);
+	if (*slot == 0) {
+		uint64_t i = slot - h_table->h;
+		h_table->key[i] = 0;
+		return (uint64_t *)EMPTY_BX;
+	} else {
+		*slot--;
+		return slot;
 	}
-	if (i == slot)
-		return MINIHASH_END;
-	else
-		return h_table->h + slot;
 }
 
 /**
