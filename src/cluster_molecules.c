@@ -708,7 +708,7 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	int *visited = calloc(g->n_e, sizeof(int));
 	log_info("Init visited hash table");
 	double *ori_cov = calloc(g->n_e, sizeof(n_e));
-	for (int i = 0; i < n_e; i++) {
+	for (int i = 0; i < g->n_e; i++) {
 		ori_cov[i] = __get_edge_cov(&g->edges[i], g->ksize);
 	}
 	khash_t(long_spath) *stored = kh_init(long_spath);
