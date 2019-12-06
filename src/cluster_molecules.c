@@ -707,7 +707,7 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	log_info("Global genome coverage %.2f", global_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	log_info("Init visited hash table");
-	double *ori_cov = calloc(g->n_e, sizeof(n_e));
+	double *ori_cov = calloc(g->n_e, sizeof(double));
 	for (int i = 0; i < g->n_e; i++) {
 		ori_cov[i] = __get_edge_cov(&g->edges[i], g->ksize);
 	}
