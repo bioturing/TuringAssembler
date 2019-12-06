@@ -2,8 +2,10 @@
 #define __BARCODE_RESOLVE2_H__
 #include "assembly_graph.h"
 #include "sort_read.h"
+#include "khash_operations.h"
 
 KHASH_SET_INIT_INT64(gint);
+KHASH_SET_OPERATIONS(gint, uint64_t);
 
 struct opt_local_t {
 	char *out_dir;
