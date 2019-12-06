@@ -443,7 +443,6 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			int u = (key >> 32) & (uint32_t) (-1);
 			int v = key & (uint32_t) (-1);
 			uint64_t val = kh_value(all_count, i);
-
 			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
 			if (val < MIN_SHARE_BARCODE_COUNT) {
@@ -454,8 +453,8 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			list_edges[(n_edges << 1) + 1] = v;
 			n_edges++;
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
-			list_edges[n_edges << 1] = v;
-			list_edges[(n_edges << 1) + 1] = u;
+			list_edges[n_edges << 1] = g->edges[v].rc_id;
+			list_edges[(n_edges << 1) + 1] = g->edges[u].rc_id;
 			n_edges++;
 		}
 	}
