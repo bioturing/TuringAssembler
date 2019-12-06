@@ -303,6 +303,11 @@ void print_info(int argc, char *argv[])
 void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_proc_t *))
 {
 	struct opt_proc_t *opt;
+	char *res = "";
+	for(int i = 0; i < argc; i++) {
+		res = str_concate(res, argv[i]);
+		res = str_concate(res, " ");
+	}
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (build_process == &(assembly3_process)) {
 		check_process_assembly3(argc, opt);
@@ -315,6 +320,7 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 	char tmp_dir[1024];
 	snprintf(tmp_dir, 1024, "%s/assembly.log", opt->out_dir);
 	init_log(tmp_dir);
+	log_info("%s", res);
 	init_clock();
 	print_info(argc, argv);
 	build_process(opt);
