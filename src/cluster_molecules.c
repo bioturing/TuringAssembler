@@ -722,7 +722,6 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
-
 		int been_touch = visited[e] + visited[e_rc];
 		if (__get_edge_cov(&g->edges[i], g->ksize) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov && been_touch != 0) {
 			log_debug("Ignore edge %d, coverage %.2f, ration threshold %.2f, coverage threshold %.2f", i, __get_edge_cov(&g->edges[i], g->ksize), MIN_COVERAGE_TO_BE_IGNORE, global_cov);
