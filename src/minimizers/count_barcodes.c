@@ -349,7 +349,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, 12);
+	init_mini_hash(&h_table, INIT_PRIME_INDEX);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
