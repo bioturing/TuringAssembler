@@ -912,62 +912,9 @@ void filter_xxx(struct asm_graph_t *g)
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-//	init_global_params(g);
-//	struct asm_graph_t *g0 = huu_create_new_graph(g, opt->var[0]);
-//	char path[1024];
-//	log_warn("done create new graph");
-//	snprintf(path, 1024, "%s/graph_k_%d_%s.fasta",
-//	         opt->out_dir, g->ksize, "pair");
-//	write_stupid_fasta(g0, path);
-
-/*
-	int (*a)[2], n;
-	load_ground_truth_file(&a, &n);
-	log_info("No. pair ground truth is: %d", n);
-	FILE *out = fopen("out.txt", "w");
-	int (*share_bc_list)[3] = NULL, n_share = 0;
-	load_share_barcode_file(&share_bc_list, &n_share);
-	qsort(share_bc_list, n_share, sizeof(int[3]), compare);
-	FILE *outout = fopen("tmp.txt","w");
-	for(int l = 0 ; l < n_share; l++)
-		fprintf(outout, "%d %d %d\n", share_bc_list[l][0], share_bc_list[l][1], share_bc_list[l][2]);
-	fclose(outout);
-	for (int i = 0; i < n; i++) {
-//		printf("%d\r", i);
-		int *path = NULL;
-		int n_path;
-		int x = a[i][0], y = a[i][1];
-		int distance = get_shortest_path(g, x, y, &path, &n_path);
-		if (distance == -1) {
-			log_warn("distance is -1");
-		}
-		int share_bx  = get_share_barcode_fromfile(a[i], share_bc_list, n_share);
-		struct info_pair *t = calloc(1, sizeof( struct info_pair));
-		t->x = x;
-		t->y = y;
-		t->len_x = g->edges[x].seq_len;
-		t->len_y = g->edges[y].seq_len;
-		t->n_shortest = n_path;
-		t->len_shortest = distance;
-		t->share_bx = share_bx;
-		free(path);
-		write_pair_info(out, t);
-	}
-	fclose(out);
- */
-	init_logger(opt->log_level, "zzz.log");
+	init_logger(opt->log_level, "get_long_contig.log");
+	set_log_stage("Get long contig");
 	get_list_contig(opt, g);
-	/*int *edges = calloc(626, sizeof(int));
-	int n = 0;
-	FILE *f = fopen("graph.dot", "r");
-	for (int i = 0; i < 313; ++i){
-		int v, u;
-		fscanf(f, "%d %d\n", &v, &u);
-		edges[n++] = v;
-		edges[n++] = u;
-	}
-	create_barcode_molecules(edges, n, g);
-	fclose(f);*/
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
