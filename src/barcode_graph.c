@@ -6,6 +6,7 @@
 #include <minimizers/count_barcodes.h>
 #include "cluster_molecules.h"
 #include "log.h"
+#include "utils.h"
 
 #define MIN_SHARE_BARCODE_COUNT 100
 #define MIN_EDGE_LEN 500
@@ -445,7 +446,9 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			uint64_t val = kh_value(all_count, i);
 			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
-			if (val < MIN_SHARE_BARCODE_COUNT) {
+			int len_u = MIN(g->edges[u].seq_len, 3000);
+			int len_v = MIN(g->edges[v].seq_len, 3000);
+			if (val * 1.0 / (len_u + len_v) < 0.033) {
 				continue;
 			}
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
