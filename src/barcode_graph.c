@@ -221,6 +221,96 @@ void print_dot_graph(struct barcode_graph *bg, char *path)
 	fclose(out);
 }
 
+void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
+		khash_t(long_spath) *stored)
+{
+	for (int node = 0; node < bg->n_nodes; node++) {
+		int out[2];
+		int out_id[2];
+		int deg_out = 0;
+		for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
+			if (bg->is_del[j] == 0) {
+				if (j & 1){
+					out[deg_out & 1] = bg->edges[j];
+					out_id[deg_out & 1] = j;
+					deg_out++;
+				}
+			}
+
+		if (deg_out != 2)
+			continue;
+		struct shortest_path_info_t *spath = get_shortest_path(g, node,
+				out[0], stored);
+		int flag[2] = {};
+		for (int i = 0; i < spath->n_e; ++i){
+			if (spath->path[i] == out[1]){
+				flag[1] = 1;
+				break;
+			}
+		}
+
+		spath = get_shortest_path(g, node, out[1], stored);
+		for (int i = 0; i < spath->n_e; ++i){
+			if (spath->path[i] == out[0]){
+				flag[0] = 1;
+				break;
+			}
+		}
+		if (!flag[0] && !flag[1])
+			flag[0] = flag[1] = 1;
+		for (int i = 0; i < 2; ++i){
+			if (flag[i]){
+				bg->is_del[out_id[i]] = 1;
+				bg->is_del[out_id[i] ^ 1] = 1;
+			}
+		}
+	}
+
+
+	for (int node = 0; node < bg->n_nodes; ++node) {
+		int in[2];
+		int in_id[2];
+		int deg_in = 0;
+		for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
+			if (bg->is_del[j] == 0) {
+				if ((j & 1) == 0){
+					in[deg_in & 1] = bg->edges[j];
+					in_id[deg_in & 1] = j;
+					deg_in++;
+				}
+			}
+
+		if (deg_in != 2)
+			continue;
+
+		struct shortest_path_info_t *spath = get_shortest_path(g, in[0],
+				node, stored);
+		int flag[2] = {};
+		for (int i = 0; i < spath->n_e; ++i){
+			if (spath->path[i] == in[1]){
+				flag[1] = 1;
+				break;
+			}
+		}
+
+		spath = get_shortest_path(g, in[1], node, stored);
+		for (int i = 0; i < spath->n_e; ++i){
+			if (spath->path[i] == in[0]){
+				flag[0] = 1;
+				break;
+			}
+		}
+		if (!flag[0] && !flag[1])
+			flag[0] = flag[1] = 1;
+		for (int i = 0; i < 2; ++i){
+			if (flag[i]){
+				bg->is_del[in_id[i]] = 1;
+				bg->is_del[in_id[i] ^ 1] = 1;
+			}
+		}
+	}
+}
+
 void filter_graph_reverse_complement(struct asm_graph_t *g, struct barcode_graph *bg)
 {
 	for (int node = 0; node < bg->n_nodes; node++){
@@ -274,6 +364,7 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	append_list_edge(bg, n_filted, list_filted);
 	print_dot_graph(bg, "after_filter_BCandpair.dot");
 	filter_graph_reverse_complement(g, bg);
+	remove_tips_barcode_graph(g, bg, stored);
 	filter_complex_barcode_graph(bg);
 	int *list_res = NULL, n_res = 0;
 	for (int i = 0; i < bg->n_edges * 2; i += 2) {
