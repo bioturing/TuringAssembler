@@ -271,7 +271,7 @@ uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
-			return (uint64_t *)EMPTY_SLOT;
+			return (uint64_t *)EMPTY_BX;
 		slot = i;
 	}
 	return h_table->h + slot;
