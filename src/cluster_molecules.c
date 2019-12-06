@@ -183,7 +183,7 @@ void load_pair_edge_count(char *path, khash_t(long_int) *h_all)
 {
 	FILE *f = fopen(path, "r");
 	int u, v, c;
-	while (fscanf(f, "%d %d %d\n", &v, &u, &c) == 3){
+	while (fscanf(f, "%d %d %d\n", &v, &u, &c) == 3) {
 		uint64_t code = GET_CODE(v, u);
 		kh_long_int_set(h_all, code, c);
 	}
@@ -208,8 +208,8 @@ void print_barcode_graph(struct opt_proc_t *opt)
 	FILE *f = fopen(opt->lc, "w");
 	fprintf(f, "digraph %s{\n", opt->bx_str);
 	float unit_cov = get_genome_coverage(g);
-	for (int i = 0; i < n_e; ++i){
-		for (int j = 0; j < n_e; ++j){
+	for (int i = 0; i < n_e; ++i) {
+		for (int j = 0; j < n_e; ++j) {
 			if (i == j)
 				continue;
 			int v = edges[i];
@@ -224,16 +224,16 @@ void print_barcode_graph(struct opt_proc_t *opt)
 		}
 	}
 
-	for (int i = 0; i < n_e; ++i){
+	for (int i = 0; i < n_e; ++i) {
 		int v = edges[i];
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
 		float ratio = cov / unit_cov;
 		if (ratio >= 0.8 && ratio <= 1.2)
 			fprintf(f, "%d [style=\"filled\",fillcolor=green]\n",
-					v);
+				v);
 		else
 			fprintf(f, "%d [style=\"filled\",fillcolor=violet]\n",
-					v);
+				v);
 	}
 	fprintf(f, "}");
 	fclose(f);
@@ -249,8 +249,8 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 	char bc[19];
 	int count;
 	FILE *f = fopen(bc_count_path, "r");
-	while (fscanf(f, "%s\t%d\n", bc, &count) == 2){
-		if (n == m){
+	while (fscanf(f, "%s\t%d\n", bc, &count) == 2) {
+		if (n == m) {
 			m <<= 1;
 			bc_list = realloc(bc_list, sizeof(char *) * m);
 			read_count = realloc(read_count, sizeof(int) * m);
@@ -270,9 +270,9 @@ void get_barcode_list(char *bc_count_path, struct barcode_list_t *blist)
 
 void add_simple_node(struct simple_graph_t *sg, int v)
 {
-	if (kh_int_node_exist(sg->nodes, v) == 0){
+	if (kh_int_node_exist(sg->nodes, v) == 0) {
 		struct simple_node_t *snode = calloc(1,
-				sizeof(struct simple_node_t));
+						     sizeof(struct simple_node_t));
 		kh_int_node_set(sg->nodes, v, snode);
 	}
 }
@@ -301,20 +301,20 @@ void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg)
 }
 
 void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
-		struct simple_graph_t *sg)
+			struct simple_graph_t *sg)
 {
 	struct asm_graph_t *g = sg->g;
 	for (int i = 0; i < n_e; ++i)
 		add_simple_node(sg, edges[i]);
-	for (int i = 0; i < n_e; ++i){
-		for (int j = 0; j < n_e; ++j){
+	for (int i = 0; i < n_e; ++i) {
+		for (int j = 0; j < n_e; ++j) {
 			if (i == j)
 				continue;
 			int v = edges[i];
 			int u = edges[j];
 			uint64_t code = GET_CODE(v, u);
 			uint64_t code_rc = GET_CODE(g->edges[u].rc_id,
-					g->edges[v].rc_id);
+						    g->edges[v].rc_id);
 			int val = 0;
 			val = max(val, kh_long_int_try_get(all_bc, code, 0));
 			val = max(val, kh_long_int_try_get(all_bc, code_rc, 0));
@@ -328,7 +328,7 @@ void build_simple_graph(int *edges, int n_e, khash_t(long_int) *all_bc,
 
 void simple_graph_destroy(struct simple_graph_t *sg)
 {
-	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it) {
 		if (!kh_exist(sg->nodes, it))
 			continue;
 		struct simple_node_t *snode = kh_val(sg->nodes, it);
@@ -343,9 +343,9 @@ void simple_graph_destroy(struct simple_graph_t *sg)
 }
 
 void check_loop_dfs(struct simple_graph_t *sg, int v, khash_t(set_int) *visited,
-		khash_t(set_int) *in_dfs)
+		    khash_t(set_int) *in_dfs)
 {
-	if (kh_set_int_exist(in_dfs, v)){
+	if (kh_set_int_exist(in_dfs, v)) {
 		kh_set_int_add(sg->is_loop, v);
 		return;
 	}
@@ -354,7 +354,7 @@ void check_loop_dfs(struct simple_graph_t *sg, int v, khash_t(set_int) *visited,
 	kh_set_int_add(visited, v);
 	kh_set_int_add(in_dfs, v);
 	struct simple_node_t *snode = kh_int_node_get(sg->nodes, v);
-	for (int i = 0; i < snode->deg; ++i){
+	for (int i = 0; i < snode->deg; ++i) {
 		int u = snode->adj[i];
 		check_loop_dfs(sg, u, visited, in_dfs);
 	}
@@ -367,7 +367,7 @@ void find_DAG(struct simple_graph_t *sg)
 	khash_t(int_node) *nodes = sg->nodes;
 	khash_t(set_int) *visited = kh_init(set_int);
 	khash_t(set_int) *in_dfs = kh_init(set_int);
-	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it) {
 		if (!kh_exist(nodes, it))
 			continue;
 		int v = kh_key(nodes, it);
@@ -378,18 +378,18 @@ void find_DAG(struct simple_graph_t *sg)
 }
 
 void get_longest_path_dfs(struct simple_graph_t *sg, int v,
-		khash_t(set_int) *done_dfs)
+			  khash_t(set_int) *done_dfs)
 {
 	if (kh_set_int_exist(done_dfs, v))
 		return;
 	struct simple_node_t *snode = kh_int_node_get(sg->nodes, v);
 	int max_len = 0;
 	int next = -1;
-	for (int i = 0; i < snode->deg; ++i){
+	for (int i = 0; i < snode->deg; ++i) {
 		int u = snode->adj[i];
 		get_longest_path_dfs(sg, u, done_dfs);
 		int next_len = kh_int_int_get(sg->path_len, u);
-		if (max_len < next_len){
+		if (max_len < next_len) {
 			max_len = next_len;
 			next = u;
 		}
@@ -402,7 +402,7 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int v,
 void get_longest_path(struct simple_graph_t *sg)
 {
 	khash_t(set_int) *done_dfs = kh_init(set_int);
-	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it) {
 		if (!kh_exist(sg->nodes, it))
 			continue;
 		int v = kh_key(sg->nodes, it);
@@ -420,7 +420,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 	khash_t(set_int) *visited = kh_init(set_int);
 	int n_total = 0;
 	int n_complex = 0;
-	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it) {
 		if (!kh_exist(nodes, it))
 			continue;
 		int v = kh_key(nodes, it);
@@ -437,13 +437,13 @@ void filter_complex_regions(struct simple_graph_t *sg)
 		int has_loop = 0;
 		int n_source = 0;
 		int n_sink = 0;
-		while (!is_queue_empty(&q)){
+		while (!is_queue_empty(&q)) {
 			int v = *(int *) get_queue(&q);
 			free(get_queue(&q));
 			pop_queue(&q);
 
 			struct simple_node_t *snode = kh_int_node_get(sg->nodes,
-					v);
+								      v);
 			if (snode->deg == 0)
 				++n_sink;
 			if (snode->rv_deg == 0)
@@ -454,7 +454,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 				has_loop = 1;
 			kh_set_int_add(component, v);
 
-			for (int i = 0; i < snode->deg + snode->rv_deg; ++i){
+			for (int i = 0; i < snode->deg + snode->rv_deg; ++i) {
 				int u = i < snode->deg ? snode->adj[i] :
 					snode->rv_adj[i - snode->deg];
 				if (kh_set_int_exist(visited, u))
@@ -466,11 +466,11 @@ void filter_complex_regions(struct simple_graph_t *sg)
 		++n_total;
 
 		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1
-				&& kh_size(component) > 1)
+		    && kh_size(component) > 1)
 			continue;
 		++n_complex;
 		for (khiter_t it = kh_begin(component); it != kh_end(component);
-				++it){
+		     ++it) {
 			if (!kh_exist(component, it))
 				continue;
 			int v = kh_key(component, it);
@@ -485,12 +485,12 @@ void filter_complex_regions(struct simple_graph_t *sg)
 
 void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 {
-	for (int i = 0; i < n_e; ++i){
+	for (int i = 0; i < n_e; ++i) {
 		int v = edges[i];
 		if (kh_set_int_exist(sg->is_complex, v))
 			continue;
 		struct simple_node_t *snode = kh_int_node_get(sg->nodes, v);
-		for (int j = 0; j < snode->deg; ++j){
+		for (int j = 0; j < snode->deg; ++j) {
 			int u = snode->adj[j];
 			if (kh_set_int_exist(sg->is_complex, u))
 				continue;
@@ -612,8 +612,8 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 	}
 	log_debug("Path: %s", path);
 
-	for(int i = 1; i < n_contig_path; i++) {
-		int a = contig_path[i-1], b = contig_path[i];
+	for (int i = 1; i < n_contig_path; i++) {
+		int a = contig_path[i - 1], b = contig_path[i];
 		struct shortest_path_info_t *res = get_shortest_path(g, a, b, stored);
 		if (res == NULL) {
 			log_error("Can not find shortest path between %d and %d!", a, b);
@@ -707,8 +707,12 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	log_info("Global genome coverage %.2f", global_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	log_info("Init visited hash table");
+	double *ori_cov = calloc(g->n_e, sizeof(n_e));
+	for (int i = 0; i < n_e; i++) {
+		ori_cov[i] = __get_edge_cov(&g->edges[i], g->ksize);
+	}
 	khash_t(long_spath) *stored = kh_init(long_spath);
-	for (int i = 0; i < paths_bundle->n_paths; ++i){
+	for (int i = 0; i < paths_bundle->n_paths; ++i) {
 		add_path_to_edges(g, g_new, stored, paths_bundle->paths[i].edges,
 				paths_bundle->paths[i].n_e, global_cov, visited);
 		log_trace("Process %d/%d path", i, paths_bundle->n_paths);
@@ -793,7 +797,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 {
 	struct asm_graph_t *g = sg->g;
 	khash_t(set_int) *visited = kh_init(set_int);
-	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it){
+	for (khiter_t it = kh_begin(sg->nodes); it != kh_end(sg->nodes); ++it) {
 		if (!kh_exist(sg->nodes, it))
 			continue;
 		int s = kh_key(sg->nodes, it);
@@ -808,7 +812,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 		init_queue(&q, 1024);
 		push_queue(&q, pointerize(&s, sizeof(int)));
 		kh_set_int_add(visited, s);
-		while (!is_queue_empty(&q)){
+		while (!is_queue_empty(&q)) {
 			int v = *(int *) get_queue(&q);
 			free(get_queue(&q));
 			pop_queue(&q);
@@ -820,8 +824,8 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 			kh_set_int_add(component, v);
 
 			struct simple_node_t *node = kh_int_node_get(sg->nodes,
-					v);
-			for (int i = 0; i < node->deg; ++i){
+								     v);
+			for (int i = 0; i < node->deg; ++i) {
 				int u = node->adj[i];
 				if (kh_set_int_exist(visited, u))
 					continue;
@@ -830,7 +834,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 			}
 
 			node = kh_int_node_get(sg->nodes, g->edges[v].rc_id);
-			for (int i = 0; i < node->deg; ++i){
+			for (int i = 0; i < node->deg; ++i) {
 				int u = g->edges[node->adj[i]].rc_id;
 				if (kh_int_node_exist(sg->nodes, u) == 0)
 					continue;
@@ -840,15 +844,15 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
-		if (!has_loop && !has_rc && kh_size(component) > 1){
+		if (!has_loop && !has_rc && kh_size(component) > 1) {
 			fprintf(f, "digraph %s{\n", bc);
 			for (khiter_t it = kh_begin(component); it != kh_end(component);
-					++it){
+			     ++it) {
 				if (!kh_exist(component, it))
 					continue;
 				int s = kh_key(component, it);
 				struct simple_node_t *snode = kh_int_node_get(
-						sg->nodes, s);
+					sg->nodes, s);
 				for (int i = 0; i < snode->deg; ++i)
 					fprintf(f, "\t%d -> %d\n", s, snode->adj[i]);
 				float unit_cov = get_genome_coverage(sg->g);
@@ -856,10 +860,10 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				float ratio = cov / unit_cov;
 				if (ratio >= 0.8 && ratio <= 1.2)
 					fprintf(f, "\t%d [style=\"filled\",fillcolor=green]\n",
-							s);
+						s);
 				else
 					fprintf(f, "\t%d [style=\"filled\",fillcolor=violet]\n",
-							s);
+						s);
 			}
 			fprintf(f, "}\n");
 		}
@@ -870,10 +874,10 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 }
 
 void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
-		int *n_e)
+		   int *n_e)
 {
 	khash_t(set_int) *tmp = kh_init(set_int);
-	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it){
+	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it) {
 		if (!kh_exist(hits->edges, it))
 			continue;
 		int e = kh_key(hits->edges, it);
@@ -884,7 +888,7 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 
 	*edges = calloc(kh_size(tmp), sizeof(int));
 	*n_e = 0;
-	for (khiter_t it = kh_begin(tmp); it != kh_end(tmp); ++it){
+	for (khiter_t it = kh_begin(tmp); it != kh_end(tmp); ++it) {
 		if (!kh_exist(tmp, it))
 			continue;
 		int e = kh_key(tmp, it);
@@ -988,7 +992,7 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 	init_queue(&q, 1024);
 	push_queue(&q, pointerize(&source, sizeof(int)));
 	kh_int_int_set(L, source, 1);
-	while (!is_queue_empty(&q)){
+	while (!is_queue_empty(&q)) {
 		int v = *(int *) get_queue(&q);
 		free(get_queue(&q));
 		pop_queue(&q);
@@ -997,7 +1001,7 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 		if (len > radius)
 			break;
 		int tg = g->edges[v].target;
-		for (int i = 0; i < g->nodes[tg].deg; ++i){
+		for (int i = 0; i < g->nodes[tg].deg; ++i) {
 			int u = g->nodes[tg].adj[i];
 			if (kh_int_int_exist(L, u))
 				continue;
@@ -1010,7 +1014,7 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 
 	*edges = calloc(kh_size(L), sizeof(int));
 	*n_e = 0;
-	for (khiter_t it = kh_begin(L); it != kh_end(L); ++it){
+	for (khiter_t it = kh_begin(L); it != kh_end(L); ++it) {
 		if (!kh_exist(L, it))
 			continue;
 		(*edges)[(*n_e)++] = kh_key(L, it);
@@ -1059,10 +1063,10 @@ void bfs_nearby(struct asm_graph_t *g, int source, int radius, int **edges, int 
 //}
 
 void build_graph_from_edges_list(int *edges, int n_e, struct asm_graph_t *g,
-		struct simple_graph_t *sg)
+				 struct simple_graph_t *sg)
 {
 	init_simple_graph(g, sg);
-	for (int i = 0; i < n_e; i += 2){
+	for (int i = 0; i < n_e; i += 2) {
 		int v = edges[i];
 		int u = edges[i + 1];
 		add_simple_node(sg, v);
@@ -1072,7 +1076,7 @@ void build_graph_from_edges_list(int *edges, int n_e, struct asm_graph_t *g,
 }
 
 void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
-		struct paths_bundle_t *path_bundle)
+			   struct paths_bundle_t *path_bundle)
 {
 	struct simple_graph_t sg;
 	build_graph_from_edges_list(edges, n_e, g, &sg);
@@ -1082,7 +1086,7 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 
 
 	float unit_cov = get_genome_coverage(g);
-	for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes); ++it){
+	for (khiter_t it = kh_begin(sg.nodes); it != kh_end(sg.nodes); ++it) {
 		if (!kh_exist(sg.nodes, it))
 			continue;
 		int source = kh_key(sg.nodes, it);
@@ -1098,13 +1102,14 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 		int n_e = 1;
 		path[0] = source;
 		for (int v = kh_int_int_get(sg.next, source); v != -1;
-				v = kh_int_int_get(sg.next, v)){
+		     v = kh_int_int_get(sg.next, v)) {
 			path = realloc(path, (n_e + 1) * sizeof(int));
 			path[n_e] = v;
 			n_e++;
 		}
 		path_bundle->paths = realloc(path_bundle->paths,
-				sizeof(struct simple_path_t) * (path_bundle->n_paths + 1));
+					     sizeof(struct simple_path_t) *
+					     (path_bundle->n_paths + 1));
 		struct simple_path_t new_path = {
 			.edges = path,
 			.n_e = n_e
@@ -1117,7 +1122,7 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 int check_adj_edges(struct asm_graph_t *g, int v, int u)
 {
 	int v_tg = g->edges[v].target;
-	for (int i = 0; i < g->nodes[v_tg].deg; ++i){
+	for (int i = 0; i < g->nodes[v_tg].deg; ++i) {
 		int w = g->nodes[v_tg].adj[i];
 		if (w == u)
 			return 1;
@@ -1126,13 +1131,13 @@ int check_adj_edges(struct asm_graph_t *g, int v, int u)
 }
 
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
-		int t, khash_t(long_spath) *stored)
+					       int t, khash_t(long_spath) *stored)
 {
 	if (kh_long_spath_exist(stored, GET_CODE(s, t)))
 		return kh_long_spath_get(stored, GET_CODE(s, t));
 
 	struct shortest_path_info_t *res = NULL;
-	if (check_adj_edges(g, s, t)){
+	if (check_adj_edges(g, s, t)) {
 		res = calloc(1, sizeof(struct shortest_path_info_t));
 		res->sum_seq = 0;
 		res->n_e = 2;
@@ -1151,7 +1156,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 
 	int s_tg = g->edges[s].target;
 	struct len_info_t wrapper;
-	for (int i = 0; i < g->nodes[s_tg].deg; ++i){
+	for (int i = 0; i < g->nodes[s_tg].deg; ++i) {
 		int v = g->nodes[s_tg].adj[i];
 		wrapper.v = v;
 		wrapper.sum_seq = g->edges[v].seq_len;
@@ -1162,7 +1167,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		kh_int_int_set(best_D, v, 1);
 	}
 
-	while (!is_queue_empty(&q)){
+	while (!is_queue_empty(&q)) {
 		struct len_info_t *wrapper = get_queue(&q);
 		int v = wrapper->v;
 		int sum_seq = wrapper->sum_seq;
@@ -1173,11 +1178,11 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 			continue;
 
 		int v_tg = g->edges[v].target;
-		for (int i = 0; i < g->nodes[v_tg].deg; ++i){
+		for (int i = 0; i < g->nodes[v_tg].deg; ++i) {
 			int u = g->nodes[v_tg].adj[i];
 			int new_sum_seq = sum_seq + g->edges[u].seq_len - g->ksize;
 			int new_len = len + 1;
-			if (new_sum_seq < kh_int_int_try_get(best_L, u, 1e9)){
+			if (new_sum_seq < kh_int_int_try_get(best_L, u, 1e9)) {
 				kh_int_int_set(best_L, u, new_sum_seq);
 				kh_long_int_set(best_P, GET_CODE(u, new_len), v);
 				kh_int_int_set(best_D, u, new_len);
@@ -1188,7 +1193,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 					.len = new_len
 				};
 				push_queue(&q, pointerize(&new_wrapper,
-						sizeof(struct len_info_t)));
+							  sizeof(struct len_info_t)));
 			}
 		}
 	}
@@ -1196,7 +1201,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 
 	int best_w = -1;
 	int best_sum_seq = 1e9;
-	for (khiter_t it = kh_begin(best_L); it != kh_end(best_L); ++it){
+	for (khiter_t it = kh_begin(best_L); it != kh_end(best_L); ++it) {
 		if (!kh_exist(best_L, it))
 			continue;
 		int w = kh_key(best_L, it);
@@ -1205,8 +1210,8 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 			continue;
 
 		int w_tg = g->edges[w].target;
-		for (int i = 0; i < g->nodes[w_tg].deg; ++i){
-			if (t == g->nodes[w_tg].adj[i]){
+		for (int i = 0; i < g->nodes[w_tg].deg; ++i) {
+			if (t == g->nodes[w_tg].adj[i]) {
 				best_w = w;
 				best_sum_seq = sum_seq;
 				break;
@@ -1223,13 +1228,13 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 
 	int d = kh_int_int_get(best_D, best_w);
 	int v = best_w;
-	while (v != -1){
+	while (v != -1) {
 		path[n_e++] = v;
 		v = kh_long_int_get(best_P, GET_CODE(v, d));
 		--d;
 	}
 	path[n_e++] = s;
-	for (int i = 0, j = n_e - 1; i < j; ++i, --j){
+	for (int i = 0, j = n_e - 1; i < j; ++i, --j) {
 		int tmp = path[i];
 		path[i] = path[j];
 		path[j] = tmp;

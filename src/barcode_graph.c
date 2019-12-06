@@ -95,32 +95,6 @@ void filter_bulge(struct barcode_graph *bg)
 					}
 		}
 	}
-
-	for (int node = 0; node < bg->n_nodes; node++) {
-		int deg_in = 0;
-		for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-			if (bg->is_del[j] == 0) {
-				if ((j & 1) == 0) {
-					near[deg_in] = bg->edges[j];
-					deg_in++;
-				}
-			}
-		if (deg_in == 2) {
-			if (have_edge(bg, near[0], near[1]))
-				for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-					if (bg->edges[j] == near[1]) {
-						bg->is_del[j] = 1;
-						bg->is_del[j ^ 1] = 1;
-						log_debug("Del bulge %d %d", node, near[1]);
-					}
-		} else if (have_edge(bg, near[1], near[0]))
-			for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-				if (bg->edges[j] == near[0]) {
-					bg->is_del[j] = 1;
-					bg->is_del[j ^ 1] = 1;
-					log_debug("Del bulge %d %d", node, near[0]);
-				}
-	}
 }
 
 void filter_by_deg(struct barcode_graph *bg, int thres_deg)
@@ -292,6 +266,7 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 			if (flag[i]) {
 				bg->is_del[out_id[i]] = 1;
 				bg->is_del[out_id[i] ^ 1] = 1;
+				log_debug("Del remove tips hao %d %d", node, out[i]);
 			}
 		}
 	}
@@ -336,6 +311,7 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 			if (flag[i]) {
 				bg->is_del[in_id[i]] = 1;
 				bg->is_del[in_id[i] ^ 1] = 1;
+				log_debug("Del remove tips hao %d %d", in[i], node);
 			}
 		}
 	}
@@ -396,9 +372,11 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	print_dot_graph(bg, "after_filter_BCandpair.dot");
 	filter_graph_reverse_complement(g, bg);
 	remove_tips_barcode_graph(g, bg, stored);
+	print_dot_graph(bg, "after_remove_tips.dot");
 	filter_complex_barcode_graph(bg);
 
 	khash_t(set_long) *mark_link = kh_init(long_int);
+	print_dot_graph(bg, "after_filter_complex.dot");
 	int *list_res = NULL, n_res = 0;
 	for (int i = 0; i < bg->n_edges * 2; i += 2) {
 		if (bg->is_del[i]) {
@@ -431,7 +409,6 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 
 	*list_ret = list_res;
 	*n_ret = n_res;
-	print_dot_graph(bg, "after_filter_deg.dot");
 	log_info("n edges after in deg and out deg: %d", *n_ret);
 	destroy_barcode_graph(bg);
 }
