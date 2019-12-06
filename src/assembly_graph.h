@@ -269,6 +269,7 @@ void write_gfa(struct asm_graph_t *g, const char *path);
 
 void write_fasta_seq(struct asm_graph_t *g, const char *fasta_path);
 
+void write_stupid_fasta(struct asm_graph_t *g, const char *path);
 /* Save graph topology as binary format */
 void save_asm_graph(struct asm_graph_t *g, const char *path);
 

@@ -21,6 +21,9 @@
 #include "minimizers/minimizers.h"
 #include "minimizers/smart_load.h"
 #include "minimizers/count_barcodes.h"
+#include "minimizers/get_buffer.h"
+#include "cluster_molecules.h"
+#include "split_molecules.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -91,14 +94,6 @@ void build_1_2(struct asm_graph_t *g0, struct asm_graph_t *g)
 	log_info("Build graph level 2 time: %.3f", sec_from_prev_time());
 }
 
-struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt)
-{
-	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g0, opt->in_file);
-	test_asm_graph(g0);
-	return g0;
-}
-
 void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 {
 	char *log_file = str_concate(opt->out_dir, "/build_scaffolding_1_2.log");
@@ -120,15 +115,30 @@ void build_scaffolding_1_2_process(struct opt_proc_t *opt)
 	close_logger();
 }
 
-void build_scaffolding_test_process(struct opt_proc_t *opt)
+void write_neo4j_create(struct asm_graph_t *g)
 {
-	init_clock();
-	FILE *fp;
-	struct asm_graph_t *g0 = create_and_load_graph(opt);
+	FILE *out = fopen("/home/che/bioturing/data/yeast/neo4j/listnode.tsv", "w");
+	fprintf(out, "ID\n");
+	for (int i = 0; i < g->n_e; i++){
+		fprintf(out, "%d\n", i);
+	}
+	fclose(out);
+	out = fopen("/home/che/bioturing/data/yeast/neo4j/reverse_edge.tsv", "w");
+	fprintf(out, "i,i_rc\n");
+	for (int i = 0; i < g->n_e; i++){
+		int rc_id = g->edges[i].rc_id;
+		if (rc_id < i)
+			continue;
+		fprintf(out, "%d,%d\n", i, rc_id);
+	}
+	fclose(out);
+}
 
-	scaffolding_test(g0, opt);
-
-	asm_graph_destroy(g0);
+void dirty_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g = create_and_load_graph(opt);
+	dirty(g, opt);
+//	write_neo4j_create(g);
 }
 
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
@@ -184,6 +194,126 @@ void build_bridge_process(struct opt_proc_t *opt)
 	build_bridge(opt);
 }
 
+void split_molecules_wrapper(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Split molecules");
+	FILE *f = fopen(opt->in_fasta, "r");
+	char bx[19];
+	int count;
+	fclose(fopen(opt->lc, "w"));
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
+	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, &read_sorted_path);
+	}
+	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
+	int C = 0;
+	while (fscanf(f, "%s\t%d\n", bx, &count)){
+		if (C == 50000)
+			break;
+		if ((++C) % 1000 == 0)
+			log_debug("Processing %d-th barcode", C);
+		opt->bx_str = bx;
+		split_molecules_process(opt, &g, mm_edges, bx_pos_dict);
+	}
+	fclose(f);
+}
+
+/**
+ *
+ * @param opt
+ * @param g
+ * @param mm_edges
+ * @param bx_pos_dict
+ */
+void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct mm_db_edge_t *mm_edges, khash_t(bcpos) *bx_pos_dict)
+{
+
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, &read_sorted_path);
+	}
+	uint64_t bx_encoded = barcode_hash_mini(opt->bx_str);
+	//log_info("Hashed barcode: %lu", bx_encoded);
+	uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
+
+	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k == kh_end(bx_pos_dict)) {
+		log_error("Barcode does not exists!");
+	} else {
+		//log_info("Barcode does exist. Getting reads");
+	}
+
+	char *buf1, *buf2;
+	uint64_t m_buf1, m_buf2;
+	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
+
+	struct read_t r1, r2;
+	int pos1 = 0, pos2 = 0;
+	int n_reads = 0;
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits;
+	hits = mm_hits_init();
+
+
+	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS) {
+		n_reads++;
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+
+		mm_hits_cmp(db1, mm_edges, hits, g);
+		mm_hits_cmp(db2, mm_edges, hits, g);
+	}
+	//log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
+	//log_info("Number of singleton hits: %d", kh_size(hits->edges));
+	mm_hits_print(hits, "barcode_hits.csv");
+	free(buf1);
+	free(buf2);
+
+	order_edges(opt, g, hits);
+}
+
+//void debug_process(struct opt_proc_t *opt)
+//{
+//	char path[1024];
+//	sprintf(path, "%s/debug.log", opt->out_dir);
+//	init_logger(opt->log_level, path);
+//	set_log_stage("Debug process");
+//	create_barcode_molecules(opt);
+//}
+
+void print_barcode_graph_process(struct opt_proc_t *opt)
+{
+	print_barcode_graph(opt);
+}
+
+//void cluster_molecules_process(struct opt_proc_t *opt)
+//{
+//	char path[1024];
+//	sprintf(path, "%s/cluster_molecules.log", opt->out_dir);
+//	init_logger(opt->log_level, path);
+//	set_log_stage("Cluster molecules");
+//
+//	count_edge_links_bc(opt);
+//}
+
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];
@@ -218,7 +348,7 @@ void index_mm_process(struct opt_proc_t *opt)
 	set_log_stage("Minimizers Index");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	mm_index_edges(&g, 17, 17);
+	mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
 	__VERBOSE("Done indexing\n");
 }
 
@@ -234,7 +364,7 @@ void count_bx_process(struct opt_proc_t *opt)
 {
 	struct read_path_t read_path;
 	__VERBOSE("Counting barcode frequencies\n");
-	count_bx_freq(opt, &read_path);
+	count_bx_freq(opt);
 	__VERBOSE("Done counting\n");
 }
 
@@ -602,7 +732,22 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;
 	load_asm_graph_fasta(&g, opt->in_fasta, opt->k0);
-	build_barcode_read(opt, &g);
+	gint_t le_idx = get_longest_edge(&g);
+	if (le_idx != -1) {
+		log_info("Longest edge %ld_%ld, length %u",
+		         le_idx, g.edges[le_idx].rc_id, get_edge_len(g.edges + le_idx));
+	}
+	save_graph_info(opt->out_dir, &g, "from_fasta");
+	char fasta_path[MAX_PATH];
+	struct read_path_t read_path;
+	read_path.R1_path = opt->files_1[0];
+	read_path.R2_path = opt->files_2[0];
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g, fasta_path);
+	log_info("Aligning reads on two heads of each contigs using BWA");
+	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE, FOR_SCAFFOLD);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 }
@@ -617,19 +762,4 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g1, "level_4");
 	asm_graph_destroy(&g);
 	asm_graph_destroy(&g1);
-}
-
-void resolve_1_2_process(struct opt_proc_t *opt)
-{
-	char *log_file = str_concate(opt->out_dir, "/resolve_1_2.log");
-	init_logger(opt->log_level, log_file);
-	init_clock();
-	struct asm_graph_t *g0 = create_and_load_graph(opt);
-	log_info("resolve 1_2 process");
-	resolve_1_2(g0,opt);
-	save_graph_info(opt->out_dir, g0, "level_2_huu");
-	asm_graph_destroy(g0);
-	free(g0);
-	free(log_file);
-	close_logger();
 }

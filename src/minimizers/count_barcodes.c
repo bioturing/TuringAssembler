@@ -30,110 +30,79 @@
 #include "utils.h"
 #include "verbose.h"
 #include "atomic.h"
+#include "log.h"
 
-pthread_mutex_t lock_key;
+#include "count_barcodes.h"
 
-#define BARCODES100M 100663320
-#define BIG_CONSTANT(x) (x##LLU)
 
-#if defined(_MSC_VER)
+/*
+ Credit for primes table: Aaron Krowne
+ http://br.endernet.org/~akrowne/
+ http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
+ */
+static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
+                                   12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739,
+                                   6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
+                                   805306457, 1610612741 };
+#define N_PRIMES_NUMBER 26
 
-#define FORCE_INLINE	__forceinline
+#define MAX_LOAD_FACTOR 0.8
+#define FATAL_LOAD_FACTOR 0.9
 
-#include <stdlib.h>
+#define MINIHASH_END (uint64_t *)UINT64_MAX
+#define KEY_LEN 8
 
-#define ROTL32(x,y)	_rotl(x,y)
-#define ROTL64(x,y)	_rotl64(x,y)
+pthread_mutex_t h_table_mut;
 
-#define BIG_CONSTANT(x) (x)
-
-// Other compilers
-
-#else	// defined(_MSC_VER)
-
-#define	FORCE_INLINE inline __attribute__((always_inline))
-
-inline uint32_t rotl32(uint32_t x, int8_t r)
-{
-	return (x << r) | (x >> (32 - r));
-}
-
-inline uint64_t rotl64(uint64_t x, int8_t r)
-{
-	return (x << r) | (x >> (64 - r));
-}
-
-#define	ROTL32(x,y)	rotl32(x,y)
-#define ROTL64(x,y)	rotl64(x,y)
-
-#define BIG_CONSTANT(x) (x##LLU)
-
-#endif // !defined(_MSC_VER)
-
-static inline uint64_t fmix64(uint64_t k)
-{
-	k ^= k >> 33;
-	k *= BIG_CONSTANT(0xff51afd7ed558ccd);
-	k ^= k >> 33;
-	k *= BIG_CONSTANT(0xc4ceb9fe1a85ec53);
-	k ^= k >> 33;
-
-	return k;
-}
-
-static struct readbc_t {
-    uint64_t barcode;
-    int64_t offset;
-    int len1;
-    int len2;
+struct h_bundle_t {
+    uint64_t *slot_ptr;
+    void *arg;
 };
 
-static struct readsort_bundle_t {
-    struct dqueue_t *q;
-    char prefix[MAX_PATH];
-    int64_t sm;
-};
-
-struct mini_hash_t {
-    uint64_t *h;
-    uint64_t *key;
-    unsigned int size;
-};
-
-struct mini_hash_t *init_mini_hash()
+void destroy_worker_bundles(struct readsort_bundle1_t *bundles, int n)
 {
-	struct mini_hash_t *h_table = malloc(sizeof(struct mini_hash_t));
-	h_table->h = calloc(BARCODES100M, sizeof(uint64_t));
-	h_table->key = calloc(BARCODES100M, sizeof(uint64_t));
-	h_table->size = BARCODES100M;
-	memset(h_table->h, 0, h_table->size);
-	memset(h_table->key, 0, h_table->size);
-	return h_table;
+	destroy_mini_hash(*bundles[0].h_table_ptr);
+	free(bundles);
+}
+
+/**
+ * @brief Init a hash table with a pre-define size in the prime number table
+ * @param p_index index of the prime number table
+ * @return
+ */
+void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
+{
+	struct mini_hash_t *table = calloc(1, sizeof(struct mini_hash_t));
+	table->prime_index = p_index;
+	uint32_t h_size = primes[table->prime_index];
+	table->h = calloc(h_size, sizeof(uint64_t));
+	table->key = calloc(h_size, sizeof(uint64_t));
+	table->size = h_size;
+	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
+	table->count = 0;
+	*h_table = table;
 }
 
 void destroy_mini_hash(struct mini_hash_t *h_table)
 {
 	free(h_table->h);
 	free(h_table->key);
-	free(h_table);
 }
-
-static struct mini_hash_t *h_table;
 
 uint64_t barcode_hash_mini(char *s)
 {
 	uint64_t ret = 0;
 	for (int i = 0; i < 18; ++i) {
-		ret = ret * 5 + nt4_table[(int)s[i]];
+		ret = ret * 5 + nt4_table[(int) s[i]];
 	}
 	return ret;
 }
 
-static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
+uint64_t get_barcode_biot(char *s, struct read_t *r)
 {
 	if (s == NULL) {
 		r->seq = r->qual = NULL;
-		return (uint64_t)-1;
+		return (uint64_t) -1;
 	}
 	int i, len = 0;
 	uint64_t ret = 0;
@@ -141,11 +110,11 @@ static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
 	p = strstr(s, "BX:Z:");
 	if (p == NULL) {
 		r->seq = r->qual = NULL;
-		return (uint64_t)-1;
+		return (uint64_t) -1;
 	}
 	r->seq = p += 5;
 	for (i = 0; p[i] && !__is_sep(p[i]); ++i) {
-		ret = ret * 5 + nt4_table[(int)p[i]];
+		ret = ret * 5 + nt4_table[(int) p[i]];
 		++len;
 	}
 	p = strstr(s, "QB:Z:");
@@ -157,110 +126,203 @@ static inline uint64_t get_barcode_biot(char *s, struct read_t *r)
 	return ret;
 }
 
-static inline uint64_t getblock64(const uint64_t * p, int i)
-{
-	return p[i];
+/*
+ * Thomas Wang 64 bit mix hash function
+ */
+
+uint64_t twang_mix64(uint64_t key) {
+	key = (~key) + (key << 21); // key *= (1 << 21) - 1; key -= 1;
+	key = key ^ (key >> 24);
+	key = key + (key << 3) + (key << 8); // key *= 1 + (1 << 3) + (1 << 8)
+	key = key ^ (key >> 14);
+	key = key + (key << 2) + (key << 4); // key *= 1 + (1 << 2) + (1 << 4)
+	key = key ^ (key >> 28);
+	key = key + (key << 31); // key *= 1 + (1 << 31)
+	return key;
 }
 
-static inline uint64_t MurmurHash3_x64_64(const uint8_t *data, const int len)
-{
-	int n_blocks = len >> 4;
-	uint64_t h1 = BIG_CONSTANT(0x13097);
-	uint64_t h2 = BIG_CONSTANT(0x13097);
+/*
+ * Inverse of twang_mix64
+ *
+ * Note that twang_unmix64 is significantly slower than twang_mix64.
+ */
 
-	const uint64_t c1 = BIG_CONSTANT(0x87c37b91114253d5);
-	const uint64_t c2 = BIG_CONSTANT(0x4cf5ad432745937f);
-
-	const uint64_t *blocks = (const uint64_t *)(data);
-
-	int i;
-	for (i = 0; i < n_blocks; ++i) {
-		uint64_t k1 = getblock64(blocks, i << 1);
-		uint64_t k2 = getblock64(blocks, (i << 1) + 1);
-		k1 *= c1; k1 = ROTL64(k1, 31); k1 *= c2; h1 ^= k1;
-		h1 = ROTL64(h1, 27); h1 += h2; h1 = h1 * 5 + 0x52dce729;
-		k2 *= c2; k2 = ROTL64(k2, 33); k2 *= c1; h2 ^= k2;
-		h2 = ROTL64(h2, 31); h2 += h1; h2 = h2 * 5 + 0x38495ab5;
-	}
-
-	const uint8_t *tail = (const uint8_t *)(data + (n_blocks << 4));
-	uint64_t k1 = 0;
-	uint64_t k2 = 0;
-
-	switch (len & 15) {
-		case 15: k2 ^= ((uint64_t)tail[14]) << 48;
-		case 14: k2 ^= ((uint64_t)tail[13]) << 40;
-		case 13: k2 ^= ((uint64_t)tail[12]) << 32;
-		case 12: k2 ^= ((uint64_t)tail[11]) << 24;
-		case 11: k2 ^= ((uint64_t)tail[10]) << 16;
-		case 10: k2 ^= ((uint64_t)tail[ 9]) << 8;
-		case  9: k2 ^= ((uint64_t)tail[ 8]) << 0;
-			k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
-
-		case  8: k1 ^= ((uint64_t)tail[ 7]) << 56;
-		case  7: k1 ^= ((uint64_t)tail[ 6]) << 48;
-		case  6: k1 ^= ((uint64_t)tail[ 5]) << 40;
-		case  5: k1 ^= ((uint64_t)tail[ 4]) << 32;
-		case  4: k1 ^= ((uint64_t)tail[ 3]) << 24;
-		case  3: k1 ^= ((uint64_t)tail[ 2]) << 16;
-		case  2: k1 ^= ((uint64_t)tail[ 1]) << 8;
-		case  1: k1 ^= ((uint64_t)tail[ 0]) << 0;
-			k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
-	}
-
-	h1 ^= len; h2 ^= len;
-
-	h1 += h2;
-	h2 += h1;
-
-	h1 = fmix64(h1);
-	h2 = fmix64(h2);
-
-	h1 += h2;
-	h2 += h1;
-
-	return h2;
+uint64_t twang_unmix64(uint64_t key) {
+	// See the comments in jenkins_rev_unmix32 for an explanation as to how this
+	// was generated
+	key *= 4611686016279904257U;
+	key ^= (key >> 28) ^ (key >> 56);
+	key *= 14933078535860113213U;
+	key ^= (key >> 14) ^ (key >> 28) ^ (key >> 42) ^ (key >> 56);
+	key *= 15244667743933553977U;
+	key ^= (key >> 24) ^ (key >> 48);
+	key = (key + 1) * 9223367638806167551U;
+	return key;
 }
 
-void mini_inc(uint64_t data, int len)
+/**
+ * @brief Expand the hash table by re-hash and doubling size
+ * when the load factor reach MAX_LOAD_FACTOR (0.65 by default)
+ * key must be hashed by MurMurHash64
+ */
+void mini_expand(struct mini_hash_t **new_table_ptr)
 {
-	uint64_t key = MurmurHash3_x64_64((uint8_t *)&data, len);
-	uint64_t mask = h_table->size - 1;
-	uint64_t slot = key % mask;
-	uint64_t prev = atomic_val_CAS64(h_table->h + slot, 0, 1);
-	if (!prev) { // slot is empty -> fill in
-		atomic_bool_CAS64(h_table->key + slot, 0, data); //TODO: check return
-	} else if (atomic_bool_CAS64(h_table->key + slot, data, data)){
-		atomic_add_and_fetch64(h_table->h + slot, 1);
-	} else { //linear probing
-		int i;
-		for (i = slot + 1; i < h_table->size && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			prev = atomic_val_CAS64(h_table->h + i, 0, 1);
-			if (prev == 0) {
-				break;
+	uint32_t i;
+	uint64_t *slot;
+	uint64_t key, data, val;
+	uint32_t log_size = 1<<16;
+	struct mini_hash_t *new_table;
+	struct mini_hash_t *h_table = *new_table_ptr;
+	init_mini_hash(&new_table, h_table->prime_index + 1);
+	assert(h_table->h != NULL);
+	for (i = 0; i < h_table->size; ++i) {
+		if (!((i + 1) % log_size)) {
+			log_info("Copied %d elements", log_size);
+			log_size <<= 1;
+		}
+		if (h_table->key[i] == 0)
+			continue;
+		val = h_table->h[i];
+		data = h_table->key[i];
+		key = twang_mix64(data);
+		slot = mini_put_by_key(new_table, data, key);
+		*slot = val;
+	}
+	destroy_mini_hash(h_table);
+	*new_table_ptr = new_table;
+}
+
+/**
+ * @brief Try expanding the hash table by doubling in size
+ */
+inline void try_expanding(struct mini_hash_t **h_table)
+{
+	struct mini_hash_t *table = *h_table;
+	if (table->count == table->max_cnt) {
+		if (table->prime_index < N_PRIMES_NUMBER - 1) {
+			log_info("Doubling hash table...");
+			mini_expand(h_table);
+		} else {
+			if ((double)table->count > FATAL_LOAD_FACTOR * (table->size)) {
+				log_warn("Hash table size reached limit!");
 			}
+		}
+	}
+}
+
+/**
+ * Increase the the count of one barcode by 1
+ * @param data  barcode encoded as an uint64_t number
+ * @param key   hash(data)
+ */
+uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
+{
+	if (h_table->count > h_table->max_cnt) // Return for counting big kmer
+		return MINIHASH_END;
+	uint32_t i;
+	uint64_t mask = h_table->size;
+	uint64_t slot = key % mask;
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, data);
+	if (is_empty) { // slot is empty -> fill in
+		atomic_add_and_fetch64(&(h_table->count), 1);
+	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
+		//linear probing
+		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+			if (is_empty)
+				break;
 		}
 		if (i == h_table->size) {
-			for (i = 0; i < slot && prev && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				prev = atomic_val_CAS64(h_table->h + i, 0, 1);
+			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+				is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+				if (is_empty)
+					break;
 			}
 		}
-		if (i == slot)
-			__ERROR("No more slot in the hash table! There are more than 100 millions distinct barcodes in \n your data. Please check it or let tan@bioturing.com know to increase the size of the hash table!");
-		if (!prev) { //room at probe is empty -> fill in
-			atomic_bool_CAS64(h_table->key + i, 0, data); //TODO: check return
-		} else{
-			atomic_add_and_fetch64(h_table->h + i, 1);
-		}
+		assert(!atomic_bool_CAS64(&i, slot, slot));
+		if (is_empty) //room at probe is empty -> fill in
+			atomic_add_and_fetch64(&(h_table->count), 1);
+		slot = i;
 	}
+	return h_table->h + slot;
 }
 
-void mini_print(size_t bx_size, char *out_dir)
+/**
+ * @param data  barcode encoded as an uint64_t number
+ * @param key   hash(data)
+ */
+uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
+{
+	uint32_t i;
+	uint64_t mask = h_table->size;
+	uint64_t slot = key % mask;
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, 0);
+	if (is_empty) { // slot is empty -> fill in
+		return (uint64_t *)EMPTY_BX;
+	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
+		//linear probing
+		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+			if (is_empty)
+				break;
+		}
+		if (i == h_table->size) {
+			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+				is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+				if (is_empty)
+					break;
+			}
+		}
+		assert(!atomic_bool_CAS64(&i, slot, slot));
+		if (is_empty) //room at probe is empty -> fill in
+			return (uint64_t *)EMPTY_BX;
+		slot = i;
+	}
+	return h_table->h + slot;
+}
+
+/**
+ * @brief
+ * @param data
+ * @param key
+ * @return count of data
+ */
+
+uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
+{
+	uint64_t key = twang_mix64(data);
+	uint64_t *slot = mini_get_by_key(h_table, data, key);
+	return slot;
+}
+
+/**
+ * @brief Increase the count of data to 1
+ * @param data byte array of data
+ * @param len length in byte of data
+ */
+uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
+{
+	struct mini_hash_t *table = *h_table;
+	uint64_t key = twang_mix64(data);
+	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
+		pthread_mutex_lock(&h_table_mut);
+		try_expanding(h_table);
+		pthread_mutex_unlock(&h_table_mut);
+	}
+	return mini_put_by_key(*h_table, data, key);
+}
+
+/**
+ * @brief Print the barcode frequencies to a file
+ * @param bx_size
+ * @param out_dir
+ */
+void mini_print(struct mini_hash_t *h_table, size_t bx_size, char *out_dir)
 {
 	char count_file[1024];
 	sprintf(count_file, "%s/barcode_frequencies.txt", out_dir);
 	FILE *fp = fopen(count_file, "w");
-	int i, j, c;
+	uint32_t i, j, c;
 	char bx[bx_size + 1];
 	char nt5[5] = "ACGTN";
 
@@ -273,9 +335,9 @@ void mini_print(size_t bx_size, char *out_dir)
 			while (j) {
 				c = ret % 5;
 				bx[--j] = nt5[c];
-				ret = (ret - c)/5;
+				ret = (ret - c) / 5;
 			}
-			fprintf(fp, "%s\t%d\n", bx, h_table->h[i]);
+			fprintf(fp, "%s\t%lu\n", bx, h_table->h[i]);
 		}
 	}
 	fclose(fp);
@@ -283,10 +345,15 @@ void mini_print(size_t bx_size, char *out_dir)
 
 static inline void *biot_buffer_iterator_simple(void *data);
 
-void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
+/**
+ * @brief main function that count barcode frequencies
+ * @param opt
+ * @param r_path
+ */
+struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
-	pthread_mutex_init(&lock_key, NULL);
-	h_table = init_mini_hash();
+	struct mini_hash_t *h_table;
+	init_mini_hash(&h_table, 16);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -296,13 +363,14 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 	void *(*buffer_iterator)(void *) = biot_buffer_iterator_simple;
 	struct producer_bundle_t *producer_bundles = NULL;
 	producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
-		                                   opt->files_1, opt->files_2);
+	                                   opt->files_1, opt->files_2);
 	buffer_iterator = biot_buffer_iterator_simple;
-	struct readsort_bundle_t *worker_bundles; //use an arbitrary structure for worker bundle
-	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));
+	struct readsort_bundle1_t *worker_bundles; //use an arbitrary structure for worker bundle
+	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle1_t));
 	int i;
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].h_table_ptr = &h_table;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -324,15 +392,18 @@ void count_bx_freq(struct opt_proc_t *opt, struct read_path_t *r_path)
 		pthread_join(worker_threads[i], NULL);
 
 	free_fastq_pair(producer_bundles, opt->n_files);
-	free(worker_bundles);
-
-	mini_print(18, opt->out_dir);
-	destroy_mini_hash(h_table);
+	mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
+	return h_table;
 }
 
+/**
+ * @brief Worker for counting barcode
+ * @param data
+ * @return
+ */
 static inline void *biot_buffer_iterator_simple(void *data)
 {
-	struct readsort_bundle_t *bundle = (struct readsort_bundle_t *)data;
+	struct readsort_bundle1_t *bundle = (struct readsort_bundle1_t *) data;
 	struct dqueue_t *q = bundle->q;
 	struct read_t read1, read2, readbc;
 	struct pair_buffer_t *own_buf, *ext_buf;
@@ -354,21 +425,22 @@ static inline void *biot_buffer_iterator_simple(void *data)
 
 		while (1) {
 			rc1 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read1, R1_buf, &pos1) :
-				get_read_from_fa(&read1, R1_buf, &pos1);
+			      get_read_from_fq(&read1, R1_buf, &pos1) :
+			      get_read_from_fa(&read1, R1_buf, &pos1);
 
 			rc2 = input_format == TYPE_FASTQ ?
-				get_read_from_fq(&read2, R2_buf, &pos2) :
-				get_read_from_fa(&read2, R2_buf, &pos2);
+			      get_read_from_fq(&read2, R2_buf, &pos2) :
+			      get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				__ERROR("\nWrong format file\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
-			if (barcode != (uint64_t)-1) {
+			if (barcode != (uint64_t) -1) {
 				// any main stuff goes here
-				mini_inc(barcode, sizeof(uint64_t) / sizeof(uint8_t));
+				uint64_t *slot = mini_put(bundle->h_table_ptr, barcode);
+				atomic_add_and_fetch64(slot, 1);
 			} else {
 				//read doesn't have barcode
 			}
@@ -377,4 +449,77 @@ static inline void *biot_buffer_iterator_simple(void *data)
 		}
 	}
 	return NULL;
+}
+
+/**
+ * @brief: Create the hash table of share-barcode count of every edge pair u-v
+ * @param: edge hits of all barcodes. See @function mm_hit_all_barcodes
+ * @return: khash, key = (uint64_t)(e1|e2), e1 < e2, value: share barcode count
+ */
+khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
+		struct mini_hash_t *bc)
+{
+	khash_t(long_int) *res = kh_init(long_int);
+	for (int i = 0; i < bc->size; ++i){
+		if (bc->h[i] == EMPTY_BX)
+			continue;
+		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i];
+		int *edges = calloc(wrapper->size, sizeof(int));
+		int n_e = 0;
+		for (int j = 0; j < wrapper->size; ++j){
+			if (wrapper->h[j] == 0)
+				continue;
+			edges[n_e++] = wrapper->key[j];
+		}
+
+		for (int j = 0; j < n_e; ++j){
+			for (int k = j + 1; k < n_e; ++k){
+				int e1 = edges[j];
+				int e2 = edges[k];
+				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
+				int cur_count = kh_long_int_try_get(res, code, 0);
+				kh_long_int_set(res, code, cur_count + 1);
+			}
+		}
+		free(edges);
+	}
+
+	khash_t(long_int) *tmp = kh_init(long_int);
+	for (khiter_t it = kh_begin(res); it != kh_end(res); ++it){
+		if (!kh_exist(res, it))
+			continue;
+		uint64_t code = kh_key(res, it);
+		int v = code >> 32;
+		int u = (uint64_t) code & (-1);
+		int v_rc = g->edges[v].rc_id;
+		int u_rc = g->edges[u].rc_id;
+		uint64_t code_rc = v_rc < u_rc ? GET_CODE(v_rc, u_rc) : GET_CODE(u_rc, v_rc);
+		int sum_cnt = kh_val(res, it) + kh_long_int_try_get(res, code_rc, 0);
+		kh_long_int_set(tmp, code, sum_cnt);
+		kh_long_int_set(tmp, code_rc, sum_cnt);
+	}
+	kh_destroy(long_int, res);
+	res = tmp;
+
+	FILE *fp = fopen("bc_hits_edge_pairs.txt", "w");
+	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
+		if (kh_exist(res, k)) {
+			fprintf(fp, "%lu %lu %d\n", kh_key(res, k) >> 32, kh_key(res, k) & 0x00000000ffffffff, kh_value(res, k));
+		}
+	}
+	fclose(fp);
+	return res;
+}
+
+/**
+ * @brief Query share barcode of a pair e1-e2
+ * @param all_count
+ * @param e1
+ * @param e2
+ * @return share barcode count
+ */
+int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2)
+{
+	uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
+	return kh_long_int_try_get(all_count, code, 0);
 }

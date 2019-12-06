@@ -8,17 +8,33 @@
 #include "smart_load.h"
 #include "sort_read.h"
 #include "verbose.h"
-#include "radix_sort.h"
-#include "buffer_file_wrapper.h"
-#include "io_utils.h"
+#include "../radix_sort.h"
+#include "../buffer_file_wrapper.h"
+#include "../io_utils.h"
 #include "kseq.h"
-#include "utils.h"
-#include "log.h"
+#include "../utils.h"
+#include "../log.h"
 #include "count_barcodes.h"
 #include "minimizers.h"
-#include "assembly_graph.h"
-#include "attribute.h"
+#include "../assembly_graph.h"
 #include "get_buffer.h"
+
+static const char *bit_rep[16] = {
+	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
+	[ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
+	[ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
+	[12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
+};
+
+#define PRINT_BYTE(byte) printf("%s%s\n", bit_rep[(byte >> 4)& 0x0F], bit_rep[byte & 0x0F]);
+#define PRINT_UINT64(byte) printf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n", bit_rep[(byte >> 60) & 0x0F], bit_rep[(byte >> 56)& 0x0F], \
+								bit_rep[(byte >> 52) & 0x0F], bit_rep[(byte >> 48) & 0x0F], \
+								bit_rep[(byte >> 44) & 0x0F], bit_rep[(byte >> 40) & 0x0F], \
+								bit_rep[(byte >> 36) & 0x0F], bit_rep[(byte >> 32) & 0x0F], \
+								bit_rep[(byte >> 28) & 0x0F], bit_rep[(byte >> 24) & 0x0F], \
+								bit_rep[(byte >> 20) & 0x0F], bit_rep[(byte >> 16) & 0x0F], \
+								bit_rep[(byte >> 12) & 0x0F], bit_rep[(byte >> 8) & 0x0F],  \
+								bit_rep[(byte >> 4) & 0x0F], bit_rep[(uint8_t)byte & 0x0F]);
 
 /**
  * Construct the dictionary index of
@@ -82,8 +98,8 @@ void stream_filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 		m_buf1 += pos[i].r1_len;
 		m_buf2 += pos[i].r2_len;
 	}
-	char *buf1_ = malloc(m_buf1);
-	char *buf2_ = malloc(m_buf2);
+	char *buf1_ = calloc(m_buf1 + 1, sizeof(char));
+	char *buf2_ = calloc(m_buf2 + 1, sizeof(char));
 
 	for (i = 0; i < n_shared; ++i) {
 		fseek(fi1, pos[i].r1_offset, SEEK_SET);
@@ -101,6 +117,9 @@ void stream_filter_read(struct read_path_t *ref, khash_t(bcpos) *dict,
 	*size1 = m_buf1;
 	*size2 = m_buf2;
 }
+#define kh_set(kname, hash, key, val) ({int ret; k = kh_put(kname, hash,key,&ret); kh_value(hash,k) = val; ret;})
+// shorthand way to get the key from hashtable or defVal if not found
+#define kh_get_val(kname, hash, key, defVal) ({k=kh_get(kname, hash, key);(k!=kh_end(hash)?kh_val(hash,k):defVal);})
 /**
  * @brief Seeking and loading the barcode sequences into the buffer stream
  * @param opt
@@ -122,8 +141,8 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	khash_t(bcpos) *bx_pos_dict = kh_init(bcpos);
 	smart_construct_read_index(&read_sorted_path, bx_pos_dict); //load the barcode indices
 
-	khint_t k = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
-	if (k == kh_end(bx_pos_dict)) {
+	khint_t k_bx = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k_bx == kh_end(bx_pos_dict)) {
 		log_error("Barcode does not exists!");
 	} else {
 		log_info("Barcode does exist. Getting reads");
@@ -131,31 +150,197 @@ void smart_load_barcode(struct opt_proc_t *opt)
 
 	char *buf1, *buf2;
 	uint64_t m_buf1, m_buf2;
-	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 2, &buf1, &buf2, &m_buf1, &m_buf2);
+	stream_filter_read(&read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2, &m_buf1, &m_buf2);
+	struct read_t r1, r2;
+	int pos1 = 0, pos2 = 0;
+	int n_reads = 0;
+	struct mm_db_t *db1, *db2;
+	struct mm_hits_t *hits1, *hits2, *hits;
+
+
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mm_db_edge_t *mm_edges_db = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
+	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
+	khiter_t ki,k;
+	hits = mm_hits_init();
+
+	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
+		n_reads++;
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+		khiter_t k1, k2;
+
+		hits1 = mm_hits_init();
+		hits2 = mm_hits_init();
+
+		mm_hits_cmp(db1, mm_edges_db, hits1, &g);
+		mm_hits_cmp(db2, mm_edges_db, hits2, &g);
+
+		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+		if (hits1->n > 0) {
+			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
+				if (kh_exist(hits1->edges, k1)) {
+					if (kh_val(hits1->edges, k1) > max) {
+						max = kh_val(hits1->edges, k1);
+						er1 = kh_key(hits1->edges, k1);
+					}
+				}
+			}
+		}
+		log_info("read: %s, hits ratio %d/%d", r1.name, max, hits1->n);
+
+		if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
+			er1 = UINT64_MAX;
+		max = 0;
+		if (hits2->n > 0) {
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (kh_exist(hits2->edges, k2))
+					if (kh_val(hits2->edges, k2) > max) {
+						max = kh_val(hits2->edges, k2);
+						er2 = kh_key(hits2->edges, k2);
+					}
+			}
+		}
+		log_info("read: %s, hits ratio %d/%d", r2.name, max, hits2->n);
+		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
+			er2 = UINT64_MAX;
+
+		if (er1 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er1, 1);
+		if (er2 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g.edges[er1].rc_id != er2) {
+			log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			printf("%lu %lu\n", er1, er2);
+		}
+		mm_hits_destroy(hits1);
+		mm_hits_destroy(hits2);
+		mm_db_destroy(db1);
+		mm_db_destroy(db2);
+	}
+
+	free(buf1);
+	free(buf2);
+}
+
+struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit_bundle)
+{
+	struct read_path_t *read_sorted_path = bc_hit_bundle->read_sorted_path;
+	khash_t(bcpos) *bx_pos_dict = bc_hit_bundle->bc_pos_dict;
+	struct asm_graph_t *g = bc_hit_bundle->g;
+	struct mm_db_edge_t *mm_edges_db = bc_hit_bundle->mm_edges;
+
+	uint64_t bx_encoded = barcode_hash_mini(bc);
+	uint64_t bx[1] = {bx_encoded}; //43 15 mock barcode pseudo hash id here
+
+	khint_t k_bx = kh_get(bcpos, bx_pos_dict, bx_encoded);          // query the hash table
+	if (k_bx == kh_end(bx_pos_dict)) {
+		log_error("Barcode does not exists!");
+	}
+
+	char *buf1, *buf2;
+	uint64_t m_buf1, m_buf2;
+	stream_filter_read(read_sorted_path, bx_pos_dict, bx, 1, &buf1, &buf2,
+			&m_buf1, &m_buf2);
 
 	struct read_t r1, r2;
 	int pos1 = 0, pos2 = 0;
 	int n_reads = 0;
 	struct mm_db_t *db1, *db2;
-	struct mm_hits_t *hits;
-	hits = mm_hits_init();
+	struct mm_hits_t *hits1, *hits2, *hits;
 
-	struct asm_graph_t g;
-	load_asm_graph(&g, opt->in_file);
-	struct mm_db_edge_t *mm_edges = mm_index_edges(&g, 17, 17);
+	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
+	khiter_t ki, k;
+	hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
-		db1 = mm_index_char_str(r1.seq, 17, 17, r1.len);
-		db2 = mm_index_char_str(r2.seq, 17, 17, r2.len);
+		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
+		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
+		khiter_t k1, k2;
 
-		mm_hits_cmp(db1, mm_edges, hits);
-		mm_hits_cmp(db2, mm_edges, hits);
+		hits1 = mm_hits_init();
+		hits2 = mm_hits_init();
+
+		mm_hits_cmp(db1, mm_edges_db, hits1, g);
+		mm_hits_cmp(db2, mm_edges_db, hits2, g);
+
+		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+		if (hits1->n > 0) {
+			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
+				if (kh_exist(hits1->edges, k1)) {
+					if (kh_val(hits1->edges, k1) > max) {
+						max = kh_val(hits1->edges, k1);
+						er1 = kh_key(hits1->edges, k1);
+					}
+				}
+			}
+		}
+
+		if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
+			er1 = UINT64_MAX;
+		max = 0;
+		if (hits2->n > 0) {
+			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
+				if (kh_exist(hits2->edges, k2))
+					if (kh_val(hits2->edges, k2) > max) {
+						max = kh_val(hits2->edges, k2);
+						er2 = kh_key(hits2->edges, k2);
+					}
+			}
+		}
+		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
+			er2 = UINT64_MAX;
+
+		if (er1 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er1, 1);
+		if (er2 != UINT64_MAX)
+			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
+			//log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			printf("%llu %llu\n", er1, er2);
+		}
+		mm_hits_destroy(hits1);
+		mm_hits_destroy(hits2);
+		mm_db_destroy(db1);
+		mm_db_destroy(db2);
 	}
-	log_info("Number of read-pairs in barcode %s: %d", opt->bx_str, n_reads);
-	log_info("Number of singleton hits: %d", kh_size(hits->edges));
-	mm_hits_print(hits, "barcode_hits.csv");
-
-	free(buf1);
-	free(buf2);
+	return hits;
 }
+
+void get_bc_hit_bundle(struct opt_proc_t *opt, struct bc_hit_bundle_t *bc_hit_bundle)
+{
+	struct read_path_t *read_sorted_path = calloc(1, sizeof(struct read_path_t));
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path->R1_path = opt->files_1[0];
+		read_sorted_path->R2_path = opt->files_2[0];
+		read_sorted_path->idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, read_sorted_path);
+	}
+	khash_t(bcpos) *bc_pos_dict = kh_init(bcpos);
+	smart_construct_read_index(read_sorted_path, bc_pos_dict); //load the barcode indices
+
+	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	assert(opt->in_file != NULL);
+	load_asm_graph(g, opt->in_file);
+	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
+			MINIMIZERS_WINDOW);
+
+	bc_hit_bundle->g = g;
+	bc_hit_bundle->read_sorted_path = read_sorted_path;
+	bc_hit_bundle->bc_pos_dict = bc_pos_dict;
+	bc_hit_bundle->mm_edges = mm_edges;
+}
+
+void bc_hit_bundle_destroy(struct bc_hit_bundle_t *bc_hit_bundle)
+{
+	asm_graph_destroy(bc_hit_bundle->g);
+	free(bc_hit_bundle->g);
+	free(bc_hit_bundle->read_sorted_path);
+	kh_destroy(bcpos, bc_hit_bundle->bc_pos_dict);
+	//TODO: destroy everything
+}
+

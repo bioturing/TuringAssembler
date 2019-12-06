@@ -17,6 +17,9 @@
 #define KMCP			"KMCP"
 #define KMCS			"KMCS"
 
+#define MINIMIZERS_WINDOW       17
+#define MINIMIZERS_KMER       17
+
 #define LIB_TYPE_SORTED		0
 #define LIB_TYPE_BIOT		1
 #define LIB_TYPE_UST		2
@@ -52,7 +55,7 @@ struct opt_proc_t {
 	int split_len;
 	int lib_type;
 	int n_files;
-	char **files_1, **files_2, **files_I;
+	char **files_1, **files_2, **files_I, **var;
 	int metagenomics;
 	char *out_dir;
 	char *in_file;
@@ -64,6 +67,7 @@ struct opt_proc_t {
 	int lk;
 	int log_level;
 	char *bx_str;
+	int thresh;
 };
 
 struct read_path_t {

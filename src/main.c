@@ -214,6 +214,9 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-f")) {
 			opt->in_fasta = argv[pos + 1];
 			pos += 2;
+		} else if (!strcmp(argv[pos], "-th")) {
+			opt->thresh = atoi(argv[pos + 1]);
+			pos += 2;
                 } else if (!strcmp(argv[pos], "-fg")) {
                         opt->in_fastg = argv[pos + 1];
                         pos += 2;
@@ -237,6 +240,10 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 				__ERROR("Inconsistent number of files");
 			opt->n_files = n;
 			opt->files_1 = argv + pos + 1;
+			pos += (n + 1);
+		}else if (!strcmp(argv[pos], "-var")) {
+			n = opt_count_list(argc - pos, argv + pos);
+			opt->var = argv + pos + 1;
 			pos += (n + 1);
 		} else if (!strcmp(argv[pos], "-2")) {
 			n = opt_count_list(argc - pos, argv + pos);
@@ -454,24 +461,32 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_bulges_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+	else if (!strcmp(argv[1], "debug_split_molecules"))
+		build_opt_process(argc, argv, &split_molecules_wrapper);
 	else if (!strcmp(argv[1], "reduce_reads"))
 		reduce_read_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "resolve_local"))
 		resolve_local_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_scaffolding_1_2"))
 		build_opt_process(argc, argv, &build_scaffolding_1_2_process); 
-	else if (!strcmp(argv[1], "build_scaffolding_test"))
-		build_opt_process(argc, argv, &build_scaffolding_test_process);
-	else if(!strcmp(argv[1], "resolve_1_2"))
-		build_opt_process(argc, argv, &resolve_1_2_process);
+	else if (!strcmp(argv[1], "dirty"))
+		build_opt_process(argc, argv, &dirty_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+//	else if (!strcmp(argv[1], "debug_cluster_molecules"))
+//		build_opt_process(argc, argv, &cluster_molecules_process);
+	else if (!strcmp(argv[1], "debug_get_barcode_graph"))
+		build_opt_process(argc, argv, &print_barcode_graph_process);
+//	else if (!strcmp(argv[1], "debug_current"))
+//		build_opt_process(argc, argv, &debug_process);
 	else if (!strcmp(argv[1], "mm_index"))
 		build_opt_process(argc, argv, &index_mm_process);
 	else if (!strcmp(argv[1], "barcode_hit"))
 		build_opt_process(argc, argv, &hits_barcode_process);
 	else if (!strcmp(argv[1], "count_bx"))
 		build_opt_process(argc, argv, &count_bx_process);
+	else if (!strcmp(argv[1], "minimizers_hit"))
+		build_opt_process(argc, argv, &mm_hit_all_barcodes);
 	else
 		print_usage();
 	return 0;

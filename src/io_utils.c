@@ -14,7 +14,7 @@ FILE *xfopen(const char *file_path, const char *mode) {
 		if (strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0)
 			__ERROR("Unable to open file [%s] to read", file_path);
 		else if (strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0)
-			__ERROR("Unable to open file [%s] to read", file_path);
+			__ERROR("Unable to open file [%s] to write", file_path);
 		else
 			__ERROR("Unable to open file [%s]"
 				"with unknown mode [%s]", file_path, mode);

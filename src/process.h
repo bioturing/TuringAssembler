@@ -1,5 +1,10 @@
 #ifndef __PROCESS_H__
 #define __PROCESS_H__
+#include "minimizers/minimizers.h"
+#include "khash.h"
+#include "assembly_graph.h"
+#include "sort_read.h"
+#include "attribute.h"
 
 void graph_convert_process(struct opt_proc_t *opt);
 void clean_process(struct opt_proc_t *opt);
@@ -13,7 +18,7 @@ void build_3_4_process(struct opt_proc_t *opt);
 void build_3_4_no_bc_rebuild_process(struct opt_proc_t *opt);
 void build_4_5_process(struct opt_proc_t *opt);
 void build_scaffolding_1_2_process(struct opt_proc_t *opt);
-void build_scaffolding_test_process(struct opt_proc_t *opt);
+void dirty_process(struct opt_proc_t *opt);
 void build_barcode_process(struct opt_proc_t *opt);
 void build_barcode_info(struct opt_proc_t *opt);
 void build_barcode_scaffold(struct opt_proc_t *opt);
@@ -29,10 +34,14 @@ void resolve_local_process(struct opt_proc_t *opt);
 void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix);
 void reduce_read_process(struct opt_proc_t *opt);
 void resolve_bulges_process(struct opt_proc_t *opt);
-void resolve_1_2_process(struct opt_proc_t *opt);
 void resolve_complex_bulges_process(struct opt_proc_t *opt);
 void index_mm_process(struct opt_proc_t *opt);
 void hits_barcode_process(struct opt_proc_t *opt);
 void count_bx_process(struct opt_proc_t *opt);
-
+void split_molecules_wrapper(struct opt_proc_t *opt);
+void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct mm_db_edge_t *mm_edges, khash_t(bcpos) *bx_pos_dict);
+void print_barcode_graph_process(struct opt_proc_t *opt);
+void cluster_molecules_process(struct opt_proc_t *opt);
+void debug_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

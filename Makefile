@@ -50,6 +50,10 @@ SRC = src/assembly_graph.c 				\
       src/helper.c 					\
       src/fastg.c 					\
       src/complex_resolve.c 				\
+      src/split_molecules.c 				\
+      src/cluster_molecules.c 				\
+      src/simple_queue.c 				\
+      src/khash_operations.c 				\
       src/scaffolding/bin_hash.c 						\
       src/scaffolding/algorithm.c 						\
       src/scaffolding/compare.c 						\
@@ -61,13 +65,15 @@ SRC = src/assembly_graph.c 				\
       src/scaffolding/score.c 						\
       src/scaffolding/scaffolding.c 						\
       src/scaffolding/scaffold.c 						\
+	  src/scaffolding/yeast_analyze_utils.c\
+	  src/barcode_graph.c\
       src/read_list.c 								\
       src/kmer_hash.c 								\
       src/fastq_reducer.c 						\
       src/main.c \
       src/log.c 					\
-	  src/build_hash_table.c\
-	  src/resolve_big.c \
+      src/build_hash_table.c\
+      src/resolve_big.c \
       src/unit_test.c \
       src/minimizers/minimizers.c \
       src/minimizers/smart_load.c \
