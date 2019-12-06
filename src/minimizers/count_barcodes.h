@@ -9,7 +9,7 @@
 #include "../cluster_molecules.h"
 
 #define EMPTY_SLOT UINT64_MAX
-#define __mini_empty(table, i) (!(table->key[i] ^ EMPTY_SLOT))
+#define __mini_empty(table, i) (!(~table->key[i]))
 
 struct mini_hash_t {
     uint64_t *h;

@@ -215,7 +215,7 @@ inline void try_expanding(struct mini_hash_t **h_table)
  */
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
-	uint32_t i;
+	uint64_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
@@ -249,7 +249,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
  */
 uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
-	uint32_t i;
+	uint64_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, EMPTY_SLOT);
@@ -349,7 +349,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, 16);
+	init_mini_hash(&h_table, 12);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
