@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include "../cluster_molecules.h"
 
-#define EMPTY_SLOT UINT64_MAX
-#define __mini_empty(table, i) (!(~table->key[i]))
+#define EMPTY_SLOT 0xffffffffffffffff
+#define __mini_empty(table, i) (table->key[i] == 0xffffffffffffffff)
 
 struct mini_hash_t {
     uint64_t *h;
