@@ -678,7 +678,7 @@ void print_all_hits(struct mini_hash_t *hits_table)
 	char bx[18 + 1];
 	char nt5[5] = "ACGTN";
 	for (i = 0; i < hits_table->size; ++i) {
-		if (hits_table->h[i] != EMPTY_BX && hits_table->key[i] != 0) {
+		if (!__mini_empty(hits_table, i) && hits_table->h[i] != EMPTY_BX) {
 			uint64_t ret = hits_table->key[i];
 			struct mini_hash_t *hits = (struct mini_hash_t *)(hits_table->h[i]);
 			k = 18;
@@ -840,7 +840,7 @@ void print_read_pairs(struct mini_hash_t *h_table)
 	uint64_t i;
 	FILE *fp = fopen("bc_hits_read_pairs.txt", "w");
 	for (i = 0; i < h_table->size; ++i) {
-		if (h_table->h[i] == 0)
+		if (__mini_empty(h_table, i))
 			continue;
 		uint64_t u = h_table->key[i] >> 32;
 		uint64_t v = h_table->key[i] & 0x00000000ffffffff;
@@ -866,7 +866,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 	struct mini_hash_t *bx_table, *rp_table;
 	bx_table = count_bx_freq(opt); //count barcode freq
 	for (i = 0; i < bx_table->size; ++i) {
-		if (bx_table->key[i] != 0 && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
+		if (!__mini_empty(bx_table, i) && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
 			struct mini_hash_t *h;
 			int p = __leftmost(bx_table->h[i]);
 			init_mini_hash(&h, p > 4 ? p - 4:0);
@@ -924,7 +924,6 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 		pthread_join(worker_threads[i], NULL);
 
 	print_read_pairs(rp_table);
-	//TODO: free the farm of hash tables
 	free_fastq_pair(producer_bundles, opt->n_files);
 
 	//Compile the return bundle

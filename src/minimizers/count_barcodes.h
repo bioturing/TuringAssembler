@@ -8,6 +8,10 @@
 #include <stdint.h>
 #include "../cluster_molecules.h"
 
+#define EMPTY_SLOT 0xffffffffffffffff
+#define __mini_empty(table, i) (table->key[i] == EMPTY_SLOT)
+#define INIT_PRIME_INDEX 16
+
 struct mini_hash_t {
     uint64_t *h;
     uint64_t *key;
