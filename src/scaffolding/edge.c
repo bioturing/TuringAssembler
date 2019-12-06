@@ -11,27 +11,27 @@
 #include "scaffolding/score.h"
 #include "utils.h"
 
-struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1,
- 			float avg_bin_hash, struct opt_proc_t *opt)
-{
-	int rev_i0 = g->edges[i0].rc_id;
-	assert(rev_i0 < g->n_e);
-	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
-	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
-	log_trace("len e0, e1: %d %d " , e0_len, e1_len);
-
-	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
-	float cov_e1 = __get_edge_cov(e1, g->ksize);
-
-	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
-	score->bc_score = get_share_barcode(&rev_e0->barcodes_scaf, &e1->barcodes_scaf, cov_rev_e0, cov_e1, avg_bin_hash);
-	//todo @huu not hardcode
-//	if (score->bc_score < 0.3){
-//		return score;
-//	}
-	score->m_score = get_share_mate(g, i0, i1);
-	return score;
-}
+//struct pair_contigs_score *get_score_l_l_mat(struct asm_graph_t *g, int i0, int i1,
+// 			float avg_bin_hash, struct opt_proc_t *opt)
+//{
+//	int rev_i0 = g->edges[i0].rc_id;
+//	assert(rev_i0 < g->n_e);
+//	struct asm_edge_t *rev_e0 = &g->edges[rev_i0], *e1 = &g->edges[i1];
+//	int e1_len = get_edge_len(e1), e0_len = get_edge_len(rev_e0);
+//	log_trace("len e0, e1: %d %d " , e0_len, e1_len);
+//
+//	float cov_rev_e0 = __get_edge_cov(rev_e0, g->ksize);
+//	float cov_e1 = __get_edge_cov(e1, g->ksize);
+//
+//	struct pair_contigs_score *score = calloc(1, sizeof(struct pair_contigs_score));
+//	score->bc_score = get_share_barcode(&rev_e0->barcodes_scaf, &e1->barcodes_scaf, cov_rev_e0, cov_e1, avg_bin_hash);
+//	//todo @huu not hardcode
+////	if (score->bc_score < 0.3){
+////		return score;
+////	}
+//	score->m_score = get_share_mate(g, i0, i1);
+//	return score;
+//}
 
 int get_score_big_small(int i0, int i1, struct asm_graph_t *g, float avg_bin_hash) 
 {
@@ -51,20 +51,20 @@ int check_replicate_scaffold_edge(struct asm_graph_t *g, int i0, int i1,
 //	return res;
 }
 
-struct pair_contigs_score *get_score_edges_res(int i0, int i1, struct asm_graph_t *g, 
-		float avg_bin_hash, struct opt_proc_t *opt) 
-{
-	struct pair_contigs_score *pair_score = calloc(1, sizeof(struct pair_contigs_score));
-	pair_score->bc_score = -1;
-
-	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
-	if (is_very_short_contig(e0) || is_very_short_contig(e1))
-		return pair_score;
-	//todo @huu get_score_l_s
-	//todo @huu get_score_s_l
-
-	return get_score_l_l_mat(g, i0, i1, avg_bin_hash, opt);
-}
+//struct pair_contigs_score *get_score_edges_res(int i0, int i1, struct asm_graph_t *g,
+//		float avg_bin_hash, struct opt_proc_t *opt)
+//{
+//	struct pair_contigs_score *pair_score = calloc(1, sizeof(struct pair_contigs_score));
+//	pair_score->bc_score = -1;
+//
+//	struct asm_edge_t *e0 = &g->edges[i0], *e1 = &g->edges[i1];
+//	if (is_very_short_contig(e0) || is_very_short_contig(e1))
+//		return pair_score;
+//	//todo @huu get_score_l_s
+//	//todo @huu get_score_s_l
+//
+//	return get_score_l_l_mat(g, i0, i1, avg_bin_hash, opt);
+//}
 
 void unique_edge(struct scaffold_edge *listE, int *n_e)
 {
