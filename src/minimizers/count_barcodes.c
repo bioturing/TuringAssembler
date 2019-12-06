@@ -49,9 +49,6 @@ static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
 #define MAX_LOAD_FACTOR 0.8
 #define FATAL_LOAD_FACTOR 0.9
 
-#define MINIHASH_END (uint64_t *)UINT64_MAX
-#define KEY_LEN 8
-
 pthread_mutex_t h_table_mut;
 
 struct h_bundle_t {
@@ -77,6 +74,7 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 	uint32_t h_size = primes[table->prime_index];
 	table->h = calloc(h_size, sizeof(uint64_t));
 	table->key = calloc(h_size, sizeof(uint64_t));
+	memset(table->key, 255, sizeof(uint64_t) * h_size);
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
 	table->count = 0;
@@ -180,7 +178,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 			log_info("Copied %d elements", log_size);
 			log_size <<= 1;
 		}
-		if (h_table->key[i] == 0)
+		if (__mini_empty(h_table, i))
 			continue;
 		val = h_table->h[i];
 		data = h_table->key[i];
@@ -217,24 +215,22 @@ inline void try_expanding(struct mini_hash_t **h_table)
  */
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
-	if (h_table->count > h_table->max_cnt) // Return for counting big kmer
-		return MINIHASH_END;
 	uint32_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
-	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, data);
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
 	if (is_empty) { // slot is empty -> fill in
 		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
 		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
 			if (is_empty)
 				break;
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				is_empty = atomic_bool_CAS64(h_table->key + i, 0, data);
+				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
 				if (is_empty)
 					break;
 			}
@@ -256,26 +252,26 @@ uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint32_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
-	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, 0, 0);
+	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, EMPTY_SLOT);
 	if (is_empty) { // slot is empty -> fill in
 		return (uint64_t *)EMPTY_BX;
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
 		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
 			if (is_empty)
 				break;
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				is_empty = atomic_bool_CAS64(h_table->key + i, 0, 0);
+				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
 				if (is_empty)
 					break;
 			}
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
-			return (uint64_t *)EMPTY_BX;
+			return (uint64_t *)EMPTY_SLOT;
 		slot = i;
 	}
 	return h_table->h + slot;
@@ -331,7 +327,7 @@ void mini_print(struct mini_hash_t *h_table, size_t bx_size, char *out_dir)
 		if (h_table->h[i] != 0) {
 			j = bx_size;
 			uint64_t ret = h_table->key[i];
-			assert(ret != 0);
+			assert(ret != EMPTY_SLOT);
 			while (j) {
 				c = ret % 5;
 				bx[--j] = nt5[c];
@@ -463,7 +459,7 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 	for (int i = 0; i < bc->size; ++i){
 		if (bc->h[i] == EMPTY_BX)
 			continue;
-		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i];
+		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i]; // ptr to mini_hash_t instead of count
 		int *edges = calloc(wrapper->size, sizeof(int));
 		int n_e = 0;
 		for (int j = 0; j < wrapper->size; ++j){
