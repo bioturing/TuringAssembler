@@ -649,7 +649,7 @@ void create_barcode_molecules(int *edges, int n_e, struct asm_graph_t *g)
 		g_new->n_e++;
 	}
 
-	write_stupid_fasta(g_new, "graph_hihi.fasta");
+	write_stupid_fasta(g_new, "contigs.fasta");
 
 	free(edges);
 
