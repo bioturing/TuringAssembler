@@ -912,7 +912,9 @@ void filter_xxx(struct asm_graph_t *g)
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-	init_logger(opt->log_level, "get_long_contig.log");
+	char log_path[1024];
+	sprintf(log_path, "%s/get_long_contig.log", opt->out_dir);
+	init_logger(opt->log_level, log_path);
 	set_log_stage("Get long contig");
 	get_list_contig(opt, g);
 }
