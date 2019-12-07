@@ -497,13 +497,6 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 	kh_destroy(long_int, res);
 	res = tmp;
 
-	FILE *fp = fopen("bc_hits_edge_pairs.txt", "w");
-	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
-		if (kh_exist(res, k)) {
-			fprintf(fp, "%lu %lu %d\n", kh_key(res, k) >> 32, kh_key(res, k) & 0x00000000ffffffff, kh_value(res, k));
-		}
-	}
-	fclose(fp);
 	return res;
 }
 

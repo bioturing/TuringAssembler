@@ -9,7 +9,7 @@
 
 #define MIN_SHARE_BARCODE_COUNT 100
 #define MIN_EDGE_LEN 500
-#define MIN_READ_PAIR_COUNT 10
+#define MIN_READ_PAIR_COUNT 1
 #define VERY_SHORT_EDGE_LEN 250
 #define LONG_PATH 10
 #define SHORT_PATH 2
@@ -418,12 +418,27 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	destroy_barcode_graph(bg);
 }
 
+void print_bx_count(khash_t(long_int) *res, struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/bc_hits_edge_pairs.txt", opt->out_dir);
+	FILE *fp = fopen(path, "w");
+	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
+		if (kh_exist(res, k)) {
+			fprintf(fp, "%lu %lu %d\n", kh_key(res, k) >> 32, kh_key(res, k) & 0x00000000ffffffff, kh_value(res, k));
+		}
+	}
+	fclose(fp);
+}
+
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	struct mm_bundle_t *t = mm_hit_all_barcodes(opt);
 	struct mini_hash_t *bx_table = t->bx_table;
 	struct mini_hash_t *rp_table = t->rp_table;
 	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
+
+	print_bx_count(all_count, opt);
 
 	int n_edges = 0;
 	int *list_edges = NULL;
