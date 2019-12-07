@@ -13,6 +13,9 @@
 #define VERY_SHORT_EDGE_LEN 250
 #define LONG_PATH 10
 #define SHORT_PATH 2
+#define MIN_PAIR_SUPPORT_PAIR_END 1
+#define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
+
 
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;
@@ -179,31 +182,44 @@ check_read_pair(struct asm_graph_t *g, struct mini_hash_t *rp_table, struct shor
 {
 	int thres_share_read_pair;
 	if (r->n_e >= LONG_PATH)
-		thres_share_read_pair = 2;
-	else if (r->n_e == SHORT_PATH)
-		thres_share_read_pair = 0;
+		thres_share_read_pair = MIN_PAIR_SUPPORT_PAIR_END;
 	else
-		thres_share_read_pair = 1;
+		thres_share_read_pair = MIN_PAIR_SUPPORT_PAIR_END_SOFT;
 
 	int count_share_read_pair = 0;
+	log_debug("Check from first edge: %d", r->path[0]);
 	for (int i = 1; i < r->n_e; i++) {
 		uint64_t t = get_share_read_pair(rp_table, r->path[0], g->edges[r->path[i]].rc_id);
-		if (g->edges[r->path[i]].seq_len < VERY_SHORT_EDGE_LEN || g->edges[r->path[0]].seq_len < VERY_SHORT_EDGE_LEN)
+		if (g->edges[r->path[i]].seq_len < VERY_SHORT_EDGE_LEN || g->edges[r->path[0]].seq_len < VERY_SHORT_EDGE_LEN) {
+			log_debug("%d fail, length is short %d, thres: %d", r->path[i], g->edges[r->path[i]].seq_len, VERY_SHORT_EDGE_LEN);
 			continue;
-		if (t > MIN_READ_PAIR_COUNT)
+		}
+		if (t > MIN_READ_PAIR_COUNT) {
 			count_share_read_pair++;
+			log_debug("%d pass, n read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
+		} else
+			log_debug("%d fail, not enough read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
 	}
+	log_debug("Check to final edge: %d", r->path[r->n_e - 1]);
 	for (int i = 0; i < r->n_e - 1; i++) {
 		uint64_t t = get_share_read_pair(rp_table, r->path[i],
 						 g->edges[r->path[r->n_e - 1]].rc_id);
 		if (g->edges[r->path[i]].seq_len < VERY_SHORT_EDGE_LEN ||
-		    g->edges[r->path[r->n_e - 1]].seq_len < VERY_SHORT_EDGE_LEN)
+		    g->edges[r->path[r->n_e - 1]].seq_len < VERY_SHORT_EDGE_LEN) {
+			log_debug("%d fail, length is short %d, thres: %d", r->path[i], g->edges[r->path[i]].seq_len, VERY_SHORT_EDGE_LEN);
 			continue;
-		if (t > MIN_READ_PAIR_COUNT)
+		}
+		if (t > MIN_READ_PAIR_COUNT) {
 			count_share_read_pair++;
+			log_debug("%d pass, n read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
+		} else
+			log_debug("%d fail, not enough read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
 	}
-	if (count_share_read_pair > thres_share_read_pair)
+	if (count_share_read_pair > thres_share_read_pair) {
+		log_debug("%d-%d passed: %d pairs of edges support. thres: %d", r->path[0],r->path[r->n_e - 1], count_share_read_pair, thres_share_read_pair);
 		return 1;
+	}
+	log_debug("%d-%d fail: %d pairs of edges support. thres: %d", r->path[0],r->path[r->n_e- 1], count_share_read_pair, thres_share_read_pair);
 	return 0;
 }
 
