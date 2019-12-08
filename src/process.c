@@ -22,6 +22,7 @@
 #include "minimizers/smart_load.h"
 #include "minimizers/count_barcodes.h"
 #include "minimizers/get_buffer.h"
+#include "coverage/kmer_count.h"
 #include "cluster_molecules.h"
 #include "split_molecules.h"
 
@@ -762,4 +763,15 @@ void build_barcode_process_fastg(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g1, "level_4");
 	asm_graph_destroy(&g);
 	asm_graph_destroy(&g1);
+}
+
+void build_coverage_process(struct opt_proc_t *opt)
+{
+	char *log_file = str_concate(opt->out_dir, "/index_kmer_edges.log");
+	init_logger(opt->log_level, log_file);
+	set_log_stage("Calculate coverage");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	struct mini_hash_t *table = construct_edges_hash(&g);
+	asm_graph_destroy(&g);
 }
