@@ -771,4 +771,9 @@ void build_coverage_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, log_file);
 	set_log_stage("Calculate coverage");
 	struct mini_hash_t *table = kmer_count_on_edges(opt);
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	add_cnt_to_graph(&g, table);
+	save_graph_info(opt->out_dir, &g, "coverage_built");
+	asm_graph_destroy(&g);
 }
