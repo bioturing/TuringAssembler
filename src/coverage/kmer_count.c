@@ -12,6 +12,7 @@
 #include "../log.h"
 
 #define KMER_SIZE_COVERAGE 31
+#define MAX_KMER_COUNT 999
 
 struct cov_bundle_t {
     struct dqueue_t *q;
@@ -105,8 +106,8 @@ void add_cnt_to_graph(struct asm_graph_t *g, struct mini_hash_t *kmer_table)
 			c = (uint64_t)__binseq_get(g->edges[i].seq, j + KMER_SIZE_COVERAGE - 1);
 			km |= ((uint64_t) c << (pad + 2));
 			slot = mini_get(kmer_table, km);
-			if (slot != (uint64_t *)EMPTY_SLOT)
-				g->edges[i].count += (*slot); // TODO:why?
+			if (slot != (uint64_t *)EMPTY_SLOT) // TODO:why?
+				g->edges[i].count += __min(*slot, MAX_KMER_COUNT); 
 			km <<= 2;
 		}
 	}
