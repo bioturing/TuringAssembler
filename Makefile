@@ -77,7 +77,8 @@ SRC = src/assembly_graph.c 				\
       src/unit_test.c \
       src/minimizers/minimizers.c \
       src/minimizers/smart_load.c \
-      src/minimizers/count_barcodes.c
+      src/minimizers/count_barcodes.c \
+      src/coverage/kmer_count.c
 
 OBJ = $(SRC:.c=.o)
 

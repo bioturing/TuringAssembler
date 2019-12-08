@@ -487,6 +487,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &count_bx_process);
 	else if (!strcmp(argv[1], "minimizers_hit"))
 		build_opt_process(argc, argv, &mm_hit_all_barcodes);
+	else if (!strcmp(argv[1], "build_coverage"))
+		build_opt_process(argc, argv, &build_coverage_process);
 	else
 		print_usage();
 	return 0;
