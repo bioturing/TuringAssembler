@@ -41,10 +41,9 @@ int index_bin_edge(struct mini_hash_t **table, struct asm_edge_t e)
 	uint64_t *slot;
 	int pad = (32 - KMER_SIZE_COVERAGE - 1)*2;
 	uint64_t km = get_km_i_bin(e.seq, 0, KMER_SIZE_COVERAGE);
-	for (i = KMER_SIZE_COVERAGE + 1; i < e.seq_len - KMER_SIZE_COVERAGE + 1; ++i) {
-		c = (uint64_t)__binseq_get(e.seq, i);
-		km |= ((uint64_t) 3 << (pad + 2));
-		km &= ((uint64_t) c << (pad + 2));
+	for (i = 0 ; i < e.seq_len - KMER_SIZE_COVERAGE + 1; ++i) {
+		c = (uint64_t)__binseq_get(e.seq, i + KMER_SIZE_COVERAGE - 1);
+		km |= ((uint64_t) c << (pad + 2));
 		slot = mini_put(table, km);
 		if (*slot == 0)
 			cnt++;
