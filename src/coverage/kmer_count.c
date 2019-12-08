@@ -94,18 +94,19 @@ int get_and_add_kmer(struct mini_hash_t *table, struct read_t read)
 
 void add_cnt_to_graph(struct asm_graph_t *g, struct mini_hash_t *kmer_table)
 {
-	int i;
+	int i, j;
 	uint64_t *slot;
 	uint64_t km, c;
 	int pad = (32 - KMER_SIZE_COVERAGE - 1)*2;
 	for (i = 0; i < g->n_e; ++i) {
 		g->edges[i].count = 0;
 		km = get_km_i_bin(g->edges[i].seq, 0, KMER_SIZE_COVERAGE);
-		for (i = 0 ; i < g->edges[i].seq_len - KMER_SIZE_COVERAGE + 1; ++i) {
-			c = (uint64_t)__binseq_get(g->edges[i].seq, i + KMER_SIZE_COVERAGE - 1);
+		for (j = 0 ; j < g->edges[i].seq_len - KMER_SIZE_COVERAGE + 1; ++j) {
+			c = (uint64_t)__binseq_get(g->edges[i].seq, j + KMER_SIZE_COVERAGE - 1);
 			km |= ((uint64_t) c << (pad + 2));
 			slot = mini_get(kmer_table, km);
-			g->edges[i].count += (*slot);
+			if (slot != (uint64_t *)EMPTY_SLOT)
+				g->edges[i].count += (*slot); // TODO:why?
 			km <<= 2;
 		}
 	}
