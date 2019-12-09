@@ -582,11 +582,12 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 //	free(path);
 //}
 
-#define MIN_COVERAGE_TO_BE_IGNORE 0.5
+#define MIN_COVERAGE_TO_BE_IGNORE 0.25
+#define COVERAGE_RATIO_TO_BE_REPEAT 1.75
 
 void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		khash_t(long_spath) *stored, int *contig_path, int n_contig_path,
-		double avg_cov)
+		double avg_cov, struct mini_hash_t **visited)
 {
 	char *seq;
 	decode_seq(&seq, g->edges[contig_path[0]].seq, g->edges[contig_path[0]].seq_len);
@@ -597,6 +598,7 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 	uint32_t *p_holes = NULL;
 	uint32_t *l_holes = NULL;
 	int total_count = 0;
+	uint64_t *slot;
 
 
 	for(int i = 1; i < n_contig_path; i++) {
@@ -635,7 +637,7 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		int i_e = contig_path[i];
 		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
 		assert(cov >= 0);
-		if (cov > 1.5 * avg_cov)
+		if (cov > COVERAGE_RATIO_TO_BE_REPEAT * avg_cov)
 			continue;
 		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
 		sum_len += (g->edges[i_e].seq_len-ksize);
@@ -646,8 +648,11 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		local_cov = avg_cov;
 	} else
 		local_cov = sum_cov/sum_len;
-	char path[4096];
-	char ctg[128];
+	/*
+	 * Print the path
+	 */
+	char path[8192];
+	char ctg[16];
 	path[0] = '\0';
 	for (int i = 0; i < n_contig_path; ++i) {
 		sprintf(ctg, "%d ", contig_path[i]);
@@ -657,16 +662,21 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 
 	if (local_cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov) {
 		log_debug("Ignore path because seem to be already consider");
+		log_debug("local_cov: %.2f, ratio: %2.f, avg_cov: %.2f",local_cov, MIN_COVERAGE_TO_BE_IGNORE, avg_cov);
 		return;
 	}
 
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e  = contig_path[i];
 		int i_e_rc = g->edges[i_e].rc_id;
+		slot = mini_put(visited, (uint64_t) i_e);
+		(*slot)++;
+		slot = mini_put(visited, (uint64_t) i_e_rc);
+		(*slot)++;
 		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
-		log_debug("Decrease count of %d: from %d to %d", i_e, g->edges[i_e].count, g->edges[i_e].count - tmp);
+		log_debug("Visited and decrease count of %d: from %d to %d", i_e, g->edges[i_e].count, g->edges[i_e].count - tmp);
 		g->edges[i_e].count -= tmp;
-		log_debug("Decrease count of %d: from %d to %d", i_e, g->edges[i_e_rc].count, g->edges[i_e_rc].count - tmp);
+		log_debug("Visited and decrease count of %d: from %d to %d", i_e_rc, g->edges[i_e_rc].count, g->edges[i_e_rc].count - tmp);
 		g->edges[i_e_rc].count -= tmp;
 	}
 
@@ -695,24 +705,35 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	struct paths_bundle_t *paths_bundle = calloc(1, sizeof(struct paths_bundle_t));
 	get_all_longest_paths(edges, n_e, g, paths_bundle);
 	double global_cov = get_genome_coverage_h(g);
+	log_info("Global genome coverage %.2f", global_cov);
+	struct mini_hash_t *visited;
+	init_mini_hash(&visited, 16);
 	khash_t(long_spath) *stored = kh_init(long_spath);
 	for (int i = 0; i < paths_bundle->n_paths; ++i){
 		add_path_to_edges(g, g_new, stored, paths_bundle->paths[i].edges,
-				paths_bundle->paths[i].n_e, global_cov);
+				paths_bundle->paths[i].n_e, global_cov, &visited);
 	}
+
 
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
-		if (__get_edge_cov(&g->edges[i], g->ksize) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov) {
+		uint64_t *slot1 = mini_get(visited, (uint64_t)e);
+		uint64_t *slot2 = mini_get(visited, (uint64_t)e_rc);
+
+		assert((*slot1) != 0xf);
+		assert((*slot2) != 0xf);
+
+		int been_touch = (*slot1) * (*slot2);
+		if (__get_edge_cov(&g->edges[i], g->ksize) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov && been_touch != 0) {
 			log_debug("Ignore edge %d, coverage %.2f, ration threshold %.2f, coverage threshold %.2f", i, __get_edge_cov(&g->edges[i], g->ksize), MIN_COVERAGE_TO_BE_IGNORE, global_cov);
 			continue;
 		}
 		assert(g->edges[i].count > 0);
-//		if (mark[e])
-//			continue;
-		if (e > e_rc)
+		if (e > e_rc) {
+			log_warn("E: %d > E_RC: %d",e, e_rc);
 			continue;
+		}
 		g_new->edges = realloc(g_new->edges, (g_new->n_e+2) * sizeof(struct asm_edge_t));
 		g_new->edges[g_new->n_e].seq = g->edges[i].seq;
 		g_new->edges[g_new->n_e].seq_len = g->edges[i].seq_len;
