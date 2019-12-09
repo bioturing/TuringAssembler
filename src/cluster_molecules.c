@@ -666,12 +666,34 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 //			continue;
 		if (e > e_rc)
 			continue;
-		g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
+		g_new->edges = realloc(g_new->edges, (g_new->n_e+2) * sizeof(struct asm_edge_t));
 		g_new->edges[g_new->n_e].seq = g->edges[i].seq;
 		g_new->edges[g_new->n_e].seq_len = g->edges[i].seq_len;
 		g_new->edges[g_new->n_e].count = g->edges[i].count;
 		g_new->edges[g_new->n_e].n_holes = 0;
-		g_new->n_e++;
+		asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
+				g_new->edges + g_new->n_e);
+		g_new->n_e += 2;
+	}
+
+	for (int i = 0; i < g_new->n_e; ++i){
+		g_new->edges[i].source = i << 1;
+		g_new->edges[i].target = (i << 1) + 1;
+	}
+	g_new->nodes = calloc(g_new->n_e * 2, sizeof(struct asm_node_t));
+	for (int e = 0; e < g_new->n_e; ++e){
+		int e_rc = g_new->edges[e].rc_id;
+		int v = g_new->edges[e].source;
+		int u = g_new->edges[e].target;
+		int v_rc = g_new->edges[e_rc].source;
+		int u_rc = g_new->edges[e_rc].target;
+
+		g->nodes[v].rc_id = v_rc;
+		g->nodes[v].deg = 1;
+		g->nodes[v].adj = calloc(1, sizeof(gint_t));
+		g->nodes[v].adj[0] = e;
+
+		g->nodes[u].rc_id = u_rc;
 	}
 
 	save_graph_info(opt->out_dir, g_new, "level_3");
