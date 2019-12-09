@@ -588,12 +588,15 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 {
 	char *seq;
 	decode_seq(&seq, g->edges[contig_path[0]].seq, g->edges[contig_path[0]].seq_len);
+
 	int total_len = strlen(seq);
 
 	int n_holes = 0;
 	uint32_t *p_holes = NULL;
 	uint32_t *l_holes = NULL;
 	int total_count = 0;
+
+
 	for(int i = 1; i < n_contig_path; i++) {
 		int a = contig_path[i-1], b = contig_path[i];
 		struct shortest_path_info_t *res = get_shortest_path(g, a, b, stored);
@@ -624,6 +627,26 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		total_len += e_len - g->ksize;
 		free(tmp_seq);
 	}
+
+	double local_cov, sum_cov = 0, sum_len = 0;
+	double global_avg_cov = get_genome_coverage(g);
+	int ksize = g_new->ksize;
+	for (int i = 0; i < n_contig_path; i++) {
+		int i_e = contig_path[i];
+		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
+		assert(cov >= 0);
+		if (cov > 1.5*global_avg_cov)
+			continue;
+		sum_cov += (g_new->edges[i_e].seq_len-ksize) *cov;
+		sum_len += (g_new->edges[i_e].seq_len-ksize);
+	}
+	if (sum_len ==0) {
+//		assert(sum_len != 0 && "all edge in path is repeat");
+		local_cov = global_avg_cov;
+	} else
+		local_cov = sum_cov/sum_len;
+	if (local_cov < 0.5 * global_avg_cov)
+		return;
 
 	uint32_t *seq_encode;
 	encode_seq(&seq_encode, seq);
