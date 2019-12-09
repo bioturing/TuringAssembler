@@ -637,8 +637,8 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		assert(cov >= 0);
 		if (cov > 1.5*global_avg_cov)
 			continue;
-		sum_cov += (g_new->edges[i_e].seq_len-ksize) *cov;
-		sum_len += (g_new->edges[i_e].seq_len-ksize);
+		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
+		sum_len += (g->edges[i_e].seq_len-ksize);
 	}
 	if (sum_len ==0) {
 //		assert(sum_len != 0 && "all edge in path is repeat");
