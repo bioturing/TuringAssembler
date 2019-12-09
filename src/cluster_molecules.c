@@ -640,6 +640,7 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
 		sum_len += (g->edges[i_e].seq_len-ksize);
 	}
+
 	if (sum_len ==0) {
 //		assert(sum_len != 0 && "all edge in path is repeat");
 		local_cov = global_avg_cov;
@@ -647,6 +648,14 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		local_cov = sum_cov/sum_len;
 	if (local_cov < 0.5 * global_avg_cov)
 		return;
+
+	for (int i = 0; i < n_contig_path; i++) {
+		int i_e  = contig_path[i];
+		int i_e_rc = g->edges[i_e].rc_id;
+		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
+		g->edges[i_e].count -= tmp;
+		g->edges[i_e_rc].count -= tmp;
+	}
 
 	uint32_t *seq_encode;
 	encode_seq(&seq_encode, seq);
