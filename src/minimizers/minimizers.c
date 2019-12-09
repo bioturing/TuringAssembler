@@ -835,10 +835,12 @@ static inline void *minimizer_iterator(void *data)
  * File format: e1 e2 count
  * Caution: e1 and e2 are from different strands
  */
-void print_read_pairs(struct mini_hash_t *h_table)
+void print_read_pairs(struct mini_hash_t *h_table, struct opt_proc_t *opt)
 {
 	uint64_t i;
-	FILE *fp = fopen("bc_hits_read_pairs.txt", "w");
+	char path[1024];
+	sprintf(path, "%s/bc_hits_read_pairs.txt", opt->out_dir);
+	FILE *fp = fopen(path, "w");
 	for (i = 0; i < h_table->size; ++i) {
 		if (__mini_empty(h_table, i))
 			continue;
@@ -923,7 +925,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 
-	print_read_pairs(rp_table);
+	print_read_pairs(rp_table, opt);
 	free_fastq_pair(producer_bundles, opt->n_files);
 
 	//Compile the return bundle

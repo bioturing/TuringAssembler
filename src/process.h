@@ -44,4 +44,5 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 void print_barcode_graph_process(struct opt_proc_t *opt);
 void cluster_molecules_process(struct opt_proc_t *opt);
 void debug_process(struct opt_proc_t *opt);
+void build_coverage_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

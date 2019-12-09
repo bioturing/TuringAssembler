@@ -7,6 +7,16 @@
 #include "cluster_molecules.h"
 #include "log.h"
 
+#define MIN_SHARE_BARCODE_COUNT 100
+#define MIN_EDGE_LEN 500
+#define MIN_READ_PAIR_COUNT 1
+#define VERY_SHORT_EDGE_LEN 250
+#define LONG_PATH 10
+#define SHORT_PATH 2
+#define MIN_PAIR_SUPPORT_PAIR_END 1
+#define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
+
+
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;
     int n_nodes, n_edges;
@@ -162,7 +172,7 @@ uint64_t get_share_read_pair(struct mini_hash_t *rp_table, int u, int v)
 	//todo @huu
 	uint64_t t = GET_CODE(u, v);
 	uint64_t *val = mini_get(rp_table, t);
-	if (val == EMPTY_BX)
+	if (val == (uint64_t *)EMPTY_BX)
 		return 0;
 	return *val;
 }
@@ -171,32 +181,45 @@ int
 check_read_pair(struct asm_graph_t *g, struct mini_hash_t *rp_table, struct shortest_path_info_t *r)
 {
 	int thres_share_read_pair;
-	if (r->n_e >= 12)
-		thres_share_read_pair = 2;
-	else if (r->n_e == 2)
-		thres_share_read_pair = 0;
+	if (r->n_e >= LONG_PATH)
+		thres_share_read_pair = MIN_PAIR_SUPPORT_PAIR_END;
 	else
-		thres_share_read_pair = 1;
+		thres_share_read_pair = MIN_PAIR_SUPPORT_PAIR_END_SOFT;
 
 	int count_share_read_pair = 0;
+	log_debug("Check from first edge: %d", r->path[0]);
 	for (int i = 1; i < r->n_e; i++) {
 		uint64_t t = get_share_read_pair(rp_table, r->path[0], g->edges[r->path[i]].rc_id);
-		if (g->edges[r->path[i]].seq_len < 250 || g->edges[r->path[0]].seq_len < 250)
+		if (g->edges[r->path[i]].seq_len < VERY_SHORT_EDGE_LEN || g->edges[r->path[0]].seq_len < VERY_SHORT_EDGE_LEN) {
+			log_debug("%d fail, length is short %d, thres: %d", r->path[i], g->edges[r->path[i]].seq_len, VERY_SHORT_EDGE_LEN);
 			continue;
-		if (t > 20)
+		}
+		if (t > MIN_READ_PAIR_COUNT) {
 			count_share_read_pair++;
+			log_debug("%d pass, n read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
+		} else
+			log_debug("%d fail, not enough read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
 	}
+	log_debug("Check to final edge: %d", r->path[r->n_e - 1]);
 	for (int i = 0; i < r->n_e - 1; i++) {
 		uint64_t t = get_share_read_pair(rp_table, r->path[i],
 						 g->edges[r->path[r->n_e - 1]].rc_id);
-		if (g->edges[r->path[i]].seq_len < 250 ||
-		    g->edges[r->path[r->n_e - 1]].seq_len < 250)
+		if (g->edges[r->path[i]].seq_len < VERY_SHORT_EDGE_LEN ||
+		    g->edges[r->path[r->n_e - 1]].seq_len < VERY_SHORT_EDGE_LEN) {
+			log_debug("%d fail, length is short %d, thres: %d", r->path[i], g->edges[r->path[i]].seq_len, VERY_SHORT_EDGE_LEN);
 			continue;
-		if (t > 20)
+		}
+		if (t > MIN_READ_PAIR_COUNT) {
 			count_share_read_pair++;
+			log_debug("%d pass, n read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
+		} else
+			log_debug("%d fail, not enough read-pair support %d, thres: %d", r->path[i], t, MIN_READ_PAIR_COUNT);
 	}
-	if (count_share_read_pair > thres_share_read_pair)
+	if (count_share_read_pair > thres_share_read_pair) {
+		log_debug("%d-%d passed: %d pairs of edges support. thres: %d", r->path[0],r->path[r->n_e - 1], count_share_read_pair, thres_share_read_pair);
 		return 1;
+	}
+	log_debug("%d-%d fail: %d pairs of edges support. thres: %d", r->path[0],r->path[r->n_e- 1], count_share_read_pair, thres_share_read_pair);
 	return 0;
 }
 
@@ -395,12 +418,27 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	destroy_barcode_graph(bg);
 }
 
+void print_bx_count(khash_t(long_int) *res, struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/bc_hits_edge_pairs.txt", opt->out_dir);
+	FILE *fp = fopen(path, "w");
+	for (khiter_t k = kh_begin(res); k != kh_end(res); ++k) {
+		if (kh_exist(res, k)) {
+			fprintf(fp, "%lu %lu %d\n", kh_key(res, k) >> 32, kh_key(res, k) & 0x00000000ffffffff, kh_value(res, k));
+		}
+	}
+	fclose(fp);
+}
+
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	struct mm_bundle_t *t = mm_hit_all_barcodes(opt);
 	struct mini_hash_t *bx_table = t->bx_table;
 	struct mini_hash_t *rp_table = t->rp_table;
 	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
+
+	print_bx_count(all_count, opt);
 
 	int n_edges = 0;
 	int *list_edges = NULL;
@@ -410,17 +448,11 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			int u = (key >> 32) & (uint32_t) (-1);
 			int v = key & (uint32_t) (-1);
 			uint64_t val = kh_value(all_count, i);
-			if (u == 30226 && v == 45118) {
-				log_warn("len %d %d", g->edges[u].seq_len, g->edges[v].seq_len);
-				log_warn("val %d", val);
-			}
-			if (g->edges[u].seq_len < 500 || g->edges[v].seq_len < 500)
+
+			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
-			if (val < 200) {
+			if (val < MIN_SHARE_BARCODE_COUNT) {
 				continue;
-			}
-			if (u == 30226 && v == 45118) {
-				log_warn("is continue");
 			}
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
 			list_edges[n_edges << 1] = u;
