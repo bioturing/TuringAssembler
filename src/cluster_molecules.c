@@ -629,13 +629,12 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 	}
 
 	double local_cov, sum_cov = 0, sum_len = 0;
-	double global_avg_cov = get_genome_coverage(g);
 	int ksize = g_new->ksize;
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e = contig_path[i];
 		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
 		assert(cov >= 0);
-		if (cov > 1.5*global_avg_cov)
+		if (cov > 1.5 * avg_cov)
 			continue;
 		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
 		sum_len += (g->edges[i_e].seq_len-ksize);
@@ -643,10 +642,10 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 
 	if (sum_len ==0) {
 //		assert(sum_len != 0 && "all edge in path is repeat");
-		local_cov = global_avg_cov;
+		local_cov = avg_cov;
 	} else
 		local_cov = sum_cov/sum_len;
-	if (local_cov < 0.5 * global_avg_cov)
+	if (local_cov < 0.5 * avg_cov)
 		return;
 
 	for (int i = 0; i < n_contig_path; i++) {
