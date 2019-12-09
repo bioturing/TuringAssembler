@@ -328,7 +328,7 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 		if (edge_cov < MIN_EDGE_COV_SCAFFOLD) {
 			total_len += g->edges[i_e].seq_len;
 			g->edges[i_e].seq_len = 0;
-			log_debug("Remove edge: %d, coverage: %.2f, threshold %.2f", i_e, edge_cov, MIN_EDGE_COV_SCAFFOLD)
+			log_debug("Remove edge: %d, coverage: %.2f, threshold %.2f", i_e, edge_cov, MIN_EDGE_COV_SCAFFOLD);
 		}
 	}
 	log_info("remove %ld bp because have lower than 0.25 cov", total_len);
