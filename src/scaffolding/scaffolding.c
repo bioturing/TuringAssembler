@@ -23,6 +23,7 @@
 #include "scaffolding/output.h"
 #include "scaffolding/khash.h"
 #include "scaffolding/scaffold.h"
+#include "scaffolding.h"
 #include "smart_load.h"
 #include "log.h"
 #include "yeast_analyze_utils.h"
@@ -324,9 +325,10 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 	int64_t total_len = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize) / cvr;
-		if (edge_cov <= 0.25) {
-			g->edges[i_e].seq_len = 0;
+		if (edge_cov < MIN_EDGE_COV_SCAFFOLD) {
 			total_len += g->edges[i_e].seq_len;
+			g->edges[i_e].seq_len = 0;
+			log_debug("Remove edge: %d, coverage: %.2f, threshold %.2f", i_e, edge_cov, MIN_EDGE_COV_SCAFFOLD)
 		}
 	}
 	log_info("remove %ld bp because have lower than 0.25 cov", total_len);
@@ -614,6 +616,7 @@ void find_scaffolds(struct asm_graph_t *g, struct opt_proc_t *opt, struct edges_
 	init_mark(g, opt, mark);
 	int count = 0;
 	struct pair_contigs_score *thres_score = calloc(1, sizeof(struct pair_contigs_score));
+	//TODO: Start from the longest edge
 	for (int i = 0; i < g->n_e; i++)
 		if (mark[i] && is_long_contig(&g->edges[i])) {
 			int start_contig = i;
