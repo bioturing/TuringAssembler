@@ -582,6 +582,8 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 //	free(path);
 //}
 
+#define MIN_COVERAGE_TO_BE_IGNORE 0.5
+
 void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		khash_t(long_spath) *stored, int *contig_path, int n_contig_path,
 		double avg_cov)
@@ -601,8 +603,7 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		int a = contig_path[i-1], b = contig_path[i];
 		struct shortest_path_info_t *res = get_shortest_path(g, a, b, stored);
 		if (res == NULL) {
-			log_error("it is wrong");
-			assert(0);
+			log_error("Can not find shortest path between %d and %d!", a, b);
 		}
 		if (res->n_e > 2){
 			p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
@@ -645,14 +646,27 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		local_cov = avg_cov;
 	} else
 		local_cov = sum_cov/sum_len;
-	if (local_cov < 0.5 * avg_cov)
+	char path[4096];
+	char ctg[128];
+	path[0] = '\0';
+	for (int i = 0; i < n_contig_path; ++i) {
+		sprintf(ctg, "%d ", contig_path[i]);
+		strcat(path, ctg);
+	}
+	log_debug("Path: %s", path);
+
+	if (local_cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov) {
+		log_debug("Ignore path because seem to be already consider");
 		return;
+	}
 
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e  = contig_path[i];
 		int i_e_rc = g->edges[i_e].rc_id;
 		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
+		log_debug("Decrease count of %d: from %d to %d", i_e, g->edges[i_e].count, g->edges[i_e].count - tmp);
 		g->edges[i_e].count -= tmp;
+		log_debug("Decrease count of %d: from %d to %d", i_e, g->edges[i_e_rc].count, g->edges[i_e_rc].count - tmp);
 		g->edges[i_e_rc].count -= tmp;
 	}
 
@@ -690,8 +704,10 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
-		if (__get_edge_cov(&g->edges[i], g->ksize) <= 0.5 * global_cov)
+		if (__get_edge_cov(&g->edges[i], g->ksize) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov) {
+			log_debug("Ignore edge %d, coverage %.2f, ration threshold %.2f, coverage threshold %.2f", i, __get_edge_cov(&g->edges[i], g->ksize), MIN_COVERAGE_TO_BE_IGNORE, global_cov);
 			continue;
+		}
 		assert(g->edges[i].count > 0);
 //		if (mark[e])
 //			continue;
