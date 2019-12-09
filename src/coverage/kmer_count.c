@@ -14,6 +14,14 @@
 #define KMER_SIZE_COVERAGE 31
 #define MAX_KMER_COUNT 999
 
+#define __reverse_bit(a, b) \
+	b = ((a & 0x5555555555555555) << 1)  | ((a >> 1)  & 0x5555555555555555); \
+	b = ((b & 0x3333333333333333) << 2)  | ((b >> 2)  & 0x3333333333333333); \
+	b = ((b & 0x0f0f0f0f0f0f0f0f) << 4)  | ((b >> 4)  & 0x0f0f0f0f0f0f0f0f); \
+	b = ((b & 0x00ff00ff00ff00ff) << 8)  | ((b >> 8)  & 0x00ff00ff00ff00ff); \
+	b = ((b & 0x0000ffff0000ffff) << 16) | ((b >> 16) & 0x0000ffff0000ffff); \
+	b = ((b & 0x00000000ffffffff) << 32) | ((b >> 32) & 0x00000000ffffffff);
+
 struct cov_bundle_t {
     struct dqueue_t *q;
     struct mini_hash_t *table;
@@ -82,10 +90,17 @@ int get_and_add_kmer(struct mini_hash_t *table, struct read_t read)
 	uint64_t *slot;
 	int pad = (32 - KMER_SIZE_COVERAGE - 1)*2;
 	uint64_t km = get_km_i_str(read.seq, 0, KMER_SIZE_COVERAGE);
+	uint64_t rev;
 	for (i = 0 ; i < read.len - KMER_SIZE_COVERAGE + 1; ++i) {
 		c = (uint64_t) nt4_table[read.seq[i + KMER_SIZE_COVERAGE - 1]];
 		km |= ((uint64_t) c << (pad + 2));
+		__reverse_bit(km, rev);
+		rev ^= 0xf;
+		rev <<= (pad + 2);
 		slot = mini_get(table, km);
+		if (slot != (uint64_t *)EMPTY_SLOT)
+			atomic_add_and_fetch64(slot, 1);
+		slot = mini_get(table, rev);
 		if (slot != (uint64_t *)EMPTY_SLOT)
 			atomic_add_and_fetch64(slot, 1);
 		km <<= 2;
