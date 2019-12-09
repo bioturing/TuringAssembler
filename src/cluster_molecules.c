@@ -681,6 +681,7 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		g_new->edges[i].target = (i << 1) + 1;
 		g_new->edges[i].rc_id = i ^ 1;
 	}
+	g_new->n_v = g_new->n_e * 2;
 	g_new->nodes = calloc(g_new->n_e * 2, sizeof(struct asm_node_t));
 	for (int e = 0; e < g_new->n_e; ++e){
 		int e_rc = g_new->edges[e].rc_id;
