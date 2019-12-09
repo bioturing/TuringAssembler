@@ -4,6 +4,8 @@
 #include "scaffolding/bin_hash.h"
 #include "utils.h"
 
+#define MIN_BARCODE_SET 50
+
 int get_amount_hole(struct asm_graph_t *g, struct asm_edge_t *e)
 {
 	int res = 0, l = 0, r = MIN_CONTIG_BARCODE, sum_holes = 0;
@@ -34,7 +36,7 @@ float get_bc_score(int count_share, int size0, int size1, float avg_bin_hash, in
 {
 //	if (MIN(size0, size1) < avg_bin_hash/15)
 //		return 0;
-	if (size0 < 100 || size1 < 100){
+	if (size0 < MIN_BARCODE_SET || size1 < MIN_BARCODE_SET){
 		log_warn("Two edges %d %d have low no. of barcode %d %d", src, des, size0, size1);
 		return 0;
 	}

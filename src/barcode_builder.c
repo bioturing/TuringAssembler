@@ -16,6 +16,8 @@
 #include "scaffolding/global_params.h"
 #include "barcode_builder.h"
 
+#define MIN_DUPLICATE_ALIGNMENT 10
+
 struct bccount_bundle_t {
     struct asm_graph_t *g;
     struct dqueue_t *q;
@@ -781,7 +783,7 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 
 	//-----------------build barcode scaffold -----------------------
 	// todo verify if n1<2 is best
-	if (ar1.n <= 2) {
+	if (ar1.n <= MIN_DUPLICATE_ALIGNMENT) {
 		for (int i = 0; i < n1; i++) {
 			struct fasta_ref_t ref;
 			ref = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
@@ -795,7 +797,7 @@ void read_mapper_scaffold(struct read_t *r1, struct read_t *r2, uint64_t bc,
 //            }
 		}
 	}
-	if (ar2.n <= 2) {
+	if (ar2.n <= MIN_DUPLICATE_ALIGNMENT) {
 		for (int i = 0; i < n2; i++) {
 			struct fasta_ref_t ref;
 			ref = parse_fasta_ref(idx->bns->anns[p2[i].rid].name);
