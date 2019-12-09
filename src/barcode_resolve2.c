@@ -2103,7 +2103,7 @@ void get_local_assembly(struct opt_proc_t *opt, struct asm_graph_t *g,
 	struct read_path_t read_build_graph, read_build_cov;
 	int ret_graph = get_reads_local_graph(&read_sorted_path, &read_build_graph,
 			dict, g, e1, e2, work_dir_build_graph);
-	int ret_cov = get_reads_build_cov(&read_sorted_path, &read_build_cov,
+	int ret_cov = get_reads_local_graph(&read_sorted_path, &read_build_cov,
 			dict, g, e1, e2, work_dir_build_cov);
 	if (!ret_graph || !ret_cov){
 		log_warn("Something supicious happends, probably the read files are empty, please check these files: %s %s",
