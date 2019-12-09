@@ -16,7 +16,6 @@
 #define MIN_PAIR_SUPPORT_PAIR_END 1
 #define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
 
-
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;
     int n_nodes, n_edges;
@@ -398,6 +397,8 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	filter_graph_reverse_complement(g, bg);
 	remove_tips_barcode_graph(g, bg, stored);
 	filter_complex_barcode_graph(bg);
+
+	khash_t(set_long) *mark_link = kh_init(long_int);
 	int *list_res = NULL, n_res = 0;
 	for (int i = 0; i < bg->n_edges * 2; i += 2) {
 		if (bg->is_del[i]) {
@@ -405,12 +406,29 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 			continue;
 		}
 		assert(bg->is_del[i + 1] == 0);
-		list_res = realloc(list_res, ((n_res + 1) << 1) * sizeof(int));
-		list_res[n_res << 1] = bg->edges[i];
-		list_res[(n_res << 1) + 1] = bg->edges[i + 1];
-		n_res++;
-		log_debug("%d %d", bg->edges[i], bg->edges[i + 1]);
+		list_res = realloc(list_res, ((n_res + 2) << 1) * sizeof(int));
+		int v = bg->edges[i];
+		int u = bg->edges[i + 1];
+		int v_rc = g->edges[v].rc_id;
+		int u_rc = g->edges[u].rc_id;
+		uint64_t code = GET_CODE(v, u);
+		uint64_t code_rc = GET_CODE(u_rc, v_rc);
+		if (kh_set_long_exist(mark_link, code)
+				|| kh_set_long_exist(mark_link, code_rc))
+			continue;
+		kh_set_long_add(mark_link, code);
+		kh_set_long_add(mark_link, code_rc);
+		list_res[n_res << 1] = v;
+		list_res[(n_res << 1) + 1] = u;
+		++n_res;
+		list_res[n_res << 1] = u_rc;
+		list_res[(n_res << 1) + 1] = v_rc;
+		++n_res;
+		log_debug("%d %d", v, u);
+		log_debug("%d %d", u_rc, v_rc);
 	}
+	kh_destroy(set_long, mark_link);
+
 	*list_ret = list_res;
 	*n_ret = n_res;
 	print_dot_graph(bg, "after_filter_deg.dot");
