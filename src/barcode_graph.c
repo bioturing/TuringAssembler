@@ -467,5 +467,5 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 	log_info("n pair share 100 bc %d", n_edges);
 	int n_res = 0, *list_res = NULL;
 	filter_list_edge(opt, rp_table, g, n_edges, list_edges, &n_res, &list_res);
-	create_barcode_molecules(list_res, n_res * 2, g);
+	create_barcode_molecules(opt, list_res, n_res * 2, g);
 }

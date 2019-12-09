@@ -586,9 +586,14 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		khash_t(long_spath) *stored, int *contig_path, int n_contig_path,
 		double avg_cov)
 {
-	int *total_path = calloc(1, sizeof(int)), n_total_path = 1;
-	total_path[0] = contig_path[0];
+	char *seq;
+	decode_seq(&seq, g->edges[contig_path[0]].seq, g->edges[contig_path[0]].seq_len);
+	int total_len = strlen(seq);
 
+	int n_holes = 0;
+	uint32_t *p_holes = NULL;
+	uint32_t *l_holes = NULL;
+	int total_count = 0;
 	for(int i = 1; i < n_contig_path; i++) {
 		int a = contig_path[i-1], b = contig_path[i];
 		struct shortest_path_info_t *res = get_shortest_path(g, a, b, stored);
@@ -596,28 +601,48 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 			log_error("it is wrong");
 			assert(0);
 		}
-		total_path = realloc(total_path, (n_total_path + res->n_e-1)* sizeof(int));
-		COPY_ARR(res->path+1, total_path + n_total_path, res->n_e-1);
-		n_total_path+=res->n_e-1;
+		if (res->n_e > 2){
+			p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
+			l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
+			int N_len = 0;
+			for (int j = 1; j < res->n_e - 1; ++j){
+				int e = res->path[j];
+				N_len += g->edges[e].seq_len - g->ksize;
+			}
+			p_holes[n_holes] = total_len;
+			l_holes[n_holes] = N_len;
+			++n_holes;
+		}
+		int e = res->path[res->n_e - 1];
+		int e_len = g->edges[e].seq_len;
+		total_count += g->edges[e].count;
+
+		seq = realloc(seq, (total_len + e_len - g->ksize + 1) * sizeof(char));
+		char *tmp_seq;
+		decode_seq(&tmp_seq, g->edges[e].seq, e_len);
+		strcat(seq, tmp_seq + g->ksize);
+		total_len += e_len - g->ksize;
+		free(tmp_seq);
 	}
 
-	int total_len, total_count;
-	uint32_t *seq;
-	int ret = concate_edge(g, n_total_path, total_path, g->ksize, &total_len, &total_count,
-						    avg_cov, &seq);
-	if (ret == -1) {
-		return;
-	}
-	g_new->edges = realloc(g_new->edges, (g_new->n_e+1) * sizeof(struct asm_edge_t));
-	g_new->edges[g_new->n_e].seq = seq;
+	uint32_t *seq_encode;
+	encode_seq(&seq_encode, seq);
+	free(seq);
+
+	g_new->edges = realloc(g_new->edges, (g_new->n_e+2) * sizeof(struct asm_edge_t));
+	g_new->edges[g_new->n_e].seq = seq_encode;
 	g_new->edges[g_new->n_e].seq_len = total_len;
-	assert(total_count >0);
 	g_new->edges[g_new->n_e].count = total_count;
-	g_new->edges[g_new->n_e].n_holes = 0;
-	g_new->n_e++;
+	g_new->edges[g_new->n_e].n_holes = n_holes;
+	g_new->edges[g_new->n_e].l_holes = l_holes;
+	g_new->edges[g_new->n_e].p_holes = p_holes;
+	asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
+			g_new->edges + g_new->n_e);
+	g_new->n_e += 2;
 }
 
-void create_barcode_molecules(int *edges, int n_e, struct asm_graph_t *g)
+void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
+		struct asm_graph_t *g)
 {
 	struct asm_graph_t *g_new = calloc(1, sizeof(struct asm_graph_t));
 	g_new->ksize = g->ksize;
@@ -649,7 +674,7 @@ void create_barcode_molecules(int *edges, int n_e, struct asm_graph_t *g)
 		g_new->n_e++;
 	}
 
-	write_stupid_fasta(g_new, "contigs.fasta");
+	save_graph_info(opt->out_dir, g_new, "level_3");
 
 	free(edges);
 

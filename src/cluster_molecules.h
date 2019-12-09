@@ -115,7 +115,8 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int u,
 		khash_t(set_int) *done_dfs);
 void get_longest_path(struct simple_graph_t *sg);
 
-void create_barcode_molecules(int *edges, int n_e, struct asm_graph_t *g);
+void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
+		struct asm_graph_t *g);
 
 int is_repeat(struct asm_graph_t *g, int e);
 
