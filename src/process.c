@@ -479,6 +479,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	set_log_stage("KmerCounting");
 	build_0_KMC(opt, opt->k0, &g_lv0); /* Do kmer counting using KMC */
 	save_graph_info(opt->out_dir, &g_lv0, "level_0");
+	asm_graph_destroy(&g_lv0);
 
 	set_log_stage("GraphConstruction");
 	build_0_1(&g_lv0, &g_lv1); /* Simplify graph level 0 to graph level 1 */
@@ -491,7 +492,6 @@ void assembly3_process(struct opt_proc_t *opt)
 	/**
 	  * Resolve process (dump function, not use yet)
 	  */
-
 	set_log_stage("ResolveProcess");
 	log_info("Start resolve process with kmer size %d", opt->k0);
 	char lv1_path[1024];
@@ -499,6 +499,16 @@ void assembly3_process(struct opt_proc_t *opt)
 	opt->in_file = lv1_path;
 	resolve_local_process(opt);
 
+	/**
+	 * Molecule clustering
+	 */
+	char lv2_path[1024];
+	sprintf(lv2_path, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
+	struct asm_graph_t g_lv2;
+	load_asm_graph(&g_lv2, lv2_path);
+	set_log_stage("Get long contig");
+	get_list_contig(opt, &g_lv2);
+	asm_graph_destroy(&g_lv2);
 	/**
 	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
 	 */
@@ -525,12 +535,13 @@ void assembly3_process(struct opt_proc_t *opt)
 	 * Build barcodes
 	 */
 	set_log_stage("BWAIndex");
-
-	char lv2_path[1024];
-	sprintf(lv2_path, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
-	struct asm_graph_t g_lv2;
-	load_asm_graph(&g_lv2, lv2_path);
 	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
+	char lv3_path[1024];
+	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
+	struct asm_graph_t g_lv3;
+	load_asm_graph(&g_lv3, lv3_path);
+	set_log_stage("BWAIndex");
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g_lv2, fasta_path);

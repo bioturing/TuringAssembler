@@ -719,7 +719,6 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	for (int i = 0; i < paths_bundle->n_paths; ++i) {
 		add_path_to_edges(g, g_new, stored, paths_bundle->paths[i].edges,
 				paths_bundle->paths[i].n_e, global_cov, visited);
-		log_trace("Process %d/%d path", i, paths_bundle->n_paths);
 	}
 
 	for (int i = 0; i < g->n_e; ++i){
@@ -742,7 +741,6 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
 				g_new->edges + g_new->n_e);
 		g_new->n_e += 2;
-		log_debug("Add new edge %d/%d", i, g->n_e);
 	}
 
 	for (int i = 0; i < g_new->n_e; ++i){
@@ -758,7 +756,6 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		int u = g_new->edges[e].target;
 		int v_rc = g_new->edges[e_rc].source;
 		int u_rc = g_new->edges[e_rc].target;
-		log_debug("e %d, e_rc %d, v %d, u %d, v_rc %d, u_rc %d", e, e_rc, v, u, v_rc, u_rc);
 
 		g_new->nodes[v].rc_id = u_rc;
 		g_new->nodes[v].deg = 1;
@@ -766,15 +763,12 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		g_new->nodes[v].adj[0] = e;
 
 		g_new->nodes[u].rc_id = v_rc;
-		log_debug("Setting node info for edge %d/%d", e, g_new->n_e);
 	}
 
 	save_graph_info(opt->out_dir, g_new, "level_3");
 
 	free(edges);
 	free(visited);
-	asm_graph_destroy(g);
-	free(g);
 }
 
 void barcode_list_destroy(struct barcode_list_t *blist)

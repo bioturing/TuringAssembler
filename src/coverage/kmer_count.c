@@ -191,7 +191,6 @@ static inline void *kmer_count_iterator(void *data)
 struct mini_hash_t *kmer_count_on_edges(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	uint32_t i;
-	load_asm_graph(g, opt->in_file);
 	struct mini_hash_t *kmer_table = construct_edges_hash(g);
 
 	pthread_attr_t attr;
