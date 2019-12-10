@@ -1615,8 +1615,8 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 
 	int e1_rc = g->edges[e1].rc_id;
 	int e2_rc = g->edges[e2].rc_id;
-	khash_t(gint) *h_head = barcode_hash_2_khash(g->edges[e1_rc].barcodes + 1);
-	khash_t(gint) *h_tail = barcode_hash_2_khash(g->edges[e2_rc].barcodes + 1);
+	khash_t(gint) *h_head = barcode_hash_2_khash(g->edges[e1_rc].barcodes + 2);
+	khash_t(gint) *h_tail = barcode_hash_2_khash(g->edges[e2_rc].barcodes + 2);
 	khash_t(gint) *h_exclude = get_union_bc(h_head, h_tail);
 	kh_destroy(gint, h_head);
 	kh_destroy(gint, h_tail);
