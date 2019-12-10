@@ -231,8 +231,10 @@ void unrelated_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	bad[lc_e1] = bad[lc_e2] = bad[lg->edges[lc_e1].rc_id]
 		= bad[lg->edges[lc_e2].rc_id] = 0;
 	for (int i = 0; i < lg->n_e; ++i){
-		if (bad[i])
+		if (bad[i]){
 			asm_remove_edge(lg, i);
+			printf("Remove %d\n", i);
+		}
 	}
 	condense_check_degenerate(opt, g, lg, emap1, emap2);
 	free(bad);
@@ -465,11 +467,12 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 	//		 STAGE 2 filtering local graph 			//
 	unrelated_filter(opt, g, emap1, emap2, scaffolds, n_scaff, lg);
 	connection_filter(opt, g, lg, emap1, emap2);
-	coverage_filter(opt, g, lg, emap1, emap2);
+	//coverage_filter(opt, g, lg, emap1, emap2);
 
 	print_graph(opt, lg, emap1->gl_e, emap2->gl_e);
 
-	log_local_info("Start finding paths", emap1->gl_e, emap2->gl_e);
+	log_local_info("Start finding paths between locals %d %d", emap1->gl_e,
+			emap2->gl_e, emap1->lc_e, emap2->lc_e);
 
 	struct path_info_t pinfo;
 	path_info_init(&pinfo);
