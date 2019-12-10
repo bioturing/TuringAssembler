@@ -499,10 +499,14 @@ void get_best_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 		max_err = max(max_err, error[i]);
 	}
 	for (int i = 0; i < pinfo.n_paths; ++i){
-		if (scores[i] - min_score + max_err - error[i]  > best_score){
+		if (scores[i] > best_score){
+			best_path = i;
+			best_score = scores[i];
+		}
+		/*if (scores[i] - min_score + max_err - error[i]  > best_score){
 			best_path = i;
 			best_score = scores[i] - min_score + max_err - error[i];
-		}
+		}*/
 		log_debug("%d score %f err %f", i, scores[i], error[i]);
 	}
 	log_local_debug("Found best path id: %d, scores: %.3f\n", emap1->gl_e,
