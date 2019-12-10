@@ -153,8 +153,7 @@ uint64_t get_share_read_pair(struct mini_hash_t *rp_table, int u, int v)
 	return *val;
 }
 
-int
-check_read_pair(struct asm_graph_t *g, struct mini_hash_t *rp_table, struct shortest_path_info_t *r)
+int check_read_pair(struct asm_graph_t *g, struct mini_hash_t *rp_table, struct shortest_path_info_t *r)
 {
 	int thres_share_read_pair;
 	if (r->n_e >= LONG_PATH)
