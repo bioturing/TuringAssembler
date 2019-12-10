@@ -35,7 +35,7 @@ float get_bc_score(int count_share, int size0, int size1, float avg_bin_hash, in
 //	if (MIN(size0, size1) < avg_bin_hash/15)
 //		return 0;
 	if (size0 < MIN_SHARE_BARCODE|| size1 < MIN_SHARE_BARCODE){
-		log_warn("Two edges %d %d have low no. of barcode %d %d", src, des, size0, size1);
+		log_warn("Two edges %d %d have low no. of barcode %d %d, threshold %d", src, des, size0, size1, MIN_SHARE_BARCODE);
 		return 0;
 	}
 	return 1.0*count_share/MIN(size0 , size1);
