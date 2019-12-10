@@ -25,6 +25,7 @@
 #include "coverage/kmer_count.h"
 #include "cluster_molecules.h"
 #include "split_molecules.h"
+#include "barcode_graph.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -524,6 +525,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	 * Build barcodes
 	 */
 	set_log_stage("BWAIndex");
+
 	char lv2_path[1024];
 	sprintf(lv2_path, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
 	struct asm_graph_t g_lv2;
@@ -706,9 +708,9 @@ void build_coverage_process(struct opt_proc_t *opt)
 	char *log_file = str_concate(opt->out_dir, "/index_kmer_edges.log");
 	init_logger(opt->log_level, log_file);
 	set_log_stage("Calculate coverage");
-	struct mini_hash_t *table = kmer_count_on_edges(opt);
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
+	struct mini_hash_t *table = kmer_count_on_edges(opt, &g);
 	add_cnt_to_graph(&g, table);
 	save_graph_info(opt->out_dir, &g, "coverage_built");
 	asm_graph_destroy(&g);
