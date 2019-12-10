@@ -137,8 +137,8 @@ void filter_by_deg(struct barcode_graph *bg, int thres_deg)
 
 void filter_complex_barcode_graph(struct barcode_graph *bg)
 {
-	filter_bulge(bg);
-//	filter_by_deg(bg, 3);
+//	filter_bulge(bg);
+	filter_by_deg(bg, 3);
 //	filter_bulge(bg);
 //	filter_by_deg(bg, 1);
 }
@@ -262,8 +262,8 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 				break;
 			}
 		}
-		if (!flag[0] && !flag[1])
-			flag[0] = flag[1] = 1;
+//		if (!flag[0] && !flag[1])
+//			flag[0] = flag[1] = 1;
 		for (int i = 0; i < 2; ++i) {
 			if (flag[i]) {
 				bg->is_del[out_id[i]] = 1;
@@ -307,8 +307,8 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 				break;
 			}
 		}
-		if (!flag[0] && !flag[1])
-			flag[0] = flag[1] = 1;
+//		if (!flag[0] && !flag[1])
+//			flag[0] = flag[1] = 1;
 		for (int i = 0; i < 2; ++i) {
 			if (flag[i]) {
 				bg->is_del[in_id[i]] = 1;
