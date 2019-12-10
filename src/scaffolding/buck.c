@@ -29,13 +29,13 @@ int check_qualify_buck(struct asm_graph_t *g, struct asm_edge_t *e, float avg_bi
 	}
 	return 1;
 }
-
+#define MIN_SHARE_BARCODE 50
 float get_bc_score(int count_share, int size0, int size1, float avg_bin_hash, int src, int des)
 {
 //	if (MIN(size0, size1) < avg_bin_hash/15)
 //		return 0;
-	if (size0 < 100 || size1 < 100){
-		log_warn("Two edges %d %d have low no. of barcode %d %d", src, des, size0, size1);
+	if (size0 < MIN_SHARE_BARCODE|| size1 < MIN_SHARE_BARCODE){
+		log_warn("Two edges %d %d have low no. of barcode %d %d, threshold %d", src, des, size0, size1, MIN_SHARE_BARCODE);
 		return 0;
 	}
 	return 1.0*count_share/MIN(size0 , size1);
