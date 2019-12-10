@@ -4,11 +4,11 @@
 
 #ifndef SRC_SMART_LOAD_H
 #define SRC_SMART_LOAD_H
-#include "khash.h"
-#include "radix_sort.h"
-#include "attribute.h"
-#include "assembly_graph.h"
-#include "barcode_resolve2.h"
+#include "../khash.h"
+#include "../radix_sort.h"
+#include "../attribute.h"
+#include "../assembly_graph.h"
+#include "../barcode_resolve2.h"
 
 #define read_index_get_key(p) ((p).r1_offset)
 

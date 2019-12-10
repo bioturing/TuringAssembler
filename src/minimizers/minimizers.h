@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include "khash.h"
-#include "assembly_graph.h"
+#include "../assembly_graph.h"
 
 KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
 KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
