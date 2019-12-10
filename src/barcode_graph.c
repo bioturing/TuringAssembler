@@ -405,8 +405,8 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 		list_res[n_res << 1] = u_rc;
 		list_res[(n_res << 1) + 1] = v_rc;
 		++n_res;
-		log_debug("%d %d", v, u);
-		log_debug("%d %d", u_rc, v_rc);
+		log_debug("Add edge to final list %d %d", v, u);
+		log_debug("Add edge to final list %d %d", u_rc, v_rc);
 	}
 	kh_destroy(set_long, mark_link);
 
@@ -431,7 +431,7 @@ void print_bx_count(khash_t(long_int) *res, struct opt_proc_t *opt)
 
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
-	struct mm_bundle_t *t = mm_hit_all_barcodes(opt);
+	struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
 	struct mini_hash_t *bx_table = t->bx_table;
 	struct mini_hash_t *rp_table = t->rp_table;
 	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
@@ -440,14 +440,14 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 	int n_edges = 0;
 	int *list_edges = NULL;
+	log_debug("Edge that shorter than %d will not be considered", MIN_EDGE_LEN);
 	for (int i = kh_begin(all_count); i != kh_end(all_count); i++) {
 		if (kh_exist(all_count, i)) {
 			uint64_t key = kh_key(all_count, i);
-			int u = (key >> 32) & (uint32_t) (-1);
-			int v = key & (uint32_t) (-1);
+			int u = (key >> 32);
+			int v = key & 0x00000000ffffffff;
 			uint64_t val = kh_value(all_count, i);
 			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN) {
-				log_debug("Edge length id too short len_u %d, len_v %d, threshold %d", g->edges[u].seq_len, g->edges[v].seq_len, MIN_EDGE_LEN);
 				continue;
 			}
 			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
@@ -456,7 +456,6 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 				log_debug("Barcode count failed to pass threshold val %d, len_u %d, len_v %d, MOLECULE_DENSITY %d, MIN_SHARED_BARCODE_RATIO %d", val, g->edges[u].seq_len, g->edges[v].seq_len, MOLECULE_DENSITY, MIN_SHARED_BARCODE_RATIO);
 				continue;
 			}
-			log_debug("Passed barcode count filtering u %d, v %d", u, v);
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
 			list_edges[n_edges << 1] = u;
 			list_edges[(n_edges << 1) + 1] = v;

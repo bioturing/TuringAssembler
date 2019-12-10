@@ -460,7 +460,7 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 		if (bc->h[i] == EMPTY_BX)
 			continue;
 		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i]; // ptr to mini_hash_t instead of count
-		int *edges = calloc(wrapper->size, sizeof(int));
+		uint64_t *edges = calloc(wrapper->size, sizeof(uint64_t));
 		int n_e = 0;
 		for (int j = 0; j < wrapper->size; ++j){
 			if (wrapper->h[j] == 0)
@@ -470,8 +470,11 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 
 		for (int j = 0; j < n_e; ++j){
 			for (int k = j + 1; k < n_e; ++k){
-				int e1 = edges[j];
-				int e2 = edges[k];
+				uint64_t e1 = edges[j];
+				uint64_t e2 = edges[k];
+				if (e1 > g->n_e || e2 > g->n_e) {
+					log_error("Wrong edges number of one barcode hit, e1 %d, e2 %d", e1, e2);
+				}
 				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
 				int cur_count = kh_long_int_try_get(res, code, 0);
 				kh_long_int_set(res, code, cur_count + 1);
@@ -485,10 +488,10 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 		if (!kh_exist(res, it))
 			continue;
 		uint64_t code = kh_key(res, it);
-		int v = code >> 32;
-		int u = (uint64_t) code & (-1);
-		int v_rc = g->edges[v].rc_id;
-		int u_rc = g->edges[u].rc_id;
+		uint64_t v = code >> 32;
+		uint64_t u = (uint64_t) code & 0x00000000ffffffff;
+		uint64_t v_rc = g->edges[v].rc_id;
+		uint64_t u_rc = g->edges[u].rc_id;
 		uint64_t code_rc = v_rc < u_rc ? GET_CODE(v_rc, u_rc) : GET_CODE(u_rc, v_rc);
 		int sum_cnt = kh_val(res, it) + kh_long_int_try_get(res, code_rc, 0);
 		kh_long_int_set(tmp, code, sum_cnt);

@@ -861,7 +861,7 @@ void print_read_pairs(struct mini_hash_t *h_table, struct opt_proc_t *opt)
  * @param opt
  * @return minimizer bundle that contains barcode hit tables and read pair hit table
  */
-struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
+struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	uint64_t i;
 	struct mm_bundle_t *mm_bundle = calloc(1, sizeof(struct mm_bundle_t));
@@ -878,9 +878,6 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt)
 		}
 	}
 
-	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
-	assert(opt->in_file != NULL);
-	load_asm_graph(g, opt->in_file);
 	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
 	                                               MINIMIZERS_WINDOW);
 	init_mini_hash(&rp_table, 16);
