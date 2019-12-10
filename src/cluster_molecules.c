@@ -420,7 +420,8 @@ void filter_complex_regions(struct simple_graph_t *sg)
 	khash_t(set_int) *visited = kh_init(set_int);
 	int n_total = 0;
 	int n_complex = 0;
-	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it) {
+	int n_simple_edges = 0;
+	for (khiter_t it = kh_begin(nodes); it != kh_end(nodes); ++it){
 		if (!kh_exist(nodes, it))
 			continue;
 		int v = kh_key(nodes, it);
@@ -466,8 +467,10 @@ void filter_complex_regions(struct simple_graph_t *sg)
 		++n_total;
 
 		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1
-		    && kh_size(component) > 1)
+				&& kh_size(component) > 1){
+			n_simple_edges += kh_size(component);
 			continue;
+		}
 		++n_complex;
 		for (khiter_t it = kh_begin(component); it != kh_end(component);
 		     ++it) {
@@ -481,6 +484,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 	kh_destroy(set_int, visited);
 	log_info("Number of all regions: %d", n_total);
 	log_info("Number of simple regions: %d", n_total - n_complex);
+	log_info("Number of edges in simple regions: %d", n_simple_edges);
 }
 
 void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
