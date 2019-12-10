@@ -177,8 +177,10 @@ static inline void *kmer_count_iterator(void *data)
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				log_error("Wrong format file");
 
-			get_and_add_kmer(bundle->table, read1);
-			get_and_add_kmer(bundle->table, read2);
+			if (read1.len > KMER_SIZE_COVERAGE)
+				get_and_add_kmer(bundle->table, read1);
+			if (read2.len > KMER_SIZE_COVERAGE)
+				get_and_add_kmer(bundle->table, read2);
 
 			if (rc1 == READ_END)
 				break;
