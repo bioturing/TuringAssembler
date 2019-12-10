@@ -1612,9 +1612,19 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	bc2 = g->edges[e2].barcodes + 2;
 	khash_t(gint) *h1 = barcode_hash_2_khash(bc1);
 	khash_t(gint) *h2 = barcode_hash_2_khash(bc2);
-	khash_t(gint) *h_shared = get_shared_bc(h1, h2);
 
-	khash_t(gint) *include = get_union_bc(h1, h2);
+	int e1_rc = g->edges[e1].rc_id;
+	int e2_rc = g->edges[e2].rc_id;
+	khash_t(gint) *h_head = barcode_hash_2_khash(g->edges[e1_rc].barcodes + 1);
+	khash_t(gint) *h_tail = barcode_hash_2_khash(g->edges[e2_rc].barcodes + 1);
+	khash_t(gint) *h_exclude = get_union_bc(h_head, h_tail);
+	kh_destroy(gint, h_head);
+	kh_destroy(gint, h_tail);
+
+	khash_t(gint) *h_shared = get_shared_bc(h1, h2);
+	khash_t(gint) *h_union = get_union_bc(h1, h2);
+
+	khash_t(gint) *include = kh_init(gint);
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
@@ -1631,6 +1641,8 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 			uint64_t key = kh_key(h_u, it);
 			if (!kh_gint_exist(h1, key) && !kh_gint_exist(h2, key))
 				continue;
+			if (kh_gint_exist(h_exclude, key))
+				continue;
 			kh_gint_add(include, key);
 		}
 		kh_destroy(gint, h);
@@ -1641,12 +1653,14 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	uint64_t *shared;
 	int n;
 	khash_2_arr(include, &shared, &n);
-	log_debug("Keep %d barcodes in %d total", n, kh_size(include));
+	log_debug("Keep %d barcodes in %d total", n, kh_size(h_union));
 	filter_read(reads, dict, rpath, shared, n);
 	free(shared);
 	kh_destroy(gint, h1);
 	kh_destroy(gint, h2);
 	kh_destroy(gint, h_shared);
+	kh_destroy(gint, h_exclude);
+	kh_destroy(gint, h_union);
 
 	int res = 1;
 	if (check_file_empty(rpath->R1_path) || check_file_empty(rpath->R2_path))
