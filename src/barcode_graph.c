@@ -446,13 +446,17 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			int u = (key >> 32) & (uint32_t) (-1);
 			int v = key & (uint32_t) (-1);
 			uint64_t val = kh_value(all_count, i);
-			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
+			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN) {
+				log_debug("Edge length id too short len_u %d, len_v %d, threshold %d", g->edges[u].seq_len, g->edges[v].seq_len, MIN_EDGE_LEN);
 				continue;
+			}
 			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
 			int len_v = MIN(g->edges[v].seq_len, MOLECULE_DENSITY);
 			if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
+				log_debug("Barcode count failed to pass threshold val %d, len_u %d, len_v %d, MOLECULE_DENSITY %d, MIN_SHARED_BARCODE_RATIO %d", val, g->edges[u].seq_len, g->edges[v].seq_len, MOLECULE_DENSITY, MIN_SHARED_BARCODE_RATIO);
 				continue;
 			}
+			log_debug("Passed barcode count filtering u %d, v %d", u, v);
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
 			list_edges[n_edges << 1] = u;
 			list_edges[(n_edges << 1) + 1] = v;
@@ -463,7 +467,7 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			n_edges++;
 		}
 	}
-	log_info("n pair share 100 bc %d", n_edges);
+	log_info("n pair pass barcode count filtering %d", n_edges);
 	int n_res = 0, *list_res = NULL;
 	filter_list_edge(opt, rp_table, g, n_edges, list_edges, &n_res, &list_res);
 	create_barcode_molecules(opt, list_res, n_res * 2, g);
