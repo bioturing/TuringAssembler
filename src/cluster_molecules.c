@@ -718,7 +718,6 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		log_trace("Process %d/%d path", i, paths_bundle->n_paths);
 	}
 
-
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
