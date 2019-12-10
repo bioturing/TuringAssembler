@@ -9,10 +9,11 @@ LIBS = -pthread -std=c++11 \
        libs/bwa/libbwa.a -lm
 
 GIT_SHA := $(shell git rev-parse HEAD)
+BRANCH_NAME=$(shell git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 CFLAGS = -std=gnu99 -m64 -O3 -Wfatal-errors -Wall -Wextra \
          -Wno-unused-function -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable \
-         -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)"' \
+         -DLOG_USE_COLOR -DGIT_SHA='"$(GIT_SHA)_$(BRANCH_NAME)"' \
          -Wl,--whole-archive -lpthread -Wl,--no-whole-archive \
          -I ./ -I ./src  -fPIC -g -I ./src/minimizers \
 	 -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -fPIC
