@@ -16,6 +16,8 @@
 #define SHORT_PATH 2
 #define MIN_PAIR_SUPPORT_PAIR_END 1
 #define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
+#define MIN_SHARED_BARCODE_RATIO 0.033
+#define MOLECULE_DENSITY 3000
 
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;
@@ -446,9 +448,9 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			uint64_t val = kh_value(all_count, i);
 			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
-			int len_u = MIN(g->edges[u].seq_len, 3000);
-			int len_v = MIN(g->edges[v].seq_len, 3000);
-			if (val * 1.0 / (len_u + len_v) < 0.033) {
+			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
+			int len_v = MIN(g->edges[v].seq_len, MOLECULE_DENSITY);
+			if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
 				continue;
 			}
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
