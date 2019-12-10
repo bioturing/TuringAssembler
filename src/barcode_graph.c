@@ -6,6 +6,7 @@
 #include <minimizers/count_barcodes.h>
 #include "cluster_molecules.h"
 #include "log.h"
+#include "utils.h"
 
 #define MIN_SHARE_BARCODE_COUNT 100
 #define MIN_EDGE_LEN 500
@@ -15,7 +16,8 @@
 #define SHORT_PATH 2
 #define MIN_PAIR_SUPPORT_PAIR_END 1
 #define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
-
+#define MIN_SHARED_BARCODE_RATIO 0.033
+#define MOLECULE_DENSITY 3000
 
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;
@@ -95,32 +97,6 @@ void filter_bulge(struct barcode_graph *bg)
 						log_debug("Del bulge %d %d", node, near[0]);
 					}
 		}
-	}
-
-	for (int node = 0; node < bg->n_nodes; node++) {
-		int deg_in = 0;
-		for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-			if (bg->is_del[j] == 0) {
-				if ((j & 1) == 0) {
-					near[deg_in] = bg->edges[j];
-					deg_in++;
-				}
-			}
-		if (deg_in == 2) {
-			if (have_edge(bg, near[0], near[1]))
-				for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-					if (bg->edges[j] == near[1]) {
-						bg->is_del[j] = 1;
-						bg->is_del[j ^ 1] = 1;
-						log_debug("Del bulge %d %d", node, near[1]);
-					}
-		} else if (have_edge(bg, near[1], near[0]))
-			for (int j = bg->first_index[node]; j != -1; j = bg->next_index[j])
-				if (bg->edges[j] == near[0]) {
-					bg->is_del[j] = 1;
-					bg->is_del[j ^ 1] = 1;
-					log_debug("Del bulge %d %d", node, near[0]);
-				}
 	}
 }
 
@@ -293,6 +269,7 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 			if (flag[i]) {
 				bg->is_del[out_id[i]] = 1;
 				bg->is_del[out_id[i] ^ 1] = 1;
+				log_debug("Del remove tips hao %d %d", node, out[i]);
 			}
 		}
 	}
@@ -337,6 +314,7 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 			if (flag[i]) {
 				bg->is_del[in_id[i]] = 1;
 				bg->is_del[in_id[i] ^ 1] = 1;
+				log_debug("Del remove tips hao %d %d", in[i], node);
 			}
 		}
 	}
@@ -397,7 +375,11 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	print_dot_graph(bg, "after_filter_BCandpair.dot");
 	filter_graph_reverse_complement(g, bg);
 	remove_tips_barcode_graph(g, bg, stored);
+	print_dot_graph(bg, "after_remove_tips.dot");
 	filter_complex_barcode_graph(bg);
+
+	khash_t(set_long) *mark_link = kh_init(long_int);
+	print_dot_graph(bg, "after_filter_complex.dot");
 	int *list_res = NULL, n_res = 0;
 	for (int i = 0; i < bg->n_edges * 2; i += 2) {
 		if (bg->is_del[i]) {
@@ -405,15 +387,31 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 			continue;
 		}
 		assert(bg->is_del[i + 1] == 0);
-		list_res = realloc(list_res, ((n_res + 1) << 1) * sizeof(int));
-		list_res[n_res << 1] = bg->edges[i];
-		list_res[(n_res << 1) + 1] = bg->edges[i + 1];
-		n_res++;
-		log_debug("%d %d", bg->edges[i], bg->edges[i + 1]);
+		list_res = realloc(list_res, ((n_res + 2) << 1) * sizeof(int));
+		int v = bg->edges[i];
+		int u = bg->edges[i + 1];
+		int v_rc = g->edges[v].rc_id;
+		int u_rc = g->edges[u].rc_id;
+		uint64_t code = GET_CODE(v, u);
+		uint64_t code_rc = GET_CODE(u_rc, v_rc);
+		if (kh_set_long_exist(mark_link, code)
+				|| kh_set_long_exist(mark_link, code_rc))
+			continue;
+		kh_set_long_add(mark_link, code);
+		kh_set_long_add(mark_link, code_rc);
+		list_res[n_res << 1] = v;
+		list_res[(n_res << 1) + 1] = u;
+		++n_res;
+		list_res[n_res << 1] = u_rc;
+		list_res[(n_res << 1) + 1] = v_rc;
+		++n_res;
+		log_debug("%d %d", v, u);
+		log_debug("%d %d", u_rc, v_rc);
 	}
+	kh_destroy(set_long, mark_link);
+
 	*list_ret = list_res;
 	*n_ret = n_res;
-	print_dot_graph(bg, "after_filter_deg.dot");
 	log_info("n edges after in deg and out deg: %d", *n_ret);
 	destroy_barcode_graph(bg);
 }
@@ -448,10 +446,11 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			int u = (key >> 32) & (uint32_t) (-1);
 			int v = key & (uint32_t) (-1);
 			uint64_t val = kh_value(all_count, i);
-
 			if (g->edges[u].seq_len < MIN_EDGE_LEN || g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
-			if (val < MIN_SHARE_BARCODE_COUNT) {
+			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
+			int len_v = MIN(g->edges[v].seq_len, MOLECULE_DENSITY);
+			if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
 				continue;
 			}
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
@@ -459,13 +458,13 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			list_edges[(n_edges << 1) + 1] = v;
 			n_edges++;
 			list_edges = realloc(list_edges, ((n_edges + 1) << 1) * sizeof(int));
-			list_edges[n_edges << 1] = v;
-			list_edges[(n_edges << 1) + 1] = u;
+			list_edges[n_edges << 1] = g->edges[v].rc_id;
+			list_edges[(n_edges << 1) + 1] = g->edges[u].rc_id;
 			n_edges++;
 		}
 	}
 	log_info("n pair share 100 bc %d", n_edges);
 	int n_res = 0, *list_res = NULL;
 	filter_list_edge(opt, rp_table, g, n_edges, list_edges, &n_res, &list_res);
-	create_barcode_molecules(list_res, n_res * 2, g);
+	create_barcode_molecules(opt, list_res, n_res * 2, g);
 }

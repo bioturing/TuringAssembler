@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "../utils.h"
 #include "../attribute.h"
+
+#define MIN_EDGE_COV_SCAFFOLD 0.15
 struct asm_graph_t* create_and_load_graph(struct opt_proc_t *opt);
 void dirty_code(struct opt_proc_t *opt);
 void scaffolding(FILE *out_file, struct asm_graph_t *g,
