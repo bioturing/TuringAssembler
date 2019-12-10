@@ -598,7 +598,8 @@ void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
 {
 	if (!opt->metagenomics) {
 		for (int i = 0; i < g->n_e; i++) {
-			float edge_cov = __get_edge_cov(&g->edges[i], g->ksize) / global_genome_coverage;
+			float edge_cov =
+				MAX(__get_edge_cov(&g->edges[i], g->ksize) / global_genome_coverage, 1);
 			mark[i] = MIN(lround(edge_cov), 3);
 		}
 	} else {
