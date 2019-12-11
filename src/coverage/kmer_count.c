@@ -95,7 +95,6 @@ int get_and_add_kmer(struct mini_hash_t *table, struct read_t read)
 		c = (uint64_t) nt4_table[read.seq[i + KMER_SIZE_COVERAGE - 1]];
 		km |= ((uint64_t) c << (pad + 2));
 		__reverse_bit(km, rev);
-		rev ^= 0xf;
 		rev <<= (pad + 2);
 		slot = mini_get(table, km);
 		if (slot != (uint64_t *)EMPTY_SLOT)
@@ -116,6 +115,8 @@ void add_cnt_to_graph(struct asm_graph_t *g, struct mini_hash_t *kmer_table)
 	int pad = (32 - KMER_SIZE_COVERAGE - 1)*2;
 	for (i = 0; i < g->n_e; ++i) {
 		g->edges[i].count = 0;
+		if (g->edges[i].seq_len < (KMER_SIZE_COVERAGE + 1))
+			continue;
 		km = get_km_i_bin(g->edges[i].seq, 0, KMER_SIZE_COVERAGE);
 		for (j = 0 ; j < g->edges[i].seq_len - KMER_SIZE_COVERAGE + 1; ++j) {
 			c = (uint64_t)__binseq_get(g->edges[i].seq, j + KMER_SIZE_COVERAGE - 1);
@@ -125,6 +126,11 @@ void add_cnt_to_graph(struct asm_graph_t *g, struct mini_hash_t *kmer_table)
 				g->edges[i].count += __min(*slot, MAX_KMER_COUNT); 
 			km <<= 2;
 		}
+	}
+	//TODO: why kmer count is not symetric
+	for (i = 0; i < g->n_e; ++i) {
+		g->edges[i].count = __max(g->edges[i].count, g->edges[g->edges[i].rc_id].count);
+		log_debug("Kmer count of edge %d %d",i, g->edges[i].count);
 	}
 }
 
