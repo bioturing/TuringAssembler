@@ -91,6 +91,8 @@ int get_and_add_kmer(struct mini_hash_t *table, struct read_t read)
 	int pad = (32 - KMER_SIZE_COVERAGE - 1)*2;
 	uint64_t km = get_km_i_str(read.seq, 0, KMER_SIZE_COVERAGE);
 	uint64_t rev;
+	if (read.len < KMER_SIZE_COVERAGE + 1)
+		return 0;
 	for (i = 0 ; i < read.len - KMER_SIZE_COVERAGE + 1; ++i) {
 		c = (uint64_t) nt4_table[read.seq[i + KMER_SIZE_COVERAGE - 1]];
 		km |= ((uint64_t) c << (pad + 2));
