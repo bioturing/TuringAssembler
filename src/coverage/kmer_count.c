@@ -130,7 +130,6 @@ void add_cnt_to_graph(struct asm_graph_t *g, struct mini_hash_t *kmer_table)
 	//TODO: why kmer count is not symetric
 	for (i = 0; i < g->n_e; ++i) {
 		g->edges[i].count = __max(g->edges[i].count, g->edges[g->edges[i].rc_id].count);
-		log_debug("Kmer count of edge %d %d",i, g->edges[i].count);
 	}
 }
 
