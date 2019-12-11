@@ -488,6 +488,17 @@ void assembly3_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g_lv1);
 
 	/**
+	  * Resolve process (dump function, not use yet)
+	  */
+
+	set_log_stage("ResolveProcess");
+	log_info("Start resolve process with kmer size %d", opt->k0);
+	char lv1_path[1024];
+	sprintf(lv1_path, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
+	opt->in_file = lv1_path;
+	resolve_local_process(opt);
+
+	/**
 	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
 	 */
 	char fasta_path[MAX_PATH];
@@ -513,27 +524,19 @@ void assembly3_process(struct opt_proc_t *opt)
 	 * Build barcodes
 	 */
 	set_log_stage("BWAIndex");
-	char asm_path[1024];
+	char lv2_path[1024];
+	sprintf(lv2_path, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
+	struct asm_graph_t g_lv2;
+	load_asm_graph(&g_lv2, lv2_path);
 	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
-	write_fasta_seq(&g_lv1, fasta_path);
+	write_fasta_seq(&g_lv2, fasta_path);
 	set_log_stage("MapReads");
-	construct_aux_info(opt, &g_lv1, &read_sorted_path, fasta_path,
+	construct_aux_info(opt, &g_lv2, &read_sorted_path, fasta_path,
 			ASM_BUILD_BARCODE);
-	save_graph_info(opt->out_dir, &g_lv1, "added_barcode");
-	asm_graph_destroy(&g_lv1);
-
-	/**
-	  * Resolve process (dump function, not use yet)
-	  */
-	
-	/*set_log_stage("ResolveProcess");
-	log_info("Start resolve process with kmer size %d", opt->lk);
-	char lv1_added[1024];
-	sprintf(lv1_added, "%s/graph_k_%d_local_added_barcode.bin", opt->out_dir, opt->k0);
-	opt->in_file = lv1_added;
-	resolve_local_process(opt);*/
+	save_graph_info(opt->out_dir, &g_lv2, "added_barcode");
+	asm_graph_destroy(&g_lv2);
 
 	/**
 	* Scaffolding
