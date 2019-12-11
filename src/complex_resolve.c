@@ -436,7 +436,7 @@ int resolve_bulges(struct asm_graph_t *g)
 	return res;
 }
 
-int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+int asm_resolve_complex_bulges_ite(struct asm_graph_t *g)
 {
 	int ite = 0;
 	int res = 0;
@@ -447,9 +447,6 @@ int asm_resolve_complex_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g
 		res += resolved;
 		++ite;
 		log_debug("%d-th iteration: %d complex bulge(s) resolved", ite, resolved);
-		char path[1024];
-		sprintf(path, "%d_ite", ite);
-		save_graph_info(opt->out_dir, g, path);
 		struct asm_graph_t g1;
 		asm_condense(g, &g1);
 		asm_graph_destroy(g);

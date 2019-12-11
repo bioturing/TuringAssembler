@@ -13,6 +13,10 @@
 #include "verbose.h"
 #include "io_utils.h"
 #include "include/kmc_skipping.h"
+#include "helper.h"
+#include "barcode_builder.h"
+#include "fastq_producer.h"
+#include "map_contig.h"
 
 #define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
 
@@ -129,6 +133,13 @@ struct kmedge_bundle_t {
 	struct asm_graph_t *g;
 };
 
+struct local_kmedge_bundle_t {
+	struct kmhash_t *h;
+	struct asm_graph_t *g;
+	int lc_e1;
+	int lc_e2;
+};
+
 void assign_count_kedge_multi(int thread_no, uint8_t *kmer, uint32_t count, void *data)
 {
 	struct kmedge_bundle_t *bundle = (struct kmedge_bundle_t *)data;
@@ -143,6 +154,41 @@ void assign_count_kedge_multi(int thread_no, uint8_t *kmer, uint32_t count, void
 	gint_t e = KMHASH_IDX(h, k);
 	atomic_add_and_fetch64(&g->edges[e].count, count);
 	atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count, count);
+}
+
+void assign_count_local_kedge_multi(int thread_no, uint8_t *kmer, uint32_t count,
+		void *data)
+{
+	struct local_kmedge_bundle_t *bundle = (struct local_kmedge_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	struct asm_graph_t *g = bundle->g;
+	int ksize = g->ksize + 1;
+	int word_size = (ksize + 3) >> 2;
+	kmint_t k = kmhash_get(h, kmer);
+	if (k == KMHASH_END(h)) {
+		return;
+	}
+	int e = h->idx[k];
+	int pos = h->kmer_pos[k];
+	int ok = 0;
+	int lc_e1 = bundle->lc_e1;
+	int lc_e2 = bundle->lc_e2;
+	int rc_e1 = g->edges[lc_e1].rc_id;
+	int rc_e2 = g->edges[lc_e2].rc_id;
+	if (e == lc_e1 || e == lc_e2){
+		ok = pos < CONTIG_LEVEL_1;
+	} else if (e == rc_e1 || e == rc_e2){
+		pos = g->edges[e].seq_len - pos + ksize - 2;
+		ok = pos < CONTIG_LEVEL_1;
+	} else {
+		ok = 1;
+	}
+
+	if (ok){
+		atomic_add_and_fetch64(&g->edges[e].count, count);
+		atomic_add_and_fetch64(&g->edges[g->edges[e].rc_id].count,
+				count);
+	}
 }
 
 struct iedge_bundle_t {
@@ -195,6 +241,53 @@ void *build_edge_index_worker(void *data)
 	return NULL;
 }
 
+void *build_edge_pos_worker(void *data)
+{
+	struct iedge_bundle_t *bundle = (struct iedge_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	struct asm_graph_t *g = bundle->g;
+	gint_t lo_e, hi_e;
+	lo_e = bundle->lo_e;
+	hi_e = bundle->hi_e;
+	pthread_mutex_t *lock = bundle->lock;
+	int ksize, word_size;
+	ksize = g->ksize + 1;
+	word_size = (ksize + 3) >> 2;
+	uint8_t *knum, *krev;
+	knum = alloca(word_size);
+	krev = alloca(word_size);
+	gint_t e, e_rc, e_id;
+	for (e = lo_e; e < hi_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			e_id = e_rc;
+		else
+			e_id = e;
+		uint32_t i;
+		memset(knum, 0, word_size);
+		memset(krev, 0, word_size);
+		for (i = 0; i < g->edges[e].seq_len; ++i) {
+			uint32_t c = __binseq_get(g->edges[e].seq, i);
+			km_shift_append(knum, ksize, word_size, c);
+			km_shift_append_rv(krev, ksize, word_size, c ^ 3);
+			if (i + 1 < (uint32_t)ksize)
+				continue;
+			int pos;
+			if (e_id == e)
+				pos = i;
+			else
+				pos = g->edges[e].seq_len - i + ksize - 2;
+			kmint_t k;
+			if (km_cmp(knum, krev, word_size) <= 0) {
+				kmhash_set_pos_multi(h, knum, pos, e_id, lock);
+			} else {
+				kmhash_set_pos_multi(h, krev, pos, e_id, lock);
+			}
+		}
+	}
+	return NULL;
+}
+
 void build_edge_kmer_index_multi(int n_threads, struct kmhash_t *h, struct asm_graph_t *g)
 {
 	pthread_attr_t attr;
@@ -238,6 +331,55 @@ void build_edge_kmer_index_multi(int n_threads, struct kmhash_t *h, struct asm_g
 	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
 	for (k = 0; k < n_threads; ++k)
 		pthread_create(threads + k, &attr, build_edge_index_worker, bundle + k);
+	for (k = 0; k < n_threads; ++k)
+		pthread_join(threads[k], NULL);
+	free(threads);
+	free(bundle);
+}
+
+void build_edge_kmer_pos_multi(int n_threads, struct kmhash_t *h, struct asm_graph_t *g)
+{
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	struct iedge_bundle_t *bundle;
+	bundle = calloc(n_threads, sizeof(struct iedge_bundle_t));
+
+	gint_t e, e_rc, cur_e, cap, sum = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum += g->edges[e].seq_len - g->ksize;
+	}
+	cap = sum / n_threads + 1;
+	int k = 0;
+	sum = 0;
+	bundle[0].lo_e = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		sum += g->edges[e].seq_len - g->ksize;
+		if (sum >= cap * (k + 1)) {
+			bundle[k].hi_e = e + 1;
+			bundle[k + 1].lo_e = e + 1;
+			++k;
+		}
+	}
+	bundle[n_threads - 1].hi_e = g->n_e;
+
+	for (k = 0; k < n_threads; ++k) {
+		bundle[k].h = h;
+		bundle[k].g = g;
+		bundle[k].lock = h->locks + k;
+	}
+
+	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
+	for (k = 0; k < n_threads; ++k)
+		pthread_create(threads + k, &attr, build_edge_pos_worker, bundle + k);
 	for (k = 0; k < n_threads; ++k)
 		pthread_join(threads[k], NULL);
 	free(threads);
@@ -781,6 +923,69 @@ void assign_count_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t
 			}
 		}
 	}
+}
+
+void build_local_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *lg, int e1, int e2, char *work_dir,
+		char *R1_path, char *R2_path)
+{
+	struct map_contig_t mct1;
+	init_map_contig(&mct1, g->edges[e1], *lg);
+	int lc_e1 = find_match(&mct1);
+	map_contig_destroy(&mct1);
+
+	struct map_contig_t mct2; init_map_contig(&mct2, g->edges[e2], *lg);
+	int lc_e2 = find_match(&mct2);
+	map_contig_destroy(&mct2);
+
+	char *tmp_files[2] = {R1_path, R2_path};
+	log_debug("|---- Counting kmer");
+	KMC_build_kmer_database(lg->ksize + 1, work_dir, opt->n_threads, opt->mmem,
+			2, tmp_files);
+	log_debug("|---- Retrieving kmer from KMC database");
+	struct kmhash_t kmer_table;
+	struct kmc_info_t kmc_inf;
+	char *kmc_pre = alloca(strlen(work_dir) + 50);
+	char *kmc_suf = alloca(strlen(work_dir) + 50);
+	sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", work_dir, lg->ksize + 1);
+	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, lg->ksize + 1);
+	KMC_read_prefix(kmc_pre, &kmc_inf);
+
+	log_debug("|---- Assigning edge count");
+	kmhash_init(&kmer_table, SIZE_1MB, (lg->ksize + 4) >> 2, KM_AUX_POS | KM_AUX_IDX,
+			opt->n_threads);
+	build_edge_kmer_pos_multi(opt->n_threads, &kmer_table, lg);
+	log_info("Number of (k+1)-mer on edge: %lu", kmer_table.n_item);
+
+	struct local_kmedge_bundle_t kmedge_bundle;
+	kmedge_bundle.h = &kmer_table;
+	kmedge_bundle.g = lg;
+	kmedge_bundle.lc_e1 = lc_e1;
+	kmedge_bundle.lc_e2 = lc_e2;
+	for (int i = 0; i < lg->n_e; ++i)
+		lg->edges[i].count = 0;
+	KMC_retrieve_kmer_multi(kmc_suf, opt->n_threads, &kmc_inf,
+			(void *)(&kmedge_bundle), assign_count_local_kedge_multi);
+	kmhash_destroy(&kmer_table);
+
+	for (int i = 0; i < lg->n_e; ++i){
+		int rc = lg->edges[i].rc_id;
+		if (lg->edges[i].count != lg->edges[rc].count)
+			log_error("Edge %d count %d edge %d count %d",
+					i, lg->edges[i].count, rc, lg->edges[rc].count);
+	}
+
+	/* Create fake count */
+	for (int i = 0; i < lg->n_e; ++i){
+		if (i != lc_e1 && i != lc_e2)
+			continue;
+		int rc = lg->edges[i].rc_id;
+		int count = lg->edges[i].count;
+		float expected_cov = count * 1.0 / (CONTIG_LEVEL_1 - lg->ksize + 1);
+		lg->edges[i].count = expected_cov * (lg->edges[i].seq_len - lg->ksize + 1);
+		lg->edges[rc].count = lg->edges[i].count;
+	}
+	destroy_kmc_info(&kmc_inf);
 }
 
 void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,

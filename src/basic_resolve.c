@@ -1639,8 +1639,8 @@ int find_alternative_path(struct asm_graph_t *g, int u, int v, int e, int len)
 	return res;
 }
 
-int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
-		khash_t(int64_alterp) *h, int *map)
+int asm_resolve_simple_bulges(struct asm_graph_t *g, khash_t(int64_alterp) *h,
+		int *map)
 {
 	int res = 0;
 	for (int i = 0; i < g->n_e; ++i){
@@ -1694,7 +1694,7 @@ int asm_resolve_simple_bulges(struct opt_proc_t *opt, struct asm_graph_t *g,
  * @param opt: application options
  * @param g: the graph
  */
-int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
+int asm_resolve_simple_bulges_ite(struct asm_graph_t *g)
 {
 	int ite = 0;
 	int res = 0;
@@ -1703,7 +1703,7 @@ int asm_resolve_simple_bulges_ite(struct opt_proc_t *opt, struct asm_graph_t *g)
 	for (int i = 0; i < g->n_v; ++i)
 		map[i] = i;
 	do{
-		int resolved = asm_resolve_simple_bulges(opt, g, h, map);
+		int resolved = asm_resolve_simple_bulges(g, h, map);
 		if (!resolved)
 			break;
 		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
