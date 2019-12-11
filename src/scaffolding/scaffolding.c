@@ -607,6 +607,9 @@ void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
 			mark[i] = 1;
 		}
 	}
+	for(int i = 0 ; i < g->n_e; i++) {
+		assert(mark[i] == mark[g->edges[i].rc_id]);
+	}
 }
 
 void find_scaffolds(struct asm_graph_t *g, struct opt_proc_t *opt, struct edges_score_type *edges_score,
