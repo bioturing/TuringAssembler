@@ -544,68 +544,42 @@ void assembly3_process(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
 	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
-	write_fasta_seq(&g_lv2, fasta_path);
+	write_fasta_seq(&g_lv3, fasta_path);
 	set_log_stage("MapReads");
-	construct_aux_info(opt, &g_lv2, &read_sorted_path, fasta_path,
+	construct_aux_info(opt, &g_lv3, &read_sorted_path, fasta_path,
 			ASM_BUILD_BARCODE);
-	save_graph_info(opt->out_dir, &g_lv2, "added_barcode");
-	asm_graph_destroy(&g_lv2);
+	save_graph_info(opt->out_dir, &g_lv3, "added_barcode");
+	asm_graph_destroy(&g_lv3);
 
 	/**
 	* Scaffolding
 	*/
-	char lv1_added_path[1024];
-	sprintf(lv1_added_path, "%s/graph_k_%d_added_barcode.bin", opt->out_dir,
+	char lv3_added_path[1024];
+	sprintf(lv3_added_path, "%s/graph_k_%d_added_barcode.bin", opt->out_dir,
 			opt->k0);
-	struct asm_graph_t g_lv1_added;
-	load_asm_graph(&g_lv1_added, lv1_added_path);
+	struct asm_graph_t g_lv3_added;
+	load_asm_graph(&g_lv3_added, lv3_added_path);
 	set_log_stage("Scaffolding");
 	char out_name[MAX_PATH];
 	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);
 	log_info("Construct the scaffolds using barcode information.");
 	FILE *out_file = fopen(out_name, "w");
-	scaffolding(out_file, &g_lv1_added, opt);
+	scaffolding(out_file, &g_lv3_added, opt);
 	fclose(out_file);
 	log_info("Done scaffolding. Please see the file: %s/scaffolds.fasta", opt->out_dir);
-	//TODO: BOTH ARE WROGN
-/*<<<<<<< HEAD
-	asm_graph_destroy(&g_lv1_added);
-=======
-	asm_graph_destroy(&g_scaff_lv2_added);*/
+	asm_graph_destroy(&g_lv3_added);
 
-
-	/**
-	 * Build barcode for local assembly
-	 */
-	set_log_stage("BWAIndex");
-	load_asm_graph(&g_lv3, lv3_path);
-	char asm_path[1024];
-	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
-	mkdir(fasta_path, 0755);
-	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
-	write_fasta_seq(&g_lv3, fasta_path);
-	set_log_stage("MapReads");
-	construct_aux_info(opt, &g_lv3, &read_sorted_path, fasta_path,
-			ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
-	add_cnt_to_graph(&g_lv3, table);
-	save_graph_info(opt->out_dir, &g_lv3, "local_added_barcode"); /* Barcode-added assembly graph */
-	log_info("Done re-calculate coverage for local assembly");
-	asm_graph_destroy(&g_lv3);
->>>>>>> use the right graph for local assembly
 
 	/**
 	* Local assembly
 	*/
-	char lv2_local_added_path[1024];
-	sprintf(lv2_local_added_path, "%s/graph_k_%d_local_added_barcode.bin",
-			opt->out_dir, opt->k0);
 	set_log_stage("LocalAssembly");
 	log_info("Start local assembly process with kmer size %d", opt->lk);
 	char in_fasta[1024];
 	char local_fasta[1024];
 	sprintf(in_fasta, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
 	sprintf(local_fasta, "%s/scaffold.full.fasta", opt->out_dir);
-	opt->in_file = lv1_added_path;
+	opt->in_file = lv3_added_path;
 	opt->in_fasta = in_fasta;
 	opt->lc = local_fasta;
 	char local_path[1024];
