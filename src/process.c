@@ -567,7 +567,31 @@ void assembly3_process(struct opt_proc_t *opt)
 	scaffolding(out_file, &g_lv1_added, opt);
 	fclose(out_file);
 	log_info("Done scaffolding. Please see the file: %s/scaffolds.fasta", opt->out_dir);
+	//TODO: BOTH ARE WROGN
+/*<<<<<<< HEAD
 	asm_graph_destroy(&g_lv1_added);
+=======
+	asm_graph_destroy(&g_scaff_lv2_added);*/
+
+
+	/**
+	 * Build barcode for local assembly
+	 */
+	set_log_stage("BWAIndex");
+	load_asm_graph(&g_lv3, lv3_path);
+	char asm_path[1024];
+	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g_lv3, fasta_path);
+	set_log_stage("MapReads");
+	construct_aux_info(opt, &g_lv3, &read_sorted_path, fasta_path,
+			ASM_BUILD_BARCODE, NOT_FOR_SCAFF);
+	add_cnt_to_graph(&g_lv3, table);
+	save_graph_info(opt->out_dir, &g_lv3, "local_added_barcode"); /* Barcode-added assembly graph */
+	log_info("Done re-calculate coverage for local assembly");
+	asm_graph_destroy(&g_lv3);
+>>>>>>> use the right graph for local assembly
 
 	/**
 	* Local assembly
