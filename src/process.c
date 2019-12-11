@@ -533,16 +533,15 @@ void assembly3_process(struct opt_proc_t *opt)
 	/**
 	 * Build barcodes
 	 */
-	set_log_stage("BWAIndex");
-	sprintf(fasta_path, "%s/barcode_build_dir_local", opt->out_dir);
 	char lv3_path[1024];
 	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
 	struct asm_graph_t g_lv3;
 	load_asm_graph(&g_lv3, lv3_path);
+
 	set_log_stage("BWAIndex");
 	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
-	sprintf(fasta_path, "%s/barcode_build_dir_local/contigs_tmp.fasta", opt->out_dir);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g_lv3, fasta_path);
 	set_log_stage("MapReads");
 	construct_aux_info(opt, &g_lv3, &read_sorted_path, fasta_path,
