@@ -479,7 +479,6 @@ void assembly3_process(struct opt_proc_t *opt)
 	set_log_stage("KmerCounting");
 	build_0_KMC(opt, opt->k0, &g_lv0); /* Do kmer counting using KMC */
 	save_graph_info(opt->out_dir, &g_lv0, "level_0");
-	asm_graph_destroy(&g_lv0);
 
 	set_log_stage("GraphConstruction");
 	build_0_1(&g_lv0, &g_lv1); /* Simplify graph level 0 to graph level 1 */
