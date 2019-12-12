@@ -24,9 +24,9 @@
 #define DEBUG_MM
 #endif
 
-#define MOLECULE_MARGIN 6000
+#define MOLECULE_MARGIN 5000
 #define MIN_READS_TO_HITS 0
-#define MAX_READS_TO_HITS 88
+#define MAX_READS_TO_HITS 100
 
 /* Credit for
  * https://graphics.stanford.edu/~seander/bithacks.html
@@ -259,39 +259,6 @@ struct mm_align_t *init_mm_align()
 	return aln;
 }
 
-/**
- * @brief Insert one hit of minimizers to the hits database
- * @param hits hits database
- * @param mm encode minimizers
- * @param e edge ID
- * @param p mapped position
- */
-void mm_hits_insert(struct mm_hits_t *hits, uint64_t mm, uint64_t e, uint32_t p) {
-	khiter_t k;
-	int miss;
-	struct mm_align_t *aln;
-	k = kh_get(mm_edges, hits->edges, e);
-	// Increase the number of hits of each edge to 1
-	if (k == kh_end(hits->edges)) {
-		k = kh_put(mm_edges, hits->edges, e, &miss);
-		kh_value(hits->edges, k) = 1;
-	} else
-		kh_value(hits->edges, k)++;
-	k = kh_get(mm_align, hits->aln, mm);
-	// Add the alignment object of each minimizers hit
-	if (k == kh_end(hits->aln)) {
-		k = kh_put(mm_align, hits->aln, mm, &miss);
-		kh_value(hits->aln, k) = init_mm_align();
-	}
-	aln = kh_value(hits->aln, k);
-	aln->cnt++;
-	aln->edge = e;
-	aln->pos  = p; // Single-ton minimizers so the pos and edge ID doens't change
-	aln->mm = mm;
-
-	hits->n++;
-}
-
 struct mm_db_t * mm_db_init()
 {
 	struct mm_db_t *db = calloc(1, sizeof(struct mm_db_t));
@@ -316,8 +283,7 @@ void mm_db_destroy(struct mm_db_t *db)
 struct mm_hits_t *mm_hits_init()
 {
 	struct mm_hits_t *hits = calloc(1, sizeof(struct mm_hits_t));
-	hits->edges = kh_init(mm_edges);
-	hits->aln = kh_init(mm_align);
+	init_mini_hash(&hits->edges, 0);
 	hits->n = 0;
 	return hits;
 }
@@ -328,13 +294,7 @@ struct mm_hits_t *mm_hits_init()
  */
 void mm_hits_destroy(struct mm_hits_t *hits)
 {
-	for (khiter_t it = kh_begin(hits->aln); it != kh_end(hits->aln); ++it){
-		if (!kh_exist(hits->aln, it))
-			continue;
-		free(kh_val(hits->aln, it));
-	}
-	kh_destroy(mm_edges, hits->edges);
-	kh_destroy(mm_align, hits->aln);
+	destroy_mini_hash(hits->edges);
 	free(hits);
 }
 
@@ -528,6 +488,7 @@ struct mm_db_edge_t *mm_db_edge_init()
 {
 	struct mm_db_edge_t *db = calloc(1, sizeof(struct mm_db_edge_t));
 	init_mini_hash(&db->table, INIT_PRIME_INDEX);
+	db->cnt = 0;
 	return db;
 }
 
@@ -541,19 +502,12 @@ struct mm_db_edge_t *mm_db_edge_init()
 void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
 {
 	uint64_t *slot = mini_put(&db->table, mm);
-	khiter_t k, ki, k_h;
-
-	ki = kh_get(mm_hash, db->cnt, mm);
-	if (ki == kh_end(db->cnt)) {
-		kh_set(mm_hash, db->cnt, mm, 1);
-		kh_set(mm_hash, db->h, mm, e);
-		kh_set(mm_hash, db->p, mm, p);
-	} else {
-		k_h = kh_get(mm_hash, db->h, mm);
-		//if (e != kh_value(db->h, k_h)) // Allow multiple mapped on one edge minimizer to be single-ton
-		kh_value(db->cnt, ki)++;
-	}
-
+	uint64_t old_edge;
+	uint64_t encode = GET_CODE(e, p);
+	if ((old_edge = atomic_val_CAS64(slot, 0, encode))) // for new minimizer
+		atomic_val_CAS64(slot, old_edge, EMPTY_SLOT); //non-singleton
+	if (old_edge == 0)
+		atomic_add_and_fetch64(&db->cnt, 1);
 }
 
 /**
@@ -562,9 +516,7 @@ void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_
  */
 void mm_db_edge_destroy(struct mm_db_edge_t *db)
 {
-	kh_destroy(mm_hash, db->h);
-	kh_destroy(mm_hash, db->cnt);
-	kh_destroy(mm_hash, db->p);
+	destroy_mini_hash(db->table);
 	free(db);
 }
 
@@ -575,23 +527,14 @@ void mm_db_edge_destroy(struct mm_db_edge_t *db)
  */
 static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 {
-	khiter_t k_cnt, k_h, k;
-	uint64_t single_cnt = 0, n_mm = 0;
-	for (k_cnt = kh_begin(db->cnt); k_cnt != kh_end(db->cnt); ++k_cnt) {
-		if (kh_exist(db->cnt, k_cnt)) {
-			n_mm++;
-			char *s = mm_dump_seq(kh_key(db->cnt, k_cnt), k_size);
-			uint32_t p = kh_get_val(mm_hash, db->p, kh_key(db->cnt, k_cnt), -1) ;
-			if (kh_value(db->cnt, k_cnt) == 1) {
-				single_cnt++;
-				DEBUG_MM("Singleton %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
-			} else {
-				DEBUG_MM("Redundant minimizers %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
-			}
-			free(s);
-		}
+	uint64_t i, cnt = 0, singleton = 0;
+	for (i = 0 ; i < db->table->size; ++i) {
+		if (db->table->key[i] != EMPTY_SLOT)
+			cnt++;
+		if (db->table->h[i] != EMPTY_SLOT)
+			singleton++;
 	}
-
+	log_info("Ratio of singleton minimizers %d/%d: %.2f %", singleton, cnt, (double)(singleton*1.0/cnt));
 }
 
 /**
@@ -628,22 +571,20 @@ struct mm_db_edge_t *mm_index_edges(struct asm_graph_t *g, int k, int w) {
  */
 void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_t *hits, struct asm_graph_t *g)
 {
-	khiter_t k;
 	uint32_t i, p;
 	uint64_t e;
-	int single_ton = 0;
+	uint64_t *slot, *hit_slot;
 	for (i = 0; i < db->n; ++i) {
-		k = kh_get(mm_hash, db_e->cnt, db->mm[i]);
-		if (k != kh_end(db_e->cnt) && kh_get_val(mm_hash, db_e->cnt, db->mm[i], -1) == 1) {
-			single_ton++;
-			p = kh_get_val(mm_hash, db_e->p, db->mm[i], -1);
-			e = kh_get_val(mm_hash, db_e->h, db->mm[i], -1);
-			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
-				continue;
-			mm_hits_insert(hits, db->mm[i], e, p);
-		} else {
-			return NULL;
-		}
+		slot = mini_get(db_e->table, db->mm[i]);
+		if ((*slot) == EMPTY_SLOT) //minimizer doesn't exists
+			continue;
+		p = (*slot) & 0x00000000ffffffff;
+		e = (uint64_t)((*slot) >> 32);
+		if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN) //minimizer mapped on the middle of the edge
+			continue;
+		hit_slot = mini_put(&hits->edges, e);
+		(*hit_slot)++; //increment alignment count of edge e to 1
+		hits->n++;
 	}
 	return hits;
 }
@@ -658,13 +599,15 @@ void mm_hits_print(struct mm_hits_t *hits, const char *file_path)
 	FILE *f = fopen(file_path, "w");
 	khiter_t k;
 	uint32_t even, key;
+	uint64_t *slot;
 	fprintf(f, "edge,Colour,hits\n");
-	for (k = kh_begin(hits->edges); k != kh_end(hits->edges); ++k) {
-		if (kh_exist(hits->edges, k)) {
-			key = kh_key(hits->edges, k);
-			even = key % 2 ? key - 1 : key;
-			fprintf(f, "%d_%d,red,%d\n", even, even + 1, kh_value(hits->edges, k));
-		}
+	for (uint64_t i = 0; i < hits->edges->size; ++i) {
+		if (hits->edges->key[i] == EMPTY_SLOT)
+			continue;
+		key = hits->edges->key[i];
+		even = key % 2 ? key - 1 : key;
+		fprintf(f, "%d_%d,red,%lu\n", even, even + 1, hits->edges->h[i]);
+
 	}
 	fclose(f);
 }
@@ -727,13 +670,12 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 
 	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX, tmp1 = er1, tmp2 = er2, count1 = 0, count2 = 0;
 	if (hits1->n > 0) {
-		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
-			if (kh_exist(hits1->edges, k1)) {
-				if (kh_val(hits1->edges, k1) > max) {
-					max = kh_val(hits1->edges, k1);
-					er1 = kh_key(hits1->edges, k1);
-					count1++;
-				}
+		for (uint64_t i = 0; i < hits1->edges->size; ++i) {
+			if (hits1->edges->key[i] == EMPTY_SLOT)
+				continue;
+			if (hits1->edges->h[i] > max) {
+				max = hits1->edges->h[i];
+				er1 = hits1->edges->key[i];
 			}
 		}
 	}
@@ -744,13 +686,13 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 	}
 	max = 0;
 	if (hits2->n > 0) {
-		for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
-			if (kh_exist(hits2->edges, k2))
-				if (kh_val(hits2->edges, k2) > max) {
-					max = kh_val(hits2->edges, k2);
-					er2 = kh_key(hits2->edges, k2);
-					count2++;
-				}
+		for (uint64_t i = 0; i < hits2->edges->size; ++i) {
+			if (hits2->edges->key[i] == EMPTY_SLOT)
+				continue;
+			if (hits2->edges->h[i] > max) {
+				max = hits2->edges->h[i];
+				er2 = hits2->edges->key[i];
+			}
 		}
 	}
 	if (count2 > 1) {

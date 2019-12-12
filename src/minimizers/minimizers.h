@@ -40,13 +40,13 @@ struct mm_db_t {
 };
 
 struct mm_hits_t {
-    kh_mm_edges_t *edges;
-    kh_mm_align_t *aln;
+    struct mini_hash_t *edges;
     uint32_t n;
 };
 
 struct mm_db_edge_t {
-    struct mini_hash_t *table
+    struct mini_hash_t *table;
+    uint64_t cnt;
 };
 
 struct mm_bundle_t {

@@ -18,6 +18,7 @@
 #include "minimizers.h"
 #include "../assembly_graph.h"
 #include "get_buffer.h"
+#include "../atomic.h"
 
 static const char *bit_rep[16] = {
 	[ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
@@ -161,8 +162,7 @@ void smart_load_barcode(struct opt_proc_t *opt)
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 	struct mm_db_edge_t *mm_edges_db = mm_index_edges(&g, MINIMIZERS_KMER, MINIMIZERS_WINDOW);
-	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
-	khiter_t ki,k;
+	uint64_t *slot;
 	hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
@@ -179,12 +179,12 @@ void smart_load_barcode(struct opt_proc_t *opt)
 
 		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
 		if (hits1->n > 0) {
-			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
-				if (kh_exist(hits1->edges, k1)) {
-					if (kh_val(hits1->edges, k1) > max) {
-						max = kh_val(hits1->edges, k1);
-						er1 = kh_key(hits1->edges, k1);
-					}
+			for (uint64_t i = 0; i < hits1->edges->size; ++i) {
+				if (hits1->edges->key[i] == EMPTY_SLOT)
+					continue;
+				if (hits1->edges->h[i] > max) {
+					max = hits1->edges->h[i];
+					er1 = hits1->edges->key[i];
 				}
 			}
 		}
@@ -194,22 +194,27 @@ void smart_load_barcode(struct opt_proc_t *opt)
 			er1 = UINT64_MAX;
 		max = 0;
 		if (hits2->n > 0) {
-			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
-				if (kh_exist(hits2->edges, k2))
-					if (kh_val(hits2->edges, k2) > max) {
-						max = kh_val(hits2->edges, k2);
-						er2 = kh_key(hits2->edges, k2);
-					}
+			for (uint64_t i = 0; i < hits2->edges->size; ++i) {
+				if (hits2->edges->key[i] == EMPTY_SLOT)
+					continue;
+				if (hits2->edges->h[i] > max) {
+					max = hits2->edges->h[i];
+					er2 = hits2->edges->key[i];
+				}
 			}
 		}
 		log_info("read: %s, hits ratio %d/%d", r2.name, max, hits2->n);
 		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
 			er2 = UINT64_MAX;
 
-		if (er1 != UINT64_MAX)
-			kh_set(mm_edges, hits->edges, er1, 1);
-		if (er2 != UINT64_MAX)
-			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != UINT64_MAX) {
+			slot = mini_put(&hits->edges, er1);
+			atomic_add_and_fetch64(slot, 1);
+		}
+		if (er2 != UINT64_MAX) {
+			slot = mini_put(&hits->edges, er2);
+			atomic_add_and_fetch64(slot, 1);
+		}
 		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g.edges[er1].rc_id != er2) {
 			log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
 			printf("%lu %lu\n", er1, er2);
@@ -250,15 +255,13 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 	struct mm_db_t *db1, *db2;
 	struct mm_hits_t *hits1, *hits2, *hits;
 
-	kh_mm_pw_t *kh_pw = kh_init(mm_pw);
-	khiter_t ki, k;
+	uint64_t *slot;
 	hits = mm_hits_init();
 
 	while (get_read_from_fq(&r1, buf1, &pos1) == READ_SUCCESS && get_read_from_fq(&r2, buf2, &pos2) == READ_SUCCESS ) {
 		n_reads++;
 		db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
 		db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
-		khiter_t k1, k2;
 
 		hits1 = mm_hits_init();
 		hits2 = mm_hits_init();
@@ -268,38 +271,45 @@ struct mm_hits_t *get_hits_from_barcode(char *bc, struct bc_hit_bundle_t *bc_hit
 
 		uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
 		if (hits1->n > 0) {
-			for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
-				if (kh_exist(hits1->edges, k1)) {
-					if (kh_val(hits1->edges, k1) > max) {
-						max = kh_val(hits1->edges, k1);
-						er1 = kh_key(hits1->edges, k1);
-					}
+			for (uint64_t i = 0; i < hits1->edges->size; ++i) {
+				if (hits1->edges->key[i] == EMPTY_SLOT)
+					continue;
+				if (hits1->edges->h[i] > max) {
+					max = hits1->edges->h[i];
+					er1 = hits1->edges->key[i];
 				}
 			}
 		}
+		log_info("read: %s, hits ratio %d/%d", r1.name, max, hits1->n);
 
 		if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON)
 			er1 = UINT64_MAX;
 		max = 0;
 		if (hits2->n > 0) {
-			for (k2 = kh_begin(hits2->edges); k2 != kh_end(hits2->edges); ++k2) {
-				if (kh_exist(hits2->edges, k2))
-					if (kh_val(hits2->edges, k2) > max) {
-						max = kh_val(hits2->edges, k2);
-						er2 = kh_key(hits2->edges, k2);
-					}
+			for (uint64_t i = 0; i < hits2->edges->size; ++i) {
+				if (hits2->edges->key[i] == EMPTY_SLOT)
+					continue;
+				if (hits2->edges->h[i] > max) {
+					max = hits2->edges->h[i];
+					er2 = hits2->edges->key[i];
+				}
 			}
 		}
+		log_info("read: %s, hits ratio %d/%d", r2.name, max, hits2->n);
 		if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON)
 			er2 = UINT64_MAX;
 
-		if (er1 != UINT64_MAX)
-			kh_set(mm_edges, hits->edges, er1, 1);
-		if (er2 != UINT64_MAX)
-			kh_set(mm_edges, hits->edges, er2, 1);
+		if (er1 != UINT64_MAX) {
+			slot = mini_put(&hits->edges, er1);
+			atomic_add_and_fetch64(slot, 1);
+		}
+		if (er2 != UINT64_MAX) {
+			slot = mini_put(&hits->edges, er2);
+			atomic_add_and_fetch64(slot, 1);
+		}
 		if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
-			//log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
-			printf("%llu %llu\n", er1, er2);
+			log_debug("Spanned pair of read: (R1) %lu, (R2) %lu", er1, er2);
+			printf("%lu %lu\n", er1, er2);
 		}
 		mm_hits_destroy(hits1);
 		mm_hits_destroy(hits2);
