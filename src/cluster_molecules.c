@@ -1149,23 +1149,30 @@ int check_adj_edges(struct asm_graph_t *g, int v, int u)
 	return 0;
 }
 
+void trace_shortest_path(int s, int t, khash_t(long_int) *best_P,
+		khash_t(int_int) *best_D, int **path, int *n_e)
+{
+	*path = calloc(MAX_PATH_LEN + 2, sizeof(int));
+	*n_e = 0;
+	int d = kh_int_int_get(best_D, t);
+	int v = t;
+	while (v != -1) {
+		(*path)[(*n_e)++] = v;
+		v = kh_long_int_get(best_P, GET_CODE(v, d));
+		--d;
+	}
+	for (int i = 0, j = (*n_e) - 1; i < j; ++i, --j) {
+		int tmp = (*path)[i];
+		(*path)[i] = (*path)[j];
+		(*path[j]) = tmp;
+	}
+}
+
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 					       int t, khash_t(long_spath) *stored)
 {
 	if (kh_long_spath_exist(stored, GET_CODE(s, t)))
 		return kh_long_spath_get(stored, GET_CODE(s, t));
-
-	struct shortest_path_info_t *res = NULL;
-	if (check_adj_edges(g, s, t)) {
-		res = calloc(1, sizeof(struct shortest_path_info_t));
-		res->sum_seq = 0;
-		res->n_e = 2;
-		res->path = calloc(2, sizeof(int));
-		res->path[0] = s;
-		res->path[1] = t;
-		kh_long_spath_set(stored, GET_CODE(s, t), res);
-		return res;
-	}
 
 	struct queue_t q;
 	init_queue(&q, 1024);
@@ -1174,17 +1181,15 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 	khash_t(int_int) *best_D = kh_init(int_int);
 
 	int s_tg = g->edges[s].target;
-	struct len_info_t wrapper;
-	for (int i = 0; i < g->nodes[s_tg].deg; ++i) {
-		int v = g->nodes[s_tg].adj[i];
-		wrapper.v = v;
-		wrapper.sum_seq = g->edges[v].seq_len;
-		wrapper.len = 1;
-		push_queue(&q, pointerize(&wrapper, sizeof(struct len_info_t)));
-		kh_long_int_set(best_P, GET_CODE(v, 1), -1);
-		kh_int_int_set(best_L, v, 0);
-		kh_int_int_set(best_D, v, 1);
-	}
+	struct len_info_t wrapper = {
+		.v = s,
+		.sum_seq = g->edges[s].seq_len,
+		.len = 0
+	};
+	push_queue(&q, pointerize(&wrapper, sizeof(struct len_info_t)));
+	kh_long_int_set(best_P, GET_CODE(s, 0), -1);
+	kh_int_int_set(best_L, s, wrapper.sum_seq);
+	kh_int_int_set(best_D, s, wrapper.len);
 
 	while (!is_queue_empty(&q)) {
 		struct len_info_t *wrapper = get_queue(&q);
@@ -1193,7 +1198,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		int len = wrapper->len;
 		free(wrapper);
 		pop_queue(&q);
-		if (len == MAX_PATH_LEN)
+		if (len > MAX_PATH_LEN)
 			continue;
 
 		if (g->edges[v].seq_len > MIN_EDGE_LEN)
@@ -1220,52 +1225,28 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 	}
 	destroy_queue(&q);
 
-	int best_w = -1;
-	int best_sum_seq = 1e9;
-	for (khiter_t it = kh_begin(best_L); it != kh_end(best_L); ++it) {
+	struct shortest_path_info_t *res = NULL;
+	for (khiter_t it = kh_begin(best_L); it != kh_end(best_L); ++it){
 		if (!kh_exist(best_L, it))
 			continue;
-		int w = kh_key(best_L, it);
-		int sum_seq = kh_val(best_L, it);
-		if (sum_seq > best_sum_seq)
+		int v = kh_key(best_L, it);
+		int real_len = kh_val(best_L, it) - (g->edges[s].seq_len
+			+ g->edges[v].seq_len - g->ksize);
+		if (real_len > MAX_RADIUS)
 			continue;
-
-		int w_tg = g->edges[w].target;
-		for (int i = 0; i < g->nodes[w_tg].deg; ++i) {
-			if (t == g->nodes[w_tg].adj[i]) {
-				best_w = w;
-				best_sum_seq = sum_seq;
-				break;
-			}
-		}
+		int *path;
+		int n_e;
+		trace_shortest_path(s, v, best_P, best_D, &path, &n_e);
+		struct shortest_path_info_t *tmp = calloc(1,
+				sizeof(struct shortest_path_info_t));
+		tmp->sum_seq = real_len;
+		tmp->n_e = n_e;
+		tmp->path = path;
+		uint64_t code = GET_CODE(s, v);
+		kh_long_spath_set(stored, code, tmp);
+		if (v == t)
+			res = tmp;
 	}
-
-	if (best_w == -1)
-		return NULL;
-
-	int *path = calloc(MAX_PATH_LEN + 2, sizeof(int));
-	int n_e = 1;
-	path[0] = t;
-
-	int d = kh_int_int_get(best_D, best_w);
-	int v = best_w;
-	while (v != -1) {
-		path[n_e++] = v;
-		v = kh_long_int_get(best_P, GET_CODE(v, d));
-		--d;
-	}
-	path[n_e++] = s;
-	for (int i = 0, j = n_e - 1; i < j; ++i, --j) {
-		int tmp = path[i];
-		path[i] = path[j];
-		path[j] = tmp;
-	}
-
-	res = calloc(1, sizeof(struct shortest_path_info_t));
-	res->sum_seq = best_sum_seq;
-	res->n_e = n_e;
-	res->path = path;
-	kh_long_spath_set(stored, GET_CODE(s, t), res);
 
 	kh_destroy(int_int, best_L);
 	kh_destroy(long_int, best_P);

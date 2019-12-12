@@ -77,6 +77,9 @@ void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 /*int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
 		int v, int u, int **path, int *n_v);*/
 
+void trace_shortest_path(int s, int t, khash_t(long_int) *best_P,
+		khash_t(int_int) *best_D, int **path, int *n_e);
+
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		int t, khash_t(long_spath) *stored);
 
