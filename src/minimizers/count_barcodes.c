@@ -83,8 +83,10 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 
 void destroy_mini_hash(struct mini_hash_t *h_table)
 {
-	for (int i = 0; i < h_table->size; ++i)
-		free((struct mini_hash_t *) h_table->h[i]);
+	for (int i = 0; i < h_table->size; ++i){
+		if (h_table->h[i] != EMPTY_BX)
+			free((struct mini_hash_t *) h_table->h[i]);
+	}
 	free(h_table->h);
 	free(h_table->key);
 }
