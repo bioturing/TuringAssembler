@@ -1164,7 +1164,7 @@ void trace_shortest_path(int s, int t, khash_t(long_int) *best_P,
 	for (int i = 0, j = (*n_e) - 1; i < j; ++i, --j) {
 		int tmp = (*path)[i];
 		(*path)[i] = (*path)[j];
-		(*path[j]) = tmp;
+		(*path)[j] = tmp;
 	}
 }
 
