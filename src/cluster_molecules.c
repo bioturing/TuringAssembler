@@ -464,12 +464,13 @@ void filter_complex_regions(struct simple_graph_t *sg)
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
+		destroy_queue(&q);
 		++n_total;
 
 		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1
 				&& kh_size(component) > 1){
 			n_simple_edges += kh_size(component);
-			continue;
+			goto free_stage_1;
 		}
 		++n_complex;
 		for (khiter_t it = kh_begin(component); it != kh_end(component);
@@ -479,6 +480,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 			int v = kh_key(component, it);
 			kh_set_int_add(sg->is_complex, v);
 		}
+free_stage_1:
 		kh_destroy(set_int, component);
 	}
 	kh_destroy(set_int, visited);

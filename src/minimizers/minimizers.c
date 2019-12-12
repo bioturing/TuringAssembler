@@ -588,8 +588,8 @@ static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 				DEBUG_MM("Singleton %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
 			} else {
 				DEBUG_MM("Redundant minimizers %s: contig: %d, pos: %d\n", s, kh_get_val(mm_hash, db->h, kh_key(db->cnt, k_cnt), -1), p);
-
 			}
+			free(s);
 		}
 	}
 

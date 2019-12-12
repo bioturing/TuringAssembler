@@ -83,6 +83,8 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 
 void destroy_mini_hash(struct mini_hash_t *h_table)
 {
+	for (int i = 0; i < h_table->size; ++i)
+		free((struct mini_hash_t *) h_table->h[i]);
 	free(h_table->h);
 	free(h_table->key);
 }
@@ -386,6 +388,10 @@ struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
+
+	free(producer_threads);
+	free(worker_threads);
+	free(worker_bundles);
 
 	free_fastq_pair(producer_bundles, opt->n_files);
 	mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
