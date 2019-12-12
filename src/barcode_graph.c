@@ -588,7 +588,8 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 	int n_res = 0, *list_res = NULL;
 	filter_list_edge(opt, rp_table, g, n_edges, list_edges, &n_res, &list_res);
 	free(list_edges);
-	destroy_mini_hash(rp_table);
+	//TODO: Free this
+	//destroy_mini_hash(rp_table);
 
 	create_barcode_molecules(opt, list_res, n_res * 2, g);
 	free(list_res);
