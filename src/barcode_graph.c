@@ -38,6 +38,7 @@ void destroy_barcode_graph(struct barcode_graph *bg)
 	free(bg->first_index);
 	free(bg->next_index);
 	free(bg->edges);
+	free(bg->is_del);
 	free(bg);
 }
 
@@ -120,6 +121,7 @@ void filter_bulge(struct barcode_graph *bg)
 					}
 		}
 	}
+	free(near);
 }
 
 void filter_by_deg(struct barcode_graph *bg, int thres_deg)
@@ -458,16 +460,22 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	//todo @huu test move remove tip to here
 	filter_shortest_path_and_readpair(g, bg, stored, rp_table);
 	print_dot_graph(bg, "after_filter_BCandpair.dot");
+
 	filter_go_both_reverse_complement(g, bg);
 	filter_go_reverse_complement(g, bg);
 	print_dot_graph(bg, "after_filter_reverse.dot");
+
 	filter_by_deg(bg, 4);
 	remove_tips_barcode_graph(g, bg, stored);
 	print_dot_graph(bg, "after_remove_tips.dot");
+	long_spath_destroy(stored);
+
 	filter_complex_barcode_graph(bg);
 	print_dot_graph(bg, "after_filter_complex.dot");
+
 	filter_bulge(bg);
 	print_dot_graph(bg, "after_filter_bulge.dot");
+
 	filter_by_deg(bg, 1);
 	print_dot_graph(bg, "after_all.dot");
 	print_del_barcode_graph(bg);
@@ -492,12 +500,12 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 		++n_res;
 		log_debug("Add edge to final list %d %d", v, u);
 	}
+	destroy_barcode_graph(bg);
 	kh_destroy(set_long, mark_link);
 
 	*list_ret = list_res;
 	*n_ret = n_res;
 	log_info("n edges after in deg and out deg: %d", *n_ret);
-	destroy_barcode_graph(bg);
 }
 
 void print_bx_count(khash_t(long_int) *res, struct opt_proc_t *opt)
@@ -528,6 +536,7 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 	struct mini_hash_t *bx_table = t->bx_table;
 	struct mini_hash_t *rp_table = t->rp_table;
 	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
+	destroy_mini_hash(bx_table);
 
 	print_bx_count(all_count, opt);
 
@@ -573,8 +582,15 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			append_edge(&n_edges, &list_edges, v, u);
 		}
 	}
+	kh_destroy(long_int, all_count);
+
 	log_info("n pair pass barcode count filtering %d", n_edges);
 	int n_res = 0, *list_res = NULL;
 	filter_list_edge(opt, rp_table, g, n_edges, list_edges, &n_res, &list_res);
+	free(list_edges);
+	destroy_mini_hash(rp_table);
+
 	create_barcode_molecules(opt, list_res, n_res * 2, g);
+	free(list_res);
+
 }
