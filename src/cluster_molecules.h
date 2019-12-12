@@ -140,5 +140,6 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 		struct paths_bundle_t *paths_bundle);
 
 void paths_bundle_destroy(struct paths_bundle_t *paths_bundle);
+
 int check_adj_edges(struct asm_graph_t *g, int v, int u);
 #endif
