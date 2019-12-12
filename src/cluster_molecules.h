@@ -80,6 +80,8 @@ void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		int t, khash_t(long_spath) *stored);
 
+void long_spath_destroy(khash_t(long_spath) *stored);
+
 int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
 
 void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
@@ -135,6 +137,8 @@ void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
 		struct simple_graph_t *sg, char **seq);
 void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges);
 void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
-		struct paths_bundle_t *path_bundle);
+		struct paths_bundle_t *paths_bundle);
+
+void paths_bundle_destroy(struct paths_bundle_t *paths_bundle);
 int check_adj_edges(struct asm_graph_t *g, int v, int u);
 #endif
