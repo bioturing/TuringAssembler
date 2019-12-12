@@ -447,6 +447,20 @@ static inline void *biot_buffer_iterator_simple(void *data)
 	return NULL;
 }
 
+uint64_t get_min_code(struct asm_graph_t *g, int u, int v)
+{
+	if (g->edges[u].rc_id < u)
+		u = g->edges[u].rc_id;
+	if (g->edges[v].rc_id < v)
+		v = g->edges[v].rc_id;
+	if (u > v) {
+		int tmp = u;
+		u = v;
+		v = tmp;
+	}
+	return ((uint64_t)u << 32) + v;
+}
+
 /**
  * @brief: Create the hash table of share-barcode count of every edge pair u-v
  * @param: edge hits of all barcodes. See @function mm_hit_all_barcodes
@@ -470,35 +484,19 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 
 		for (int j = 0; j < n_e; ++j){
 			for (int k = j + 1; k < n_e; ++k){
-				uint64_t e1 = edges[j];
-				uint64_t e2 = edges[k];
+				int e1 = edges[j];
+				int e2 = edges[k];
 				if (e1 >= g->n_e || e2 >= g->n_e) {
 					log_error("Wrong edges number of one barcode hit, e1 %d, e2 %d", e1, e2);
 				}
-				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
+				uint64_t code = get_min_code(g, e1, e2);
+
 				int cur_count = kh_long_int_try_get(res, code, 0);
 				kh_long_int_set(res, code, cur_count + 1);
 			}
 		}
 		free(edges);
 	}
-
-	khash_t(long_int) *tmp = kh_init(long_int);
-	for (khiter_t it = kh_begin(res); it != kh_end(res); ++it){
-		if (!kh_exist(res, it))
-			continue;
-		uint64_t code = kh_key(res, it);
-		uint64_t v = code >> 32;
-		uint64_t u = (uint64_t) code & 0x00000000ffffffff;
-		uint64_t v_rc = g->edges[v].rc_id;
-		uint64_t u_rc = g->edges[u].rc_id;
-		uint64_t code_rc = v_rc < u_rc ? GET_CODE(v_rc, u_rc) : GET_CODE(u_rc, v_rc);
-		int sum_cnt = kh_val(res, it) + kh_long_int_try_get(res, code_rc, 0);
-		kh_long_int_set(tmp, code, sum_cnt);
-		kh_long_int_set(tmp, code_rc, sum_cnt);
-	}
-	kh_destroy(long_int, res);
-	res = tmp;
 
 	return res;
 }

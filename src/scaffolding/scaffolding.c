@@ -485,8 +485,10 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	struct best_next_contig *res = calloc(1, sizeof(struct best_next_contig));
 	res->i_contig = best_edge;
 	res->score = *max_score;
-	if (!better_edge(&res->score, thres_score))
+	if (!better_edge(&res->score, thres_score)) {
 		res->i_contig = -1;
+		log_trace("below thres score %f", thres_score->bc_score);
+	}
 	log_trace("res icontig %d thres score %f", res->i_contig, thres_score->bc_score);
 	free(max_score);
 	return res;

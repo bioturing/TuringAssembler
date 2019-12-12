@@ -614,7 +614,6 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		sprintf(ctg, "%d ", contig_path[i]);
 		strcat(path, ctg);
 	}
-	log_debug("Path: %s", path);
 
 	for (int i = 1; i < n_contig_path; i++) {
 		int a = contig_path[i - 1], b = contig_path[i];
@@ -652,6 +651,8 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		int i_e = contig_path[i];
 		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
 		assert(cov >= 0);
+		if (cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov)
+			return;
 		if (cov > COVERAGE_RATIO_TO_BE_REPEAT * avg_cov)
 			continue;
 		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
@@ -663,7 +664,6 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		local_cov = avg_cov;
 	} else
 		local_cov = sum_cov/sum_len;
-
 
 	if (local_cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov) {
 		log_debug("Ignore path because seem to be already consider");
@@ -683,6 +683,7 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		g->edges[i_e_rc].count -= tmp;
 	}
 
+	log_debug("Path: %s", path);
 	uint32_t *seq_encode;
 	encode_seq(&seq_encode, seq);
 	free(seq);
@@ -1173,6 +1174,8 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		if (len == MAX_PATH_LEN)
 			continue;
 
+		if (g->edges[v].seq_len > MIN_EDGE_LEN)
+			continue;
 		int v_tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[v_tg].deg; ++i) {
 			int u = g->nodes[v_tg].adj[i];
