@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include "../khash.h"
 #include "../assembly_graph.h"
+#include "minimizers/count_barcodes.h"
 
 #define RATIO_OF_CONFIDENT 0.85
 #define MIN_NUMBER_SINGLETON 2
@@ -45,9 +46,7 @@ struct mm_hits_t {
 };
 
 struct mm_db_edge_t {
-    kh_mm_hash_t *h;
-    kh_mm_hash_t *cnt;
-    kh_mm_hash_t *p;
+    struct mini_hash_t *table
 };
 
 struct mm_bundle_t {

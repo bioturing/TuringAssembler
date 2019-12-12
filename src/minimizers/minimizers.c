@@ -527,9 +527,7 @@ struct mm_db_t * mm_index_char_str(char *s, int k, int w, int l)
 struct mm_db_edge_t *mm_db_edge_init()
 {
 	struct mm_db_edge_t *db = calloc(1, sizeof(struct mm_db_edge_t));
-	db->h = kh_init(mm_hash);
-	db->cnt = kh_init(mm_hash);
-	db->p = kh_init(mm_hash);
+	init_mini_hash(&db->table, INIT_PRIME_INDEX);
 	return db;
 }
 
@@ -542,6 +540,7 @@ struct mm_db_edge_t *mm_db_edge_init()
  */
 void mm_db_edge_insert(struct mm_db_edge_t *db, uint64_t mm, uint32_t e, uint32_t p)
 {
+	uint64_t *slot = mini_put(&db->table, mm);
 	khiter_t k, ki, k_h;
 
 	ki = kh_get(mm_hash, db->cnt, mm);

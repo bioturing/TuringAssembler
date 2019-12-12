@@ -224,23 +224,26 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
+	uint64_t is_set = 0;
 	if (is_empty) { // slot is empty -> fill in
 		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
-		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+		for (i = slot + 1; i < h_table->size; ++i) {
 			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
-			if (is_empty)
+			is_set = atomic_bool_CAS64(h_table->key + i, data, data);
+			if (is_empty || is_set)
 				break;
 		}
 		if (i == h_table->size) {
-			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
+			for (i = 0; i < slot ; ++i) {
 				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
-				if (is_empty)
+				is_set = atomic_bool_CAS64(h_table->key + i, data, data);
+				if (is_empty || is_set)
 					break;
 			}
 		}
-		assert(!atomic_bool_CAS64(&i, slot, slot));
+		assert(!atomic_bool_CAS64(&i, slot, slot)); //TODO: sometime crash here
 		if (is_empty) //room at probe is empty -> fill in
 			atomic_add_and_fetch64(&(h_table->count), 1);
 		slot = i;
@@ -258,19 +261,22 @@ uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, EMPTY_SLOT);
+	uint64_t is_set = 0;
 	if (is_empty) { // slot is empty -> fill in
 		return (uint64_t *)EMPTY_BX;
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
-		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
-			if (is_empty)
+		for (i = slot + 1; i < h_table->size; ++i) {
+			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
+			is_set = atomic_bool_CAS64(h_table->key + i, data, data);
+			if (is_empty || is_set)
 				break;
 		}
 		if (i == h_table->size) {
-			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
-				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
-				if (is_empty)
+			for (i = 0; i < slot; ++i) {
+				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
+				is_set = atomic_bool_CAS64(h_table->key + i, data, data);
+				if (is_empty || is_set)
 					break;
 			}
 		}
