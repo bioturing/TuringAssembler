@@ -1314,11 +1314,16 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 	int n_e = 0;
 	int *e_id = NULL;
 	int *dis_len = NULL;
+	int *pos = NULL;
 	g_dump->edges = NULL;
 	for (int e = 0; e < g->n_e; ++e){
-		int e_len = g->edges[e].seq_len;
-		if (e_len < 20000)
+		int e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
 			continue;
+		int e_len = g->edges[e].seq_len;
+		if (e_len < 20000){
+			continue;
+		}
 		char *seq;
 		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
 		for (int i = 0; i + MOLECULE_DENSITY <= e_len;){
@@ -1334,17 +1339,33 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 			g_dump->edges[n_e].seq = seq_encode;
 			g_dump->edges[n_e].seq_len = MOLECULE_DENSITY;
 			g_dump->edges[n_e].n_holes = 0;
-			asm_clone_edge(g_dump, n_e + 1, n_e);
+			asm_clone_seq_reverse(g_dump->edges + n_e + 1,
+					g_dump->edges + n_e);
 
 			e_id = realloc(e_id, (n_e + 2) * sizeof(int));
 			dis_len = realloc(dis_len, (n_e + 2) * sizeof(int));
+			pos = realloc(pos, (n_e + 2) * sizeof(int));
 			int dis = rand() % (MAX_RADIUS + 1);
-			i += MOLECULE_DENSITY + dis;
 			e_id[n_e] = e_id[n_e + 1] = e;
 			dis_len[n_e] = dis_len[n_e + 1] = dis;
+			pos[n_e] = pos[n_e + 1] = i;
+			i += MOLECULE_DENSITY + dis;
 			n_e += 2;
 		}
 		free(seq);
+	}
+	int n_e_20k = n_e;
+	for (int e = 0; e < g->n_e; ++e){
+		int e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
+		if (g->edges[e].seq_len >= 20000)
+			continue;
+		g_dump->edges = realloc(g_dump->edges, (n_e + 2) * sizeof(struct asm_edge_t));
+		asm_clone_seq(g_dump->edges + n_e, g->edges + e);
+		asm_clone_seq_reverse(g_dump->edges + n_e + 1,
+				g->edges + e);
+		n_e += 2;
 	}
 	g_dump->n_e = n_e;
 
@@ -1362,19 +1383,22 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 	construct_aux_info(opt, g_dump, &read_sorted_path, fasta_path,
 			ASM_BUILD_BARCODE);
 	FILE *f = fopen(opt->lc, "w");
-	for (int i = 2; i < g_dump->n_e; i += 2){
+	for (int i = 2; i < n_e_20k; i += 2){
 		if (e_id[i] != e_id[i - 1])
 			continue;
 		khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
 		khash_t(gint) *h2 = barcode_hash_2_khash(g_dump->edges[i - 1].barcodes + 2);
 		log_debug("number of barcodes %d %d", kh_size(h1), kh_size(h2));
 		khash_t(gint) *h_shared = get_shared_bc(h1, h2);
-		fprintf(f, "%d %d %d %d\n", MOLECULE_DENSITY, MOLECULE_DENSITY,
-				dis_len[i - 1], kh_size(h_shared));
+		fprintf(f, "%d %d %d %d\n", e_id[i], pos[i], dis_len[i - 1],
+				kh_size(h_shared));
 		kh_destroy(gint, h1);
 		kh_destroy(gint, h2);
 		kh_destroy(gint, h_shared);
 	}
+	free(e_id);
+	free(pos);
+	free(dis_len);
 	fclose(f);
 
 	free(g_dump);
