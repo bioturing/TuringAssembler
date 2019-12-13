@@ -7,6 +7,7 @@
 #include "cluster_molecules.h"
 #include "log.h"
 #include "utils.h"
+#include "io_utils.h"
 
 #define MIN_SHARE_BARCODE_COUNT 100
 #define MIN_READ_PAIR_COUNT 1
@@ -15,7 +16,7 @@
 #define SHORT_PATH 2
 #define MIN_PAIR_SUPPORT_PAIR_END 1
 #define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
-#define MIN_SHARED_BARCODE_RATIO 0.04
+#define MIN_SHARED_BARCODE_RATIO 0.005
 #define MOLECULE_DENSITY 5000
 
 struct barcode_graph {
@@ -484,9 +485,10 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 		int v = bg->edges[i];
 		int u = bg->edges[i + 1];
 		uint64_t code = GET_CODE(v, u);
-		if (kh_set_long_exist(mark_link, code))
-			continue;
-		kh_set_long_add(mark_link, code);
+		if (!kh_set_long_exist(mark_link, code))
+			kh_set_long_add(mark_link, code);
+		else
+			log_error("wtf");
 		list_res[n_res << 1] = v;
 		list_res[(n_res << 1) + 1] = u;
 		++n_res;
@@ -522,15 +524,115 @@ void append_edge(int *n_edges, int **list_edges, int u, int v)
 	(*n_edges)++;
 }
 
+void save_khash(khash_t(long_int) *h, char *path)
+{
+	FILE *f = xfopen(path, "wb");
+	xfwrite(&h->n_buckets, sizeof(h->n_buckets), 1, f);
+	xfwrite(&h->size, sizeof(h->size), 1, f);
+	xfwrite(&h->n_occupied, sizeof(h->n_occupied), 1, f);
+	xfwrite(&h->upper_bound, sizeof(h->upper_bound), 1, f);
+
+	//flag
+	xfwrite(h->flags, sizeof(khint32_t), __ac_fsize(h->n_buckets), f);
+	//key
+	xfwrite(h->keys, sizeof(uint64_t), h->n_buckets, f);
+	//value
+	xfwrite(h->vals, sizeof(int), h->n_buckets, f);
+
+	fclose(f);
+}
+
+khash_t(long_int) *load_khash(char *path)
+{
+	khash_t(long_int) *h = kh_init(long_int);
+	FILE *f = xfopen(path, "rb");
+	xfread(&h->n_buckets, sizeof(h->n_buckets), 1, f);
+	xfread(&h->size, sizeof(h->size), 1, f);
+	xfread(&h->n_occupied, sizeof(h->n_occupied), 1, f);
+	xfread(&h->upper_bound, sizeof(h->upper_bound), 1, f);
+
+	//flag
+	h->flags = calloc(__ac_fsize(h->n_buckets), sizeof(khint32_t));
+	xfread(h->flags, sizeof(khint32_t), __ac_fsize(h->n_buckets), f);
+	//key
+	h->keys = calloc(h->n_buckets, sizeof(uint64_t));
+	xfread(h->keys, sizeof(uint64_t), h->n_buckets, f);
+	//value
+	h->vals = calloc(h->n_buckets, sizeof(int));
+	xfread(h->vals, sizeof(int), h->n_buckets, f);
+
+	fclose(f);
+	return h;
+}
+
+void compare_equal(khash_t(long_int) *a, khash_t(long_int) *b)
+{
+	assert(a->n_buckets == b->n_buckets);
+	assert(a->size == b->size);
+	assert(a->n_occupied == b->n_occupied);
+	assert(a->upper_bound == b->upper_bound);
+
+	for (int i = 0; i < __ac_fsize(a->n_buckets); i++) {
+		assert(a->flags[i] == b->flags[i]);
+	}
+	for (int i = 0; i < a->n_buckets; i++) {
+		assert(a->keys[i] == b->keys[i]);
+		assert(a->vals[i] == b->vals[i]);
+	}
+}
+
+void save_simple_minihash(struct mini_hash_t *simple, char *path)
+{
+	FILE *f = fopen(path, "wb");
+	xfwrite(&simple->size, sizeof(uint64_t), 1, f);
+	xfwrite(&simple->count, sizeof(uint64_t), 1, f);
+	xfwrite(&simple->max_cnt, sizeof(uint64_t), 1, f);
+	xfwrite(&simple->prime_index, sizeof(int), 1, f);
+	//write key
+	xfwrite(simple->key, sizeof(uint64_t), simple->size, f);
+	//write h
+	xfwrite(simple->h, sizeof(uint64_t), simple->size, f);
+	fclose(f);
+}
+
+struct mini_hash_t *load_simple_minihash(char *path)
+{
+	FILE *f = fopen(path, "rb");
+	struct mini_hash_t *simple = calloc(1, sizeof(struct mini_hash_t));
+
+	xfread(&simple->size, sizeof(uint64_t), 1, f);
+	xfread(&simple->count, sizeof(uint64_t), 1, f);
+	xfread(&simple->max_cnt, sizeof(uint64_t), 1, f);
+	xfread(&simple->prime_index, sizeof(int), 1, f);
+	//read key
+	simple->key = calloc(simple->size, sizeof(uint64_t));
+	xfread(simple->key, sizeof(uint64_t), simple->size, f);
+	//read h
+	simple->h = calloc(simple->size, sizeof(uint64_t));
+	xfread(simple->h, sizeof(uint64_t), simple->size, f);
+	fclose(f);
+	return simple;
+}
+
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
-	struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
-	struct mini_hash_t *bx_table = t->bx_table;
-	struct mini_hash_t *rp_table = t->rp_table;
-	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
+	log_info("get list contig");
+	struct mini_hash_t *rp_table = NULL;
+	khash_t(long_int) *all_count = NULL;
+	if (opt->var == NULL) {
+		log_info("save ");
+		struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
+		struct mini_hash_t *bx_table = t->bx_table;
+		rp_table = t->rp_table;
+		save_simple_minihash(t->rp_table, str_concate(opt->out_dir, "/rptable.mini"));
+		all_count = count_edge_link_shared_bc(g, bx_table);
+		save_khash(all_count, str_concate(opt->out_dir, "/allcount.khash"));
+	} else {
+		all_count = load_khash(opt->var[0]);
+		rp_table = load_simple_minihash(opt->var[1]);
+	}
 
 	print_bx_count(all_count, opt);
-
 	int n_edges = 0;
 	int *list_edges = NULL;
 	double global_cov = get_genome_coverage_h(g);
@@ -552,10 +654,10 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			if (g->edges[u].seq_len < MIN_EDGE_LEN ||
 			    g->edges[v].seq_len < MIN_EDGE_LEN)
 				continue;
-			int len_u = MIN(g->edges[u].seq_len, 5000);
-			int len_v = MIN(g->edges[v].seq_len, 5000);
+			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
+			int len_v = MIN(g->edges[v].seq_len, MOLECULE_DENSITY);
 			if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
-				log_debug("Edge %d %d, len_u %d, len_v %d, share only %d barcodes", u, v, len_u, len_v, val);
+//				log_debug("Edge %d %d, len_u %d, len_v %d, share only %d barcodes", u, v, len_u, len_v, val);
 				continue;
 			}
 			int u_rc = g->edges[u].rc_id;

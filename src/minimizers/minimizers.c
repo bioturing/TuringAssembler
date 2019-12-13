@@ -866,6 +866,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph
 	uint64_t i;
 	struct mm_bundle_t *mm_bundle = calloc(1, sizeof(struct mm_bundle_t));
 	struct mini_hash_t *bx_table, *rp_table;
+	log_info("Start count barcode freq");
 	bx_table = count_bx_freq(opt); //count barcode freq
 	for (i = 0; i < bx_table->size; ++i) {
 		if (!__mini_empty(bx_table, i) && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
@@ -878,6 +879,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph
 		}
 	}
 
+	log_info("Start index edge");
 	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
 	                                               MINIMIZERS_WINDOW);
 	init_mini_hash(&rp_table, 16);
@@ -887,6 +889,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
+	log_info("Start index read");
 	void *(*buffer_iterator)(void *) = minimizer_iterator;
 	struct producer_bundle_t *producer_bundles = NULL;
 	//TODO: implement for ust library

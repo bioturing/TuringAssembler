@@ -649,6 +649,8 @@ void concate_edges_fill_N(struct asm_graph_t *g, int *path, int n,
 			++n_holes;
 		}
 		int b_len = g->edges[b].seq_len;
+		double tmp_cov = __get_edge_cov(&g->edges[b], g->ksize);
+		log_debug("cov %d %d %lf", b, g->edges[b].count, tmp_cov);
 		total_count += g->edges[b].count;
 
 		seq = realloc(seq, (total_len + b_len - g->ksize + 1) * sizeof(char));
@@ -666,6 +668,7 @@ void concate_edges_fill_N(struct asm_graph_t *g, int *path, int n,
 	e->seq = seq_encode;
 	e->seq_len = total_len;
 	e->count = total_count;
+	log_debug("total_count %d %lf", total_count, __get_edge_cov(e, g->ksize));
 	e->n_holes = n_holes;
 	e->l_holes = l_holes;
 	e->p_holes = p_holes;
@@ -691,11 +694,10 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		sprintf(ctg, "%d ", contig_path[i]);
 		strcat(path, ctg);
 	}
+	log_debug("Path: %s", path);
 
 	struct asm_edge_t new_edge;
 	concate_edges_fill_N(g, contig_path, n_contig_path, stored, &new_edge);
-
-	//log_debug("Total len and total count: %d %d", total_len, total_count);
 
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e  = contig_path[i];
@@ -709,12 +711,12 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 		g->edges[i_e_rc].count -= tmp;
 	}
 
-	log_debug("Path: %s", path);
 
 	g_new->edges = realloc(g_new->edges, (g_new->n_e+2) * sizeof(struct asm_edge_t));
 	g_new->edges[g_new->n_e] = new_edge;
 	asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
 			g_new->edges + g_new->n_e);
+	assert(g_new->edges[g_new->n_e].count == g_new->edges[g_new->n_e+1].count);
 	g_new->n_e += 2;
 }
 
@@ -759,6 +761,7 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		g_new->edges[g_new->n_e].n_holes = 0;
 		asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
 				g_new->edges + g_new->n_e);
+		assert(g_new->edges[g_new->n_e].count == g_new->edges[g_new->n_e+1].count);
 		g_new->n_e += 2;
 	}
 
