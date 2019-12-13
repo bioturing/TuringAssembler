@@ -73,25 +73,8 @@ KHASH_MAP_OPERATIONS(long_spath, uint64_t, struct shortest_path_info_t *);
 
 void init_simple_graph(struct asm_graph_t *g, struct simple_graph_t *sg);
 
-//void get_all_shortest_paths_dp(struct asm_graph_t *g, khash_t(long_spath) *spath_info);
-/*int extract_shortest_path(struct asm_graph_t *g, khash_t(long_spath) *spath,
-		int v, int u, int **path, int *n_v);*/
-
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		int t, khash_t(long_spath) *stored);
-
-void long_spath_destroy(khash_t(long_spath) *stored);
-
-int get_pair_distance(int v, int u, khash_t(long_spath) *spath_info);
-
-void get_edge_links_by_distance(struct asm_graph_t *g, int *edges, int n_e,
-		khash_t(long_spath) *spath_info, khash_t(long_int) *is_connected,
-		khash_t(long_int) *count_link);
-
-int check_connected(struct asm_graph_t *g, int v, int u,
-		khash_t(long_spath) *spath_info);
-
-//void count_edge_links_bc(struct opt_proc_t *opt);
 
 void print_barcode_graph(struct opt_proc_t *opt);
 
@@ -133,9 +116,6 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f);
 
 void load_pair_edge_count(char *path, khash_t(long_int) *h_all);
 void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f);
-void fill_gap(struct asm_graph_t *g, int v, int u, khash_t(long_spath) *spath,
-		struct simple_graph_t *sg, char **seq);
-void get_all_pair_edges(struct asm_graph_t *g, khash_t(long_int) *pair_edges);
 void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 		struct paths_bundle_t *paths_bundle);
 
