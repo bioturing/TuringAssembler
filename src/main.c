@@ -471,6 +471,8 @@ int main(int argc, char *argv[])
 //		build_opt_process(argc, argv, &cluster_molecules_process);
 	else if (!strcmp(argv[1], "debug_get_barcode_graph"))
 		build_opt_process(argc, argv, &print_barcode_graph_process);
+	else if (!strcmp(argv[1], "estimate_shared_barcode"))
+		build_opt_process(argc, argv, &estimate_shared_barcode_process);
 //	else if (!strcmp(argv[1], "debug_current"))
 //		build_opt_process(argc, argv, &debug_process);
 	else if (!strcmp(argv[1], "mm_index"))
