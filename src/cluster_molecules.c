@@ -464,12 +464,13 @@ void filter_complex_regions(struct simple_graph_t *sg)
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
+		destroy_queue(&q);
 		++n_total;
 
 		if (!has_rc && !has_loop && n_source == 1 && n_sink == 1
 				&& kh_size(component) > 1){
 			n_simple_edges += kh_size(component);
-			continue;
+			goto free_stage_1;
 		}
 		++n_complex;
 		for (khiter_t it = kh_begin(component); it != kh_end(component);
@@ -479,6 +480,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 			int v = kh_key(component, it);
 			kh_set_int_add(sg->is_complex, v);
 		}
+free_stage_1:
 		kh_destroy(set_int, component);
 	}
 	kh_destroy(set_int, visited);
@@ -730,15 +732,13 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	log_info("Global genome coverage %.2f", global_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	log_info("Init visited hash table");
-	double *ori_cov = calloc(g->n_e, sizeof(double));
-	for (int i = 0; i < g->n_e; i++) {
-		ori_cov[i] = __get_edge_cov(&g->edges[i], g->ksize);
-	}
 	khash_t(long_spath) *stored = kh_init(long_spath);
 	for (int i = 0; i < paths_bundle->n_paths; ++i) {
 		add_path_to_edges(g, g_new, stored, paths_bundle->paths[i].edges,
 				paths_bundle->paths[i].n_e, global_cov, visited);
 	}
+	long_spath_destroy(stored);
+	paths_bundle_destroy(paths_bundle);
 
 	for (int i = 0; i < g->n_e; ++i){
 		int e = i;
@@ -761,6 +761,7 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 				g_new->edges + g_new->n_e);
 		g_new->n_e += 2;
 	}
+	free(visited);
 
 	for (int i = 0; i < g_new->n_e; ++i){
 		g_new->edges[i].source = i << 1;
@@ -789,9 +790,8 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 	}
 
 	save_graph_info(opt->out_dir, g_new, "level_3");
-
-	free(edges);
-	free(visited);
+	asm_graph_destroy(g_new);
+	free(g_new);
 }
 
 void barcode_list_destroy(struct barcode_list_t *blist)
@@ -1138,6 +1138,13 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 	}
 }
 
+void paths_bundle_destroy(struct paths_bundle_t *paths_bundle)
+{
+	for (int i = 0; i < paths_bundle->n_paths; ++i)
+		free(paths_bundle->paths[i].edges);
+	free(paths_bundle->paths);
+}
+
 int check_adj_edges(struct asm_graph_t *g, int v, int u)
 {
 	int v_tg = g->edges[v].target;
@@ -1273,3 +1280,13 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 	return res;
 }
 
+void long_spath_destroy(khash_t(long_spath) *stored)
+{
+	for (khiter_t it = kh_begin(stored); it != kh_end(stored); ++it){
+		if (!kh_exist(stored, it))
+			continue;
+		struct shortest_path_info_t *spath = kh_val(stored, it);
+		free(spath->path);
+	}
+	kh_destroy(long_spath, stored);
+}
