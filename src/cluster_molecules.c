@@ -1298,3 +1298,77 @@ void long_spath_destroy(khash_t(long_spath) *stored)
 	}
 	kh_destroy(long_spath, stored);
 }
+
+void get_shared_barcode_statistic(struct opt_proc_t *opt)
+{
+	if (opt->lib_type != LIB_TYPE_SORTED)
+		log_error("Please first sort the read files");
+
+	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g, opt->in_file);
+
+	int me = 0;
+	for (int i = 0; i < g->n_e; ++i){
+		if (g->edges[i].seq_len > g->edges[me].seq_len)
+			me = i;
+	}
+
+	struct asm_graph_t *g_dump = calloc(1, sizeof(struct asm_graph_t));
+	char *seq;
+	decode_seq(&seq, g->edges[me].seq, g->edges[me].seq_len);
+	int max_len = g->edges[me].seq_len;
+	struct asm_edge_t *edges = NULL;
+	int n_e = 0;
+	for (int i = 0; i + MOLECULE_DENSITY <= max_len; i += 100){
+		char *sub_seq = calloc(MOLECULE_DENSITY + 1, sizeof(char));
+		strncpy(sub_seq, seq + i, MOLECULE_DENSITY);
+
+		uint32_t *seq_encode;
+		encode_seq(&seq_encode, sub_seq);
+		free(sub_seq);
+
+		edges = realloc(edges, (n_e + 1) * sizeof(struct asm_edge_t));
+		edges[n_e].count = 0;
+		edges[n_e].seq = seq_encode;
+		edges[n_e].seq_len = MOLECULE_DENSITY;
+		edges[n_e].n_holes = 0;
+		++n_e;
+	}
+	free(seq);
+	g_dump->edges = edges;
+	g_dump->n_e = n_e;
+
+	struct read_path_t read_sorted_path = {
+		.R1_path = opt->files_1[0],
+		.R2_path = opt->files_2[0],
+		.idx_path = opt->files_I[0]
+	};
+	char fasta_path[1024];
+	sprintf(fasta_path, "%s/estimate_shared_barcode", opt->out_dir); /* Store temporary contigs for indexing two heads */
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/estimate_shared_barcode/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(g_dump, fasta_path);
+	set_log_stage("MapReads");
+	construct_aux_info(opt, g_dump, &read_sorted_path, fasta_path,
+			ASM_BUILD_BARCODE);
+	FILE *f = fopen(opt->lc, "w");
+	for (int i = 0; i < g_dump->n_e; ++i){
+		for (int j = 0, dis = 0; j < g_dump->n_e && dis <= MAX_RADIUS;
+				++j, dis += 100){
+			khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
+			khash_t(gint) *h2 = barcode_hash_2_khash(g_dump->edges[j].barcodes + 2);
+			khash_t(gint) *h_shared = get_shared_bc(h1, h2);
+			fprintf(f, "%d %d %d %d\n", MOLECULE_DENSITY, MOLECULE_DENSITY,
+					dis, kh_size(h_shared));
+			kh_destroy(gint, h1);
+			kh_destroy(gint, h2);
+			kh_destroy(gint, h_shared);
+		}
+	}
+	fclose(f);
+
+	free(g_dump);
+
+	asm_graph_destroy(g);
+	free(g);
+}

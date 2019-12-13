@@ -16,8 +16,7 @@
 #define SHORT_PATH 2
 #define MIN_PAIR_SUPPORT_PAIR_END 1
 #define MIN_PAIR_SUPPORT_PAIR_END_SOFT 0
-#define MIN_SHARED_BARCODE_RATIO 0.005
-#define MOLECULE_DENSITY 5000
+#define MIN_SHARED_BARCODE_RATIO 0.04
 
 struct barcode_graph {
     int *first_index, *next_index, *edges, *is_del;

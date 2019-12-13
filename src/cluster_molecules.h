@@ -9,6 +9,7 @@
 #define MIN_BARCODE_EDGE_COUNT 100
 #define MIN_COVERAGE_TO_BE_IGNORE 0.25
 #define COVERAGE_RATIO_TO_BE_REPEAT 1.75
+#define MOLECULE_DENSITY 5000
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
@@ -142,4 +143,6 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 void paths_bundle_destroy(struct paths_bundle_t *paths_bundle);
 
 int check_adj_edges(struct asm_graph_t *g, int v, int u);
+
+void get_shared_barcode_statistic(struct opt_proc_t *opt);
 #endif

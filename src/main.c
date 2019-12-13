@@ -483,6 +483,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &debug_process);
 	else if (!strcmp(argv[1], "get_rp_count"))
 		build_opt_process(argc, argv, &read_pairs_count_process);
+	else if (!strcmp(argv[1], "estimate_shared_barcode"))
+		build_opt_process(argc, argv, &estimate_shared_barcode_process);
 	else if (!strcmp(argv[1], "mm_index"))
 		build_opt_process(argc, argv, &index_mm_process);
 	else if (!strcmp(argv[1], "barcode_hit"))
