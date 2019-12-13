@@ -472,7 +472,7 @@ khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 			for (int k = j + 1; k < n_e; ++k){
 				uint64_t e1 = edges[j];
 				uint64_t e2 = edges[k];
-				if (e1 > g->n_e || e2 > g->n_e) {
+				if (e1 >= g->n_e || e2 >= g->n_e) {
 					log_error("Wrong edges number of one barcode hit, e1 %d, e2 %d", e1, e2);
 				}
 				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
