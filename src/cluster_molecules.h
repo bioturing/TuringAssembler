@@ -9,7 +9,7 @@
 #define MIN_BARCODE_EDGE_COUNT 100
 #define MIN_COVERAGE_TO_BE_IGNORE 0.25
 #define COVERAGE_RATIO_TO_BE_REPEAT 1.75
-#define MOLECULE_DENSITY 5000
+#define MOLECULE_DENSITY 3000
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
