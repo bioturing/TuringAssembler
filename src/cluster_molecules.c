@@ -1,3 +1,5 @@
+#include <time.h>
+#include <stdlib.h>
 #include "scaffolding/scaffolding.h"
 #include "attribute.h"
 #include "cluster_molecules.h"
@@ -1301,41 +1303,49 @@ void long_spath_destroy(khash_t(long_spath) *stored)
 
 void get_shared_barcode_statistic(struct opt_proc_t *opt)
 {
+	srand(time(NULL));
 	if (opt->lib_type != LIB_TYPE_SORTED)
 		log_error("Please first sort the read files");
 
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 
-	int me = 0;
-	for (int i = 0; i < g->n_e; ++i){
-		if (g->edges[i].seq_len > g->edges[me].seq_len)
-			me = i;
-	}
-
 	struct asm_graph_t *g_dump = calloc(1, sizeof(struct asm_graph_t));
-	char *seq;
-	decode_seq(&seq, g->edges[me].seq, g->edges[me].seq_len);
-	int max_len = g->edges[me].seq_len;
-	struct asm_edge_t *edges = NULL;
 	int n_e = 0;
-	for (int i = 0; i + MOLECULE_DENSITY <= max_len; i += 100){
-		char *sub_seq = calloc(MOLECULE_DENSITY + 1, sizeof(char));
-		strncpy(sub_seq, seq + i, MOLECULE_DENSITY);
+	int *e_id = NULL;
+	int *dis_len = NULL;
+	g_dump->edges = NULL;
+	for (int e = 0; e < g->n_e; ++e){
+		int e_len = g->edges[e].seq_len;
+		if (e_len < 20000)
+			continue;
+		char *seq;
+		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		for (int i = 0; i + MOLECULE_DENSITY <= e_len;){
+			char *sub_seq = calloc(MOLECULE_DENSITY + 1, sizeof(char));
+			strncpy(sub_seq, seq + i, MOLECULE_DENSITY);
 
-		uint32_t *seq_encode;
-		encode_seq(&seq_encode, sub_seq);
-		free(sub_seq);
+			uint32_t *seq_encode;
+			encode_seq(&seq_encode, sub_seq);
+			free(sub_seq);
 
-		edges = realloc(edges, (n_e + 1) * sizeof(struct asm_edge_t));
-		edges[n_e].count = 0;
-		edges[n_e].seq = seq_encode;
-		edges[n_e].seq_len = MOLECULE_DENSITY;
-		edges[n_e].n_holes = 0;
-		++n_e;
+			g_dump->edges = realloc(g_dump->edges, (n_e + 2) * sizeof(struct asm_edge_t));
+			g_dump->edges[n_e].count = 0;
+			g_dump->edges[n_e].seq = seq_encode;
+			g_dump->edges[n_e].seq_len = MOLECULE_DENSITY;
+			g_dump->edges[n_e].n_holes = 0;
+			asm_clone_edge(g_dump, n_e + 1, n_e);
+
+			e_id = realloc(e_id, (n_e + 2) * sizeof(int));
+			dis_len = realloc(dis_len, (n_e + 2) * sizeof(int));
+			int dis = rand() % (MAX_RADIUS + 1);
+			i += MOLECULE_DENSITY + dis;
+			e_id[n_e] = e_id[n_e + 1] = e;
+			dis_len[n_e] = dis_len[n_e + 1] = dis;
+			n_e += 2;
+		}
+		free(seq);
 	}
-	free(seq);
-	g_dump->edges = edges;
 	g_dump->n_e = n_e;
 
 	struct read_path_t read_sorted_path = {
@@ -1352,18 +1362,18 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 	construct_aux_info(opt, g_dump, &read_sorted_path, fasta_path,
 			ASM_BUILD_BARCODE);
 	FILE *f = fopen(opt->lc, "w");
-	for (int i = 0; i < g_dump->n_e; ++i){
-		for (int j = 0, dis = 0; j < g_dump->n_e && dis <= MAX_RADIUS;
-				++j, dis += 100){
-			khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
-			khash_t(gint) *h2 = barcode_hash_2_khash(g_dump->edges[j].barcodes + 2);
-			khash_t(gint) *h_shared = get_shared_bc(h1, h2);
-			fprintf(f, "%d %d %d %d\n", MOLECULE_DENSITY, MOLECULE_DENSITY,
-					dis, kh_size(h_shared));
-			kh_destroy(gint, h1);
-			kh_destroy(gint, h2);
-			kh_destroy(gint, h_shared);
-		}
+	for (int i = 2; i < g_dump->n_e; i += 2){
+		if (e_id[i] != e_id[i - 1])
+			continue;
+		khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
+		khash_t(gint) *h2 = barcode_hash_2_khash(g_dump->edges[i - 1].barcodes + 2);
+		log_debug("number of barcodes %d %d", kh_size(h1), kh_size(h2));
+		khash_t(gint) *h_shared = get_shared_bc(h1, h2);
+		fprintf(f, "%d %d %d %d\n", MOLECULE_DENSITY, MOLECULE_DENSITY,
+				dis_len[i - 1], kh_size(h_shared));
+		kh_destroy(gint, h1);
+		kh_destroy(gint, h2);
+		kh_destroy(gint, h_shared);
 	}
 	fclose(f);
 
