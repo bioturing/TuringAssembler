@@ -1232,6 +1232,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		int v = kh_key(best_L, it);
 		int real_len = kh_val(best_L, it) - (g->edges[s].seq_len
 			+ g->edges[v].seq_len - g->ksize);
+		real_len = max(real_len, 0);
 		if (real_len > MAX_RADIUS)
 			continue;
 		int *path;
