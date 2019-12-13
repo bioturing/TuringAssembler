@@ -295,6 +295,9 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 					  flag[j] - 1);
 			}
 		}
+		free(out);
+		free(out_id);
+		free(flag);
 	}
 
 	for (int node = 0; node < bg->n_nodes; node++) {
@@ -329,6 +332,9 @@ void remove_tips_barcode_graph(struct asm_graph_t *g, struct barcode_graph *bg,
 					  flag[j] - 1);
 			}
 		}
+		free(out);
+		free(out_id);
+		free(flag);
 	}
 }
 
