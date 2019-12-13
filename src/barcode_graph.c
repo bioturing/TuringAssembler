@@ -3,7 +3,7 @@
 //
 
 #include <stdlib.h>
-#include <minimizers/count_barcodes.h>
+#include "minimizers/count_barcodes.h"
 #include "cluster_molecules.h"
 #include "log.h"
 #include "utils.h"
@@ -466,7 +466,7 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 	print_dot_graph(bg, "after_all.dot");
 	print_del_barcode_graph(bg);
 
-	khash_t(set_long) *mark_link = kh_init(long_int);
+	khash_t(set_long) *mark_link = kh_init(set_long);
 	int *list_res = NULL, n_res = 0;
 	for (int i = 0; i < bg->n_edges * 2; i += 2) {
 		if (bg->is_del[i]) {

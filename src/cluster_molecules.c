@@ -586,41 +586,56 @@ void print_simple_graph(struct simple_graph_t *sg, int *edges, int n_e, FILE *f)
 //	free(path);
 //}
 
-#define MIN_COVERAGE_TO_BE_IGNORE 0.25
-#define COVERAGE_RATIO_TO_BE_REPEAT 1.75
+int check_ignore_path(struct asm_graph_t *g, double global_avg_cov,
+		int *contig_path, int n_contig_path, double *local_cov)
+{
+	int ksize = g->ksize;
+	double sum_cov = 0, sum_len = 0;
+	for (int i = 0; i < n_contig_path; i++) {
+		int i_e = contig_path[i];
+		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
+		assert(cov >= 0);
+		if (cov < MIN_COVERAGE_TO_BE_IGNORE * global_avg_cov){
+			log_debug("Ignore path cov: %.3f", cov);
+			return -1;
+		}
+		if (cov > COVERAGE_RATIO_TO_BE_REPEAT * global_avg_cov)
+			continue;
+		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
+		sum_len += (g->edges[i_e].seq_len-ksize);
+	}
+	if (sum_len ==0) {
+//		assert(sum_len != 0 && "all edge in path is repeat");
+		*local_cov = global_avg_cov;
+	} else
+		*local_cov = sum_cov/sum_len;
 
-void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
-		khash_t(long_spath) *stored, int *contig_path, int n_contig_path,
-		double avg_cov, int *visited)
+	if (*local_cov < MIN_COVERAGE_TO_BE_IGNORE * global_avg_cov) {
+		log_debug("Ignore path because seem to be already consider");
+		log_debug("local_cov: %.2f, ratio: %.2f, avg_cov: %.2f",
+				*local_cov, MIN_COVERAGE_TO_BE_IGNORE,
+				global_avg_cov);
+		return -1;
+	}
+	return 0;
+}
+
+void concate_edges_fill_N(struct asm_graph_t *g, int *path, int n,
+		khash_t(long_spath) *stored, struct asm_edge_t *e)
 {
 	char *seq;
-	decode_seq(&seq, g->edges[contig_path[0]].seq, g->edges[contig_path[0]].seq_len);
-
+	decode_seq(&seq, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
 	int total_len = strlen(seq);
 
 	int n_holes = 0;
 	uint32_t *p_holes = NULL;
 	uint32_t *l_holes = NULL;
-	int total_count = 0;
-	uint64_t *slot;
-
-	/*
-	 * Print the path
-	 */
-	char path[8192];
-	char ctg[16];
-	path[0] = '\0';
-	for (int i = 0; i < n_contig_path; ++i) {
-		sprintf(ctg, "%d ", contig_path[i]);
-		strcat(path, ctg);
-	}
-
-	for (int i = 1; i < n_contig_path; i++) {
-		int a = contig_path[i - 1], b = contig_path[i];
+	int total_count = g->edges[path[0]].count;
+	for(int i = 1; i < n; i++) {
+		int a = path[i-1], b = path[i];
 		struct shortest_path_info_t *res = get_shortest_path(g, a, b, stored);
-		if (res == NULL) {
+		if (res == NULL)
 			log_error("Can not find shortest path between %d and %d!", a, b);
-		}
 		if (res->n_e > 2){
 			p_holes = realloc(p_holes, (n_holes + 1) * sizeof(uint32_t));
 			l_holes = realloc(l_holes, (n_holes + 1) * sizeof(uint32_t));
@@ -633,50 +648,61 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 			l_holes[n_holes] = N_len;
 			++n_holes;
 		}
-		int e = res->path[res->n_e - 1];
-		int e_len = g->edges[e].seq_len;
-		total_count += g->edges[e].count;
+		int b_len = g->edges[b].seq_len;
+		total_count += g->edges[b].count;
 
-		seq = realloc(seq, (total_len + e_len - g->ksize + 1) * sizeof(char));
+		seq = realloc(seq, (total_len + b_len - g->ksize + 1) * sizeof(char));
 		char *tmp_seq;
-		decode_seq(&tmp_seq, g->edges[e].seq, e_len);
+		decode_seq(&tmp_seq, g->edges[b].seq, b_len);
 		strcat(seq, tmp_seq + g->ksize);
-		total_len += e_len - g->ksize;
+		total_len += b_len - g->ksize;
 		free(tmp_seq);
 	}
 
-	double local_cov, sum_cov = 0, sum_len = 0;
-	int ksize = g_new->ksize;
-	for (int i = 0; i < n_contig_path; i++) {
-		int i_e = contig_path[i];
-		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
-		assert(cov >= 0);
-		if (cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov)
-			return;
-		if (cov > COVERAGE_RATIO_TO_BE_REPEAT * avg_cov)
-			continue;
-		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
-		sum_len += (g->edges[i_e].seq_len-ksize);
-	}
+	uint32_t *seq_encode;
+	encode_seq(&seq_encode, seq);
+	free(seq);
 
-	if (sum_len ==0) {
-//		assert(sum_len != 0 && "all edge in path is repeat");
-		local_cov = avg_cov;
-	} else
-		local_cov = sum_cov/sum_len;
+	e->seq = seq_encode;
+	e->seq_len = total_len;
+	e->count = total_count;
+	e->n_holes = n_holes;
+	e->l_holes = l_holes;
+	e->p_holes = p_holes;
+}
 
-	if (local_cov < MIN_COVERAGE_TO_BE_IGNORE * avg_cov) {
-		log_debug("Ignore path because seem to be already consider");
-		log_debug("local_cov: %.2f, ratio: %.2f, avg_cov: %.2f",local_cov, MIN_COVERAGE_TO_BE_IGNORE, avg_cov);
+void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
+		khash_t(long_spath) *stored, int *contig_path, int n_contig_path,
+		double avg_cov, int *visited)
+{
+	double local_cov;
+	int ret = check_ignore_path(g, avg_cov, contig_path, n_contig_path,
+			&local_cov);
+	if (ret == -1)
 		return;
+
+	/*
+	 * Print the path
+	 */
+	char path[8192];
+	char ctg[16];
+	path[0] = '\0';
+	for (int i = 0; i < n_contig_path; ++i) {
+		sprintf(ctg, "%d ", contig_path[i]);
+		strcat(path, ctg);
 	}
+
+	struct asm_edge_t new_edge;
+	concate_edges_fill_N(g, contig_path, n_contig_path, stored, &new_edge);
+
+	//log_debug("Total len and total count: %d %d", total_len, total_count);
 
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e  = contig_path[i];
 		int i_e_rc = g->edges[i_e].rc_id;
 		visited[i_e]++;
 		visited[i_e_rc]++;
-		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
+		int tmp = MIN((g->edges[i_e].seq_len - g->ksize) * local_cov, g->edges[i_e].count);
 		log_debug("Visited and decrease count of %d: from %d to %d", i_e, g->edges[i_e].count, g->edges[i_e].count - tmp);
 		g->edges[i_e].count -= tmp;
 		log_debug("Visited and decrease count of %d: from %d to %d", i_e_rc, g->edges[i_e_rc].count, g->edges[i_e_rc].count - tmp);
@@ -684,17 +710,9 @@ void add_path_to_edges(struct asm_graph_t *g, struct asm_graph_t *g_new,
 	}
 
 	log_debug("Path: %s", path);
-	uint32_t *seq_encode;
-	encode_seq(&seq_encode, seq);
-	free(seq);
 
 	g_new->edges = realloc(g_new->edges, (g_new->n_e+2) * sizeof(struct asm_edge_t));
-	g_new->edges[g_new->n_e].seq = seq_encode;
-	g_new->edges[g_new->n_e].seq_len = total_len;
-	g_new->edges[g_new->n_e].count = total_count;
-	g_new->edges[g_new->n_e].n_holes = n_holes;
-	g_new->edges[g_new->n_e].l_holes = l_holes;
-	g_new->edges[g_new->n_e].p_holes = p_holes;
+	g_new->edges[g_new->n_e] = new_edge;
 	asm_clone_seq_reverse(g_new->edges + g_new->n_e + 1,
 			g_new->edges + g_new->n_e);
 	g_new->n_e += 2;
@@ -764,6 +782,10 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		g_new->nodes[v].adj[0] = e;
 
 		g_new->nodes[u].rc_id = v_rc;
+	}
+	for (int i = 0; i < g_new->n_e; ++i){
+		log_debug("Edge %d len %d count %d", i, g_new->edges[i].seq_len,
+				g_new->edges[i].count);
 	}
 
 	save_graph_info(opt->out_dir, g_new, "level_3");

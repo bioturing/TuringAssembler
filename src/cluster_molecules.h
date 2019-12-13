@@ -7,6 +7,8 @@
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
+#define MIN_COVERAGE_TO_BE_IGNORE 0.25
+#define COVERAGE_RATIO_TO_BE_REPEAT 1.75
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
