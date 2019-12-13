@@ -485,8 +485,10 @@ struct best_next_contig *find_best_edge(struct asm_graph_t *g, struct edges_scor
 	struct best_next_contig *res = calloc(1, sizeof(struct best_next_contig));
 	res->i_contig = best_edge;
 	res->score = *max_score;
-	if (!better_edge(&res->score, thres_score))
+	if (!better_edge(&res->score, thres_score)) {
 		res->i_contig = -1;
+		log_trace("below thres score %f", thres_score->bc_score);
+	}
 	log_trace("res icontig %d thres score %f", res->i_contig, thres_score->bc_score);
 	free(max_score);
 	return res;
@@ -768,46 +770,12 @@ inline void set_nu(uint32_t *seq, int pos, int val)
 	seq[pos >> 4] |= val << ((pos & 15) << 1);
 }
 
-int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize, int *ret_len,
-		   int *total_count, double global_avg_cov, uint32_t **res_seq)
+int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize,
+		uint32_t **res_seq)
 {
 	int total_len = ksize;
-	double local_cov, sum_cov = 0, sum_len = 0;
-	for (int i = 0; i < n_path; i++) {
-		int i_e  = path[i];
-		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
-		assert(cov >= 0);
-		if (cov > 1.5*global_avg_cov)
-			continue;
-		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
-		sum_len += (g->edges[i_e].seq_len-ksize);
-	}
-	if (sum_len ==0) {
-//		assert(sum_len != 0 && "all edge in path is repeat");
-		local_cov = global_avg_cov;
-	} else
-		local_cov = sum_cov/sum_len;
-	if (local_cov < 0.5 * global_avg_cov)
-		return -1;
-//	log_warn("global %lf local %lf", global_avg_cov, local_cov);
-	int t_count = 0;
-	for (int i = 0; i < n_path; i++) {
-		int a = path[i];
-		total_len += g->edges[a].seq_len - ksize;
-	}
-
-	for (int i = 0; i < n_path; i++) {
-		int i_e  = path[i];
-		int i_e_rc = g->edges[i_e].rc_id;
-		double cov_be4 = __get_edge_cov(&g->edges[i_e], ksize);
-		int tmp = MIN((g->edges[i_e].seq_len - ksize) * local_cov, g->edges[i_e].count);
-		t_count += tmp;
-		g->edges[i_e].count -= tmp;
-		g->edges[i_e_rc].count -= tmp;
-		double cov_after = __get_edge_cov(&g->edges[i_e], ksize);
-//		log_warn("cov_be4 %lf loc_cov %lf cov_after %lf", cov_be4, local_cov, cov_after);
-	}
-
+	for (int i = 0; i < n_path; ++i)
+		total_len += g->edges[path[i]].seq_len - ksize;
 	uint32_t *res = calloc((total_len + 15) / 16, 4);
 	int cur_len = g->edges[path[0]].seq_len;
 	for (int i = 0 ;  i < cur_len; i++) {
@@ -821,10 +789,6 @@ int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize, int *r
 		}
 		cur_len += a->seq_len - ksize;
 	}
-	assert(cur_len == total_len);
-	*ret_len = total_len;
-	*total_count = t_count;
-	assert(total_count > 0);
 	*res_seq = res;
 	return 0;
 }

@@ -1,11 +1,14 @@
 #ifndef __CLUSTER_MOLECULES__
 #define __CLUSTER_MOLECULES__
 #include "assembly_graph.h"
+#define MIN_EDGE_LEN 500
 #define MAX_RADIUS 4000
 #define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
 #define MIN_BARCODE_EDGE_COUNT 100
+#define MIN_COVERAGE_TO_BE_IGNORE 0.25
+#define COVERAGE_RATIO_TO_BE_REPEAT 1.75
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
