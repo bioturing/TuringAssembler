@@ -1201,7 +1201,7 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 		if (len > MAX_PATH_LEN)
 			continue;
 
-		if (g->edges[v].seq_len > MIN_EDGE_LEN)
+		if (v != s && g->edges[v].seq_len > MIN_EDGE_LEN)
 			continue;
 		int v_tg = g->edges[v].target;
 		for (int i = 0; i < g->nodes[v_tg].deg; ++i) {
