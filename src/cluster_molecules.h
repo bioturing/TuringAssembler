@@ -145,4 +145,6 @@ void paths_bundle_destroy(struct paths_bundle_t *paths_bundle);
 int check_adj_edges(struct asm_graph_t *g, int v, int u);
 
 void get_shared_barcode_statistic(struct opt_proc_t *opt);
+
+void long_spath_destroy(khash_t(long_spath) *stored);
 #endif
