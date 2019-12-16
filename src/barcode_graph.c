@@ -622,6 +622,16 @@ struct mini_hash_t *load_simple_minihash(char *path)
 	return simple;
 }
 
+void inline destroy_bx_table(struct mini_hash_t *bx_table)
+{
+	for (int i = 0; i < bx_table->size; ++i){
+		if (bx_table->h[i] != EMPTY_BX)
+			free((struct mini_hash_t *) bx_table->h[i]);
+		}
+	free(bx_table->h);
+	free(bx_table->key);
+}
+
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	log_info("get list contig");
