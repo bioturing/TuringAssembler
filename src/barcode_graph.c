@@ -530,13 +530,24 @@ void append_edge(int *n_edges, int **list_edges, int u, int v)
 	(*n_edges)++;
 }
 
+void inline destroy_bx_table(struct mini_hash_t *bx_table)
+{
+	for (int i = 0; i < bx_table->size; ++i){
+		if (bx_table->h[i] != EMPTY_BX)
+			free((struct mini_hash_t *) bx_table->h[i]);
+		}
+	free(bx_table->h);
+	free(bx_table->key);
+
+}
+
 void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 {
 	struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
 	struct mini_hash_t *bx_table = t->bx_table;
 	struct mini_hash_t *rp_table = t->rp_table;
 	khash_t(long_int) *all_count = count_edge_link_shared_bc(g, bx_table);
-	destroy_mini_hash(bx_table);
+	destroy_bx_table(bx_table);
 
 	print_bx_count(all_count, opt);
 
