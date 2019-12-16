@@ -50,9 +50,11 @@ SRC = src/assembly_graph.c 				\
       src/graph_search.c 				\
       src/helper.c 					\
       src/fastg.c 					\
-      src/complex_resolve.c 				\
-      src/split_molecules.c 				\
       src/cluster_molecules.c 				\
+      src/minimizers/minimizers.c \
+      src/minimizers/smart_load.c \
+      src/minimizers/count_barcodes.c \
+      src/complex_resolve.c 				\
       src/simple_queue.c 				\
       src/khash_operations.c 				\
       src/read_pairs_resolve.c 				\
@@ -77,9 +79,6 @@ SRC = src/assembly_graph.c 				\
       src/build_hash_table.c\
       src/resolve_big.c \
       src/unit_test.c \
-      src/minimizers/minimizers.c \
-      src/minimizers/smart_load.c \
-      src/minimizers/count_barcodes.c \
       src/coverage/kmer_count.c
 
 OBJ = $(SRC:.c=.o)

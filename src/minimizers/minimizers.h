@@ -18,10 +18,6 @@
 #define MIN_NUMBER_SINGLETON 2
 #define EMPTY_BX UINT64_MAX
 
-KHASH_MAP_INIT_INT64(mm_hash, uint32_t);        /* Hash table structure of the minimizers */
-KHASH_MAP_INIT_INT64(mm_edges, uint32_t);                 /* Hash table edge count */
-KHASH_MAP_INIT_INT64(mm_pw, uint32_t);                 /* Hash table edge count */
-
 struct mm_align_t {
     uint64_t edge;
     uint32_t pos;
@@ -29,7 +25,6 @@ struct mm_align_t {
     uint64_t mm;
 };
 
-KHASH_MAP_INIT_INT64(mm_align, struct mm_align_t *);
 
 struct mm_db_t {
     uint64_t *mm;

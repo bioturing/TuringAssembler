@@ -899,15 +899,14 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 		   int *n_e)
 {
 	khash_t(set_int) *tmp = kh_init(set_int);
-	for (khiter_t it = kh_begin(hits->edges); it != kh_end(hits->edges); ++it) {
-		if (!kh_exist(hits->edges, it))
+	for (int i = 0; i < hits->edges->size; ++i) {
+		if (hits->edges->key[i] == EMPTY_SLOT)
 			continue;
-		int e = kh_key(hits->edges, it);
+		int e = hits->edges->key[i];
 		int rc = g->edges[e].rc_id;
 		kh_set_int_insert(tmp, e);
 		kh_set_int_insert(tmp, rc);
 	}
-
 	*edges = calloc(kh_size(tmp), sizeof(int));
 	*n_e = 0;
 	for (khiter_t it = kh_begin(tmp); it != kh_end(tmp); ++it) {
@@ -1284,6 +1283,71 @@ struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 	kh_destroy(long_int, best_P);
 	kh_destroy(int_int, best_D);
 	return res;
+}
+/**
+ * @brief: Create the hash table of share-barcode count of every edge pair u-v
+ * @param: edge hits of all barcodes. See @function mm_hit_all_barcodes
+ * @return: khash, key = (uint64_t)(e1|e2), e1 < e2, value: share barcode count
+ */
+khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
+                                             struct mini_hash_t *bc)
+{
+	khash_t(long_int) *res = kh_init(long_int);
+	for (int i = 0; i < bc->size; ++i){
+		if (bc->h[i] == EMPTY_BX)
+			continue;
+		struct mini_hash_t *wrapper = (struct mini_hash_t *)bc->h[i]; // ptr to mini_hash_t instead of count
+		int *edges = calloc(wrapper->size, sizeof(int));
+		int n_e = 0;
+		for (int j = 0; j < wrapper->size; ++j){
+			if (wrapper->h[j] == 0)
+				continue;
+			edges[n_e++] = wrapper->key[j];
+		}
+
+		for (int j = 0; j < n_e; ++j){
+			for (int k = j + 1; k < n_e; ++k){
+				int e1 = edges[j];
+				int e2 = edges[k];
+				uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
+				int cur_count = kh_long_int_try_get(res, code, 0);
+				kh_long_int_set(res, code, cur_count + 1);
+			}
+		}
+		free(edges);
+	}
+
+	khash_t(long_int) *tmp = kh_init(long_int);
+	for (khiter_t it = kh_begin(res); it != kh_end(res); ++it){
+		if (!kh_exist(res, it))
+			continue;
+		uint64_t code = kh_key(res, it);
+		int v = code >> 32;
+		int u = (uint64_t) code & (-1);
+		int v_rc = g->edges[v].rc_id;
+		int u_rc = g->edges[u].rc_id;
+		uint64_t code_rc = v_rc < u_rc ? GET_CODE(v_rc, u_rc) : GET_CODE(u_rc, v_rc);
+		int sum_cnt = kh_val(res, it) + kh_long_int_try_get(res, code_rc, 0);
+		kh_long_int_set(tmp, code, sum_cnt);
+		kh_long_int_set(tmp, code_rc, sum_cnt);
+	}
+	kh_destroy(long_int, res);
+	res = tmp;
+
+	return res;
+}
+
+/**
+ * @brief Query share barcode of a pair e1-e2
+ * @param all_count
+ * @param e1
+ * @param e2
+ * @return share barcode count
+ */
+int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2)
+{
+	uint64_t code = (e1 <= e2) ? GET_CODE(e1, e2) : GET_CODE(e2, e1);
+	return kh_long_int_try_get(all_count, code, 0);
 }
 
 void long_spath_destroy(khash_t(long_spath) *stored)

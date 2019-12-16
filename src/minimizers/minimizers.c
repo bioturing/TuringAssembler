@@ -531,7 +531,7 @@ static inline void mm_singleton_stats(struct mm_db_edge_t *db, int k_size)
 	for (i = 0 ; i < db->table->size; ++i) {
 		if (db->table->key[i] != EMPTY_SLOT)
 			cnt++;
-		if (db->table->h[i] != EMPTY_SLOT)
+		if (db->table->h[i] != EMPTY_SLOT && db->table->h[i] != 0)
 			singleton++;
 	}
 	log_info("Ratio of singleton minimizers %d/%d: %.2f %", singleton, cnt, (double)(singleton*1.0/cnt));
@@ -576,7 +576,7 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 	uint64_t *slot, *hit_slot;
 	for (i = 0; i < db->n; ++i) {
 		slot = mini_get(db_e->table, db->mm[i]);
-		if ((*slot) == EMPTY_SLOT) //minimizer doesn't exists
+		if (slot == (uint64_t *)EMPTY_SLOT || *slot == EMPTY_SLOT) //minimizer doesn't exists or multipleton
 			continue;
 		p = (*slot) & 0x00000000ffffffff;
 		e = (uint64_t)((*slot) >> 32);
@@ -667,6 +667,7 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 		return;
 	mm_hits_cmp(db1, mm_edges_db, hits1, g);
 	mm_hits_cmp(db2, mm_edges_db, hits2, g);
+	log_debug("Done alignment hits1 %d hits2 %d", hits1->n, hits2->n);
 
 	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX, tmp1 = er1, tmp2 = er2, count1 = 0, count2 = 0;
 	if (hits1->n > 0) {
@@ -679,6 +680,7 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 			}
 		}
 	}
+	log_debug("Found best e for r1: %d with count ");
 
 	if (count1 > 1) {
 //		log_warn("%d ", count1);

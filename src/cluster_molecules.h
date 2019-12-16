@@ -142,4 +142,7 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 void paths_bundle_destroy(struct paths_bundle_t *paths_bundle);
 
 int check_adj_edges(struct asm_graph_t *g, int v, int u);
+khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
+                                             struct mini_hash_t *bc);
+int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2);
 #endif
