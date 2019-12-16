@@ -1354,7 +1354,7 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 		}
 		free(seq);
 	}
-	int n_e_20k = n_e;
+	/*int n_e_20k = n_e;
 	for (int e = 0; e < g->n_e; ++e){
 		int e_rc = g->edges[e].rc_id;
 		if (e > e_rc)
@@ -1366,7 +1366,7 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 		asm_clone_seq_reverse(g_dump->edges + n_e + 1,
 				g->edges + e);
 		n_e += 2;
-	}
+	}*/
 	g_dump->n_e = n_e;
 
 	struct read_path_t read_sorted_path = {
@@ -1383,7 +1383,8 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 	construct_aux_info(opt, g_dump, &read_sorted_path, fasta_path,
 			ASM_BUILD_BARCODE);
 	FILE *f = fopen(opt->lc, "w");
-	for (int i = 2; i < n_e_20k; i += 2){
+	//for (int i = 2; i < n_e_20k; i += 2){
+	for (int i = 2; i < n_e; i += 2){
 		if (e_id[i] != e_id[i - 1])
 			continue;
 		khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
