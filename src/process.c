@@ -842,3 +842,4 @@ void estimate_shared_barcode_process(struct opt_proc_t *opt)
 	set_log_stage("Estimate shared barcode");
 	get_shared_barcode_statistic(opt);
 }
+
