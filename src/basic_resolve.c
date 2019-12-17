@@ -562,7 +562,7 @@ void find_topo(struct asm_graph_t *g, gint_t *d, gint_t *deg, uint32_t max_len)
 			v = g->nodes[v_rc].rc_id;
 			--deg[v];
 			if (d[v] == -1 || d[u] + g->edges[e].seq_len - ksize > d[v])
-				d[v] = g->edges[e].seq_len - ksize;
+				d[v] = d[u] + g->edges[e].seq_len - ksize;
 			if (d[v] > max_len)
 				d[v] = max_len;
 			if (deg[v] == 0) {
@@ -587,7 +587,7 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 	gint_t *d, *degs;
 	d = malloc(g->n_v * sizeof(gint_t));
 	degs = malloc(g->n_v * sizeof(gint_t));
-	find_topo(g, d, degs, TIPS_LEN_THRES);
+	find_topo(g, d, degs, 1000);
 
 	gint_t u, u_rc, v, e, e_rc, j, cnt_removed;
 	double cov, cov_fw, cov_rv, max_cov;
