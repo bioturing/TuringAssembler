@@ -3,6 +3,7 @@
 //
 
 #include <stdlib.h>
+#include <math.h>
 #include "minimizers/count_barcodes.h"
 #include "cluster_molecules.h"
 #include "log.h"
@@ -673,8 +674,13 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 				continue;
 			int len_u = MIN(g->edges[u].seq_len, MOLECULE_DENSITY);
 			int len_v = MIN(g->edges[v].seq_len, MOLECULE_DENSITY);
-			if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
-//				log_debug("Edge %d %d, len_u %d, len_v %d, share only %d barcodes", u, v, len_u, len_v, val);
+			double avg_cov = (cov_u + cov_v) / 2;
+			double lenu2 = (double) len_u * len_u;
+			double lenv2 = (double) len_v * len_v;
+			//if (val * 1.0 / (len_u + len_v) < MIN_SHARED_BARCODE_RATIO) {
+			if (1.0 * val / avg_cov * sqrt(2) * MOLECULE_DENSITY <
+				MIN_SHARED_BC_PER_COV * sqrt(lenu2 + lenv2)){
+				log_debug("Edge %d %d, len_u %d, len_v %d, share only %d barcodes", u, v, len_u, len_v, val);
 				continue;
 			}
 			int u_rc = g->edges[u].rc_id;

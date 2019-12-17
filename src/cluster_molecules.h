@@ -10,6 +10,7 @@
 #define MIN_COVERAGE_TO_BE_IGNORE 0.25
 #define COVERAGE_RATIO_TO_BE_REPEAT 1.75
 #define MOLECULE_DENSITY 3000
+#define MIN_SHARED_BC_PER_COV 9.45
 #include "minimizers/minimizers.h"
 #include "sort_read.h"
 #include "get_buffer.h"
