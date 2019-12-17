@@ -473,8 +473,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &print_barcode_graph_process);
 	else if (!strcmp(argv[1], "estimate_shared_barcode"))
 		build_opt_process(argc, argv, &estimate_shared_barcode_process);
-//	else if (!strcmp(argv[1], "debug_current"))
-//		build_opt_process(argc, argv, &debug_process);
+	else if (!strcmp(argv[1], "debug_current"))
+		build_opt_process(argc, argv, &debug_process);
 	else if (!strcmp(argv[1], "mm_index"))
 		build_opt_process(argc, argv, &index_mm_process);
 	else if (!strcmp(argv[1], "barcode_hit"))

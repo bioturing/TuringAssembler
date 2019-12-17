@@ -294,14 +294,21 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
-//void debug_process(struct opt_proc_t *opt)
-//{
-//	char path[1024];
-//	sprintf(path, "%s/debug.log", opt->out_dir);
-//	init_logger(opt->log_level, path);
-//	set_log_stage("Debug process");
-//	create_barcode_molecules(opt);
-//}
+void debug_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Debug process");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	int e1 = g.edges[opt->k0].rc_id;
+	int e2 = opt->lk;
+	khash_t(gint) *h1 = barcode_hash_2_khash(g.edges[e1].barcodes + 1);
+	khash_t(gint) *h2 = barcode_hash_2_khash(g.edges[e2].barcodes + 1);
+	log_info("Number of shared barcodes of %d and %d: %d", e1, e2,
+			kh_size(get_shared_bc(h1, h2)));
+}
 
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
@@ -731,3 +738,4 @@ void estimate_shared_barcode_process(struct opt_proc_t *opt)
 	set_log_stage("Estimate shared barcode");
 	get_shared_barcode_statistic(opt);
 }
+
