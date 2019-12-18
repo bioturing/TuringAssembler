@@ -1,3 +1,4 @@
+#include <minimizers/count_barcodes.h>
 #include "read_pairs_resolve.h"
 
 void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
@@ -122,6 +123,14 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	}
 }
 
+int get_share_bc(struct asm_graph_t *g, khash_t(long_int) *share_bc, int u, int v)
+{
+	uint64_t code = get_min_code(g, u, v);
+	gint_t k = kh_get(long_int, share_bc, code);
+	int ret = kh_value(share_bc,k);
+	return ret;
+}
+
 void get_long_contigs(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
@@ -133,6 +142,12 @@ void get_long_contigs(struct opt_proc_t *opt)
 	for (int i = 0; i < g->n_e; ++i)
 		edge_sorted[i] = GET_CODE(i, g->edges[i].seq_len);
 	qsort(edge_sorted, g->n_e, sizeof(uint64_t), &cmp_edge_length);
+
+	khash_t(long_int) *all_count = NULL;
+	struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
+	struct mini_hash_t *bx_table = t->bx_table;
+	all_count = count_edge_link_shared_bc(g, bx_table);
+	destroy_bx_table(bx_table);
 
 	float unit_cov = get_genome_coverage(g);
 	int *visited = calloc(g->n_e, sizeof(int));

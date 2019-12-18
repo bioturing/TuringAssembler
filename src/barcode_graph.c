@@ -704,5 +704,4 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 	create_barcode_molecules(opt, list_res, n_res * 2, g);
 	free(list_res);
-
 }
