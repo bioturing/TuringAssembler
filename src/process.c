@@ -64,8 +64,64 @@ void build_local_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
 	log_info("Build graph level 1 time: %.3f", sec_from_prev_time());
 }
 
-void build_0_1(struct asm_graph_t *g0, struct asm_graph_t *g)
+int64_t dfs(struct asm_graph_t *g, int x, int *mark, int *hd)
 {
+	int64_t res = g->edges[x].seq_len-g->ksize;
+	int l = 0, r = 1;
+	hd[0] = x;
+	while (l < r) {
+		int x = hd[l++];
+		res += g->edges[x].seq_len-g->ksize;
+		int target = g->edges[x].target;
+		int src_rc = g->nodes[target].rc_id;
+		for (int i = 0; i < g->nodes[src_rc].deg; i++) {
+			int next = g->nodes[src_rc].adj[i];
+			if (mark[next] == 0) {
+				mark[next] = 1;
+				hd[r++] =  next;
+			}
+		}
+		for (int i = 0; i < g->nodes[target].deg; i++) {
+			int next = g->nodes[target].adj[i];
+			if (mark[next] == 0) {
+				mark[next] = 1;
+				hd[r++] =  next;
+			}
+		}
+	}
+	return res;
+}
+
+void count_cc(struct asm_graph_t *g)
+{
+	int *mark = calloc(g->n_e, sizeof(int));
+	int MAX = 35;
+	int *res = calloc(MAX, sizeof(int)), big_res = 0;
+	int *hd = calloc(100000000, 4), total_cc = 0, total_10k_cc = 0;
+	for (int i = 0; i < g->n_e; i++) if (mark[i] == 0){
+			int len = dfs(g, i, mark, hd);
+			if (len > MAX*10000) {
+				log_info("This component is big: %d", len);
+			} else {
+				res[len/10000]++;
+			}
+			if (len > 10000)
+				total_10k_cc++;
+			total_cc++;
+		}
+	for (int i = 0 ;  i < MAX; i++) {
+		log_info("Number of CC of len %d is %d", i, res[i]);
+	}
+	log_info("CC bigger than 10k is: %d", total_10k_cc);
+	log_info("Total cc %d", total_cc);
+}
+
+
+void build_0_1(struct opt_proc_t *opt, struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	char *log_file = str_concate(opt->out_dir, "/build_0_1.log");
+	init_logger(opt->log_level, log_file);
+	init_clock();
 	log_info("Resolve graph using small operation");
 	log_info("Input graph kmer size: %d", g0->ksize);
 	set_time_now();
@@ -141,6 +197,7 @@ void write_neo4j_create(struct asm_graph_t *g)
 void dirty_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = create_and_load_graph(opt);
+//	count_cc(g);
 	dirty(g, opt);
 //	write_neo4j_create(g);
 }
@@ -481,7 +538,7 @@ void assembly3_process(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g_lv0, "level_0");
 
 	set_log_stage("GraphConstruction");
-	build_0_1(&g_lv0, &g_lv1); /* Simplify graph level 0 to graph level 1 */
+	build_0_1(opt, &g_lv0, &g_lv1); /* Simplify graph level 0 to graph level 1 */
 	save_graph_info(opt->out_dir, &g_lv1, "level_1");
 	if (g_lv1.n_e == 0) {
 		log_error("graph after lv1 has 0 edges");
@@ -603,8 +660,9 @@ void build_0_1_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g1, g2;
 	load_asm_graph(&g1, opt->in_file);
-	build_0_1(&g1, &g2);
+	build_0_1(opt, &g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");
+	count_cc(&g2);
 	// asm_graph_destroy(&g1);
 	// asm_graph_destroy(&g2);
 }

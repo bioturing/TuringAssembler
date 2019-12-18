@@ -39,6 +39,7 @@ uint64_t get_barcode_biot(char *s, struct read_t *r);
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data);
 khash_t(long_int) *count_edge_link_shared_bc(struct asm_graph_t *g,
 		struct mini_hash_t *bc);
+uint64_t get_min_code(struct asm_graph_t *g, int u, int v);
 int get_edge_link_bc_count(khash_t(long_int) *all_count, int e1, int e2);
 
 #endif //SKIPPING_COUNT_BARCODES_H

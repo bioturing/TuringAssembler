@@ -619,10 +619,10 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 			e = g->nodes[u].adj[j];
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize);
-			if (degs[v] == 0 && d[v] != -1 && cov < max_cov &&
+			if (degs[v] == 0 && d[v] != -1 && cov < max_cov && d[v] < TIPS_LEN_THRES &&
 				((d[v] + g->edges[e].seq_len - g->ksize < TIPS_LEN_THRES && ((extend_left && extend_right && cov < 30) || (cov < cov_fw))) ||
 				 (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
-				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
+				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES && cov < TIPS_COV_THRES))) {
 				e_rc = g->edges[e].rc_id;
 				asm_remove_edge(g, e);
 				asm_remove_edge(g, e_rc);
@@ -729,7 +729,8 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 		cov_rv = __min(cov_rv, get_max_out_cov(g, v_rc));
 		if ((cov < CHIMERIC_RATIO_THRES * cov_fw ||
 			cov < CHIMERIC_RATIO_THRES * cov_rv) &&
-			g->edges[e].seq_len < CHIMERIC_LEN_THRES) {
+			g->edges[e].seq_len < CHIMERIC_LEN_THRES &&
+			cov < 15) {
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			++cnt_removed;
@@ -1024,7 +1025,8 @@ gint_t resolve_align_bubble(struct asm_graph_t *g)
 
 void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
+	// WARNING: THIS IS LOCAL GRAPH
+	gint_t cnt_tips = 0, cnt_tips_complex = 0, cnt_chimeric = 0, cnt_loop = 0, cnt_collapse = 0;
 	int iter = 0;
 	do {
 		log_debug("Iteration [%d]", ++iter);
@@ -1040,7 +1042,7 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
-		 cnt_chimeric = remove_chimeric(g0);
+		cnt_chimeric = remove_chimeric(g0);
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
@@ -1064,7 +1066,7 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
-	gint_t cnt_tips, cnt_tips_complex, cnt_chimeric, cnt_loop, cnt_collapse;
+	gint_t cnt_tips = 0 , cnt_tips_complex = 0, cnt_chimeric = 0, cnt_loop = 0, cnt_collapse = 0;
 	int iter = 0;
 	do {
 		log_debug("Iteration [%d]", ++iter);
@@ -1167,12 +1169,10 @@ int check_loop(struct asm_graph_t *g, int i_e2)
 //		return 0;
 	float cov_e2 = __get_edge_cov(e2, g->ksize);
 	float cov_e4 = __get_edge_cov(e4, g->ksize);
-	log_debug("cov e2 %f e4 %f e4len %d", cov_e2, cov_e4, e4->seq_len);
 	if (cov_e2 < cov_e4)
 		return 0;
 	if (e4->seq_len > 200)
 		return 0;
-	log_debug("check cov ok");
 	asm_remove_edge(g, i_e4);
 	int i_e4_rc = g->edges[i_e4].rc_id;
 	asm_remove_edge(g, i_e4_rc);
