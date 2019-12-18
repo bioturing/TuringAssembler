@@ -532,7 +532,7 @@ void append_edge(int *n_edges, int **list_edges, int u, int v)
 	(*n_edges)++;
 }
 
-void inline destroy_bx_table(struct mini_hash_t *bx_table)
+void destroy_bx_table(struct mini_hash_t *bx_table)
 {
 	for (int i = 0; i < bx_table->size; ++i) {
 		if (bx_table->h[i] != EMPTY_BX)
