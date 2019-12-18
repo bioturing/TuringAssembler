@@ -132,6 +132,27 @@ int get_share_bc(struct asm_graph_t *g, khash_t(long_int) *share_bc, int u, int 
 	return ret;
 }
 
+void join_read_pair_path(struct asm_graph_t *g, int *path, int n_path,
+		char **seq)
+{
+	decode_seq(seq, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
+	int seq_len = strlen(*seq);
+	for (int i = 1; i < n_path; ++i){
+		int e = path[i];
+		char *tmp_seq;
+		decode_seq(&tmp_seq, g->edges[e].seq, g->edges[e].seq_len);
+		char N[51] = {};
+		for (int j = 0; j < 50; ++j)
+			N[j] = 'N';
+		int new_len = seq_len + 50 + g->edges[e].seq_len;
+		*seq = realloc(*seq, (new_len + 1) * sizeof(char));
+		strcat(*seq, N);
+		strcat(*seq, tmp_seq);
+		free(tmp_seq);
+		seq_len = new_len;
+	}
+}
+
 void get_long_contigs(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
@@ -171,22 +192,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 		free(path_rv);
 
 		char *seq;
-		decode_seq(&seq, g->edges[path[0]].seq, g->edges[path[0]].seq_len);
-		int seq_len = strlen(seq);
-		for (int i = 1; i < n_path; ++i){
-			int e = path[i];
-			char *tmp_seq;
-			decode_seq(&tmp_seq, g->edges[e].seq, g->edges[e].seq_len);
-			char N[51] = {};
-			for (int j = 0; j < 50; ++j)
-				N[j] = 'N';
-			int new_len = seq_len + 50 + g->edges[e].seq_len;
-			seq = realloc(seq, (new_len + 1) * sizeof(char));
-			strcat(seq, N);
-			strcat(seq, tmp_seq);
-			free(tmp_seq);
-			seq_len = new_len;
-		}
+		join_read_pair_path(g, path, n_path, &seq);
 
 		char path_str[2000] = {};
 		for (int i = 0; i < n_path; ++i){
@@ -197,11 +203,6 @@ void get_long_contigs(struct opt_proc_t *opt)
 		}
 		log_debug("Path: %s", path_str);
 		free(path);
-		/*__VERBOSE("Start from %d, fw: %d, rv: %d\n", v, n_path_fw,
-				n_path_rv);
-		for (int i = 0; i < n_path; ++i)
-			__VERBOSE("%d ", path[i]);
-		__VERBOSE("\n");*/
 		fprintf(f, ">SEQ_%d\n", n_e++);
 		fprintf(f, "%s\n", seq);
 		free(seq);
