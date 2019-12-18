@@ -24,14 +24,17 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 		int v = code >> 32;
 		int u = code & -1;
 		int val = kh_val(rp_count, it);
-		if (val < MIN_READ_PAIR_MAPPED){
-			log_debug("Edges %d and %d share only %d read pairs",
-					v, u, val);
-			continue;
-		}
+		//if (val < MIN_READ_PAIR_MAPPED_SOFT){
+		//	log_debug("Edges %d and %d share only %d read pairs",
+		//			v, u, val);
+		//	continue;
+		//}
 
 		rp_cand[v].cand = realloc(rp_cand[v].cand, (rp_cand[v].n + 1) * sizeof(int));
-		rp_cand[v].cand[rp_cand[v].n++] = u;
+		rp_cand[v].cand[rp_cand[v].n] = u;
+		rp_cand[v].score = realloc(rp_cand[v].score, (rp_cand[v].n + 1) * sizeof(int));
+		rp_cand[v].score[rp_cand[v].n] = val;
+		++rp_cand[v].n;
 	}
 	kh_destroy(long_int, rp_count);
 	fclose(f);
@@ -56,7 +59,8 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.25 * unit_cov)
+		if (cov >= 0.25 * unit_cov
+			&& rp_cand[last].score[i] >= MIN_READ_PAIR_MAPPED_HARD)
 			kh_set_int_insert(cand, rp_cand[last].cand[i]);
 	}
 
@@ -66,7 +70,8 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 		khash_t(set_int) *new_cand = kh_init(set_int);
 		for (int i = 0; i < rp_cand[v].n; ++i){
 			int u = rp_cand[v].cand[i];
-			if (kh_set_int_exist(cand, u))
+			if (rp_cand[v].score[i] >= MIN_READ_PAIR_MAPPED_SOFT
+					&& kh_set_int_exist(cand, u))
 				kh_set_int_insert(new_cand, u);
 		}
 		kh_destroy(set_int, cand);
@@ -95,11 +100,17 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		if (v == -1)
 			 break;
 		int v_rc = g->edges[v].rc_id;
-		int count = unit_cov * (g->edges[v].seq_len - g->ksize + 1);
-		g->edges[v].count -= count;
-		g->edges[v_rc].count -= count;
 		*path = realloc(*path, ((*n_path) + 1) * sizeof(int));
 		(*path)[(*n_path)++] = v;
+	 }
+
+	 for (int i = 0; i < *n_path; ++i){
+		int v = (*path)[i];
+		int v_rc = g->edges[v].rc_id;
+		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
+				g->edges[v].count);
+		g->edges[v].count -= count;
+		g->edges[v_rc].count -= count;
 	 }
 }
 
@@ -117,7 +128,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 
 	float unit_cov = get_genome_coverage(g);
 	struct asm_graph_t *g_new = calloc(1, sizeof(struct asm_graph_t));
-	for (int i = g->n_e - 1; i >= 0; --i){
+	for (int i = g->n_e - 1, j = 0; i >= 0 && j < 10; --i, ++j){
 		int v = edge_sorted[i] >> 32;
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
 		if (cov < 0.25 * unit_cov)
@@ -126,9 +137,14 @@ void get_long_contigs(struct opt_proc_t *opt)
 		int n_path;
 		extend_by_read_pairs(g, v, unit_cov, rp_cand, &path, &n_path);
 
-		for (int i = 0; i < n_path; ++i)
-			__VERBOSE("%d ", path[i]);
-		exit(0);
+		for (int j = 0; j < n_path; ++j)
+			__VERBOSE("%d ", path[j]);
+		__VERBOSE("\n");
+		for (int j = 0; j < n_path; ++j){
+			float cov = __get_edge_cov(g->edges + path[j], g->ksize);
+			__VERBOSE("%.3f ", cov);
+		}
+		__VERBOSE("\n");
 	}
 
 	asm_graph_destroy(g);

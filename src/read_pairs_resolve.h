@@ -8,11 +8,14 @@
 #include "log.h"
 #include "cluster_molecules.h"
 #include "verbose.h"
-#define MIN_READ_PAIR_MAPPED 25
+#include "helper.h"
+#define MIN_READ_PAIR_MAPPED_HARD 25
+#define MIN_READ_PAIR_MAPPED_SOFT 2
 
 struct read_pair_cand_t{
 	int n;
 	int *cand;
+	int *score;
 };
 
 void get_read_pairs_count(struct asm_graph_t *g, char *path,
