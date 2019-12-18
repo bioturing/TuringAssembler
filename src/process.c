@@ -328,7 +328,7 @@ void resolve_complex_bulges_process(struct opt_proc_t *opt)
 	load_asm_graph(&g, opt->in_file);
 	asm_resolve_complex_bulges_ite(&g);
 
-	save_graph_info(opt->out_dir, &g, "level_3");
+	save_graph_info(opt->out_dir, &g, "no_complex_bulges");
 	asm_graph_destroy(&g);
 }
 
@@ -342,7 +342,7 @@ void resolve_bulges_process(struct opt_proc_t *opt)
 	load_asm_graph(&g, opt->in_file);
 	asm_resolve_simple_bulges_ite(&g);
 
-	save_graph_info(opt->out_dir, &g, "level_2");
+	save_graph_info(opt->out_dir, &g, "no_simple_bulges");
 	asm_graph_destroy(&g);
 }
 
