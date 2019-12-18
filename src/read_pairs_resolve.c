@@ -1,5 +1,6 @@
 #include <minimizers/count_barcodes.h>
 #include "read_pairs_resolve.h"
+#include "barcode_graph.h"
 
 void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
 {
@@ -144,10 +145,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 	qsort(edge_sorted, g->n_e, sizeof(uint64_t), &cmp_edge_length);
 
 	khash_t(long_int) *all_count = NULL;
-	struct mm_bundle_t *t = mm_hit_all_barcodes(opt, g);
-	struct mini_hash_t *bx_table = t->bx_table;
-	all_count = count_edge_link_shared_bc(g, bx_table);
-	destroy_bx_table(bx_table);
+	all_count = load_khash(opt->var[0]);
 
 	float unit_cov = get_genome_coverage(g);
 	int *visited = calloc(g->n_e, sizeof(int));
