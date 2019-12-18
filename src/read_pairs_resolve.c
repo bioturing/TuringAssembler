@@ -38,12 +38,33 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 	fclose(f);
 }
 
+int cmp_edge_length(const void *a, const void *b)
+{
+	int len_a = (*(uint64_t *) a) & -1;
+	int len_b = (*(uint64_t *) b) & -1;
+	if (len_a < len_b)
+		return -1;
+	if (len_a > len_b)
+		return 1;
+	return 0;
+}
+
 void get_long_contigs(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	struct read_pair_cand_t *rp_cand = calloc(g->n_e, sizeof(struct read_pair_cand_t));
 	get_read_pairs_count(g, opt->in_fasta, rp_cand);
+	
+	uint64_t *edge_sorted = calloc(g->n_e, sizeof(uint64_t));
+	for (int i = 0; i < g->n_e; ++i)
+		edge_sorted[i] = GET_CODE(i, g->edges[i].seq_len);
+	qsort(edge_sorted, g->n_e, sizeof(uint64_t), &cmp_edge_length);
+
+	for (int i = g->n_e - 1; i >= 0; --i){
+		int v = edge_sorted[i] >> 32;
+		printf("%d %d\n", v, g->edges[v].seq_len);
+	}
 
 	asm_graph_destroy(g);
 	free(g);
