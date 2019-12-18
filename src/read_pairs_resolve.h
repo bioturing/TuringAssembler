@@ -18,6 +18,8 @@ struct read_pair_cand_t{
 	int *score;
 };
 
+void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand);
+
 void get_read_pairs_count(struct asm_graph_t *g, char *path,
 		struct read_pair_cand_t *rp_cand);
 
