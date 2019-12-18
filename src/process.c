@@ -97,7 +97,7 @@ void count_cc(struct asm_graph_t *g)
 	int *mark = calloc(g->n_e, sizeof(int));
 	int MAX = 35;
 	int *res = calloc(MAX, sizeof(int)), big_res = 0;
-	int *hd = calloc(100000000, 4), total_cc = 0;
+	int *hd = calloc(100000000, 4), total_cc = 0, total_10k_cc = 0;
 	for (int i = 0; i < g->n_e; i++) if (mark[i] == 0){
 			int len = dfs(g, i, mark, hd);
 			if (len > MAX*10000) {
@@ -105,13 +105,15 @@ void count_cc(struct asm_graph_t *g)
 			} else {
 				res[len/10000]++;
 			}
+			if (len > 10000)
+				total_10k_cc++;
 			total_cc++;
 		}
 	for (int i = 0 ;  i < MAX; i++) {
 		log_info("Number of CC of len %d is %d", i, res[i]);
 	}
+	log_info("CC bigger than 10k is: %d", total_10k_cc);
 	log_info("Total cc %d", total_cc);
-
 }
 
 
