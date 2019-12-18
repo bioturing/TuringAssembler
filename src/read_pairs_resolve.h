@@ -7,6 +7,7 @@
 #include "khash_operations.h"
 #include "log.h"
 #include "cluster_molecules.h"
+#include "verbose.h"
 #define MIN_READ_PAIR_MAPPED 25
 
 struct read_pair_cand_t{
@@ -18,6 +19,12 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 		struct read_pair_cand_t *rp_cand);
 
 void merge_sort_by_edge_length(int *edges, int l, int r);
+
+void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
+		struct read_pair_cand_t *rp_cand, int **path, int *n_path);
+
+int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
+		int *path, int n_path);
 
 void get_long_contigs(struct opt_proc_t *opt);
 #endif
