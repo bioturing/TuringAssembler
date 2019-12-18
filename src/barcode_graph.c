@@ -494,7 +494,7 @@ void filter_list_edge(struct opt_proc_t *opt, struct mini_hash_t *rp_table, stru
 		int u = bg->edges[i + 1];
 		uint64_t code = GET_CODE(v, u);
 		if (!kh_set_long_exist(mark_link, code))
-			kh_set_long_add(mark_link, code);
+			kh_set_long_insert(mark_link, code);
 		else
 			log_error("wtf");
 		list_res[n_res << 1] = v;

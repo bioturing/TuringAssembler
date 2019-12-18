@@ -119,7 +119,7 @@
 //		int tg = g->edges[v].target;
 //		for (int i = 0; i < g->nodes[tg].deg; ++i){
 //			int u = g->nodes[tg].adj[i];
-//			kh_set_long_add(mark, GET_CODE(v, u));
+//			kh_set_long_insert(mark, GET_CODE(v, u));
 //			fprintf(all_paths, "%d to %d: %d,%d\n", v, u, v, u);
 //		}
 //	}
@@ -140,7 +140,7 @@
 //				uint64_t new_code = GET_CODE(w, t);
 //				if (kh_set_long_exist(mark, new_code))
 //					continue;
-//				kh_set_long_add(mark, new_code);
+//				kh_set_long_insert(mark, new_code);
 //				fprintf(all_paths, "%d to %d: ", w, t);
 //				fprintf(all_paths, "%d,", w);
 //				int p = v;
@@ -346,13 +346,13 @@ void check_loop_dfs(struct simple_graph_t *sg, int v, khash_t(set_int) *visited,
 		    khash_t(set_int) *in_dfs)
 {
 	if (kh_set_int_exist(in_dfs, v)) {
-		kh_set_int_add(sg->is_loop, v);
+		kh_set_int_insert(sg->is_loop, v);
 		return;
 	}
 	if (kh_set_int_exist(visited, v))
 		return;
-	kh_set_int_add(visited, v);
-	kh_set_int_add(in_dfs, v);
+	kh_set_int_insert(visited, v);
+	kh_set_int_insert(in_dfs, v);
 	struct simple_node_t *snode = kh_int_node_get(sg->nodes, v);
 	for (int i = 0; i < snode->deg; ++i) {
 		int u = snode->adj[i];
@@ -396,7 +396,7 @@ void get_longest_path_dfs(struct simple_graph_t *sg, int v,
 	}
 	kh_int_int_set(sg->path_len, v, max_len + 1);
 	kh_int_int_set(sg->next, v, next);
-	kh_set_int_add(done_dfs, v);
+	kh_set_int_insert(done_dfs, v);
 }
 
 void get_longest_path(struct simple_graph_t *sg)
@@ -431,7 +431,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 		struct queue_t q;
 		init_queue(&q, 1024);
 		push_queue(&q, pointerize(&v, sizeof(int)));
-		kh_set_int_add(visited, v);
+		kh_set_int_insert(visited, v);
 
 		khash_t(set_int) *component = kh_init(set_int);
 		int has_rc = 0;
@@ -453,14 +453,14 @@ void filter_complex_regions(struct simple_graph_t *sg)
 				has_rc = 1;
 			if (kh_set_int_exist(sg->is_loop, v))
 				has_loop = 1;
-			kh_set_int_add(component, v);
+			kh_set_int_insert(component, v);
 
 			for (int i = 0; i < snode->deg + snode->rv_deg; ++i) {
 				int u = i < snode->deg ? snode->adj[i] :
 					snode->rv_adj[i - snode->deg];
 				if (kh_set_int_exist(visited, u))
 					continue;
-				kh_set_int_add(visited, u);
+				kh_set_int_insert(visited, u);
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
@@ -478,7 +478,7 @@ void filter_complex_regions(struct simple_graph_t *sg)
 			if (!kh_exist(component, it))
 				continue;
 			int v = kh_key(component, it);
-			kh_set_int_add(sg->is_complex, v);
+			kh_set_int_insert(sg->is_complex, v);
 		}
 free_stage_1:
 		kh_destroy(set_int, component);
@@ -833,7 +833,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 		struct queue_t q;
 		init_queue(&q, 1024);
 		push_queue(&q, pointerize(&s, sizeof(int)));
-		kh_set_int_add(visited, s);
+		kh_set_int_insert(visited, s);
 		while (!is_queue_empty(&q)) {
 			int v = *(int *) get_queue(&q);
 			free(get_queue(&q));
@@ -843,7 +843,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				has_rc = 1;
 			if (kh_set_int_exist(sg->is_loop, v))
 				has_loop = 1;
-			kh_set_int_add(component, v);
+			kh_set_int_insert(component, v);
 
 			struct simple_node_t *node = kh_int_node_get(sg->nodes,
 								     v);
@@ -851,7 +851,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				int u = node->adj[i];
 				if (kh_set_int_exist(visited, u))
 					continue;
-				kh_set_int_add(visited, u);
+				kh_set_int_insert(visited, u);
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 
@@ -862,7 +862,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 					continue;
 				if (kh_set_int_exist(visited, u))
 					continue;
-				kh_set_int_add(visited, u);
+				kh_set_int_insert(visited, u);
 				push_queue(&q, pointerize(&u, sizeof(int)));
 			}
 		}
@@ -904,8 +904,8 @@ void hits_to_edges(struct asm_graph_t *g, struct mm_hits_t *hits, int **edges,
 			continue;
 		int e = kh_key(hits->edges, it);
 		int rc = g->edges[e].rc_id;
-		kh_set_int_add(tmp, e);
-		kh_set_int_add(tmp, rc);
+		kh_set_int_insert(tmp, e);
+		kh_set_int_insert(tmp, rc);
 	}
 
 	*edges = calloc(kh_size(tmp), sizeof(int));
