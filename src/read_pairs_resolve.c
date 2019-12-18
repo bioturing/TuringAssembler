@@ -1,5 +1,4 @@
 #include "read_pairs_resolve.h"
-#define GET_CODE(v, u) ((((uint64_t) (v)) << 32) | (u))
 
 void get_read_pairs_count(struct asm_graph_t *g, char *path,
 		struct read_pair_cand_t *rp_cand)

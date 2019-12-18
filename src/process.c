@@ -26,6 +26,7 @@
 #include "cluster_molecules.h"
 #include "split_molecules.h"
 #include "barcode_graph.h"
+#include "read_pairs_resolve.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -351,14 +352,14 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
-//void debug_process(struct opt_proc_t *opt)
-//{
-//	char path[1024];
-//	sprintf(path, "%s/debug.log", opt->out_dir);
-//	init_logger(opt->log_level, path);
-//	set_log_stage("Debug process");
-//	create_barcode_molecules(opt);
-//}
+void debug_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Debug process");
+	get_long_contigs(opt);
+}
 
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
