@@ -150,9 +150,9 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 
 	while (1){
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
-		/*if (__get_edge_cov(&g->edges[v], g->ksize) > 1.5 * unit_cov
+		if (__get_edge_cov(&g->edges[v], g->ksize) > 1.5 * unit_cov
 			|| __get_edge_cov(&g->edges[s], g->ksize) > 1.5 * unit_cov)
-			return;*/
+			return;
 		if (v == -1)
 			 break;
 		//if (check_good_cand(g, *path, *n_path, share_bc, v) == 0)
@@ -233,6 +233,8 @@ void get_long_contigs(struct opt_proc_t *opt)
 			path[n_path++] = g->edges[path_rv[i]].rc_id;
 		for (int i = 1; i < n_path_fw; ++i)
 			path[n_path++] = path_fw[i];
+		//for (int i = 0; i < n_path; ++i)
+		//	path[i] = g->edges[path[i]].rc_id;
 		//for (int i = 0; i < n_path; ++i){
 		//	int e = path[i];
 		//	int e_rc = g->edges[e].rc_id;

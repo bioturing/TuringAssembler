@@ -687,7 +687,8 @@ void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			int e2 = ref2.e1;
 			if (e1 > g->n_e || e2 > g->n_e)
 				log_error("%d %d", e1, e2);
-			uint64_t code = GET_CODE(e1, e2);
+			uint64_t code = p1[i].strand == 0 ? GET_CODE(e1, e2)
+					: GET_CODE(g->edges[e2].rc_id, g->edges[e1].rc_id);
 			pthread_mutex_lock(bundle->lock_rp);
 			kh_long_int_set(bundle->rp_count, code,
 				kh_long_int_try_get(bundle->rp_count, code, 0) + 1);

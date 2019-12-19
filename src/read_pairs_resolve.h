@@ -9,8 +9,8 @@
 #include "cluster_molecules.h"
 #include "verbose.h"
 #include "helper.h"
-#define MIN_READ_PAIR_MAPPED_HARD 25
-#define MIN_READ_PAIR_MAPPED_SOFT 2
+#define MIN_READ_PAIR_MAPPED_HARD 50
+#define MIN_READ_PAIR_MAPPED_SOFT 20
 
 struct read_pair_cand_t{
 	int n;
