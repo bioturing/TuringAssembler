@@ -62,6 +62,7 @@ int cmp_edge_length(const void *a, const void *b)
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
 		int *path, int n_path)
 {
+	int res = -1;
 	khash_t(set_int) *cand = kh_init(set_int);
 	int last = path[n_path - 1];
 	for (int i = 0; i < rp_cand[last].n; ++i){
@@ -69,9 +70,31 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
 		if (cov >= 0.25 * unit_cov
 			&& rp_cand[last].score[i] >= MIN_READ_PAIR_MAPPED_HARD
-			&& g->edges[v].seq_len >= 100)
+			&& g->edges[v].seq_len >= 100){
 			kh_set_int_insert(cand, rp_cand[last].cand[i]);
+			/*__VERBOSE("cand %d cov %.3f len %d share %d\n", rp_cand[last].cand[i],
+					cov, g->edges[rp_cand[last].cand[i]].seq_len,
+					rp_cand[last].score[i]);*/
+		}
 	}
+
+	//for (khiter_t it = kh_begin(cand); it != kh_end(cand); ++it){
+	//	if (!kh_exist(cand, it))
+	//		continue;
+	//	int v = kh_key(cand, it);
+	//	int count = 0;
+	//	for (int i = 0; i < rp_cand[v].n; ++i){
+	//		int u = rp_cand[v].cand[i];
+	//		/*if (v == 43252)
+	//			__VERBOSE("%d ", u);
+	//		__VERBOSE("\n");*/
+	//		if (u != v && kh_set_int_exist(cand, u))
+	//			++count;
+	//	}
+	//	if (count == kh_size(cand) - 1){
+	//		res = v;
+	//}
+	//goto end_function;
 
 	int p = n_path - 2;
 	while (p >= 0 && kh_size(cand) > 1){
@@ -88,19 +111,34 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 		cand = new_cand;
 		--p;
 	}
-	int res = -1;
 	if (kh_size(cand) == 1){
 		khiter_t it = kh_begin(cand);
 		while (kh_exist(cand, it) == 0)
 			++it;
 		res = kh_key(cand, it);
 	}
+end_function:
 	kh_destroy(set_int, cand);
+	//__VERBOSE("next cand %d\n", res);
 	return res;
 }
 
+int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
+		khash_t(long_int) *share_bc, int cand)
+{
+	int last_e = path[n_path - 1];
+	int sum_share = 0;
+	for (int i = max(0, n_path - 4); i < n_path - 1; ++i){
+		int e = path[i];
+		int val = get_share_bc(g, share_bc, e, last_e);
+		sum_share += val;
+	}
+	return sum_share < get_share_bc(g, share_bc, last_e, cand);
+}
+
 void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
-		struct read_pair_cand_t *rp_cand, int **path, int *n_path)
+		struct read_pair_cand_t *rp_cand, khash_t(long_int) *share_bc,
+		int **path, int *n_path)
 {
 	*path = calloc(1, sizeof(int));
 	*n_path = 1;
@@ -112,8 +150,13 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 
 	while (1){
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
+		/*if (__get_edge_cov(&g->edges[v], g->ksize) > 1.5 * unit_cov
+			|| __get_edge_cov(&g->edges[s], g->ksize) > 1.5 * unit_cov)
+			return;*/
 		if (v == -1)
 			 break;
+		//if (check_good_cand(g, *path, *n_path, share_bc, v) == 0)
+		//	break;
 		int v_rc = g->edges[v].rc_id;
 		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
 				g->edges[v].count);
@@ -139,6 +182,8 @@ void join_read_pair_path(struct asm_graph_t *g, int *path, int n_path,
 	int seq_len = strlen(*seq);
 	for (int i = 1; i < n_path; ++i){
 		int e = path[i];
+		//if (path[0] == 50913)
+		//	__VERBOSE("%d\n", e);
 		char *tmp_seq;
 		decode_seq(&tmp_seq, g->edges[e].seq, g->edges[e].seq_len);
 		char N[51] = {};
@@ -165,8 +210,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 		edge_sorted[i] = GET_CODE(i, g->edges[i].seq_len);
 	qsort(edge_sorted, g->n_e, sizeof(uint64_t), &cmp_edge_length);
 
-	khash_t(long_int) *all_count = NULL;
-	all_count = load_khash(opt->var[0]);
+	khash_t(long_int) *share_bc = load_khash(opt->var[0]);
 
 	float unit_cov = get_genome_coverage(g);
 	int *visited = calloc(g->n_e, sizeof(int));
@@ -179,15 +223,23 @@ void get_long_contigs(struct opt_proc_t *opt)
 			continue;
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;
-		extend_by_read_pairs(g, e, unit_cov, rp_cand, &path_fw, &n_path_fw);
+		extend_by_read_pairs(g, e, unit_cov, rp_cand, share_bc,
+				&path_fw, &n_path_fw);
 		extend_by_read_pairs(g, g->edges[e].rc_id, unit_cov, rp_cand,
-				&path_rv, &n_path_rv);
+				share_bc, &path_rv, &n_path_rv);
 		int *path = calloc(n_path_fw + n_path_rv - 1, sizeof(int));
 		int n_path = 0;
 		for (int i = n_path_rv - 1; i >= 0; --i)
 			path[n_path++] = g->edges[path_rv[i]].rc_id;
 		for (int i = 1; i < n_path_fw; ++i)
 			path[n_path++] = path_fw[i];
+		//for (int i = 0; i < n_path; ++i){
+		//	int e = path[i];
+		//	int e_rc = g->edges[e].rc_id;
+		//	int min_count = min(g->edges[e].count, g->edges[e_rc].count);
+		//	g->edges[e].count = min_count;
+		//	g->edges[e_rc].count = min_count;
+		//}
 		free(path_fw);
 		free(path_rv);
 
@@ -201,7 +253,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 			sprintf(tmp, "%d ", path[i]);
 			strcat(path_str, tmp);
 		}
-		log_debug("Path: %s", path_str);
+		log_debug("Path number %d start from %d: %s", n_e, e, path_str);
 		free(path);
 		fprintf(f, ">SEQ_%d\n", n_e++);
 		fprintf(f, "%s\n", seq);
@@ -228,3 +280,5 @@ void get_long_contigs(struct opt_proc_t *opt)
 	asm_graph_destroy(g);
 	free(g);
 }
+
+

@@ -361,6 +361,28 @@ void debug_process(struct opt_proc_t *opt)
 	get_long_contigs(opt);
 }
 
+void read_pairs_count_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Debug process");
+	khash_t(long_int) *rp_count = kh_init(long_int);
+	get_all_read_pairs_count(opt, rp_count);
+	sprintf(path, "%s/rp_counts.txt", opt->out_dir);
+	FILE *f = fopen(path, "w");
+	for (khiter_t it = kh_begin(rp_count); it != kh_end(rp_count); ++it){
+		if (!kh_exist(rp_count, it))
+			continue;
+		uint64_t code = kh_key(rp_count, it);
+		int v = code >> 32;
+		int u = code & -1;
+		assert(v >= 0);
+		assert(u >= 0);
+		fprintf(f, "%d %d %d\n", v, u, kh_val(rp_count, it));
+	}
+	fclose(f);
+}
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
 	print_barcode_graph(opt);

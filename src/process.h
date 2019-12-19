@@ -5,6 +5,7 @@
 #include "assembly_graph.h"
 #include "sort_read.h"
 #include "attribute.h"
+#include "barcode_builder.h"
 
 void graph_convert_process(struct opt_proc_t *opt);
 void clean_process(struct opt_proc_t *opt);
@@ -45,4 +46,5 @@ void print_barcode_graph_process(struct opt_proc_t *opt);
 void cluster_molecules_process(struct opt_proc_t *opt);
 void debug_process(struct opt_proc_t *opt);
 void build_coverage_process(struct opt_proc_t *opt);
+void read_pairs_count_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

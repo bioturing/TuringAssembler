@@ -284,6 +284,83 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 	free(bwa_opt);
 }
 
+void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count){
+	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
+	load_asm_graph(g, opt->in_file);
+
+	struct read_path_t *read_sorted_path = calloc(1, sizeof(struct read_path_t));
+	if (opt->lib_type != LIB_TYPE_SORTED)
+		log_error("Please first sort the files");
+	read_sorted_path->R1_path = opt->files_1[0];
+	read_sorted_path->R2_path = opt->files_2[0];
+	read_sorted_path->idx_path = opt->files_I[0];
+	char fasta_path[1024];
+	sprintf(fasta_path, "%s/rp_count_tmp.fasta", opt->out_dir);
+	write_fasta_seq(g, fasta_path);
+
+
+	log_info("Getting read-pairs count");
+	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
+	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
+	mem_opt_t *bwa_opt = asm_memopt_init();
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	int i;
+	struct producer_bundle_t *producer_bundles;
+	producer_bundles = init_fastq_pair(opt->n_threads, 1,
+	                                   &(read_sorted_path->R1_path),
+					   &(read_sorted_path->R2_path));
+
+	struct rp_count_bundle_t *worker_bundles;
+	worker_bundles = malloc(opt->n_threads * sizeof(struct rp_count_bundle_t));
+
+	pthread_mutex_t lock;
+	pthread_mutex_init(&lock, NULL);
+	pthread_mutex_t lock_rp;
+	pthread_mutex_init(&lock_rp, NULL);
+	for (i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].g = g;
+		worker_bundles[i].bwa_idx = bwa_idx;
+		worker_bundles[i].bwa_opt = bwa_opt;
+		worker_bundles[i].lock = &lock;
+		worker_bundles[i].rp_count = rp_count;
+		worker_bundles[i].lock_rp = &lock_rp;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	/* FIXME: not actually opt->n_files, noob */
+
+	opt->n_files = 1;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_producer,
+		               producer_bundles + i);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, rp_count_buffer_iterator,
+		               worker_bundles + i);
+
+	for (i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, 1);
+	free(worker_bundles);
+
+	free(producer_threads);
+	free(worker_threads);
+
+	bwa_idx_destroy(bwa_idx);
+	free(bwa_opt);
+}
+
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
                         struct read_path_t *rpath, const char *fasta_path, uint32_t aux_build) {
 	log_info("Construct aux info with aux_build: %d", aux_build);
@@ -549,6 +626,81 @@ static inline void add_readpair_count_candidate(struct asm_graph_t *g, gint_t e1
 	atomic_add_and_fetch32(&(kh_value(g->candidates, k).n_pair), 1);
 }
 
+void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
+                 struct rp_count_bundle_t *bundle) {
+	struct asm_graph_t *g = bundle->g;
+	bwaidx_t *idx = bundle->bwa_idx;
+	mem_opt_t *opt = bundle->bwa_opt;
+	mem_alnreg_v ar1, ar2;
+	uint8_t *r1_seq, *r2_seq;
+	int i, k, n1, n2, count, best_score_1, best_score_2;
+	ar1 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r1->len, r1->seq);
+	ar2 = mem_align1(opt, idx->bwt, idx->bns, idx->pac, r2->len, r2->seq);
+	// 			STAGE 1 			
+	r1_seq = malloc(r1->len);
+	r2_seq = malloc(r2->len);
+	for (i = 0; i < r1->len; ++i)
+		r1_seq[i] = nst_nt4_table[(int) r1->seq[i]];
+	for (i = 0; i < r2->len; ++i)
+		r2_seq[i] = nst_nt4_table[(int) r2->seq[i]];
+	struct asm_align_t *p1, *p2;
+	p1 = alloca(ar1.n * sizeof(struct asm_align_t));
+	p2 = alloca(ar2.n * sizeof(struct asm_align_t));
+	n1 = n2 = 0;
+	best_score_1 = best_score_2 = -(1 << 30);
+	for (i = 0; i < (int) ar1.n; ++i) {
+		struct asm_align_t a;
+		a = asm_reg2aln(opt, idx->bns, idx->pac, r1->len, r1_seq, ar1.a + i);
+		if (a.rid == -1)
+			continue;
+		if (a.score > best_score_1) {
+			best_score_1 = a.score;
+			p1[0] = a;
+			n1 = 1;
+		} else if (a.score == best_score_1) {
+			p1[n1++] = a;
+		}
+	}
+	for (i = 0; i < (int) ar2.n; ++i) {
+		struct asm_align_t a;
+		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
+		if (a.rid == -1)
+			continue;
+		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
+		if (a.score > best_score_2) {
+			best_score_2 = a.score;
+			p2[0] = a;
+			n2 = 1;
+		} else if (a.score == best_score_2) {
+			p2[n2++] = a;
+		}
+	}
+	if (ar1.n != 2 || ar2.n != 2|| ar1.a->score < 50 || ar2.a->score < 50)
+		goto free_stage_1;
+	for (int i = 0; i < n1; ++i){
+		for (int j = 0; j < n2; ++j){
+			if (p1[i].strand != p2[j].strand)
+				continue;
+			struct fasta_ref_t ref1 = parse_fasta_ref(idx->bns->anns[p1[i].rid].name);
+			struct fasta_ref_t ref2 = parse_fasta_ref(idx->bns->anns[p2[j].rid].name);
+			int e1 = ref1.e1;
+			int e2 = ref2.e1;
+			if (e1 > g->n_e || e2 > g->n_e)
+				log_error("%d %d", e1, e2);
+			uint64_t code = GET_CODE(e1, e2);
+			pthread_mutex_lock(bundle->lock_rp);
+			kh_long_int_set(bundle->rp_count, code,
+				kh_long_int_try_get(bundle->rp_count, code, 0) + 1);
+			pthread_mutex_unlock(bundle->lock_rp);
+		}
+	}
+free_stage_1:
+	free(ar1.a);
+	free(ar2.a);
+	free(r1_seq);
+	free(r2_seq);
+}
+
 void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
                  struct bccount_bundle_t *bundle) {
 	struct asm_graph_t *g = bundle->g;
@@ -730,6 +882,63 @@ free_stage_1:
 	free(ar2.a);
 	free(r1_seq);
 	free(r2_seq);
+}
+
+void *rp_count_buffer_iterator(void *data) {
+	struct rp_count_bundle_t *bundle = (struct rp_count_bundle_t *) data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_pair_buffer();
+
+	char *buf1, *buf2;
+	int pos1, pos2, rc1, rc2, input_format, mapper_algo;
+
+	int64_t n_reads;
+	int64_t *gcnt_reads;
+	uint64_t barcode;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf) {
+			break;
+		}
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read1, buf1, &pos1) :
+			      get_read_from_fa(&read1, buf1, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read2, buf2, &pos2) :
+			      get_read_from_fa(&read2, buf2, &pos2);
+
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
+				log_warn("buf1 %s", buf1);
+				log_warn("buf2 %s", buf2);
+				__ERROR("\nWrong format file when build barcode scaffold\n");
+			}
+
+			barcode = get_barcode(&read1);
+			if (barcode == (uint64_t) -1) {
+				continue;
+			}
+			rp_count_mapper(&read1, &read2, barcode, bundle);
+
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+
+	free_pair_buffer(own_buf);
+	pthread_exit(NULL);
 }
 
 void *barcode_buffer_iterator(void *data) {
