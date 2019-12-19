@@ -289,11 +289,8 @@ void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_coun
 	load_asm_graph(g, opt->in_file);
 
 	struct read_path_t *read_sorted_path = calloc(1, sizeof(struct read_path_t));
-	if (opt->lib_type != LIB_TYPE_SORTED)
-		log_error("Please first sort the files");
 	read_sorted_path->R1_path = opt->files_1[0];
 	read_sorted_path->R2_path = opt->files_2[0];
-	read_sorted_path->idx_path = opt->files_I[0];
 	char fasta_path[1024];
 	sprintf(fasta_path, "%s/rp_count_tmp.fasta", opt->out_dir);
 	write_fasta_seq(g, fasta_path);
@@ -318,16 +315,20 @@ void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_coun
 
 	pthread_mutex_t lock;
 	pthread_mutex_init(&lock, NULL);
-	pthread_mutex_t lock_rp;
-	pthread_mutex_init(&lock_rp, NULL);
+	pthread_mutex_t *edge_lock_rp = calloc(g->n_e, sizeof(pthread_mutex_t));
+	for (int i = 0; i < g->n_e; ++i)
+		pthread_mutex_init(edge_lock_rp + i, NULL);
+	khash_t(int_int) **edge_rp_count = calloc(g->n_e, sizeof(khash_t(int_int) *));
+	for (int i = 0; i < g->n_e; ++i)
+		edge_rp_count[i] = kh_init(int_int);
 	for (i = 0; i < opt->n_threads; ++i) {
 		worker_bundles[i].q = producer_bundles->q;
 		worker_bundles[i].g = g;
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
 		worker_bundles[i].lock = &lock;
-		worker_bundles[i].rp_count = rp_count;
-		worker_bundles[i].lock_rp = &lock_rp;
+		worker_bundles[i].rp_count = edge_rp_count;
+		worker_bundles[i].lock_rp = edge_lock_rp;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -351,14 +352,35 @@ void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_coun
 	for (i = 0; i < opt->n_threads; ++i)
 		pthread_join(worker_threads[i], NULL);
 
+	for (int i = 0; i < g->n_e; ++i){
+		int v = i;
+		khash_t(int_int) *h = edge_rp_count[i];
+		for (khiter_t it = kh_begin(h); it != kh_end(h); ++it){
+			if (!kh_exist(h, it))
+				continue;
+			int u = kh_key(h, it);
+			int count = kh_val(h, it);
+			uint64_t code = GET_CODE(v, u);
+			kh_long_int_set(rp_count, code, count);
+		}
+	}
+
 	free_fastq_pair(producer_bundles, 1);
 	free(worker_bundles);
 
 	free(producer_threads);
 	free(worker_threads);
 
+	for (int i = 0; i < g->n_e; ++i)
+		kh_destroy(int_int, edge_rp_count[i]);
+	free(edge_rp_count);
+
 	bwa_idx_destroy(bwa_idx);
 	free(bwa_opt);
+
+	free(read_sorted_path);
+	asm_graph_destroy(g);
+	free(g);
 }
 
 void construct_aux_info(struct opt_proc_t *opt, struct asm_graph_t *g,
@@ -687,12 +709,18 @@ void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			int e2 = ref2.e1;
 			if (e1 > g->n_e || e2 > g->n_e)
 				log_error("%d %d", e1, e2);
-			uint64_t code = p1[i].strand == 0 ? GET_CODE(e1, e2)
-					: GET_CODE(g->edges[e2].rc_id, g->edges[e1].rc_id);
-			pthread_mutex_lock(bundle->lock_rp);
-			kh_long_int_set(bundle->rp_count, code,
-				kh_long_int_try_get(bundle->rp_count, code, 0) + 1);
-			pthread_mutex_unlock(bundle->lock_rp);
+			if (p1[i].strand == 1){
+				e1 = g->edges[e1].rc_id;
+				e2 = g->edges[e2].rc_id;
+				int tmp = e1;
+				e1 = e2;
+				e2 = tmp;
+			}
+			pthread_mutex_lock(bundle->lock_rp + e1);
+			int cur_count = kh_int_int_try_get(bundle->rp_count[e1],
+					e2, 0);
+			kh_int_int_set(bundle->rp_count[e1], e2, cur_count + 1);
+			pthread_mutex_unlock(bundle->lock_rp + e1);
 		}
 	}
 free_stage_1:

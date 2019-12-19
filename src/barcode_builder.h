@@ -26,7 +26,7 @@ struct rp_count_bundle_t{
 	bwaidx_t *bwa_idx;
 	mem_opt_t *bwa_opt;
 	pthread_mutex_t *lock;
-	khash_t(long_int) *rp_count;
+	khash_t(int_int) **rp_count;
 	pthread_mutex_t *lock_rp;
 };
 #endif
