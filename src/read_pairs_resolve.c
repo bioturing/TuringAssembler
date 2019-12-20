@@ -77,6 +77,8 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 					rp_cand[last].score[i]);*/
 		}
 	}
+	if (kh_size(cand) != 1)
+		return -1;
 
 	//for (khiter_t it = kh_begin(cand); it != kh_end(cand); ++it){
 	//	if (!kh_exist(cand, it))
@@ -150,8 +152,8 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 
 	while (1){
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
-		if (__get_edge_cov(&g->edges[v], g->ksize) > 1.5 * unit_cov
-			|| __get_edge_cov(&g->edges[s], g->ksize) > 1.5 * unit_cov)
+		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
+			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
 			return;
 		if (v == -1)
 			 break;
@@ -219,7 +221,8 @@ void get_long_contigs(struct opt_proc_t *opt)
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int e = edge_sorted[i] >> 32;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (cov < 0.25 * unit_cov || g->edges[e].seq_len < 100)
+		if (cov < 0.25 * unit_cov || g->edges[e].seq_len < 100
+			|| cov > REPEAT_COV_RATIO * unit_cov)
 			continue;
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;

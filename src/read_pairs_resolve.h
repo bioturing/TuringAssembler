@@ -11,6 +11,7 @@
 #include "helper.h"
 #define MIN_READ_PAIR_MAPPED_HARD 50
 #define MIN_READ_PAIR_MAPPED_SOFT 20
+#define REPEAT_COV_RATIO 1.3
 
 struct read_pair_cand_t{
 	int n;
