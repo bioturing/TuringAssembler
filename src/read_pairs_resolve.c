@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "minimizers/count_barcodes.h"
 #include "read_pairs_resolve.h"
 #include "barcode_graph.h"
@@ -50,13 +51,14 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 	fclose(f);
 }
 
-int cmp_edge_length(const void *a, const void *b)
+int cmp_edge_length(const void *a, const void *b, void *arg)
 {
-	int len_a = (*(uint64_t *) a) & -1;
-	int len_b = (*(uint64_t *) b) & -1;
-	if (len_a < len_b)
+	struct asm_graph_t *g = (struct asm_graph_t *) arg;
+	int a_id = *(int *) a;
+	int b_id = *(int *) b;
+	if (g->edges[a_id].seq_len < g->edges[b_id].seq_len)
 		return -1;
-	if (len_a > len_b)
+	if (g->edges[a_id].seq_len > g->edges[b_id].seq_len)
 		return 1;
 	return 0;
 }
@@ -222,10 +224,10 @@ void get_long_contigs(struct opt_proc_t *opt)
 	struct read_pair_cand_t *rp_cand = calloc(g->n_e, sizeof(struct read_pair_cand_t));
 	get_read_pairs_count(g, opt->in_fasta, rp_cand);
 
-	uint64_t *edge_sorted = calloc(g->n_e, sizeof(uint64_t));
+	int *edge_sorted = calloc(g->n_e, sizeof(int));
 	for (int i = 0; i < g->n_e; ++i)
-		edge_sorted[i] = GET_CODE(i, g->edges[i].seq_len);
-	qsort(edge_sorted, g->n_e, sizeof(uint64_t), &cmp_edge_length);
+		edge_sorted[i] = i;
+	qsort_r(edge_sorted, g->n_e, sizeof(int), &cmp_edge_length, g);
 
 	khash_t(long_int) *share_bc = load_khash(opt->var[0]);
 
@@ -237,7 +239,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 	sprintf(out_path, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
 	FILE *f = fopen(out_path, "w");
 	for (int i = g->n_e - 1; i >= 0; --i){
-		int e = edge_sorted[i] >> 32;
+		int e = edge_sorted[i];
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
 			continue;
