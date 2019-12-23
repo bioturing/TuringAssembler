@@ -26,6 +26,7 @@
 #include "cluster_molecules.h"
 #include "split_molecules.h"
 #include "barcode_graph.h"
+#include "read_pairs_resolve.h"
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
@@ -351,15 +352,37 @@ void split_molecules_process(struct opt_proc_t *opt, struct asm_graph_t *g,
 	order_edges(opt, g, hits);
 }
 
-//void debug_process(struct opt_proc_t *opt)
-//{
-//	char path[1024];
-//	sprintf(path, "%s/debug.log", opt->out_dir);
-//	init_logger(opt->log_level, path);
-//	set_log_stage("Debug process");
-//	create_barcode_molecules(opt);
-//}
+void debug_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Debug process");
+	get_long_contigs(opt);
+}
 
+void read_pairs_count_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/debug.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Debug process");
+	khash_t(long_int) *rp_count = kh_init(long_int);
+	get_all_read_pairs_count(opt, rp_count);
+	sprintf(path, "%s/rp_counts.txt", opt->out_dir);
+	FILE *f = fopen(path, "w");
+	for (khiter_t it = kh_begin(rp_count); it != kh_end(rp_count); ++it){
+		if (!kh_exist(rp_count, it))
+			continue;
+		uint64_t code = kh_key(rp_count, it);
+		int v = code >> 32;
+		int u = code & -1;
+		assert(v >= 0);
+		assert(u >= 0);
+		fprintf(f, "%d %d %d\n", v, u, kh_val(rp_count, it));
+	}
+	fclose(f);
+}
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
 	print_barcode_graph(opt);
@@ -751,7 +774,7 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	log_info("Aligning reads on two heads of each contigs using BWA");
-	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE);
+	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE|ASM_BUILD_COVERAGE);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 }

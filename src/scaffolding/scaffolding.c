@@ -159,7 +159,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 	*n_local_edges = MIN(global_n_candidate, *n_local_edges);
 	for (int i = 0; i < *n_local_edges; i++) {
 		struct scaffold_edge e = (*list_local_edges)[i];
-		if ((*list_local_edges)[i].score.bc_score == 0) {
+		if ((*list_local_edges)[i].score.bc_score == 0
+		     || (i > 0 && (*list_local_edges)[i].score.bc_score < 0.5 * (*list_local_edges)[i-1].score.bc_score)) {
 			for (int j = 0; j < *n_local_edges; j++) {
 				struct scaffold_edge e_j = (*list_local_edges)[j];
 			}
@@ -578,6 +579,7 @@ struct scaffold_path *find_path(struct opt_proc_t *opt, struct asm_graph_t *g,
 			next_contig = next_r_contig;
 		}
 		mark_contig(g, mark, next_contig->i_contig);
+		assert(g->edges[next_contig->i_contig].seq_len > 0);
 		thres_score->bc_score = (thres_score->bc_score + next_contig->score.bc_score);
 		free(next_l_contig);
 		free(next_r_contig);
@@ -629,6 +631,7 @@ void find_scaffolds(struct asm_graph_t *g, struct opt_proc_t *opt, struct edges_
 			struct scaffold_path *path = calloc(1, sizeof(struct scaffold_path));
 			mark_contig(g, mark, i);
 			append_i_contig(path, i);
+			assert(g->edges[i].seq_len > 0);
 			add_path(scaffold, path);
 			free(path);
 		} else if (is_very_short_contig(&g->edges[i])) {

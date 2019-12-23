@@ -156,6 +156,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 		*seq = realloc(*seq, *m_seq);
 	}
 	j = k = 0;
+	assert(e->seq_len > 0);
 	for (i = 0; i < e->seq_len; ++i) {
 		(*seq)[k++] = nt4_char[__binseq_get(e->seq, i)];
 		/* append holes to the sequences */

@@ -58,6 +58,7 @@ struct contig_statictis print_contig(struct asm_graph_t *g, FILE *out_file, int 
 	for(int i = 0; i < n_contig; i++) {
 		int e = list_contig[i];
 		int len_of_contig = dump_edge_seq_reduce_N(&seq, &seq_len, &g->edges[e]);
+		assert(len_of_contig > 0);
 		total_seq = realloc(total_seq, (total_len + len_of_contig + len_NNN) * sizeof(char));
 		memcpy(total_seq + total_len, seq, len_of_contig);
 		memcpy(total_seq + total_len + len_of_contig, NNN, len_NNN);
@@ -65,11 +66,9 @@ struct contig_statictis print_contig(struct asm_graph_t *g, FILE *out_file, int 
 		sta.number_N += len_NNN;
 	}
 	total_len -= len_NNN;
+	assert(total_len > 0);
 	sta.number_N -= len_NNN;
 	print_seq(out_file, index, total_seq, total_len, 1);
-	for(int i = 0; i < n_contig; i++) {
-		int e = list_contig[i];
-	}
 	free(seq);
 	free(total_seq);
 	free(NNN);

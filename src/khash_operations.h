@@ -41,7 +41,7 @@ static int kh_##name##_exist(khash_t(name) *h, key_type k)\
 	khiter_t it = kh_get(name, h, k);\
 	return it != kh_end(h);\
 }\
-static void kh_##name##_add(khash_t(name) *h, key_type k)\
+static void kh_##name##_insert(khash_t(name) *h, key_type k)\
 {\
 	khiter_t it = kh_get(name, h, k);\
 	if (it == kh_end(h)){\

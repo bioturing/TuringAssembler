@@ -2,6 +2,7 @@
 #define __BARCODE_BUILDER__
 #include "../include/bwa.h"
 #include "../include/bwamem.h"
+#include "cluster_molecules.h"
 struct asm_align_t {
 	int rid;
 	int pos;
@@ -14,4 +15,18 @@ mem_opt_t *asm_memopt_init();
 struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
 	const uint8_t *pac, int l_query, const uint8_t *query, const mem_alnreg_t *ar);
 struct read_path_t parse_read_path_from_opt(struct opt_proc_t *opt);
+
+void *rp_count_buffer_iterator(void *data);
+
+void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count);
+
+struct rp_count_bundle_t{
+	struct asm_graph_t *g;
+	struct dqueue_t *q;
+	bwaidx_t *bwa_idx;
+	mem_opt_t *bwa_opt;
+	pthread_mutex_t *lock;
+	khash_t(int_int) **rp_count;
+	pthread_mutex_t *lock_rp;
+};
 #endif
