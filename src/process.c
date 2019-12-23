@@ -774,7 +774,7 @@ void build_barcode_process_fasta(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	log_info("Aligning reads on two heads of each contigs using BWA");
-	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE);
+	construct_aux_info(opt, &g, &read_path, fasta_path, ASM_BUILD_BARCODE|ASM_BUILD_COVERAGE);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 }

@@ -642,6 +642,8 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
 				continue;
 			mm_hits_insert(hits, db->mm[i], e, p);
+		} else {
+			return NULL;
 		}
 	}
 	return hits;
@@ -719,22 +721,26 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 	khiter_t k1, k2;
 	hits1 = mm_hits_init();
 	hits2 = mm_hits_init();
+	if (hits1 == NULL || hits2 == NULL)
+		return;
 	mm_hits_cmp(db1, mm_edges_db, hits1, g);
 	mm_hits_cmp(db2, mm_edges_db, hits2, g);
 
-	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX;
+	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX, tmp1 = er1, tmp2 = er2, count1 = 0, count2 = 0;
 	if (hits1->n > 0) {
 		for (k1 = kh_begin(hits1->edges); k1 != kh_end(hits1->edges); ++k1) {
 			if (kh_exist(hits1->edges, k1)) {
 				if (kh_val(hits1->edges, k1) > max) {
 					max = kh_val(hits1->edges, k1);
 					er1 = kh_key(hits1->edges, k1);
+					count1++;
 				}
 			}
 		}
 	}
 
-	if (max < RATIO_OF_CONFIDENT * hits1->n && hits1->n > MIN_NUMBER_SINGLETON) {
+	if (count1 > 1) {
+//		log_warn("%d ", count1);
 		er1 = UINT64_MAX;
 	}
 	max = 0;
@@ -744,10 +750,12 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 				if (kh_val(hits2->edges, k2) > max) {
 					max = kh_val(hits2->edges, k2);
 					er2 = kh_key(hits2->edges, k2);
+					count2++;
 				}
 		}
 	}
-	if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON) {
+	if (count2 > 1) {
+//		log_warn("%d ", count2);
 		er2 = UINT64_MAX;
 	}
 
@@ -869,7 +877,7 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph
 	log_info("Start count barcode freq");
 	bx_table = count_bx_freq(opt); //count barcode freq
 	for (i = 0; i < bx_table->size; ++i) {
-		if (!__mini_empty(bx_table, i) && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
+		if (!__mini_empty(bx_table, i) ) {
 			struct mini_hash_t *h;
 			int p = __leftmost(bx_table->h[i]);
 			init_mini_hash(&h, p > 4 ? p - 4:0);

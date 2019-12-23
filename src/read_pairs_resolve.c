@@ -17,6 +17,8 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 	while (fscanf(f, "%d %d %d\n", &v, &u_rc, &count) == 3){
 		int u = g->edges[u_rc].rc_id;
 		int v_rc = g->edges[v].rc_id;
+		if (u == g->edges[v_rc].rc_id)
+			continue;
 		uint64_t code = GET_CODE(v, u);
 		uint64_t code_rc = GET_CODE(u_rc, v_rc);
 		kh_long_int_set(rp_count, code,
@@ -64,22 +66,34 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 {
 	int res = -1;
 	khash_t(set_int) *cand = kh_init(set_int);
-	int last = path[n_path - 1];
+	int last = path[n_path - 1], count = 0;
+	int second_score = 0, best_score = 0, best = -1;
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
-		if (v == last || v == g->edges[last].rc_id)
+		if (g->edges[v].rc_id == last)
 			continue;
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.25 * unit_cov
-			&& rp_cand[last].score[i] >= MIN_READ_PAIR_MAPPED_HARD
-			&& g->edges[v].seq_len >= 100){
-			kh_set_int_insert(cand, rp_cand[last].cand[i]);
-			//__VERBOSE("cand %d cov %.3f len %d share %d\n", rp_cand[last].cand[i],
-			//		cov, g->edges[rp_cand[last].cand[i]].seq_len,
-			//		rp_cand[last].score[i]);
+		if (cov >= 0.5 * unit_cov
+		&& g->edges[v].seq_len >= 100) {
+			if (rp_cand[last].score[i] > second_score) {
+				second_score = rp_cand[last].score[i];
+				if (second_score > best_score) {
+					int tmp = best_score;
+					best_score = second_score;
+					second_score = tmp;
+					best= rp_cand[last].cand[i];
+				}
+			}
+//			kh_set_int_insert(cand, rp_cand[last].cand[i]);
 		}
 	}
-	if (kh_size(cand) != 1)
+	if (best_score >  (second_score + 10)*1.3)
+		return best;
+	else {
+//		log_warn("best %d second %d", best_score, second_score);
+		return -1;
+	}
+	if (count > 1)
 		return -1;
 
 	//for (khiter_t it = kh_begin(cand); it != kh_end(cand); ++it){
@@ -159,14 +173,12 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
 			return;
 		if (v == -1)
-			 break;
-		//if (check_good_cand(g, *path, *n_path, share_bc, v) == 0)
-		//	break;
+			return;
 		int v_rc = g->edges[v].rc_id;
 		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
 				g->edges[v].count);
-		g->edges[v].count -= count;
-		g->edges[v_rc].count -= count;
+		g->edges[v].count = 0;
+		g->edges[v_rc].count = 0;
 		*path = realloc(*path, ((*n_path) + 1) * sizeof(int));
 		(*path)[(*n_path)++] = v;
 	}
@@ -217,7 +229,8 @@ void get_long_contigs(struct opt_proc_t *opt)
 
 	khash_t(long_int) *share_bc = load_khash(opt->var[0]);
 
-	float unit_cov = get_genome_coverage(g);
+	float unit_cov = get_genome_coverage_h(g);
+	log_info("global cov: %lf", unit_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	int n_e = 0;
 	char out_path[1024];
@@ -226,8 +239,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int e = edge_sorted[i] >> 32;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (cov < 0.25 * unit_cov || g->edges[e].seq_len < 100
-			|| cov > REPEAT_COV_RATIO * unit_cov)
+		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
 			continue;
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;

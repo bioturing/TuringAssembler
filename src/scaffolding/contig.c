@@ -44,7 +44,7 @@
 
 int is_long_contig(struct asm_edge_t *e)
 {
-	int len = get_edge_len(e);
+	int len = e->seq_len;
 	if (len >= global_thres_length){
 		return 1;
 	}
@@ -53,8 +53,9 @@ int is_long_contig(struct asm_edge_t *e)
 
 int is_short_contig(struct asm_edge_t *e)
 {
-	int len = get_edge_len(e);
+	int len = e->seq_len;
 	if (global_thres_length > len && len >= global_thres_short_len ){
+		assert(len > 0);
 		return 1;
 	}
 	return 0;
@@ -62,7 +63,7 @@ int is_short_contig(struct asm_edge_t *e)
 
 int is_very_short_contig(struct asm_edge_t *e)
 {
-	int len = get_edge_len(e);
+	int len = e->seq_len;
 	if (global_thres_short_len > len){
 		return 1;
 	}

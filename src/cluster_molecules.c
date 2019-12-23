@@ -606,7 +606,7 @@ int check_ignore_path(struct asm_graph_t *g, double global_avg_cov,
 		sum_cov += (g->edges[i_e].seq_len-ksize) *cov;
 		sum_len += (g->edges[i_e].seq_len-ksize);
 	}
-	if (sum_len ==0) {
+	if (sum_len == 0) {
 //		assert(sum_len != 0 && "all edge in path is repeat");
 		*local_cov = global_avg_cov;
 	} else

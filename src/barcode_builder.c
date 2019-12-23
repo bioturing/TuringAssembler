@@ -673,6 +673,8 @@ void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	for (i = 0; i < (int) ar1.n; ++i) {
 		struct asm_align_t a;
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r1->len, r1_seq, ar1.a + i);
+		if (a.aligned < r1->len)
+			continue;
 		if (a.rid == -1)
 			continue;
 		if (a.score > best_score_1) {
@@ -686,6 +688,8 @@ void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 	for (i = 0; i < (int) ar2.n; ++i) {
 		struct asm_align_t a;
 		a = asm_reg2aln(opt, idx->bns, idx->pac, r2->len, r2_seq, ar2.a + i);
+		if (a.aligned < r2->len)
+			continue;
 		if (a.rid == -1)
 			continue;
 		struct fasta_ref_t r = parse_fasta_ref(idx->bns->anns[a.rid].name);
@@ -697,7 +701,7 @@ void rp_count_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			p2[n2++] = a;
 		}
 	}
-	if (ar1.n != 2 || ar2.n != 2|| ar1.a->score < 50 || ar2.a->score < 50)
+	if (ar1.n != 2 || ar2.n != 2|| ar1.a->score < 50 || ar2.a->score < 50 )
 		goto free_stage_1;
 	for (int i = 0; i < n1; ++i){
 		for (int j = 0; j < n2; ++j){
