@@ -40,7 +40,7 @@
  http://br.endernet.org/~akrowne/
  http://planetmath.org/encyclopedia/GoodHashTablePrimes.html
  */
-static const uint64_t primes[] = { 53, 97, 193, 389, 769, 1543, 3079, 6151,
+static const uint64_t primes[] = { 37, 53, 97, 193, 389, 769, 1543, 3079, 6151,
                                    12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739,
                                    6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189,
                                    805306457, 1610612741 };
@@ -267,14 +267,14 @@ uint64_t *mini_get_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
 		for (i = slot + 1; i < h_table->size; ++i) {
-			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
+			is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
 			is_set = atomic_bool_CAS64(h_table->key + i, data, data);
 			if (is_empty || is_set)
 				break;
 		}
 		if (i == h_table->size) {
 			for (i = 0; i < slot; ++i) {
-				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
+				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, EMPTY_SLOT);
 				is_set = atomic_bool_CAS64(h_table->key + i, data, data);
 				if (is_empty || is_set)
 					break;

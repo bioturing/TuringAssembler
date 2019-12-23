@@ -583,7 +583,7 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 		if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN) //minimizer mapped on the middle of the edge
 			continue;
 		hit_slot = mini_put(&hits->edges, e);
-		(*hit_slot)++; //increment alignment count of edge e to 1
+		atomic_add_and_fetch64(hit_slot, 1);
 		hits->n++;
 	}
 	return hits;
@@ -660,14 +660,12 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 
 	db1 = mm_index_char_str(r1.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r1.len);
 	db2 = mm_index_char_str(r2.seq, MINIMIZERS_KMER, MINIMIZERS_WINDOW, r2.len);
-	khiter_t k1, k2;
 	hits1 = mm_hits_init();
 	hits2 = mm_hits_init();
 	if (hits1 == NULL || hits2 == NULL)
 		return;
 	mm_hits_cmp(db1, mm_edges_db, hits1, g);
 	mm_hits_cmp(db2, mm_edges_db, hits2, g);
-	log_debug("Done alignment hits1 %d hits2 %d", hits1->n, hits2->n);
 
 	uint64_t max = 0, er1 = UINT64_MAX, er2 = UINT64_MAX, tmp1 = er1, tmp2 = er2, count1 = 0, count2 = 0;
 	if (hits1->n > 0) {
@@ -680,12 +678,7 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 			}
 		}
 	}
-	log_debug("Found best e for r1: %d with count ");
 
-	if (count1 > 1) {
-//		log_warn("%d ", count1);
-		er1 = UINT64_MAX;
-	}
 	max = 0;
 	if (hits2->n > 0) {
 		for (uint64_t i = 0; i < hits2->edges->size; ++i) {
@@ -697,17 +690,16 @@ void mm_align(struct read_t r1, struct read_t r2, uint64_t bx, struct minimizer_
 			}
 		}
 	}
-	if (count2 > 1) {
-//		log_warn("%d ", count2);
+	if (max < RATIO_OF_CONFIDENT * hits2->n && hits2->n > MIN_NUMBER_SINGLETON) {
 		er2 = UINT64_MAX;
 	}
 
 	if (er1 != UINT64_MAX) {
-		slot = mini_put((struct mini_hash_t **)h_slot, er1);
+		slot = mini_put((struct mini_hash_t **)(*h_slot), er1);
 		atomic_add_and_fetch64(slot, 1);
 	}
 	if (er2 != UINT64_MAX) {
-		slot = mini_put((struct mini_hash_t **)h_slot, er2);
+		slot = mini_put((struct mini_hash_t **)(*h_slot), er2);
 		atomic_add_and_fetch64(slot, 1);
 	}
 	if (er1 != er2  && er1 != UINT64_MAX && er2 != UINT64_MAX && g->edges[er1].rc_id != er2) {
@@ -819,16 +811,20 @@ struct mm_bundle_t *mm_hit_all_barcodes(struct opt_proc_t *opt, struct asm_graph
 	struct mini_hash_t *bx_table, *rp_table;
 	log_info("Start count barcode freq");
 	bx_table = count_bx_freq(opt); //count barcode freq
+	struct mini_hash_t **pool_table = calloc(bx_table->count, sizeof(struct mini_hash_t *));
+	int cnt_table = 0;
 	for (i = 0; i < bx_table->size; ++i) {
-		if (!__mini_empty(bx_table, i) ) {
-			struct mini_hash_t *h;
+		// convert number of reads into pointer of mini_hash_t
+		if (!__mini_empty(bx_table, i) && bx_table->h[i] < MAX_READS_TO_HITS && bx_table->h[i] > MIN_READS_TO_HITS) {
 			int p = __leftmost(bx_table->h[i]);
-			init_mini_hash(&h, p > 4 ? p - 4:0);
-			bx_table->h[i] = (uint64_t)h;
+			init_mini_hash(pool_table + cnt_table, p > 4 ? p - 4:0);
+			bx_table->h[i] = (uint64_t)(pool_table + cnt_table);
+			cnt_table++;
 		} else {
 			bx_table->h[i] = EMPTY_BX;
 		}
 	}
+	assert(cnt_table <= bx_table->count);
 
 	log_info("Start index edge");
 	struct mm_db_edge_t *mm_edges = mm_index_edges(g, MINIMIZERS_KMER,
