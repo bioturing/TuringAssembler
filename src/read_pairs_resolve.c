@@ -67,14 +67,16 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	int last = path[n_path - 1];
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
+		if (v == last || v == g->edges[last].rc_id)
+			continue;
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
 		if (cov >= 0.25 * unit_cov
 			&& rp_cand[last].score[i] >= MIN_READ_PAIR_MAPPED_HARD
 			&& g->edges[v].seq_len >= 100){
 			kh_set_int_insert(cand, rp_cand[last].cand[i]);
-			/*__VERBOSE("cand %d cov %.3f len %d share %d\n", rp_cand[last].cand[i],
-					cov, g->edges[rp_cand[last].cand[i]].seq_len,
-					rp_cand[last].score[i]);*/
+			//__VERBOSE("cand %d cov %.3f len %d share %d\n", rp_cand[last].cand[i],
+			//		cov, g->edges[rp_cand[last].cand[i]].seq_len,
+			//		rp_cand[last].score[i]);
 		}
 	}
 	if (kh_size(cand) != 1)
@@ -142,6 +144,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		struct read_pair_cand_t *rp_cand, khash_t(long_int) *share_bc,
 		int **path, int *n_path)
 {
+	//__VERBOSE("s = %d\n", s);
 	*path = calloc(1, sizeof(int));
 	*n_path = 1;
 	(*path)[0] = s;
@@ -217,7 +220,9 @@ void get_long_contigs(struct opt_proc_t *opt)
 	float unit_cov = get_genome_coverage(g);
 	int *visited = calloc(g->n_e, sizeof(int));
 	int n_e = 0;
-	FILE *f = fopen(opt->lc, "w");
+	char out_path[1024];
+	sprintf(out_path, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
+	FILE *f = fopen(out_path, "w");
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int e = edge_sorted[i] >> 32;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
