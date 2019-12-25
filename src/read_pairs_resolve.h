@@ -12,6 +12,7 @@
 #define MIN_READ_PAIR_MAPPED_HARD 50
 #define MIN_READ_PAIR_MAPPED_SOFT 20
 #define REPEAT_COV_RATIO 1.3
+#define MIN_SHARE_BC_RP_EXTEND 200
 
 struct read_pair_cand_t{
 	int n;
@@ -31,7 +32,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		struct read_pair_cand_t *rp_cand, int **path, int *n_path);
 
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
-		int *path, int n_path);
+		khash_t(long_int) *share_bc, int *path, int n_path);
 
 void join_read_pair_path(struct asm_graph_t *g, int *path, int n_path,
 		char **seq);
