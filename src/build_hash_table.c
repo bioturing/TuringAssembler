@@ -138,7 +138,7 @@ void *get_pair_kmer_ust_iterator(void *data)
 			      get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL )
-				__ERROR("\nWrong format file ust\n");
+				log_error("\nWrong format file ust\n");
 
 			ust_add_big_kmer(&read1, table, bundle->ksize, bundle->table_lock);
 			ust_add_big_kmer(&read2, table, bundle->ksize, bundle->table_lock);
@@ -165,13 +165,13 @@ void build_pair_kmer_table(struct opt_proc_t *opt, khash_t(pair_kmer_count) *tab
 //			buffer_iterator = biot_buffer_iterator;
 //		else
 //			buffer_iterator = x10_buffer_iterator;
-		__ERROR("not handle yet");
+		log_error("not handle yet");
 	} else if (opt->lib_type == LIB_TYPE_UST || opt->lib_type == LIB_TYPE_SORTED) {
 		producer_bundles = init_fastq_pair(opt->n_threads, opt->n_files,
 		                                   opt->files_1, opt->files_2);
 		buffer_iterator = get_pair_kmer_ust_iterator;
 	} else {
-		__ERROR("Wrong library format\n");
+		log_error("Wrong library format\n");
 	}
 	struct kmer_pair_iterator_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct kmer_pair_iterator_bundle_t));

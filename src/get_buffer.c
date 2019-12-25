@@ -12,18 +12,18 @@ static int get_format(const char *file_path)
 
 	file = gzopen(file_path, "r");
 	if (!file)
-		__ERROR("Could not open file: %s", file_path);
+		log_error("Could not open file: %s", file_path);
 
 	n = gzread(file, buf, 1);
 	if (!n)
-		__ERROR("Could not read file: %s", file_path);
+		log_error("Could not read file: %s", file_path);
 
 	if (buf[0] == '@')
 		ret = TYPE_FASTQ;
 	else if (buf[0] == '>')
 		ret = TYPE_FASTA;
 	else
-		__ERROR("Unsupport format of file: %s", file_path);
+		log_error("Unsupport format of file: %s", file_path);
 
 	gzclose(file);
 	return ret;
@@ -53,11 +53,11 @@ void gb_trip_init(struct gb_trip_data *data, const char *R1_path,
 				const char *R2_path, const char *I_path)
 {
 	if (!strcmp(R1_path, R2_path) || !strcmp(R1_path, I_path) || !strcmp(R2_path, I_path))
-		__ERROR("Two identical read files");
+		log_error("Two identical read files");
 
 	data->type = get_format(R1_path);
 	if (get_format(R2_path) != data->type || get_format(I_path) != data->type)
-		__ERROR("Error in three read files are not equal");
+		log_error("Error in three read files are not equal");
 	gb_file_init(&(data->R1), R1_path);
 	gb_file_init(&(data->R2), R2_path);
 	gb_file_init(&(data->I), I_path);
@@ -79,11 +79,11 @@ void gb_trip_destroy(struct gb_trip_data *data)
 void gb_pair_init(struct gb_pair_data *data, const char *R1_path, const char *R2_path)
 {
 	if (!strcmp(R1_path, R2_path))
-		__ERROR("Two identical read files");
+		log_error("Two identical read files");
 
 	data->type = get_format(R1_path);
 	if (get_format(R2_path) != data->type)
-		__ERROR("Format in two read files are not equal");
+		log_error("Format in two read files are not equal");
 
 	gb_file_init(&(data->R1), R1_path);
 	gb_file_init(&(data->R2), R2_path);
@@ -143,7 +143,7 @@ static inline int get_next_pos(struct gb_file_inf *data, int prev, int type)
 
 	if (size - prev >= BUF_SIZE) {
 		__VERBOSE("\n");
-		__ERROR("Read is too long from file: %s", data->name);
+		log_error("Read is too long from file: %s", data->name);
 	}
 
 	return 0;

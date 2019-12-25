@@ -103,7 +103,7 @@ void asm_lazy_condense(struct asm_graph_t *g)
 void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	if (!(g0->aux_flag & ASM_HAVE_BARCODE))
-		__ERROR("Graph must have barcode\n");
+		log_error("Graph must have barcode\n");
 	gint_t *node_id;
 	gint_t n_v, n_e, m_e;
 	node_id = malloc(g0->n_v * sizeof(gint_t));

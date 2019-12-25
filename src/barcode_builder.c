@@ -583,7 +583,7 @@ static inline void parse_int_array(const char *s, gint_t *a) {
 			num = 0;
 		} else {
 			if (s[i] < '0' || s[i] > '9')
-				__ERROR("Parse QRY fail: %s", s);
+				log_error("Parse QRY fail: %s", s);
 			num = num * 10 + s[i] - '0';
 		}
 	}
@@ -632,7 +632,7 @@ static inline void add_read_count_candidate(struct asm_graph_t *g, gint_t e1, gi
 	struct pair_contig_t key = (struct pair_contig_t) {e1, e2};
 	khint_t k = kh_get(pair_contig_count, g->candidates, key);
 	//if (k == kh_end(g->candidates))
-	//	__ERROR("candidate is not initilized");
+	//	log_error("candidate is not initilized");
 	if (k == kh_end(g->candidates))
 		return;
 	atomic_add_and_fetch32(&(kh_value(g->candidates, k).n_read), 1);
@@ -642,7 +642,7 @@ static inline void add_readpair_count_candidate(struct asm_graph_t *g, gint_t e1
 	struct pair_contig_t key = (struct pair_contig_t) {e1, e2};
 	khint_t k = kh_get(pair_contig_count, g->candidates, key);
 	// if (k == kh_end(g->candidates))
-	// 	__ERROR("candidate is not initilized");
+	// 	log_error("candidate is not initilized");
 	if (k == kh_end(g->candidates))
 		return;
 	atomic_add_and_fetch32(&(kh_value(g->candidates, k).n_pair), 1);
@@ -956,7 +956,7 @@ void *rp_count_buffer_iterator(void *data) {
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
 				log_warn("buf1 %s", buf1);
 				log_warn("buf2 %s", buf2);
-				__ERROR("\nWrong format file when build barcode scaffold\n");
+				log_error("\nWrong format file when build barcode scaffold\n");
 			}
 
 			barcode = get_barcode(&read1);
@@ -1013,7 +1013,7 @@ void *barcode_buffer_iterator(void *data) {
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
 				log_warn("buf1 %s", buf1);
 				log_warn("buf2 %s", buf2);
-				__ERROR("\nWrong format file when build barcode scaffold\n");
+				log_error("\nWrong format file when build barcode scaffold\n");
 			}
 
 			barcode = get_barcode(&read1);
@@ -1176,7 +1176,7 @@ void *pathcount_buffer_iterator(void *data) {
 			      get_read_from_fa(&read2, buf2, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file in pathcount\n");
+				log_error("\nWrong format file in pathcount\n");
 
 			path_mapper(&read1, &read2, bundle);
 

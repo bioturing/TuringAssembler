@@ -13,11 +13,11 @@ aqueue_t *init_aqueue()
 {
   aqueue_t *q = (aqueue_t *)malloc(sizeof(aqueue_t));
   if (q == NULL)
-    __ERROR("Cannot allocate memory\n");
+    log_error("Cannot allocate memory\n");
   
   q->e = (gint_t *)calloc(INIT_SIZE, sizeof(gint_t));
   if (q->e == NULL)
-    __ERROR("Cannot allocate memory\n");
+    log_error("Cannot allocate memory\n");
   q->s = INIT_SIZE;
   q->p = 0;
   q->n = 0;

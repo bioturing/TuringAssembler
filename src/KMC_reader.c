@@ -27,11 +27,11 @@ void KMC_read_prefix(const char *path, struct kmc_info_t *data)
 	fseek(fp, 0, SEEK_SET);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCP, 4))
-		__ERROR("Wrong KMC prefix file");
+		log_error("Wrong KMC prefix file");
 	fseek(fp, -4, SEEK_END);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCP, 4))
-		__ERROR("KMC prefix file is truncated");
+		log_error("KMC prefix file is truncated");
 	fseek(fp, 0, SEEK_END);
 	uint64_t size = ftell(fp)-4-4; // size of file without 2 marker and header_offset
 
@@ -236,7 +236,7 @@ void *KMC_worker_multi(void *raw_data)
 				b.cur_pos = 0;
 			}
 			if (b.rem_size < record_size)
-				__ERROR("Truncated KMC suffix file");
+				log_error("Truncated KMC suffix file");
 			int j;
 			for (j = 0; j < suffix_size; ++j)
 				kmer[suffix_size - j - 1] = b.buf[b.cur_pos + j];
@@ -265,21 +265,21 @@ void KMC_retrieve_kmer_multi(const char *path, int n_threads,
 	fseek(fp, 0, SEEK_SET);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCS, 4))
-		__ERROR("Wrong KMC suffix format file");
+		log_error("Wrong KMC suffix format file");
 	fseek(fp, -4, SEEK_END);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCS, 4))
-		__ERROR("[Open] Truncated KMC suffix file");
+		log_error("[Open] Truncated KMC suffix file");
 
 	/* Calculate record size */
 	fseek(fp, 0, SEEK_END);
 	uint64_t file_size = ftell(fp) - 8;
 	if (file_size % data->header.total_kmers != 0)
-		__ERROR("Total kmer does not divide kmer record field total size");
+		log_error("Total kmer does not divide kmer record field total size");
 	int record_size = file_size / data->header.total_kmers;
 	int suffix_size = (data->header.kmer_length - data->header.lut_prefix_length) / 4;
 	if (record_size != suffix_size + (int)data->header.counter_size)
-		__ERROR("KMC record size not consistent (%d != %d + %u)",
+		log_error("KMC record size not consistent (%d != %d + %u)",
 			record_size, suffix_size, data->header.counter_size);
 	fclose(fp);
 
@@ -342,21 +342,21 @@ void KMC_retrive_kmer(const char *path, struct kmc_info_t *data, void *bundle,
 	fseek(fp, 0, SEEK_SET);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCS, 4))
-		__ERROR("Wrong KMC suffix format file");
+		log_error("Wrong KMC suffix format file");
 	fseek(fp, -4, SEEK_END);
 	xfread(sig, 4, 1, fp);
 	if (strncmp(sig, KMCS, 4))
-		__ERROR("[Open] Truncated KMC suffix file");
+		log_error("[Open] Truncated KMC suffix file");
 
 	/* Calculate record size */
 	fseek(fp, 0, SEEK_END);
 	uint64_t file_size = ftell(fp) - 8;
 	if (file_size % data->header.total_kmers != 0)
-		__ERROR("Total kmer does not divide kmer record field total size");
+		log_error("Total kmer does not divide kmer record field total size");
 	int record_size = file_size / data->header.total_kmers;
 	int suffix_size = (data->header.kmer_length - data->header.lut_prefix_length) / 4;
 	if (record_size != suffix_size + (int)data->header.counter_size)
-		__ERROR("KMC record size not consistent (%d != %d + %u)",
+		log_error("KMC record size not consistent (%d != %d + %u)",
 			record_size, suffix_size, data->header.counter_size);
 
 	/* iterate through buffer */
@@ -381,7 +381,7 @@ void KMC_retrive_kmer(const char *path, struct kmc_info_t *data, void *bundle,
 				b.cur_pos = 0;
 			}
 			if (b.rem_size < record_size)
-				__ERROR("Truncated KMC suffix file");
+				log_error("Truncated KMC suffix file");
 			int j;
 			for (j = 0; j < suffix_size; ++j)
 				kmer[suffix_size - j - 1] = b.buf[b.cur_pos + j];

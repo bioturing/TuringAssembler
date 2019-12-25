@@ -366,7 +366,7 @@ static void kmhash_resize(struct kmhash_t *h)
 						kp = kpt;
 					}
 				} else {
-					__ERROR("Resize kmhash failed");
+					log_error("Resize kmhash failed");
 				}
 			}
 		}
@@ -380,7 +380,7 @@ static void kmhash_resize_multi(struct kmhash_t *h)
 		pthread_mutex_lock(h->locks + i);
 
 	if (h->size == KMHASH_MAX_SIZE)
-		__ERROR("Hash table size limit");
+		log_error("Hash table size limit");
 
 	kmhash_resize(h);
 
@@ -495,7 +495,7 @@ kmint_t kmhash_put(struct kmhash_t *h, const uint8_t *key)
 	while (k == KMHASH_END(h)) {
 		++n_try;
 		if (n_try > 3)
-			__ERROR("Insert kmhash failed");
+			log_error("Insert kmhash failed");
 		kmhash_resize(h);
 		k = internal_kmhash_put(h, key);
 	}

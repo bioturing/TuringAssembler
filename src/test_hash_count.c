@@ -111,7 +111,7 @@ static void *PE_count(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file pe count\n");
+				log_error("\nWrong format file pe count\n");
 
 			++n_reads;
 			count_from_read(&read1, h, ksize, lock_hash);

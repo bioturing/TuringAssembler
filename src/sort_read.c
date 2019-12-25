@@ -138,7 +138,7 @@ static inline void extract_read_barcode(struct buffered_file_t *fp, struct readb
 	if (ret == 0) {
 		r->barcode = (uint64_t)-1;
 	} else if (ret < 16) {
-		__ERROR("Corrupted temporary files %lu", ret);
+		log_error("Corrupted temporary files %lu", ret);
 	} else {
 		r->barcode = unpack_int64((uint8_t *)buf);
 		r->len1 = unpack_int32((uint8_t *)buf + 8);
@@ -192,7 +192,7 @@ void merge_sorted_small(const char *prefix, int64_t sm, int n_file)
 		bf_write(&fo, tmp_buf, 16);
 		int64_t byte_read = bf_read(fp + idx, buf, reads[idx].len1 + reads[idx].len2);
 		if (byte_read < reads[idx].len1 + reads[idx].len2)
-			__ERROR("small merge Corrupted temporary files");
+			log_error("small merge Corrupted temporary files");
 		bf_write(&fo, buf, reads[idx].len1 + reads[idx].len2);
 		extract_read_barcode(fp + idx, reads + idx, tmp_buf);
 	}
@@ -258,7 +258,7 @@ void *biot_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file biot\n");
+				log_error("\nWrong format file biot\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
@@ -378,7 +378,7 @@ void *x10_buffer_iterator(void *data)
 				get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file when sort bc 10x\n");
+				log_error("\nWrong format file when sort bc 10x\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_10x(&read1, &readbc);
@@ -501,7 +501,7 @@ void *ust_buffer_iterator(void *data)
 				get_read_from_fa(&readI, I_buf, &posI);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL || rcI == READ_FAIL)
-				__ERROR("\nWrong format file ust\n");
+				log_error("\nWrong format file ust\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_ust_raw(&readI);
@@ -618,7 +618,7 @@ void merge_sorted_large(const char *prefix, int64_t sm, int n_file,
 		}
 		int64_t byte_read = bf_read(fp + idx, buf, reads[idx].len1 + reads[idx].len2);
 		if (byte_read < reads[idx].len1 + reads[idx].len2)
-			__ERROR("[large merge] Corrupted temporary files");
+			log_error("[large merge] Corrupted temporary files");
 		bf_write(&fo1, buf, reads[idx].len1);
 		bf_write(&fo2, buf + reads[idx].len1, reads[idx].len2);
 		if (cur_bc != pbarcode && pbarcode != (uint64_t)-1) {
@@ -678,7 +678,7 @@ void sort_read(struct opt_proc_t *opt, struct read_path_t *rpath)
 				opt->files_1, opt->files_2, opt->files_I);
 		buffer_iterator = ust_buffer_iterator;
 	} else {
-	    __ERROR("Wrong library format\n");
+	    log_error("Wrong library format\n");
 	}
 	struct readsort_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct readsort_bundle_t));
