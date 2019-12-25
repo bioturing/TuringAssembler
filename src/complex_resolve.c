@@ -267,6 +267,13 @@ int is_complex_closure(struct resolve_bulges_bundle_t *bundle)
 	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *B_vertices = bundle->B_vertices;
 	int res = 0;
+	int s = bundle->source;
+	for (int i = 0; i < graph->nodes[s].deg; ++i){
+		int v = get_adj_node(graph, s, i);
+		if (v == s)
+			return 1;
+	}
+
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
 		if (check_in_set(bundle->B, graph->nodes[*v].rc_id) != 0)
