@@ -639,8 +639,6 @@ void *mm_hits_cmp(struct mm_db_t *db, struct mm_db_edge_t *db_e, struct mm_hits_
 			single_ton++;
 			p = kh_get_val(mm_hash, db_e->p, db->mm[i], -1);
 			e = kh_get_val(mm_hash, db_e->h, db->mm[i], -1);
-			if (p > MOLECULE_MARGIN && abs(g->edges[e].seq_len - p) > MOLECULE_MARGIN)
-				continue;
 			mm_hits_insert(hits, db->mm[i], e, p);
 		} else {
 			return NULL;
