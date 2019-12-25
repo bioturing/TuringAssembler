@@ -186,6 +186,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 					__get_edge_cov(g->edges + s, g->ksize), unit_cov);
 			return;
 		}
+		log_debug("Next cand of %d: %d", (*path)[(*n_path) - 1], v);
 		int v_rc = g->edges[v].rc_id;
 		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
 				g->edges[v].count);
