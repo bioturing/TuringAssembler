@@ -84,6 +84,7 @@ struct params_build_candidate_edges {
     int i;
     struct edges_score_type *list_candidate_edges;
     float avg_bin_hash;
+    int metagenomics;
     khash_t(btable_sig) *big_table;
 };
 
@@ -279,6 +280,12 @@ void *process_build_candidate_edges(void *data)
 		struct scaffold_edge *list_local_edges = NULL;
 		if (!is_long_contig(&g->edges[i_contig]))
 			continue;
+		if (!params_candidate->metagenomics) {
+			float edge_cov = __get_edge_cov(&g->edges[i_contig], g->ksize) / global_genome_coverage;
+			if (edge_cov < MIN_EDGE_COV_SCAFFOLD) {
+				continue;
+			}
+		}
 		find_local_nearby_contig(i_contig, params_candidate,
 		                         &n_local_edges,
 		                         &list_local_edges);
@@ -303,6 +310,7 @@ struct params_build_candidate_edges *new_params_build_candidate_edges(
 	params_candidate->big_table = big_table;
 	params_candidate->list_candidate_edges = calloc(1, sizeof(struct edges_score_type));
 	params_candidate->avg_bin_hash = get_avg_barcode(g);
+	params_candidate->metagenomics = opt->metagenomics;
 	return params_candidate;
 }
 
@@ -701,9 +709,9 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 {
 	init_global_params(g);
 
-	if (!opt->metagenomics) {
-		remove_lov_high_cov(g);
-	}
+//	if (!opt->metagenomics) {
+//		remove_lov_high_cov(g);
+//	}
 
 	print_contig_info(g);
 
