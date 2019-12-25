@@ -70,13 +70,17 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	khash_t(set_int) *cand = kh_init(set_int);
 	int last = path[n_path - 1], count = 0;
 	int second_score = 0, best_score = 0, best = -1;
+	log_debug("Get next candidates of %d", last);
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
-		if (g->edges[v].rc_id == last)
+		int score = rp_cand[last].score[i];
+		if (g->edges[v].rc_id == last){
+			log_debug("%d is reverse complement of %d, ignore",
+					v, last);
 			continue;
+		}
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.5 * unit_cov
-		&& g->edges[v].seq_len >= 100) {
+		if (cov >= 0.5 * unit_cov && g->edges[v].seq_len >= 100) {
 			if (rp_cand[last].score[i] > second_score) {
 				second_score = rp_cand[last].score[i];
 				if (second_score > best_score) {
@@ -87,12 +91,15 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 				}
 			}
 //			kh_set_int_insert(cand, rp_cand[last].cand[i]);
+		} else {
+			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %.3f, unit cov: %.3f",
+					cov, g->edges[v].seq_len, unit_cov);
 		}
 	}
 	if (best_score >  (second_score + 10)*1.3)
 		return best;
 	else {
-//		log_warn("best %d second %d", best_score, second_score);
+		log_debug("best %d second %d", best_score, second_score);
 		return -1;
 	}
 	if (count > 1)
@@ -170,11 +177,15 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 
 	while (1){
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
-		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
-			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
-			return;
 		if (v == -1)
 			return;
+		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
+			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov){
+			log_debug("Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
+					v, __get_edge_cov(g->edges + v, g->ksize),
+					__get_edge_cov(g->edges + s, g->ksize), unit_cov);
+			return;
+		}
 		int v_rc = g->edges[v].rc_id;
 		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
 				g->edges[v].count);
@@ -238,9 +249,15 @@ void get_long_contigs(struct opt_proc_t *opt)
 	FILE *f = fopen(out_path, "w");
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int e = edge_sorted[i];
+		log_debug("Trying to extend from %d", e);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
+		//if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
+		//	continue;
+		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov){
+			log_debug("Edge violates threshold, cov: %.3f, len: %d, unit cov: %.3f",
+					cov, g->edges[e].seq_len, unit_cov);
 			continue;
+		}
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;
 		extend_by_read_pairs(g, e, unit_cov, rp_cand, &path_fw, &n_path_fw);
