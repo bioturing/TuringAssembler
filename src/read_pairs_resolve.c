@@ -305,7 +305,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 
 	for (int e = 0; e < g->n_e; ++e){
 		int e_rc = g->edges[e].rc_id;
-		if (e > e_rc)
+		if (e > e_rc || g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		if (visited[e] == 0 || cov >= 0.2 * unit_cov){
