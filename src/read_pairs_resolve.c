@@ -68,7 +68,7 @@ int cmp_edge_length(const void *a, const void *b, void *arg)
 }
 
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
-		  int *path, int n_path)
+		khash_t(long_int) *share_bc, int *path, int n_path)
 {
 	int res = -1;
 	khash_t(set_int) *cand = kh_init(set_int);
@@ -83,33 +83,29 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 					v, last);
 			continue;
 		}
-			if (rp_cand[last].score[i] > second_score) {
-				second_score = rp_cand[last].score[i];
-				if (second_score > best_score) {
-					int tmp = best_score;
-					best_score = second_score;
-					second_score = tmp;
-					best = rp_cand[last].cand[i];
-				}
+		if (rp_cand[last].score[i] > second_score) {
+			second_score = rp_cand[last].score[i];
+			if (second_score > best_score) {
+				int tmp = best_score;
+				best_score = second_score;
+				second_score = tmp;
+				best = rp_cand[last].cand[i];
 			}
-//			kh_set_int_insert(cand, rp_cand[last].cand[i]);
+		}
+		float cov = __get_edge_cov(g->edges + best, g->ksize);
+		if (cov >= 0.5 * unit_cov && g->edges[best].seq_len >= 100)
+			kh_set_int_insert(cand, v);
 	}
 	if (best_score > (second_score + 10) * 1.3) {
 		float cov = __get_edge_cov(g->edges + best, g->ksize);
 		if (cov >= 0.5 * unit_cov && g->edges[best].seq_len >= 100) {
-			return best;
+			res = best;
+			goto end_function;
 		} else {
-			log_debug(
-				"edge %d does not sastisfy threshold, cov: %.3f, len: %d, unit cov: %.3f",
+			log_debug("edge %d does not sastisfy threshold, cov: %.3f, len: %d, unit cov: %.3f",
 				best, cov, g->edges[best].seq_len, unit_cov);
 		}
 	}
-	else {
-		log_debug("best %d second %d", best_score, second_score);
-		return -1;
-	}
-	if (count > 1)
-		return -1;
 
 	//for (khiter_t it = kh_begin(cand); it != kh_end(cand); ++it){
 	//	if (!kh_exist(cand, it))
@@ -132,16 +128,32 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	int p = n_path - 2;
 	while (p >= 0 && kh_size(cand) > 1) {
 		int v = path[p];
-		khash_t(set_int) *new_cand = kh_init(set_int);
-		for (int i = 0; i < rp_cand[v].n; ++i) {
+		khash_t(set_int) *new_cand_rp = kh_init(set_int);
+		for (int i = 0; i < rp_cand[v].n; ++i){
 			int u = rp_cand[v].cand[i];
 			if (rp_cand[v].score[i] >= MIN_READ_PAIR_MAPPED_SOFT
-			    && kh_set_int_exist(cand, u)
-			    && g->edges[u].seq_len >= 100)
-				kh_set_int_insert(new_cand, u);
+				&& kh_set_int_exist(cand, u)
+				&& g->edges[u].seq_len >= 100)
+				kh_set_int_insert(new_cand_rp, u);
+		}
+
+		khash_t(set_int) *new_cand_bc = kh_init(set_int);
+		for (khiter_t it = kh_begin(cand); it != kh_end(cand); ++it){
+			if (!kh_exist(cand, it))
+				continue;
+			int u = kh_key(cand, it);
+			int shared_bc = get_share_bc(g, share_bc, v, u);
+			if (shared_bc >= MIN_SHARE_BC_RP_EXTEND)
+				kh_set_int_insert(new_cand_bc, u);
 		}
 		kh_destroy(set_int, cand);
-		cand = new_cand;
+		if (kh_size(new_cand_rp) != 0){
+			cand = new_cand_rp;
+			kh_destroy(set_int, new_cand_bc);
+		} else {
+			cand = new_cand_bc;
+			kh_destroy(set_int, new_cand_rp);
+		}
 		--p;
 	}
 	if (kh_size(cand) == 1) {
@@ -152,7 +164,6 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	}
 	end_function:
 	kh_destroy(set_int, cand);
-	//__VERBOSE("next cand %d\n", res);
 	return res;
 }
 
@@ -182,8 +193,12 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	g->edges[s].count -= count;
 	g->edges[g->edges[s].rc_id].count -= count;
 
-	while (1) {
-		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
+	while (1){
+		int v = get_next_cand(g, unit_cov, rp_cand, share_bc, *path,
+				*n_path);
+		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
+			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
+			return;
 		if (v == -1)
 			return;
 		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
@@ -315,7 +330,7 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		//if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
 		//	continue;
-		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov){
+		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100){
 			log_debug("Edge violates threshold, cov: %.3f, len: %d, unit cov: %.3f",
 					cov, g->edges[e].seq_len, unit_cov);
 			continue;
