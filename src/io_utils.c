@@ -12,11 +12,11 @@ FILE *xfopen(const char *file_path, const char *mode) {
 	fi = fopen(file_path, mode);
 	if (!fi) {
 		if (strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0)
-			__ERROR("Unable to open file [%s] to read", file_path);
+			log_error("Unable to open file [%s] to read", file_path);
 		else if (strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0)
-			__ERROR("Unable to open file [%s] to write", file_path);
+			log_error("Unable to open file [%s] to write", file_path);
 		else
-			__ERROR("Unable to open file [%s]"
+			log_error("Unable to open file [%s]"
 				"with unknown mode [%s]", file_path, mode);
 	}
 	return fi;
@@ -32,7 +32,7 @@ size_t xfread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t ret = fread(ptr, size, nmemb, stream);
 	if (ret != nmemb)
-		__ERROR("fread, wrong file or file is corrupted nmem expected %u found %u\n",
+		log_error("fread, wrong file or file is corrupted nmem expected %u found %u\n",
 				(uint32_t) nmemb, (uint32_t) ret);
 	return ret;
 }
@@ -41,7 +41,7 @@ size_t xfwrite(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
 	size_t ret = fwrite(ptr, size, nmemb, stream);
 	if (ret != nmemb)
-		__ERROR("fwrite, could not write data to file");
+		log_error("fwrite, could not write data to file");
 	return ret;
 }
 
@@ -94,7 +94,7 @@ size_t fetch_size(char **file_path, int n_file)
 	for (i = 0; i < n_file; ++i) {
 		fid = xfopen(file_path[i], "rb");
 		if (!fid)
-			__ERROR("Unable to open file: %s", file_path[i]);
+			log_error("Unable to open file: %s", file_path[i]);
 		fseek(fid, 0L, SEEK_END);
 		ret += ftell(fid);
 		fclose(fid);

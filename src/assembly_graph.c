@@ -423,7 +423,7 @@ void asm_append_seq_with_fill_reverse(struct asm_edge_t *dst, struct asm_edge_t 
 	m = (dst->seq_len - trim_dst + 15) >> 4;
 	dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
 	if (dst->seq == NULL)
-		__ERROR("Unable to realloc");
+		log_error("Unable to realloc");
 	if (new_m > m)
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
 	uint32_t mask = ((dst->seq_len - trim_dst) & 15) == 0 ? (uint32_t)-1 :
@@ -461,7 +461,7 @@ void asm_append_seq(struct asm_edge_t *dst, struct asm_edge_t *src, uint32_t ove
 	if (new_m > m) {
 		dst->seq = realloc(dst->seq, new_m * sizeof(uint32_t));
 		if (dst->seq == NULL)
-			__ERROR("Unable to realloc");
+			log_error("Unable to realloc");
 		memset(dst->seq + m, 0, (new_m - m) * sizeof(uint32_t));
 	}
 

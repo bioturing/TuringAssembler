@@ -163,7 +163,7 @@ int opt_count_list(int argc, char *argv[])
 			break;
 	}
 	if (n == 0)
-		__ERROR("Emtpy list %s", argv[0]);
+		log_error("Emtpy list %s", argv[0]);
 	return n;
 }
 
@@ -229,7 +229,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-l")) {
 			opt->lib_type = get_library_index(argv[pos + 1]);
 			if (opt->lib_type == -1)
-				__ERROR("Unknown library %s", argv[pos + 1]);
+				log_error("Unknown library %s", argv[pos + 1]);
 			pos += 2;
 		} else if (!strcmp(argv[pos], "-sm")) {
 			opt->mmem = atoi(argv[pos + 1]);
@@ -237,7 +237,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-1")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
+				log_error("Inconsistent number of files");
 			opt->n_files = n;
 			opt->files_1 = argv + pos + 1;
 			pos += (n + 1);
@@ -248,14 +248,14 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 		} else if (!strcmp(argv[pos], "-2")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
+				log_error("Inconsistent number of files");
 			opt->n_files = n;
 			opt->files_2 = argv + pos + 1;
 			pos += (n + 1);
 		} else if (!strcmp(argv[pos], "-I")) {
 			n = opt_count_list(argc - pos, argv + pos);
 			if (opt->n_files > 0 && opt->n_files != n)
-				__ERROR("Inconsistent number of files");
+				log_error("Inconsistent number of files");
 			opt->n_files = n;
 			opt->files_I = argv + pos + 1;
 			pos += (n + 1);
@@ -264,7 +264,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			pos += 2;
 		} else if (argv[pos][0] != '-') {
 			if (opt->n_files != 0)
-				__ERROR("Unknown %s", argv[pos]);
+				log_error("Unknown %s", argv[pos]);
 			opt->files_1 = argv + pos;
 			while (pos < argc && argv[pos][0] != '-') {
 				++pos;
@@ -277,7 +277,7 @@ struct opt_proc_t *parse_proc_option(int argc, char *argv[])
 			opt->lk = atoi(argv[pos + 1]);
 			pos += 2;
 		} else {
-			__ERROR("Unknown option %s", argv[pos]);
+			log_error("Unknown option %s", argv[pos]);
 		}
 	}
 	check_proc_opt(opt);
@@ -310,7 +310,7 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 		check_process_local_ass(argc, opt);
 	};
 	if (!opt->k0 & 1) {
-		__ERROR("Kmer size must be an odd number! e.g -k0 45\n");
+		log_error("Kmer size must be an odd number! e.g -k0 45\n");
 	}
 	char tmp_dir[1024];
 	snprintf(tmp_dir, 1024, "%s/assembly.log", opt->out_dir);
@@ -328,7 +328,7 @@ void build_0_opt_process(int argc, char *argv[])
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (opt == NULL) {
 		print_usage();
-		__ERROR("Error parsing arguments");
+		log_error("Error parsing arguments");
 	}
 	char tmp_dir[1024];
 	snprintf(tmp_dir, 1024, "%s/build.log", opt->out_dir);
@@ -344,7 +344,7 @@ void build_0_opt_process(int argc, char *argv[])
 //	opt = parse_proc_option(argc - 2, argv + 2);
 //	if (opt == NULL) {
 //		print_usage();
-//		__ERROR("Error parsing arguments");
+//		log_error("Error parsing arguments");
 //	}
 //	char tmp_dir[1024];
 //	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/query.log");
@@ -359,7 +359,7 @@ void build_bridge_opt_process(int argc, char *argv[])
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (opt == NULL){
 		print_usage();
-		__ERROR("Error parsing arguments");
+		log_error("Error parsing arguments");
 	}
 	char path[1024];
 	sprintf(path, "%s/build_bridge.log", opt->out_dir);
@@ -379,7 +379,7 @@ void reduce_read_opt_process(int argc, char *argv[])
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (opt == NULL){
 		print_usage();
-		__ERROR("Error parsing arguments");
+		log_error("Error parsing arguments");
 	}
 	char tmp_dir[1024];
 	strcpy(tmp_dir, opt->out_dir); strcat(tmp_dir, "/reduce_read.log");
@@ -407,7 +407,7 @@ void graph_convert_opt_process(int argc, char *argv[])
 	opt = parse_proc_option(argc - 2, argv + 2);
 	if (opt == NULL) {
 		print_usage();
-		__ERROR("Error parsing arguments");
+		log_error("Error parsing arguments");
 	}
 	char tmp_dir[1024];
 	snprintf(tmp_dir, 1024, "%s/convert.log", opt->out_dir);

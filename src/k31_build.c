@@ -452,7 +452,7 @@ static void *count_edge_worker(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file count edge worker\n");
+				log_error("\nWrong format file count edge worker\n");
 
 			++n_reads;
 			count_edge_read(&read1, ksize, graph, edict, ndict);

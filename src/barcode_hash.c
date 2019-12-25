@@ -128,7 +128,7 @@ static void barcode_hash_resize(struct barcode_hash_t *h)
 					h->cnts[j] = y;
 					x = xt; y = yt;
 				} else {
-					__ERROR("Resize barcode hash failed");
+					log_error("Resize barcode hash failed");
 				}
 			}
 		}
@@ -209,7 +209,7 @@ loop_refill:
 					x = xt; y = yt;
 				} else {
 					if (cur_size == new_size)
-						__ERROR("Resize barcode hash failed");
+						log_error("Resize barcode hash failed");
 					++retry;
 					goto loop_refill;
 				}

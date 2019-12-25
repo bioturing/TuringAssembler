@@ -92,7 +92,7 @@ static void *PE_count_lazy_worker(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file PE count lazy\n");
+				log_error("\nWrong format file PE count lazy\n");
 
 			++n_reads;
 			count_lazy_from_read(&read1, h, ksize, lock_hash);

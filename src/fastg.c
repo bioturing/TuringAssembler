@@ -227,7 +227,7 @@ void load_asm_graph_fastg(struct asm_graph_t *g, const char *path, int ksize )
 	khash_t(khInt) *map_v = kh_init(khInt);
 
 	if (!fp)
-		__ERROR("Load graph fastg: Unable to open file [%s] to read", path);
+		log_error("Load graph fastg: Unable to open file [%s] to read", path);
 	kseq_t *seq = kseq_init(fp);
 
 	while (kseq_read(seq) >= 0) {

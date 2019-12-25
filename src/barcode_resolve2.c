@@ -1497,11 +1497,11 @@ void construct_read_index(struct read_path_t *rpath, khash_t(bcpos) *h)
 	char *buf = alloca(40);
 	while ((byte_read = fread(buf, 1, 40, fp))) {
 		if (byte_read != 40)
-			__ERROR("Corrupted barcode in read index file");
+			log_error("Corrupted barcode in read index file");
 		barcode = unpack_int64((uint8_t *) buf);
 		k = kh_put(bcpos, h, barcode, &ret);
 		if (ret != 1)
-			__ERROR("Insert barcode failed");
+			log_error("Insert barcode failed");
 		kh_value(h, k).r1_offset = unpack_int64((uint8_t *) buf + 8);
 		kh_value(h, k).r2_offset = unpack_int64((uint8_t *) buf + 16);
 		kh_value(h, k).r1_len = unpack_int64((uint8_t *) buf + 24);

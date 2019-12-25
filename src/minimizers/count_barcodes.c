@@ -438,7 +438,7 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			      get_read_from_fa(&read2, R2_buf, &pos2);
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				log_error("\nWrong format file\n");
 
 			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
 			uint64_t barcode = get_barcode_biot(read1.info, &readbc);

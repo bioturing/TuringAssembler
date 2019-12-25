@@ -45,7 +45,7 @@ void *fastq_reducer_iterator(void *data)
 
 
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
-				__ERROR("\nWrong format file\n");
+				log_error("\nWrong format file\n");
 
 			reduce_read(&read1, &read2, bundle);
 

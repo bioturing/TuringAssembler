@@ -31,13 +31,6 @@
 } while (0) /* __DEBUG */
 #endif /* NDEBUG */
 
-/* FIXME: Write error handler: i.e. delete temporary files */
-#define __ERROR(fmt, ...)do {						       \
-	fprintf(stderr, "[ERROR] " fmt "\n", __VA_ARGS__);		       \
-	log_write("[ERROR] " fmt "\n", __VA_ARGS__);			       \
-	exit(EXIT_FAILURE);						       \
-} while(0) /* ERROR */
-
 #else /* __MSC_VER */
 
 #define __VERBOSE_INFO(tag, fmt, args...) do {				       \
@@ -63,11 +56,6 @@
 #define __DEBUG(fmt, args...)	fprintf(stderr, "[DEBUG] " fmt, ##args)
 #endif /* NDEBUG */
 
-#define __ERROR(fmt, args...) do {					       \
-	fprintf(stderr, "[ERROR] " fmt "\n", ##args);			       \
-	log_write("[ERROR] " fmt "\n", ##args);				       \
-	exit(EXIT_FAILURE);						       \
-} while(0) /* ERROR */
 #endif /* __MSC_VER */
 
 void init_log(const char *path);
