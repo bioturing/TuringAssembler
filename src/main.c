@@ -319,7 +319,7 @@ void build_opt_process(int argc, char *argv[], void (*build_process)(struct opt_
 	}
 	char tmp_dir[1024];
 	snprintf(tmp_dir, 1024, "%s/assembly.log", opt->out_dir);
-	init_log(tmp_dir);
+	init_logger(opt->log_level, tmp_dir);
 	log_info("%s", res);
 	init_clock();
 	print_info(argc, argv);
