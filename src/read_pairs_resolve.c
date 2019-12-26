@@ -181,7 +181,8 @@ int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
 }
 
 void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
-			  struct read_pair_cand_t *rp_cand, int **path, int *n_path)
+		struct read_pair_cand_t *rp_cand, khash_t(long_int) *share_bc,
+		int **path, int *n_path)
 {
 	//__VERBOSE("s = %d\n", s);
 	log_debug("rpextend from %d", s);
@@ -318,6 +319,8 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 		edge_sorted[i] = i;
 	qsort_r(edge_sorted, g->n_e, sizeof(int), &cmp_edge_length, g);
 
+	khash_t(long_int) *share_bc = load_khash(opt->var[0]);
+
 	float unit_cov = get_genome_coverage_h(g);
 	log_info("global cov: %lf", unit_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
@@ -337,9 +340,10 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 		}
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;
-		extend_by_read_pairs(g, e, unit_cov, rp_cand, &path_fw, &n_path_fw);
+		extend_by_read_pairs(g, e, unit_cov, rp_cand, share_bc, &path_fw,
+				&n_path_fw);
 		extend_by_read_pairs(g, g->edges[e].rc_id, unit_cov, rp_cand,
-				     &path_rv, &n_path_rv);
+				share_bc, &path_rv, &n_path_rv);
 		int *path = calloc(n_path_fw + n_path_rv - 1, sizeof(int));
 		int n_path = 0;
 		for (int i = n_path_rv - 1; i >= 0; --i)

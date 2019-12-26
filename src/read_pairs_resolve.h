@@ -29,7 +29,8 @@ int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
 		khash_t(long_int) *share_bc, int cand);
 
 void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
-		struct read_pair_cand_t *rp_cand, int **path, int *n_path);
+		struct read_pair_cand_t *rp_cand, khash_t(long_int) *share_bc,
+		int **path, int *n_path);
 
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
 		khash_t(long_int) *share_bc, int *path, int n_path);
