@@ -325,9 +325,13 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 	log_info("global cov: %lf", unit_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	int n_e = 0;
-	sprintf(opt->in_fasta, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
-	FILE *f = fopen(opt->in_fasta, "w");
-	for (int i = g->n_e - 1; i >= 0; --i) {
+	char out_path[1024];
+	sprintf(out_path, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
+	FILE *f = fopen(out_path, "w");
+	for (int i = g->n_e - 1; i >= 0; --i){
+		int p = g->n_e - i;
+		if (p / g->n_e > (p - 1) / g->n_e)
+			log_info("Processed %d/%d edges", p, g->n_e);
 		int e = edge_sorted[i];
 		log_debug("Trying to extend from %d", e);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
