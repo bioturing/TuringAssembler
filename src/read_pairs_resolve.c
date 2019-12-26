@@ -212,13 +212,13 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 			return;
 		if (v == -1)
 			return;
-		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
-			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov){
-			log_debug("Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
-					v, __get_edge_cov(g->edges + v, g->ksize),
-					__get_edge_cov(g->edges + s, g->ksize), unit_cov);
-			return;
-		}
+		//if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
+		//	|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov){
+		//	log_debug("Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
+		//			v, __get_edge_cov(g->edges + v, g->ksize),
+		//			__get_edge_cov(g->edges + s, g->ksize), unit_cov);
+		//	return;
+		//}
 		log_debug("Next cand of %d: %d", (*path)[(*n_path) - 1], v);
 		int v_rc = g->edges[v].rc_id;
 		int count = min(unit_cov * (g->edges[v].seq_len - g->ksize + 1),
