@@ -150,7 +150,10 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 			int shared_bc = get_share_bc(g, share_bc, v, u);
 			if (shared_bc >= MIN_SHARE_BC_RP_EXTEND){
 				kh_set_int_insert(new_cand_bc, u);
-				log_debug("Edge %d shared %d barcodes with %d",
+				log_debug("Accept edge %d shared %d barcodes with %d",
+						u, shared_bc, v);
+			} else {
+				log_debug("Reject edge %d shared %d barcodes with %d",
 						u, shared_bc, v);
 			}
 		}
