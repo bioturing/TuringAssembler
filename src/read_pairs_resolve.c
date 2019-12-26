@@ -131,7 +131,10 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	//}
 	//goto end_function;
 
-	log_debug("Too many candidates, using barcode to eliminate some of them");
+	if (kh_size(cand) > 1)
+		log_debug("Too many candidates, using barcode to eliminate some of them");
+	else
+		log_debug("No candidate sastisfies threshold, abort");
 	int p = n_path - 1;
 	while (p >= 0 && kh_size(cand) > 1){
 		int v = path[p];
