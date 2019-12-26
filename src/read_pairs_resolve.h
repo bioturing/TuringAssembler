@@ -9,8 +9,8 @@
 #include "cluster_molecules.h"
 #include "verbose.h"
 #include "helper.h"
-#define MIN_READ_PAIR_MAPPED_HARD 50
-#define MIN_READ_PAIR_MAPPED_SOFT 20
+#define MIN_READ_PAIR_MAPPED_HARD 10
+#define MIN_READ_PAIR_MAPPED_SOFT 2
 #define REPEAT_COV_RATIO 1.3
 #define MIN_SHARE_BC_RP_EXTEND 200
 
