@@ -126,7 +126,7 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	//}
 	//goto end_function;
 
-	int p = n_path - 2;
+	int p = n_path - 1;
 	while (p >= 0 && kh_size(cand) > 1){
 		int v = path[p];
 		khash_t(set_int) *new_cand_rp = kh_init(set_int);
