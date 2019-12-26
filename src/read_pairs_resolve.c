@@ -126,6 +126,7 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	//}
 	//goto end_function;
 
+	log_debug("Too many candidates, using barcode to eliminate some of them");
 	int p = n_path - 1;
 	while (p >= 0 && kh_size(cand) > 1){
 		int v = path[p];
@@ -144,8 +145,11 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 				continue;
 			int u = kh_key(cand, it);
 			int shared_bc = get_share_bc(g, share_bc, v, u);
-			if (shared_bc >= MIN_SHARE_BC_RP_EXTEND)
+			if (shared_bc >= MIN_SHARE_BC_RP_EXTEND){
 				kh_set_int_insert(new_cand_bc, u);
+				log_debug("Edge %d shared %d barcodes with %d",
+						u, shared_bc, v);
+			}
 		}
 		kh_destroy(set_int, cand);
 		if (kh_size(new_cand_rp) != 0){
