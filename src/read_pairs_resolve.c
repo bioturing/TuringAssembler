@@ -74,14 +74,11 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
 		int score = rp_cand[last].score[i];
-		if (g->edges[v].rc_id == last){
-			log_debug("%d is reverse complement of %d, ignore",
-					v, last);
+		if (g->edges[v].rc_id == last)
 			continue;
-		}
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.5 * unit_cov && g->edges[v].seq_len >= 100
-			&& score >= MIN_READ_PAIR_MAPPED_HARD) {
+		int added = 0;
+		if (cov >= 0.5 * unit_cov && g->edges[v].seq_len >= 100){
 			if (rp_cand[last].score[i] > second_score) {
 				second_score = rp_cand[last].score[i];
 				if (second_score > best_score) {
@@ -91,14 +88,23 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 					best= rp_cand[last].cand[i];
 				}
 			}
-			kh_set_int_insert(cand, rp_cand[last].cand[i]);
+
+			if (score >= MIN_READ_PAIR_MAPPED_HARD)
+				added = 1;
+		}
+		if (added){
+			log_debug("Add edge %d to list of candidates, score: %d",
+					v, score);
+			kh_set_int_insert(cand, v);
 		} else {
 			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %.3f, score: %d, unit cov: %.3f",
-					cov, g->edges[v].seq_len, score, unit_cov);
+					v, cov, g->edges[v].seq_len, score, unit_cov);
 		}
 	}
 	if (best_score >  (second_score + 10)*1.3){
 		res = best;
+		log_debug("Edge %d has score ignificantly greater than the others, best score: second score:",
+				best, best_score, second_score);
 		goto end_function;
 	}
 
