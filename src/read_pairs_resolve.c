@@ -83,7 +83,7 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 			continue;
 		}
 		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.5 * unit_cov && g->edges[v].seq_len >= 100) {
+		if (cov >= 0.25 * unit_cov && g->edges[v].seq_len >= 100) {
 			if (rp_cand[last].score[i] > second_score) {
 				second_score = rp_cand[last].score[i];
 				if (second_score > best_score) {
@@ -95,11 +95,11 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 			}
 //			kh_set_int_insert(cand, rp_cand[last].cand[i]);
 		} else {
-			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %.3f, unit cov: %.3f",
-					cov, g->edges[v].seq_len, unit_cov);
+			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %d, unit cov: %.3f",
+					v, cov, g->edges[v].seq_len, unit_cov);
 		}
 	}
-	if (best_score > (second_score + 10) * 1.3)
+	if (best_score >  (second_score + 4))
 		return best;
 	else {
 		log_debug("best %d second %d", best_score, second_score);
@@ -310,7 +310,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		//if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
 		//	continue;
-		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov){
+		if (cov < 0.25 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.5 * unit_cov){
 			log_debug("Edge violates threshold, cov: %.3f, len: %d, unit cov: %.3f",
 					cov, g->edges[e].seq_len, unit_cov);
 			continue;
