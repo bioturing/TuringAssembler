@@ -268,8 +268,9 @@ void get_long_contigs(struct opt_proc_t *opt)
 	FILE *f = fopen(out_path, "w");
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int p = g->n_e - i;
-		if (p / g->n_e > (p - 1) / g->n_e)
-			log_info("Processed %d/%d edges", p, g->n_e);
+		if (p * 100 / g->n_e > (p - 1) * 100 / g->n_e)
+			log_info("Processed %d/%d edges (%d\%)", p, g->n_e,
+					p * 100 / g->n_e);
 		int e = edge_sorted[i];
 		log_debug("Trying to extend from %d", e);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
