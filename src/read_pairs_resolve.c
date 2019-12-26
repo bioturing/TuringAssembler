@@ -96,13 +96,15 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 					v, score);
 			kh_set_int_insert(cand, v);
 		} else {
-			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %.3f, score: %d, unit cov: %.3f",
+			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %d, score: %d, unit cov: %.3f",
 					v, cov, g->edges[v].seq_len, score, unit_cov);
 		}
 	}
 	if (best_score > (second_score + 10) * 1.3) {
 		float cov = __get_edge_cov(g->edges + best, g->ksize);
 		if (cov >= 0.5 * unit_cov && g->edges[best].seq_len >= 100) {
+			log_debug("Edge %d has score ignificantly greater than the others, best score: %d, second score: %d",
+					best, best_score, second_score);
 			res = best;
 			goto end_function;
 		} else {
