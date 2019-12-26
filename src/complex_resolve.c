@@ -201,6 +201,8 @@ int get_closure(struct resolve_bulges_bundle_t *bundle)
 void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 {
 	struct asm_graph_t *graph = bundle->graph;
+	kh_destroy(int_int, bundle->PE);
+	bundle->PE = kh_init(int_int);
 	khash_t(int_int) *PE = bundle->PE;
 
 	struct queue_t *q = calloc(1, sizeof(struct queue_t));
@@ -208,6 +210,7 @@ void bfs_to_sinks(struct resolve_bulges_bundle_t *bundle)
 	push_queue(q, pointerize(&bundle->source, sizeof(int)));
 	khash_t(set_int) *visited = kh_init(set_int);
 	put_in_set(visited, bundle->source);
+	put_in_map(PE, bundle->source, -1);
 
 	while (!is_queue_empty(q)){
 		int *v = get_queue(q);
@@ -264,6 +267,13 @@ int is_complex_closure(struct resolve_bulges_bundle_t *bundle)
 	struct asm_graph_t *graph = bundle->graph;
 	struct queue_t *B_vertices = bundle->B_vertices;
 	int res = 0;
+	int s = bundle->source;
+	for (int i = 0; i < graph->nodes[s].deg; ++i){
+		int v = get_adj_node(graph, s, i);
+		if (v == s)
+			return 1;
+	}
+
 	for (int i = B_vertices->front; i < B_vertices->back; ++i){
 		int *v = B_vertices->data[i];
 		if (check_in_set(bundle->B, graph->nodes[*v].rc_id) != 0)

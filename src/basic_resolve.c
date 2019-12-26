@@ -1650,6 +1650,8 @@ int asm_resolve_simple_bulges(struct asm_graph_t *g, khash_t(int64_alterp) *h,
 		int v = g->edges[e].target;
 		if (u == -1)
 			continue;
+		if (u == g->nodes[v].rc_id)
+			continue;
 		if (g->edges[e].seq_len > MAX_BULGE_LEN)
 			continue;
 		if (e > rc)
