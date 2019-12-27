@@ -15,6 +15,8 @@
 #include "include/kmc_skipping.h"
 #include "resolve.h"
 #include "basic_resolve.h"
+#include "minimizers/minimizers.h"
+#include "minimizers/count_barcodes.h"
 
 KSEQ_INIT(gzFile, gzread);
 #define read_index_get_key(p) ((p).r1_offset)
@@ -280,6 +282,30 @@ void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 		barcode_hash_clone(g->edges[dst].barcodes + 1, g->edges[src].barcodes + 1);
 		barcode_hash_clone(g->edges[dst].barcodes + 2, g->edges[src].barcodes + 2);
 	}
+}
+
+void asm_clone_edge_differ_source(struct asm_graph_t *g, gint_t dst, gint_t src)
+{
+	asm_clone_seq(g->edges + dst, g->edges + src);
+	/* clone the barcode */
+	if (g->aux_flag & ASM_HAVE_BARCODE) {
+		g->edges[dst].barcodes = calloc(3, sizeof(struct barcode_hash_t));
+		barcode_hash_clone(g->edges[dst].barcodes, g->edges[src].barcodes);
+		barcode_hash_clone(g->edges[dst].barcodes + 1, g->edges[src].barcodes + 1);
+		barcode_hash_clone(g->edges[dst].barcodes + 2, g->edges[src].barcodes + 2);
+	}
+}
+
+gint_t asm_create_clone_edge_differ_source(struct asm_graph_t *g, gint_t src)
+{
+	g->edges = realloc(g->edges, (g->n_e + 2) * sizeof(struct asm_edge_t));
+	memset(g->edges + g->n_e, 0, 2 * sizeof(struct asm_edge_t));
+	g->n_e += 2;
+	asm_clone_edge_differ_source(g, g->n_e - 2, src);
+	asm_clone_edge_differ_source(g, g->n_e - 1, g->edges[src].rc_id);
+	g->edges[g->n_e - 2].rc_id = g->n_e - 1;
+	g->edges[g->n_e - 1].rc_id = g->n_e - 2;
+	return g->n_e - 2;
 }
 
 gint_t asm_create_clone_edge(struct asm_graph_t *g, gint_t src)
@@ -1606,56 +1632,63 @@ void transitive_edge_stats(struct asm_graph_t *g)
 	uint64_t n_nodes = g->n_v;
 	for (int i = 0 ; i < n_nodes; ++i) {
 		gint_t rc = g->nodes[i].rc_id;
+		struct mini_hash_t *h;
+		init_mini_hash(&h, 0);
 		if (g->nodes[i].deg == 2 && g->nodes[rc].deg == 1) {
+			double cov_target = __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize) + __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize);
+			double cov_source = __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize);
+			if (cov_source * 1.0 / cov_target < 0.8 || cov_source * 1.0 / cov_target > 1.3) {
+				log_debug("coverage flow doesn't make sense: cov_source %.3f, cov_target %.3f", cov_source, cov_target);
+				continue;
+			}
 			gint_t e0 = g->edges[g->nodes[rc].adj[0]].rc_id;
+			if (g->edges[e0].seq_len > 1000) {
+				log_debug("Edge too large e %d length %d", e0, g->edges[e0].seq_len);
+				continue;
+			}
 			gint_t e1 = g->nodes[i].adj[0];
 			gint_t e2 = g->nodes[i].adj[1];
 			gint_t v0 = g->edges[e0].source;
 			gint_t v1 = g->edges[e0].target;
 			gint_t v2 = g->edges[e1].target;
 			gint_t v3 = g->edges[e2].target;
-			if ((v0 - v1) * (v0 - v2) * (v0 - v3) * (v1 - v2) * (v1 - v3) * (v2 - v3) == 0) {
+			mini_put(&h, v0);
+			mini_put(&h, v1);
+			mini_put(&h, v2);
+			mini_put(&h, v3);
+			mini_put(&h, g->nodes[v0].rc_id);
+			mini_put(&h, g->nodes[v1].rc_id);
+			mini_put(&h, g->nodes[v2].rc_id);
+			mini_put(&h, g->nodes[v3].rc_id);
+			if (h->count != 8) {
 				log_debug("4 nodes are not differ in pair, %d", i);
 				continue;
 			}
-			log_info("transitive node normal %d", i);
-			gint_t new_e1 = asm_create_clone_edge(g, e0);
-			gint_t new_e2 = asm_create_clone_edge(g, e0);
+			gint_t new_e1 = asm_create_clone_edge_differ_source(g, e0);
+			gint_t new_e2 = asm_create_clone_edge_differ_source(g, e0);
 			g->edges[new_e1].source = v0;
 			g->edges[new_e1].target = v2;
+			g->edges[new_e1 + 1].source = g->nodes[v2].rc_id;
+			g->edges[new_e1 + 1].target = g->nodes[v0].rc_id;
 			g->edges[new_e2].source = v0;
-			g->edges[new_e1].target = v3;
+			g->edges[new_e2].target = v3;
+			g->edges[new_e2 + 1].source = g->nodes[v3].rc_id;
+			g->edges[new_e2 + 1].target = g->nodes[v0].rc_id;
+			asm_add_node_adj(g, v0, new_e1);
+			asm_add_node_adj(g, g->nodes[v2].rc_id, new_e1 + 1);
+			asm_add_node_adj(g, v0, new_e2);
+			asm_add_node_adj(g, g->nodes[v3].rc_id, new_e2 + 1);
 			asm_append_seq(g->edges + new_e1, g->edges + e1, g->ksize);
 			asm_append_seq(g->edges + new_e2, g->edges + e2, g->ksize);
+			asm_clone_seq_reverse(g->edges + new_e1 + 1, g->edges + new_e1);
+			asm_clone_seq_reverse(g->edges + new_e2 + 1, g->edges + new_e2);
 			asm_remove_edge(g, e0);
+			asm_remove_edge(g, g->edges[e0].rc_id);
 			asm_remove_edge(g, e1);
+			asm_remove_edge(g, g->edges[e1].rc_id);
 			asm_remove_edge(g, e2);
+			asm_remove_edge(g, g->edges[e2].rc_id);
 		}
-		if (g->nodes[rc].deg == 2 && g->nodes[i].deg == 1) {
-			gint_t e0 = g->nodes[i].adj[0];
-			gint_t e1 = g->edges[g->nodes[rc].adj[0]].rc_id;
-			gint_t e2 = g->edges[g->nodes[rc].adj[1]].rc_id;
-
-			gint_t v0 = g->edges[e0].target;
-			gint_t v1 = g->edges[e0].source;
-			gint_t v2 = g->edges[e1].source;
-			gint_t v3 = g->edges[e2].source;
-			if ((v0 - v1) * (v0 - v2) * (v0 - v3) * (v1 - v2) * (v1 - v3) * (v2 - v3) == 0) {
-				log_debug("4 nodes are not differ in pair, %d", i);
-				continue;
-			}
-			log_info("transitive node type reverse %d", i);
-			gint_t new_e1 = asm_create_clone_edge(g, e1);
-			gint_t new_e2 = asm_create_clone_edge(g, e2);
-			g->edges[new_e1].source = v2;
-			g->edges[new_e1].target = v0;
-			g->edges[new_e2].source = v3;
-			g->edges[new_e1].target = v0;
-			asm_append_seq(g->edges + new_e1, g->edges + e0, g->ksize);
-			asm_append_seq(g->edges + new_e2, g->edges + e0, g->ksize);
-			asm_remove_edge(g, e0);
-			asm_remove_edge(g, e1);
-			asm_remove_edge(g, e2);
-		}
+		destroy_mini_hash(h);
 	}
 }
