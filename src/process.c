@@ -36,13 +36,11 @@ void graph_convert_process(struct opt_proc_t *opt)
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	transitive_edge_stats(g);
+	resolve_bulges(g);
 	log_info("Input graph kmer size: %d", g->ksize);
 	log_info("kmer size: %d", g->ksize);
 	test_asm_graph(g);
-	snprintf(path, 1024, "%s/graph_k_%d_loaded.gfa", opt->out_dir, g->ksize);
-	write_gfa(g, path);
-	snprintf(path, 1024, "%s/graph_k_%d_loaded.fasta", opt->out_dir, g->ksize);
-	write_fasta(g, path);
+	save_graph_info(opt->out_dir, g, "loaded_and_simplified");
 }
 
 void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
