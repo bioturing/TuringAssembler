@@ -1738,3 +1738,40 @@ int asm_resolve_simple_bulges_ite(struct asm_graph_t *g)
 	return res;
 }
 
+int check_junction(struct asm_graph_t *g, int v)
+{
+	int v_rc = g->nodes[v].rc_id;
+	if (g->nodes[v].deg != 2 || g->nodes[v_rc].deg != 1)
+		return 0;
+	return 1;
+}
+
+int asm_resolve_1_2_junctions(struct asm_graph_t *g)
+{
+	for (int i = 0; i < g->n_v; ++i){
+
+	}
+}
+
+int asm_resolve_1_2_junctions_ite(struct asm_graph_t *g)
+{
+	int ite = 0;
+	int res = 0;
+	do{
+		int resolved = asm_resolve_1_2_junctions(g);
+		if (!resolved)
+			break;
+		log_debug("%d-th iteration: %d junction(s) resolved", ite,
+				resolved);
+		struct asm_graph_t g1;
+		int *map_cur_prev;
+		asm_condense_map(g, &g1, &map_cur_prev);
+		asm_graph_destroy(g);
+		*g = g1;
+		res += resolved;
+		++ite;
+	} while(1);
+	log_info("%d junction(s) resolved after %d iterations",
+			res, ite);
+	return res;
+}
