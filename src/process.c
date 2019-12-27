@@ -33,14 +33,16 @@ void graph_convert_process(struct opt_proc_t *opt)
 	char path[1024];
 	log_info("Dump graph from bin archive");
 	struct asm_graph_t *g;
+	struct asm_graph_t g1;
+
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	transitive_edge_stats(g);
 	resolve_bulges(g);
-	log_info("Input graph kmer size: %d", g->ksize);
-	log_info("kmer size: %d", g->ksize);
-	test_asm_graph(g);
-	save_graph_info(opt->out_dir, g, "loaded_and_simplified");
+	asm_condense(g, &g1);
+	log_info("Input graph kmer size: %d", g1.ksize);
+	test_asm_graph(&g1);
+	save_graph_info(opt->out_dir, &g1, "loaded_and_simplified");
 }
 
 void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)
