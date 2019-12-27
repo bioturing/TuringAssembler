@@ -1669,8 +1669,8 @@ void transitive_edge_stats(struct asm_graph_t *g)
 			if (ratio_src_unit < 1.75) {
 				//log_trace("Source is not repeat, ratio %.2f", ratio_src_unit);
 				//log_trace("cov e0 %.2f, e1 %.2f, e2 %.2f", __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize),
-				          __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize),
-				          __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize));
+				          //__get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize),
+				          //__get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize);
 				continue;
 			}
 			//log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d", e0, g->edges[e0].seq_len,
