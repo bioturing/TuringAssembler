@@ -1771,6 +1771,14 @@ void get_junction_edges(struct asm_graph_t *g, int v, int *e0, int *e1, int *e2)
 	*e0 = g->edges[*e0].rc_id;
 }
 
+int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2)
+{
+	float cov0 = __get_edge_cov(g->edges + e0, g->ksize);
+	float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+	float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
+	return (cov1 + cov2 >= 0.8 * cov0) && (cov1 + cov2 <= 1.2 * cov0);
+}
+
 int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 {
 	int res = 0;
@@ -1784,6 +1792,12 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 			continue;
 		int e0, e1, e2;
 		get_junction_edges(g, v, &e0, &e1, &e2);
+		if (check_junction_cov(g, e0, e1, e2) == 0){
+			log_debug("Junction detected at %d but the coverage is not consistence, ignore",
+					v);
+			continue;
+		}
+
 		int max_len = MAX(MAX(g->edges[e0].seq_len, g->edges[e1].seq_len),
 				g->edges[e2].seq_len);
 		if (max_len > MAX_JUNCTION_LEN)
