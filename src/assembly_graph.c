@@ -267,6 +267,21 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	}
 }
 
+void asm_clone_edge_reverse(struct asm_graph_t *g, gint_t dst, gint_t src)
+{
+	/* clone the topology */
+	asm_clone_seq_reverse(g->edges + dst, g->edges + src);
+	g->edges[dst].source = g->edges[src].source;
+	g->edges[dst].target = g->edges[src].target;
+	/* clone the barcode */
+	if (g->aux_flag & ASM_HAVE_BARCODE) {
+		g->edges[dst].barcodes = calloc(3, sizeof(struct barcode_hash_t));
+		barcode_hash_clone(g->edges[dst].barcodes, g->edges[src].barcodes);
+		barcode_hash_clone(g->edges[dst].barcodes + 1, g->edges[src].barcodes + 1);
+		barcode_hash_clone(g->edges[dst].barcodes + 2, g->edges[src].barcodes + 2);
+	}
+}
+
 void asm_clone_edge(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
 	/* clone the topology */
