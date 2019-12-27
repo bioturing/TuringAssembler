@@ -1637,12 +1637,12 @@ void transitive_edge_stats(struct asm_graph_t *g)
 		if (g->nodes[i].deg == 2 && g->nodes[rc].deg == 1) {
 			double cov_target = __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize) + __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize);
 			double cov_source = __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize);
-			if (cov_source * 1.0 / cov_target < 0.8 || cov_source * 1.0 / cov_target > 1.3) {
+			if (cov_source * 1.0 / cov_target < 0.5 || cov_source * 1.0 / cov_target > 1.5) {
 				log_debug("coverage flow doesn't make sense: cov_source %.3f, cov_target %.3f", cov_source, cov_target);
 				continue;
 			}
 			gint_t e0 = g->edges[g->nodes[rc].adj[0]].rc_id;
-			if (g->edges[e0].seq_len > 1000) {
+			if (g->edges[e0].seq_len > 5000) {
 				log_debug("Edge too large e %d length %d", e0, g->edges[e0].seq_len);
 				continue;
 			}
