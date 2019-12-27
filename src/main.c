@@ -461,6 +461,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_bulges_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+	else if (!strcmp(argv[1], "resolve_junctions"))
+		build_opt_process(argc, argv, &resolve_junctions_process);
 	else if (!strcmp(argv[1], "debug_split_molecules"))
 		build_opt_process(argc, argv, &split_molecules_wrapper);
 	else if (!strcmp(argv[1], "reduce_reads"))

@@ -234,6 +234,9 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src);
 
 void asm_unroll_loop_forward(struct asm_graph_t *g, gint_t e1, gint_t e2, int rep);
 
+void asm_join_edge_clone(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
+					gint_t e2, gint_t e_rc2);
+
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 					gint_t e2, gint_t e_rc2);
 void asm_join_edge_with_gap(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,

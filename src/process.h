@@ -47,4 +47,5 @@ void cluster_molecules_process(struct opt_proc_t *opt);
 void debug_process(struct opt_proc_t *opt);
 void build_coverage_process(struct opt_proc_t *opt);
 void read_pairs_count_process(struct opt_proc_t *opt);
+void resolve_junctions_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

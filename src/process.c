@@ -398,6 +398,20 @@ void print_barcode_graph_process(struct opt_proc_t *opt)
 //	count_edge_links_bc(opt);
 //}
 
+void resolve_junctions_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/resolve_junctions.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Resolve junctions");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	asm_resolve_1_2_junctions_ite(&g);
+
+	save_graph_info(opt->out_dir, &g, "no_junctions");
+	asm_graph_destroy(&g);
+}
+
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];
