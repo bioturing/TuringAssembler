@@ -1638,13 +1638,13 @@ void transitive_edge_stats(struct asm_graph_t *g)
 		if (g->nodes[i].deg == 2 && g->nodes[rc].deg == 1) {
 			double cov_target = __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize) + __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize);
 			double cov_source = __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize);
-			if (cov_source * 1.0 / cov_target < 0.5 || cov_source * 1.0 / cov_target > 1.5) {
-				log_debug("coverage flow doesn't make sense: cov_source %.3f, cov_target %.3f", cov_source, cov_target);
+			if ((cov_source * 1.0 / cov_target) < 0.5 || (cov_source * 1.0 / cov_target) > 1.5) {
+				//log_debug("coverage flow doesn't make sense: cov_source %.3f, cov_target %.3f", cov_source, cov_target);
 				continue;
 			}
 			gint_t e0 = g->edges[g->nodes[rc].adj[0]].rc_id;
 			if (g->edges[e0].seq_len > 5000) {
-				log_debug("Edge too large e %d length %d", e0, g->edges[e0].seq_len);
+				//log_debug("Edge too large e %d length %d", e0, g->edges[e0].seq_len);
 				continue;
 			}
 			gint_t e1 = g->nodes[i].adj[0];
@@ -1662,20 +1662,23 @@ void transitive_edge_stats(struct asm_graph_t *g)
 			mini_put(&h, g->nodes[v2].rc_id);
 			mini_put(&h, g->nodes[v3].rc_id);
 			if (h->count != 8) {
-				log_debug("4 nodes are not differ in pair, %d", i);
+				//log_debug("4 nodes are not differ in pair, %d", i);
 				continue;
 			}
-			if ((cov_source *1.0 / unit_cov) < 1.75) {
-				log_trace("Source is not repeat, ratio %.2f", cov_source * 1.0 / unit_cov);
+			double ratio_src_unit = cov_source *1.0 / unit_cov;
+			if (ratio_src_unit < 1.75) {
+				//log_trace("Source is not repeat, ratio %.2f", ratio_src_unit);
+				//log_trace("cov e0 %.2f, e1 %.2f, e2 %.2f", __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize),
+				          __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize),
+				          __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize));
 				continue;
 			}
-			log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d", e0, g->edges[e0].seq_len,
+			//log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d", e0, g->edges[e0].seq_len,
 			          e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len);
 			gint_t new_e1 = asm_create_clone_edge_differ_source(g, e0);
 			gint_t new_e2 = asm_create_clone_edge_differ_source(g, e0);
-			log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d. New e1 %d, new e2 %d", e0, g->edges[e0].seq_len,
-			          e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len, new_e1, new_e2);
-			log_debug("Source coverage %.2f, unit coverage %.2f", cov_source, unit_cov);
+			//log_debug("New e1 %d, new e2 %d", new_e1, new_e2);
+			//log_debug("Source coverage %.2f, unit coverage %.2f", cov_source, unit_cov);
 			g->edges[new_e1].source = v0;
 			g->edges[new_e1].target = v2;
 			g->edges[new_e1 + 1].source = g->nodes[v2].rc_id;
