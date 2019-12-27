@@ -1709,7 +1709,7 @@ int asm_resolve_simple_bulges_ite(struct asm_graph_t *g)
 		int resolved = asm_resolve_simple_bulges(g, h, map);
 		if (!resolved)
 			break;
-		log_debug("%d-th iteration: %d simple bulge(s) resolved", ite,
+		log_info("%d-th iteration: %d simple bulge(s) resolved", ite,
 				resolved);
 		struct asm_graph_t g1;
 		int *map_cur_prev;
@@ -1827,7 +1827,7 @@ int asm_resolve_1_2_junctions_ite(struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_debug("%d-th iteration: %d junction(s) resolved", ite, resolved);
+		log_info("%d-th iteration: %d junction(s) resolved", ite, resolved);
 		struct asm_graph_t g1;
 		asm_condense(g, &g1);
 		asm_graph_destroy(g);

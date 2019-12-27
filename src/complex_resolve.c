@@ -456,7 +456,7 @@ int asm_resolve_complex_bulges_ite(struct asm_graph_t *g)
 			break;
 		res += resolved;
 		++ite;
-		log_debug("%d-th iteration: %d complex bulge(s) resolved", ite, resolved);
+		log_info("%d-th iteration: %d complex bulge(s) resolved", ite, resolved);
 		struct asm_graph_t g1;
 		asm_condense(g, &g1);
 		asm_graph_destroy(g);
