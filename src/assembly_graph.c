@@ -1674,7 +1674,7 @@ void transitive_edge_stats(struct asm_graph_t *g)
 				continue;
 			}
 			//log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d", e0, g->edges[e0].seq_len,
-			          e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len);
+			          //e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len);
 			gint_t new_e1 = asm_create_clone_edge_differ_source(g, e0);
 			gint_t new_e2 = asm_create_clone_edge_differ_source(g, e0);
 			//log_debug("New e1 %d, new e2 %d", new_e1, new_e2);
