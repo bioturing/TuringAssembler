@@ -1774,7 +1774,6 @@ void get_junction_edges(struct asm_graph_t *g, int v, int *e0, int *e1, int *e2)
 int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 {
 	int res = 0;
-	int n_e = g->n_e;
 	for (int v = 0; v < g->n_v; ++v){
 		int v_rc = g->nodes[v].rc_id;
 		if (v > v_rc)
@@ -1795,18 +1794,20 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 		int w = g->edges[e0].source;
 		int u1 = g->edges[e1].target;
 		int u2 = g->edges[e2].target;
-		g->edges = realloc(g->edges, (n_e + 4) * sizeof(struct asm_edge_t));
+		g->edges = realloc(g->edges, (g->n_e + 4) * sizeof(struct asm_edge_t));
 
-		asm_clone_edge(g, n_e, e0);
-		asm_clone_edge_reverse(g, n_e + 1, e0);
+		asm_clone_edge(g, g->n_e, e0);
+		asm_clone_edge_reverse(g, g->n_e + 1, e0);
 
-		asm_clone_edge(g, n_e + 2, e0);
-		asm_clone_edge_reverse(g, n_e + 3, e0);
+		asm_clone_edge(g, g->n_e + 2, e0);
+		asm_clone_edge_reverse(g, g->n_e + 3, e0);
 
-		asm_join_edge_clone(g, n_e, n_e + 1, e1, g->edges[e1].rc_id);
-		asm_join_edge_clone(g, n_e + 2, n_e + 3, e2, g->edges[e2].rc_id);
+		asm_join_edge_clone(g, g->n_e, g->n_e + 1, e1,
+				g->edges[e1].rc_id);
+		asm_join_edge_clone(g, g->n_e + 2, g->n_e + 3, e2,
+				g->edges[e2].rc_id);
 
-		n_e += 4;
+		g->n_e += 4;
 		asm_remove_edge(g, e0);
 		asm_remove_edge(g, g->edges[e0].rc_id);
 		asm_remove_edge(g, e1);
