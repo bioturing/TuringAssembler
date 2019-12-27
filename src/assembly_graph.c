@@ -1600,3 +1600,62 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	}
 	log_info("DONE cloning assembly edges");
 }
+
+void transitive_edge_stats(struct asm_graph_t *g)
+{
+	uint64_t n_nodes = g->n_v;
+	for (int i = 0 ; i < n_nodes; ++i) {
+		gint_t rc = g->nodes[i].rc_id;
+		if (g->nodes[i].deg == 2 && g->nodes[rc].deg == 1) {
+			gint_t e0 = g->edges[g->nodes[rc].adj[0]].rc_id;
+			gint_t e1 = g->nodes[i].adj[0];
+			gint_t e2 = g->nodes[i].adj[1];
+			gint_t v0 = g->edges[e0].source;
+			gint_t v1 = g->edges[e0].target;
+			gint_t v2 = g->edges[e1].target;
+			gint_t v3 = g->edges[e2].target;
+			if ((v0 - v1) * (v0 - v2) * (v0 - v3) * (v1 - v2) * (v1 - v3) * (v2 - v3) == 0) {
+				log_debug("4 nodes are not differ in pair, %d", i);
+				continue;
+			}
+			log_info("transitive node normal %d", i);
+			gint_t new_e1 = asm_create_clone_edge(g, e0);
+			gint_t new_e2 = asm_create_clone_edge(g, e0);
+			g->edges[new_e1].source = v0;
+			g->edges[new_e1].target = v2;
+			g->edges[new_e2].source = v0;
+			g->edges[new_e1].target = v3;
+			asm_append_seq(g->edges + new_e1, g->edges + e1, g->ksize);
+			asm_append_seq(g->edges + new_e2, g->edges + e2, g->ksize);
+			asm_remove_edge(g, e0);
+			asm_remove_edge(g, e1);
+			asm_remove_edge(g, e2);
+		}
+		if (g->nodes[rc].deg == 2 && g->nodes[i].deg == 1) {
+			gint_t e0 = g->nodes[i].adj[0];
+			gint_t e1 = g->edges[g->nodes[rc].adj[0]].rc_id;
+			gint_t e2 = g->edges[g->nodes[rc].adj[1]].rc_id;
+
+			gint_t v0 = g->edges[e0].target;
+			gint_t v1 = g->edges[e0].source;
+			gint_t v2 = g->edges[e1].source;
+			gint_t v3 = g->edges[e2].source;
+			if ((v0 - v1) * (v0 - v2) * (v0 - v3) * (v1 - v2) * (v1 - v3) * (v2 - v3) == 0) {
+				log_debug("4 nodes are not differ in pair, %d", i);
+				continue;
+			}
+			log_info("transitive node type reverse %d", i);
+			gint_t new_e1 = asm_create_clone_edge(g, e1);
+			gint_t new_e2 = asm_create_clone_edge(g, e2);
+			g->edges[new_e1].source = v2;
+			g->edges[new_e1].target = v0;
+			g->edges[new_e2].source = v3;
+			g->edges[new_e1].target = v0;
+			asm_append_seq(g->edges + new_e1, g->edges + e0, g->ksize);
+			asm_append_seq(g->edges + new_e2, g->edges + e0, g->ksize);
+			asm_remove_edge(g, e0);
+			asm_remove_edge(g, e1);
+			asm_remove_edge(g, e2);
+		}
+	}
+}

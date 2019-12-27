@@ -35,6 +35,7 @@ void graph_convert_process(struct opt_proc_t *opt)
 	struct asm_graph_t *g;
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
+	transitive_edge_stats(g);
 	log_info("Input graph kmer size: %d", g->ksize);
 	log_info("kmer size: %d", g->ksize);
 	test_asm_graph(g);
