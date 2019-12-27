@@ -1630,6 +1630,7 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 void transitive_edge_stats(struct asm_graph_t *g)
 {
 	uint64_t n_nodes = g->n_v;
+	double unit_cov = get_genome_coverage_h(g);
 	for (int i = 0 ; i < n_nodes; ++i) {
 		gint_t rc = g->nodes[i].rc_id;
 		struct mini_hash_t *h;
@@ -1664,8 +1665,17 @@ void transitive_edge_stats(struct asm_graph_t *g)
 				log_debug("4 nodes are not differ in pair, %d", i);
 				continue;
 			}
+			if ((cov_source *1.0 / unit_cov) < 1.75) {
+				log_trace("Source is not repeat, ratio %.2f", cov_source * 1.0 / unit_cov);
+				continue;
+			}
+			log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d", e0, g->edges[e0].seq_len,
+			          e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len);
 			gint_t new_e1 = asm_create_clone_edge_differ_source(g, e0);
 			gint_t new_e2 = asm_create_clone_edge_differ_source(g, e0);
+			log_debug("Transitive edge e0 %d, length %d, e1 %d, length %d, e2 %d, length %d. New e1 %d, new e2 %d", e0, g->edges[e0].seq_len,
+			          e1, g->edges[e1].seq_len, e2, g->edges[e2].seq_len, new_e1, new_e2);
+			log_debug("Source coverage %.2f, unit coverage %.2f", cov_source, unit_cov);
 			g->edges[new_e1].source = v0;
 			g->edges[new_e1].target = v2;
 			g->edges[new_e1 + 1].source = g->nodes[v2].rc_id;
