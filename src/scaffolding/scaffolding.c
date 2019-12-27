@@ -9,6 +9,9 @@
 #include <minimizers/minimizers.h>
 #include <cluster_molecules.h>
 #include <barcode_graph.h>
+#include <resolve_big.h>
+#include <process.h>
+#include <resolve.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -875,7 +878,7 @@ void filter_xxx(struct asm_graph_t *g)
 	fclose(in);
 }
 
-void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
+void get_long_contig(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
 	char log_path[1024];
 	sprintf(log_path, "%s/get_long_contig.log", opt->out_dir);
@@ -883,6 +886,20 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 	log_info("Version: %s", GIT_SHA);
 	set_log_stage("Get long contig");
 	get_list_contig(opt, g);
+}
+
+void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
+{
+//	get_long_contig(g, opt);
+
+	int t = 0;
+	do {
+		t = resolve_212_by_cov(g);
+		struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+		asm_condense(g, g0);
+		g = g0;
+	} while (t);
+	save_graph_info(opt->out_dir, g, "resolve_212cov");
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)

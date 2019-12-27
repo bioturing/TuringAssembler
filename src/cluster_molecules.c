@@ -1159,6 +1159,9 @@ int check_adj_edges(struct asm_graph_t *g, int v, int u)
 	return 0;
 }
 
+//Find shortest path from s to t
+//return NULL if not found shortest path
+//return path = s..path[1]..path[2]....t
 struct shortest_path_info_t *get_shortest_path(struct asm_graph_t *g, int s,
 					       int t, khash_t(long_spath) *stored)
 {

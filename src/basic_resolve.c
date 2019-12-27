@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <scaffolding/global_params.h>
 
 #include "assembly_graph.h"
 #include "io_utils.h"
@@ -730,7 +731,7 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 		if ((cov < CHIMERIC_RATIO_THRES * cov_fw ||
 			cov < CHIMERIC_RATIO_THRES * cov_rv) &&
 			g->edges[e].seq_len < CHIMERIC_LEN_THRES &&
-			cov < 15) {
+			cov < 0.22 * global_genome_coverage) {
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			++cnt_removed;
@@ -844,7 +845,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		}
 		if (e_return == -1 || e_return_rc == -1)
 			return 0;
-		if (g->edges[e_return].seq_len >= MIN_NOTICE_LEN)
+		if (g->edges[e_return].seq_len >= MIN_UNROLL_LOOP)
 			return 0;
 		if (e1 == -1 && e2 == -1)
 			return 0;

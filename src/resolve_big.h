@@ -32,4 +32,5 @@ struct partition_information {
 };
 void km_count_bundle_destroy(struct km_count_bundle_t *b);
 void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt);
+int resolve_212_by_cov(struct asm_graph_t *g);
 #endif //SKIPPING_RESOLVE_BIG_H
