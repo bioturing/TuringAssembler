@@ -1778,6 +1778,8 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 		int v_rc = g->nodes[v].rc_id;
 		if (v > v_rc)
 			continue;
+		//if (v != 698)
+			//continue;
 		if (check_junction(g, v) == 0)
 			continue;
 		int e0, e1, e2;
@@ -1790,30 +1792,63 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 		else
 			log_debug("Junction detected at %d, corresponding edges %d %d %d",
 					v, e0, e1, e2);
+		//__VERBOSE("source %d target %d\n", g->edges[e0].source, g->edges[e0].target);
+		//__VERBOSE("source %d target %d\n", g->edges[e1].source, g->edges[e1].target);
+		//__VERBOSE("source %d target %d\n", g->edges[e2].source, g->edges[e2].target);
 		++res;
 		int w = g->edges[e0].source;
 		int u1 = g->edges[e1].target;
 		int u2 = g->edges[e2].target;
-		g->edges = realloc(g->edges, (g->n_e + 4) * sizeof(struct asm_edge_t));
+		g->edges = realloc(g->edges, (g->n_e + 8) * sizeof(struct asm_edge_t));
 
-		asm_clone_edge(g, g->n_e, e0);
-		asm_clone_edge_reverse(g, g->n_e + 1, e0);
+		asm_clone_edge_add_link(g, g->n_e, e0);
+		asm_clone_edge_add_link(g, g->n_e + 1, g->edges[e0].rc_id);
 
-		asm_clone_edge(g, g->n_e + 2, e0);
-		asm_clone_edge_reverse(g, g->n_e + 3, e0);
+		asm_clone_edge_add_link(g, g->n_e + 2, e1);
+		asm_clone_edge_add_link(g, g->n_e + 3, g->edges[e1].rc_id);
 
-		asm_join_edge_clone(g, g->n_e, g->n_e + 1, e1,
-				g->edges[e1].rc_id);
-		asm_join_edge_clone(g, g->n_e + 2, g->n_e + 3, e2,
-				g->edges[e2].rc_id);
+		asm_clone_edge_add_link(g, g->n_e + 4, e0);
+		asm_clone_edge_add_link(g, g->n_e + 5, g->edges[e0].rc_id);
 
-		g->n_e += 4;
+		asm_clone_edge_add_link(g, g->n_e + 6, e2);
+		asm_clone_edge_add_link(g, g->n_e + 7, g->edges[e2].rc_id);
+
+		//for (int i = g->n_e; i < g->n_e + 8; ++i){
+		//	__VERBOSE("edge %d rc %d source %d target %d\n",
+		//			i, g->edges[i].rc_id, g->edges[i].source,
+		//			g->edges[i].target);
+		//}
+
+		//__VERBOSE("___\n");
+		asm_join_edge(g, g->n_e, g->n_e + 1, g->n_e + 2,
+				g->n_e + 3);
+
+		asm_join_edge(g, g->n_e + 4, g->n_e + 5, g->n_e + 6,
+				g->n_e + 7);
+
+		//__VERBOSE("e0 len %d e1 len %d e2 len %d\n", g->edges[e0].seq_len,
+		//		g->edges[e1].seq_len, g->edges[e2].seq_len);
+		//__VERBOSE("%d %d\n", g->edges[g->n_e].seq_len, g->edges[g->n_e + 2].seq_len);
+		//__VERBOSE("%d\n", g->n_e);
+		//for (int i = g->n_e; i < g->n_e + 8; ++i){
+		//	__VERBOSE("edge %d rc %d source %d target %d\n",
+		//			i, g->edges[i].rc_id, g->edges[i].source,
+		//			g->edges[i].target);
+		//}
+		g->n_e += 8;
 		asm_remove_edge(g, e0);
 		asm_remove_edge(g, g->edges[e0].rc_id);
 		asm_remove_edge(g, e1);
 		asm_remove_edge(g, g->edges[e1].rc_id);
 		asm_remove_edge(g, e2);
 		asm_remove_edge(g, g->edges[e2].rc_id);
+		//__VERBOSE("___\n");
+		//for (int i = g->n_e - 8; i < g->n_e; ++i){
+		//	__VERBOSE("edge %d rc %d source %d target %d\n",
+		//			i, g->edges[i].rc_id, g->edges[i].source,
+		//			g->edges[i].target);
+		//}
+
 	}
 	return res;
 }

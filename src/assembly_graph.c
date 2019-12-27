@@ -267,12 +267,17 @@ void asm_clone_seq_reverse(struct asm_edge_t *dst, struct asm_edge_t *src)
 	}
 }
 
-void asm_clone_edge_reverse(struct asm_graph_t *g, gint_t dst, gint_t src)
+void asm_clone_edge_add_link(struct asm_graph_t *g, gint_t dst, gint_t src)
 {
 	/* clone the topology */
-	asm_clone_seq_reverse(g->edges + dst, g->edges + src);
+	asm_clone_seq(g->edges + dst, g->edges + src);
 	g->edges[dst].source = g->edges[src].source;
 	g->edges[dst].target = g->edges[src].target;
+	int source = g->edges[dst].source;
+	g->nodes[source].adj = realloc(g->nodes[source].adj,
+			(g->nodes[source].deg + 1) * sizeof(gint_t));
+	g->nodes[source].adj[g->nodes[source].deg++] = dst;
+
 	/* clone the barcode */
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		g->edges[dst].barcodes = calloc(3, sizeof(struct barcode_hash_t));
@@ -539,29 +544,6 @@ void asm_join_edge_with_fill(struct asm_graph_t *g, gint_t e1, gint_t e_rc1, gin
 
 	asm_remove_edge(g, e2);
 	asm_remove_edge(g, e_rc1);
-}
-
-void asm_join_edge_clone(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
-					gint_t e2, gint_t e_rc2)
-{
-	/*    contig 1  | overlap |
-	 * ATCTTCGGTTTTTCTTTAAAAAAG
-	 *              CTTTAAAAAAGAATTAAAAACTT
-	 *                           contig 2
-	 * Since the barcode + read pair is now preserve only on the 1st contig
-	 * we do not need to append the barcode + read pair information */
-	asm_append_barcode_readpair(g, e1, e2);
-	asm_append_seq(g->edges + e1, g->edges + e2, g->ksize);
-	g->edges[e1].target = g->edges[e2].target;
-	g->edges[e1].count += g->edges[e2].count;
-
-	asm_append_barcode_readpair(g, e_rc2, e_rc1);
-	asm_append_seq(g->edges + e_rc2, g->edges + e_rc1, g->ksize);
-	g->edges[e_rc2].target = g->edges[e_rc1].target;
-	g->edges[e_rc2].count += g->edges[e_rc1].count;
-
-	g->edges[e1].rc_id = e_rc2;
-	g->edges[e_rc2].rc_id = e1;
 }
 
 void asm_join_edge(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
