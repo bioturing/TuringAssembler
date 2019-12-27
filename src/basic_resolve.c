@@ -1791,8 +1791,8 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 		int e0, e1, e2;
 		get_junction_edges(g, v, &e0, &e1, &e2);
 		if (check_junction_cov(g, e0, e1, e2) == 0){
-			log_debug("Junction detected at %d but the coverage is not consistence, ignore",
-					v);
+			log_debug("Junction detected at %d, corresponding edges %d %d %d but the coverage is not consistence, ignore",
+					v, e0, e1, e2);
 			continue;
 		}
 
