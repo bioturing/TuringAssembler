@@ -1776,7 +1776,9 @@ int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2)
 	float cov0 = __get_edge_cov(g->edges + e0, g->ksize);
 	float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	return (cov1 + cov2 >= 0.8 * cov0) && (cov1 + cov2 <= 1.2 * cov0);
+	float unit_cov = get_genome_coverage(g);
+	return cov0 >= 1.75 * unit_cov && cov1 + cov2 >= 0.8 * cov0
+		&& cov1 + cov2 <= 1.2 * cov0;
 }
 
 int asm_resolve_1_2_junctions(struct asm_graph_t *g)
