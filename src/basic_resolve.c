@@ -1785,6 +1785,9 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 {
 	int res = 0;
 	for (int v = 0; v < g->n_v; ++v){
+		if (100 * (v + 1) / g->n_v > 100 * v / g->n_v)
+			log_info("Processed %d/%d vertices (%d\%)", v + 1,
+					g->n_v, 100 * (v + 1) / g->n_v);
 		int v_rc = g->nodes[v].rc_id;
 		if (v > v_rc)
 			continue;
