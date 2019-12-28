@@ -1771,12 +1771,12 @@ void get_junction_edges(struct asm_graph_t *g, int v, int *e0, int *e1, int *e2)
 	*e0 = g->edges[*e0].rc_id;
 }
 
-int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2)
+int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2,
+		float unit_cov)
 {
 	float cov0 = __get_edge_cov(g->edges + e0, g->ksize);
 	float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	float unit_cov = get_genome_coverage(g);
 	return cov0 >= 1.75 * unit_cov && cov1 + cov2 >= 0.8 * cov0
 		&& cov1 + cov2 <= 1.2 * cov0;
 }
@@ -1784,6 +1784,7 @@ int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2)
 int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 {
 	int res = 0;
+	float unit_cov = get_genome_coverage(g);
 	for (int v = 0; v < g->n_v; ++v){
 		if (100 * (v + 1) / g->n_v > 100 * v / g->n_v)
 			log_info("Processed %d/%d vertices (%d\%)", v + 1,
@@ -1795,7 +1796,7 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 			continue;
 		int e0, e1, e2;
 		get_junction_edges(g, v, &e0, &e1, &e2);
-		if (check_junction_cov(g, e0, e1, e2) == 0){
+		if (check_junction_cov(g, e0, e1, e2, unit_cov) == 0){
 			log_debug("Junction detected at %d, corresponding edges %d %d %d but the coverage is not consistence, ignore",
 					v, e0, e1, e2);
 			continue;
