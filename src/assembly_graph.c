@@ -1671,7 +1671,7 @@ void transitive_edge_stats(struct asm_graph_t *g)
 				double ratio_src_unit = cov_source *1.0 / unit_cov;
 				if (ratio_src_unit < 1.75) {
 					//log_trace("Source is not repeat, ratio %.2f", ratio_src_unit);
-					//log_trace("cov e0 %.2f, e1 %.2f, e2 %.2f", __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize),
+					//log_trace("e0 %d, e0 length %d, cov e0 %.2f, count %d", e0, g->edges[e0].seq_len, __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize), g->edges[e0].count);
 					//__get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize),
 					//__get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize);
 					continue;
@@ -1681,6 +1681,8 @@ void transitive_edge_stats(struct asm_graph_t *g)
 				cnt++;
 				gint_t new_e1 = asm_create_clone_edge_differ_source(g, e0);
 				gint_t new_e2 = asm_create_clone_edge_differ_source(g, e0);
+				g->edges[new_e1].count /= 2;
+				g->edges[new_e2].count /= 2;
 				//log_debug("New e1 %d, new e2 %d", new_e1, new_e2);
 				//log_debug("Source coverage %.2f, unit coverage %.2f", cov_source, unit_cov);
 				g->edges[new_e1].source = v0;

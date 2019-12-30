@@ -36,6 +36,7 @@ void graph_convert_process(struct opt_proc_t *opt)
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	transitive_edge_stats(g);
+	test_asm_graph(g);
 	save_graph_info(opt->out_dir, g, "loaded_and_simplified");
 }
 
