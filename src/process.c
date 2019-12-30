@@ -30,6 +30,9 @@
 
 void graph_convert_process(struct opt_proc_t *opt)
 {
+	char *log_file = str_concate(opt->out_dir, "/simplify_3ways.log");
+	init_logger(opt->log_level, log_file);
+
 	char path[1024];
 	log_info("Dump graph from bin archive");
 	struct asm_graph_t *g;
