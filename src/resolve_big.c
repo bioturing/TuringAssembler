@@ -490,7 +490,7 @@ int is_pairwise_different_node(struct asm_graph_t *g, int n, ...)
 
 int similar_cov(double cov1, double cov2)
 {
-	return (cov1 < cov2 * 1.2 && cov1 > cov2 * 0.8);
+	return (cov2 > cov1 * 0.8 && cov1 > cov2 * 0.8);
 }
 
 int resolve_212_by_cov_1step(struct asm_graph_t *g)
