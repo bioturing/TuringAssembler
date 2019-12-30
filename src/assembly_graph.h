@@ -94,7 +94,8 @@ struct asm_graph_t {
 	khash_t(pair_contig_count) *candidates;
 };
 
-#define MIN_NOTICE_LEN			250
+#define MIN_UNROLL_LOOP			1000
+#define MIN_NOTICE_LEN			100
 #define MIN_CONNECT_SIZE		500
 
 #define TIPS_RATIO_THRES		0.1

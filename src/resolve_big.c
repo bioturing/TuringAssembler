@@ -114,9 +114,9 @@ int is_case_2_1_2(struct asm_graph_t *g, int i_e)
 	int source = g->edges[i_e].source;
 	if (source == -1)
 		return 0;
-	if (g->edges[i_e].seq_len > 150) {
-		return 0;
-	}
+//	if (g->edges[i_e].seq_len > 150) {
+//		return 0;
+//	}
 	int target = g->edges[i_e].target;
 	int source_rc = g->nodes[source].rc_id;
 	if (g->nodes[target].deg != 2 || g->nodes[source_rc].deg != 2) {
@@ -462,4 +462,84 @@ void resolve_1_2(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 	partition_graph(ori_read, g, partition, opt->n_threads, opt->mmem, &n_partitions, table);
 	free(partition);
+}
+
+int is_deleted(struct asm_edge_t *e)
+{
+	return (e->source == -1);
+}
+
+int is_pairwise_different_node(struct asm_graph_t *g, int n, ...)
+{
+	va_list a;
+	va_start(a, n);
+	int *arr = calloc(2*n, sizeof(int));
+	for (int i = 0; i < n; i++) {
+		arr[i << 1] = va_arg(a, int);
+		arr[(i << 1) + 1] = g->nodes[arr[i << 1]].rc_id;
+	}
+	for (int i = 0 ; i < n*2; i++) {
+		for (int j = 0 ; j < n*2; j++) {
+			if (i != j && arr[i] == arr[j])
+				return 0;
+		}
+	}
+	va_end( a);
+	return 1;
+}
+
+int similar_cov(double cov1, double cov2)
+{
+	return (cov2 > cov1 * 0.8 && cov1 > cov2 * 0.8);
+}
+
+int resolve_212_by_cov_1step(struct asm_graph_t *g)
+{
+	int count = 0;
+	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		if (is_deleted(&g->edges[i_e]))
+			continue;
+		if (!is_case_2_1_2(g, i_e))
+			continue;
+		int source = g->edges[i_e].source;
+		int target = g->edges[i_e].target;
+		int i_e_rc = g->edges[i_e].rc_id;
+		int i_a0 = g->edges[g->nodes[g->nodes[source].rc_id].adj[0]].rc_id;
+		int i_a1 = g->edges[g->nodes[g->nodes[source].rc_id].adj[1]].rc_id;
+		int i_o0 = g->nodes[target].adj[0];
+		int i_o1 = g->nodes[target].adj[1];
+		struct asm_edge_t *a0 = &g->edges[i_a0];
+		struct asm_edge_t *a1 = &g->edges[i_a1];
+		struct asm_edge_t *o0 = &g->edges[i_o0];
+		struct asm_edge_t *o1 = &g->edges[i_o1];
+		struct asm_edge_t *e = &g->edges[i_e];
+		if (!is_pairwise_different_node(g, 6, a0->source, a0->target, a1->source, o0->source, o0->target, o1->target))
+			continue;
+		float cov_a0 = __get_edge_cov(a0,g->ksize);
+		float cov_a1 = __get_edge_cov(a1,g->ksize);
+		float cov_o0 = __get_edge_cov(o0,g->ksize);
+		float cov_o1 = __get_edge_cov(o1,g->ksize);
+		if (!(cov_a0 > 1.7 * cov_a1 || cov_a1 > 1.7 * cov_a0)) {
+			continue;
+		}
+		if (!(cov_o0 > 1.7 * cov_o1 || cov_o1 > 1.7 * cov_o0)) {
+			continue;
+		}
+		if (similar_cov(cov_a0, cov_o0) && similar_cov(cov_a1, cov_o1)) {
+			asm_join_edge3_wrapper(g, i_a0, i_e, i_o0, g->edges[i_e].count / 2);
+			asm_join_edge3_wrapper(g, i_a1, i_e, i_o1, g->edges[i_e].count / 2);
+			count++;
+			asm_remove_edge(g, i_e);
+			asm_remove_edge(g, i_e_rc);
+		}
+		else if (similar_cov(cov_a0, cov_o1) && similar_cov(cov_a1, cov_o0)){
+			asm_join_edge3_wrapper(g, i_a0, i_e, i_o1, g->edges[i_e].count / 2);
+			asm_join_edge3_wrapper(g, i_a1, i_e, i_o0, g->edges[i_e].count / 2);
+			asm_remove_edge(g, i_e);
+			asm_remove_edge(g, i_e_rc);
+			count++;
+		}
+	}
+	log_info("total edge join %d", count);
+	return count;
 }

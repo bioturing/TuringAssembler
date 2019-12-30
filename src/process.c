@@ -203,6 +203,18 @@ void dirty_process(struct opt_proc_t *opt)
 //	write_neo4j_create(g);
 }
 
+void resolve_212_cov_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g = create_and_load_graph(opt);
+	resolve_212_by_cov(g, opt);
+}
+
+void resolve_molecule_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t *g = create_and_load_graph(opt);
+	get_long_contig(g, opt);
+}
+
 void build_2_3(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	log_info("Resolving small complex structure");
@@ -535,6 +547,29 @@ void build_barcode_info(struct opt_proc_t *opt)
 	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(&g, fasta_path);
 	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE);
+	save_graph_info(opt->out_dir, &g, "added_barcode");
+	asm_graph_destroy(&g);
+}
+
+void build_barcode_coverage_info(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	struct read_path_t read_sorted_path;
+
+	load_asm_graph(&g, opt->in_file);
+	char fasta_path[MAX_PATH];
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		sort_read(opt, &read_sorted_path);
+	}
+	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir);
+	mkdir(fasta_path, 0755);
+	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
+	write_fasta_seq(&g, fasta_path);
+	construct_aux_info(opt, &g, &read_sorted_path, fasta_path, ASM_BUILD_BARCODE|ASM_BUILD_COVERAGE);
 	save_graph_info(opt->out_dir, &g, "added_barcode");
 	asm_graph_destroy(&g);
 }

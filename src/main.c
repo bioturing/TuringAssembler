@@ -435,6 +435,8 @@ int main(int argc, char *argv[])
 		build_0_opt_process(argc, argv);
 	else if (!strcmp(argv[1], "build_barcode"))
 		build_opt_process(argc, argv, &build_barcode_info);
+	else if (!strcmp(argv[1], "build_barcode_coverage"))
+		build_opt_process(argc, argv, &build_barcode_coverage_info);
 	else if (!strcmp(argv[1], "build_barcode_fasta"))
 		build_opt_process(argc, argv, &build_barcode_process_fasta);
 	else if (!strcmp(argv[1], "build_barcode_fastg"))
@@ -491,6 +493,10 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &mm_hit_all_barcodes);
 	else if (!strcmp(argv[1], "build_coverage"))
 		build_opt_process(argc, argv, &build_coverage_process);
+	else if (!strcmp(argv[1], "resolve_212_cov"))
+		build_opt_process(argc, argv, &resolve_212_cov_process);
+	else if (!strcmp(argv[1], "resolve_molecule"))
+		build_opt_process(argc, argv, &resolve_molecule_process);
 	else
 		print_usage();
 	return 0;
