@@ -48,4 +48,6 @@ void debug_process(struct opt_proc_t *opt);
 void build_coverage_process(struct opt_proc_t *opt);
 void read_pairs_count_process(struct opt_proc_t *opt);
 void build_barcode_coverage_info(struct opt_proc_t *opt);
+void resolve_212_cov_process(struct opt_proc_t *opt);
+void resolve_molecule_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */

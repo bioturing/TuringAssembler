@@ -493,7 +493,7 @@ int similar_cov(double cov1, double cov2)
 	return (cov1 < cov2 * 1.2 && cov1 > cov2 * 0.8);
 }
 
-int resolve_212_by_cov(struct asm_graph_t *g)
+int resolve_212_by_cov_1step(struct asm_graph_t *g)
 {
 	int count = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {

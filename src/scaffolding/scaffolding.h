@@ -14,4 +14,6 @@ void scaffolding(FILE *out_file, struct asm_graph_t *g,
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g);
 int concate_edge(struct asm_graph_t *g, int n_path, int *path, int ksize,
 		uint32_t **res_seq);
+void get_long_contig(struct asm_graph_t *g, struct opt_proc_t *opt);
+void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

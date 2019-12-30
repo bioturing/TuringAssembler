@@ -731,7 +731,7 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 		if ((cov < CHIMERIC_RATIO_THRES * cov_fw ||
 			cov < CHIMERIC_RATIO_THRES * cov_rv) &&
 			g->edges[e].seq_len < CHIMERIC_LEN_THRES &&
-			cov < 0.22 * global_genome_coverage) {
+			cov < 15) {
 			asm_remove_edge(g, e);
 			asm_remove_edge(g, e_rc);
 			++cnt_removed;

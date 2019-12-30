@@ -888,18 +888,20 @@ void get_long_contig(struct asm_graph_t *g, struct opt_proc_t *opt)
 	get_list_contig(opt, g);
 }
 
-void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
+void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-//	get_long_contig(g, opt);
-
 	int t = 0;
 	do {
-		t = resolve_212_by_cov(g);
+		t = resolve_212_by_cov_1step(g);
 		struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 		asm_condense(g, g0);
 		g = g0;
 	} while (t);
 	save_graph_info(opt->out_dir, g, "resolve_212cov");
+}
+
+void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
+{
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
