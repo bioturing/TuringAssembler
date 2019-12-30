@@ -4,6 +4,7 @@
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
 void asm_condense_h(struct asm_graph_t *g);
 
+int check_approx_cov(float cov1, float cov2);
 int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2,
 		float unit_cov);
 void get_junction_edges(struct asm_graph_t *g, int v, int *e0, int *e1, int *e2);

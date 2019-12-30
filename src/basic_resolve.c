@@ -1771,14 +1771,18 @@ void get_junction_edges(struct asm_graph_t *g, int v, int *e0, int *e1, int *e2)
 	*e0 = g->edges[*e0].rc_id;
 }
 
+int check_approx_cov(float cov1, float cov2)
+{
+	return cov1 >= 0.8 * cov2 && cov2 >= 0.8 * cov1;
+}
+
 int check_junction_cov(struct asm_graph_t *g, int e0, int e1, int e2,
 		float unit_cov)
 {
 	float cov0 = __get_edge_cov(g->edges + e0, g->ksize);
 	float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
 	float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
-	return cov0 >= 1.75 * unit_cov && cov1 + cov2 >= 0.8 * cov0
-		&& cov1 + cov2 <= 1.2 * cov0;
+	return cov0 >= 1.75 * unit_cov && MIN(cov1, cov2) >= 0.25 * (cov1 + cov2);
 }
 
 int asm_resolve_1_2_junctions(struct asm_graph_t *g)
@@ -1812,20 +1816,8 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 					v, e0, e1, e2);
 
 		++res;
-		if (__get_edge_cov(g->edges + e1, g->ksize) >
-			__get_edge_cov(g->edges + e2, g->ksize)){
-			int tmp = e1;
-			e1 = e2;
-			e2 = tmp;
-		}
-		if (__get_edge_cov(g->edges + e1, g->ksize) <
-				0.1 * __get_edge_cov(g->edges + e0, g->ksize)){
-			log_debug("Edge %d has too low coverage, removing it",
-					e1);
-			asm_remove_edge(g, e1);
-			asm_remove_edge(g, g->edges[e1].rc_id);
-			continue;
-		}
+		float cov1 = __get_edge_cov(g->edges + e1, g->ksize);
+		float cov2 = __get_edge_cov(g->edges + e2, g->ksize);
 		int w = g->edges[e0].source;
 		int u1 = g->edges[e1].target;
 		int u2 = g->edges[e2].target;
@@ -1833,12 +1825,16 @@ int asm_resolve_1_2_junctions(struct asm_graph_t *g)
 
 		asm_clone_edge_add_link(g, g->n_e, e0);
 		asm_clone_edge_add_link(g, g->n_e + 1, g->edges[e0].rc_id);
+		g->edges[g->n_e].count *= 1.0 * cov1 / (cov1 + cov2);
+		g->edges[g->n_e + 1].count *= 1.0 * cov1 / (cov1 + cov2);
 
 		asm_clone_edge_add_link(g, g->n_e + 2, e1);
 		asm_clone_edge_add_link(g, g->n_e + 3, g->edges[e1].rc_id);
 
 		asm_clone_edge_add_link(g, g->n_e + 4, e0);
 		asm_clone_edge_add_link(g, g->n_e + 5, g->edges[e0].rc_id);
+		g->edges[g->n_e + 4].count *= 1.0 * cov2 / (cov1 + cov2);
+		g->edges[g->n_e + 5].count *= 1.0 * cov2 / (cov1 + cov2);
 
 		asm_clone_edge_add_link(g, g->n_e + 6, e2);
 		asm_clone_edge_add_link(g, g->n_e + 7, g->edges[e2].rc_id);
