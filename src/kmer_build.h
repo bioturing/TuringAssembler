@@ -14,7 +14,6 @@ struct kmbuild_bundle_t {
 	uint8_t *k2_rc;
 };
 
-void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suffix);
 void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 				char **files_1, char **files_2, char *work_dir,
 						struct asm_graph_t *g);

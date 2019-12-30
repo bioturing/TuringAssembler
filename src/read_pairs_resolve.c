@@ -2,6 +2,9 @@
 #include "minimizers/count_barcodes.h"
 #include "read_pairs_resolve.h"
 #include "barcode_graph.h"
+#include "kmer_build.h"
+#include "process.h"
+#include "basic_resolve.h"
 
 void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
 {
@@ -268,6 +271,19 @@ void concate_path_seq_fill_shortest_path(struct asm_graph_t *g, int *path, int n
 	concate_path_seq_fill_N(g, new_path, n_new_path, seq, 0);
 }
 
+void print_left_over(struct opt_proc_t *opt, struct asm_graph_t *g)
+{
+	for (int i_e = 0; i_e < g->n_e; ++i_e) {
+		if (g->edges[i_e].seq_len <= MIN_NOTICE_LEN)
+			continue;
+		asm_remove_edge(g, i_e);
+		asm_remove_edge(g, g->edges[i_e].rc_id);
+	}
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	asm_condense(g, g0);
+	save_graph_info(opt->out_dir, g0, "left_over");
+}
+
 void get_long_contigs(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
@@ -357,6 +373,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 			free(seq);
 		}
 	}
+	print_left_over(opt, g);
 	fclose(f);
 	asm_graph_destroy(g);
 	free(g);
