@@ -38,9 +38,12 @@ void graph_convert_process(struct opt_proc_t *opt)
 	struct asm_graph_t *g;
 	g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
+	remove_chimeric_low_cov(g);
 	transitive_edge_stats(g);
 	test_asm_graph(g);
-	save_graph_info(opt->out_dir, g, "loaded_and_simplified");
+	struct asm_graph_t g1;
+	asm_condense(g, &g1); // Remove barcode
+	save_graph_info(opt->out_dir, &g1, "loaded_and_simplified");
 }
 
 void build_0_KMC(struct opt_proc_t *opt, int ksize, struct asm_graph_t *g)

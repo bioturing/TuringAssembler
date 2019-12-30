@@ -1713,3 +1713,14 @@ void transitive_edge_stats(struct asm_graph_t *g)
 		log_info("Removed %d junctions", cnt);
 	} while (cnt > 0);
 }
+
+void remove_chimeric_low_cov(struct asm_graph_t *g)
+{
+	for (int i = 0; i < g->n_e; ++i) {
+		if (g->edges[i].seq_len < (1.5 * g->ksize) && (__get_edge_cov(g->edges + i , g->ksize)) < 10.0) {
+			log_trace("Low coverage edge %d, len %d, cov %.2f", i, g->edges[i].seq_len, __get_edge_cov(g->edges + i , g->ksize));
+			asm_remove_edge(g, i);
+			asm_remove_edge(g, g->edges[i].rc_id);
+		}
+	}
+}
