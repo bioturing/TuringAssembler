@@ -18,6 +18,8 @@
 #include "minimizers/minimizers.h"
 #include "minimizers/count_barcodes.h"
 
+#define MINAB(a, b) (a < b ? a : b)
+#define MIN3(a, b, c) MINAB(MINAB(a, b), c)
 KSEQ_INIT(gzFile, gzread);
 #define read_index_get_key(p) ((p).r1_offset)
 RS_IMPL(read_index, struct read_index_t, 64, 8, read_index_get_key);
@@ -1668,8 +1670,8 @@ void transitive_edge_stats(struct asm_graph_t *g)
 					//log_debug("4 nodes are not differ in pair, %d", i);
 					continue;
 				}
-				double ratio_src_unit = cov_source *1.0 / unit_cov;
-				if (ratio_src_unit < 1.75) {
+				double min3 =  MIN3(cov_source, __get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize), __get_edge_cov(g->edges + g->nodes[i].adj[1], g->ksize));
+				if (min3  < 10.0) {
 					//log_trace("Source is not repeat, ratio %.2f", ratio_src_unit);
 					log_trace("e0 %d, e0 length %d, cov e0 %.2f, count %d", e0, g->edges[e0].seq_len, __get_edge_cov(g->edges + g->nodes[rc].adj[0], g->ksize), g->edges[e0].count);
 					//__get_edge_cov(g->edges + g->nodes[i].adj[0], g->ksize),
