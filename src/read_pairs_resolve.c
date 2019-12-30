@@ -269,7 +269,7 @@ void concate_path_seq_fill_shortest_path(struct asm_graph_t *g, int *path, int n
 		n_new_path++;
 	}
 	concate_path_seq_fill_N(g, new_path, n_new_path, seq, 0);
-	kh_destroy(long_spath, stored);
+	long_spath_destroy(stored);
 }
 
 void print_left_over(struct opt_proc_t *opt, struct asm_graph_t *g)
