@@ -10,6 +10,14 @@ struct asm_align_t {
 	int aligned;
 };
 
+struct region_sample_bundle_t{
+	struct dqueue_t *q;
+	bwaidx_t *bwa_idx;
+	mem_opt_t *bwa_opt;
+	pthread_mutex_t *lock;
+	struct barcode_hash_t *h;
+};
+
 int ksw_global2(int qlen, const uint8_t *query, int tlen, const uint8_t *target, int m, const int8_t *mat, int o_del, int e_del, int o_ins, int e_ins, int w, int *n_cigar_, uint32_t **cigar_);
 mem_opt_t *asm_memopt_init();
 struct asm_align_t asm_reg2aln(const mem_opt_t *opt, const bntseq_t *bns,
@@ -19,6 +27,9 @@ struct read_path_t parse_read_path_from_opt(struct opt_proc_t *opt);
 void *rp_count_buffer_iterator(void *data);
 
 void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count);
+
+void region_sample_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
+                 struct region_sample_bundle_t *bundle);
 
 struct rp_count_bundle_t{
 	struct asm_graph_t *g;
