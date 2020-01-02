@@ -1390,6 +1390,7 @@ void get_region_reads_sample(struct opt_proc_t *opt, struct read_path_t *rpath)
 
 	char path[1024];
 	sprintf(path, "%s/sub_region", opt->out_dir);
+	mkdir(path, 0755);
 	struct read_path_t local_read_path;
 	get_reads_by_barcodes(&read_sorted_path, &local_read_path, dict, &h, path);
 	destroy_read_path(&local_read_path);
