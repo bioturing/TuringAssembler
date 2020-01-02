@@ -64,7 +64,8 @@ int cmp_edge_length(const void *a, const void *b, void *arg)
 }
 
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
-		khash_t(long_int) *share_bc, int *path, int n_path)
+		khash_t(long_int) *share_bc, khash_t(set_long) *check_link,
+		int *path, int n_path)
 {
 	int res = -1;
 	khash_t(set_int) *cand = kh_init(set_int);
@@ -73,6 +74,8 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 	log_debug("Get next candidates of %d", last);
 	for (int i = 0; i < rp_cand[last].n; ++i){
 		int v = rp_cand[last].cand[i];
+		if (kh_set_long_exist(check_link, GET_CODE(last, v)))
+			continue;
 		int score = rp_cand[last].score[i];
 		if (g->edges[v].rc_id == last)
 			continue;
@@ -193,7 +196,7 @@ int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
 
 void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		struct read_pair_cand_t *rp_cand, khash_t(long_int) *share_bc,
-		int **path, int *n_path)
+		khash_t(set_long) *check_link, int **path, int *n_path)
 {
 	//__VERBOSE("s = %d\n", s);
 	*path = calloc(1, sizeof(int));
@@ -204,14 +207,18 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	g->edges[s].count -= count;
 	g->edges[g->edges[s].rc_id].count -= count;
 
+	int last = s;
 	while (1){
-		int v = get_next_cand(g, unit_cov, rp_cand, share_bc, *path,
-				*n_path);
+		int v = get_next_cand(g, unit_cov, rp_cand, share_bc, check_link,
+				*path, *n_path);
 		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
 			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
 			return;
 		if (v == -1)
 			return;
+		kh_set_long_insert(check_link, GET_CODE(last, v));
+		kh_set_long_insert(check_link, GET_CODE(g->edges[v].rc_id,
+					g->edges[last].rc_id));
 		//if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
 		//	|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov){
 		//	log_debug("Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
@@ -227,6 +234,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		g->edges[v_rc].count = 0;
 		*path = realloc(*path, ((*n_path) + 1) * sizeof(int));
 		(*path)[(*n_path)++] = v;
+		last = v;
 	}
 }
 
@@ -282,6 +290,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 	char out_path[1024];
 	sprintf(out_path, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
 	FILE *f = fopen(out_path, "w");
+	khash_t(set_long) *check_link = kh_init(set_long);
 	for (int i = g->n_e - 1; i >= 0; --i){
 		int p = g->n_e - i;
 		if (p * 100 / g->n_e > (p - 1) * 100 / g->n_e)
@@ -299,25 +308,16 @@ void get_long_contigs(struct opt_proc_t *opt)
 		}
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;
-		extend_by_read_pairs(g, e, unit_cov, rp_cand, share_bc, &path_fw,
-				&n_path_fw);
+		extend_by_read_pairs(g, e, unit_cov, rp_cand, share_bc,
+				check_link, &path_fw, &n_path_fw);
 		extend_by_read_pairs(g, g->edges[e].rc_id, unit_cov, rp_cand,
-				share_bc, &path_rv, &n_path_rv);
+				share_bc, check_link, &path_rv, &n_path_rv);
 		int *path = calloc(n_path_fw + n_path_rv - 1, sizeof(int));
 		int n_path = 0;
 		for (int i = n_path_rv - 1; i >= 0; --i)
 			path[n_path++] = g->edges[path_rv[i]].rc_id;
 		for (int i = 1; i < n_path_fw; ++i)
 			path[n_path++] = path_fw[i];
-		//for (int i = 0; i < n_path; ++i)
-		//	path[i] = g->edges[path[i]].rc_id;
-		//for (int i = 0; i < n_path; ++i){
-		//	int e = path[i];
-		//	int e_rc = g->edges[e].rc_id;
-		//	int min_count = min(g->edges[e].count, g->edges[e_rc].count);
-		//	g->edges[e].count = min_count;
-		//	g->edges[e_rc].count = min_count;
-		//}
 		free(path_fw);
 		free(path_rv);
 
@@ -337,6 +337,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 		fprintf(f, "%s\n", seq);
 		free(seq);
 	}
+	kh_destroy(set_long, check_link);
 	free(edge_sorted);
 
 	for (int i = 0; i < g->n_e; ++i)
