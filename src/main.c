@@ -476,7 +476,7 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
 	else if (!strcmp(argv[1], "region_subsample"))
-		build_opt_process(argc, argc, &region_subsample_process);
+		build_opt_process(argc, argv, &region_subsample_process);
 //	else if (!strcmp(argv[1], "debug_cluster_molecules"))
 //		build_opt_process(argc, argv, &cluster_molecules_process);
 	else if (!strcmp(argv[1], "debug_get_barcode_graph"))
