@@ -524,10 +524,44 @@ void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 	free(seq2);
 }
 
+int get_big_kmer_count(char *big_kmer, int (*kmer_count)(char *))
+{
+	return 1000;
+	return kmer_count(big_kmer) >= 2;
+}
+
+void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
+		char *big_kmer, int count, khash_t(long_int) *node_map)
+{
+	int u = kh_long_int_get(node_map, GET_CODE(e1, mid));
+	int v = kh_long_int_get(node_map, GET_CODE(mid, e2));
+	uint32_t *bin_seq;
+	encode_seq(&bin_seq, big_kmer);
+	struct asm_edge_t *e = calloc(1, sizeof(struct asm_edge_t));
+	e->count = count;
+	e->seq = bin_seq;
+	e->seq_len = strlen(big_kmer);
+	e->n_holes = 0;
+	e->p_holes = NULL;
+	e->l_holes = NULL;
+	e->source = u;
+	e->target = v;
+	e->rc_id = 0;
+	e->barcodes = NULL;
+	supg->edges = realloc(supg->edges, (supg->n_e + 1)
+			* sizeof(struct asm_edge_t));
+	supg->edges[supg->n_e] = *e;
+	asm_add_node_adj(supg, u, supg->n_e);
+	++supg->n_e;
+}
+
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map)
+		khash_t(long_int) *node_map, int (*kmer_count)(char *))
 {
 	for (int u = 0; u < g->n_v; ++u){
+		if (100 * (u + 1) / g->n_v > 100 * u / g->n_v)
+			log_debug("Processed %d/%d vertices (%d\%)", u + 1,
+					g->n_v, 100 * (u + 1) / g->n_v);
 		for (int i = 0; i < g->nodes[u].deg; ++i){
 			int e1 = g->nodes[u].adj[i];
 			int v = g->edges[e1].target;
@@ -536,16 +570,19 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				int w = g->edges[e2].target;
 				char *big_kmer;
 				get_big_kmer(e1, e2, g, &big_kmer);
-				printf("%s\n", big_kmer);
+				int count = get_big_kmer_count(big_kmer, kmer_count);
+				if (count >= 2){
+					add_super_edge(v, e1, e2, supg, big_kmer,
+							count, node_map);
+				}
 				free(big_kmer);
-				exit(0);
 			}
 		}
 	}
 }
 
 void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
-		int (*kmer_count)(int, int))
+		int (*kmer_count)(char *))
 {
 	khash_t(long_int) *node_map = kh_init(long_int);
 	log_info("Creating super nodes");
@@ -556,11 +593,11 @@ void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 		create_super_nodes(g, e, supg, node_map);
 	}
 	log_info("Creating super edges");
-	create_super_edges(g, supg, node_map);
+	create_super_edges(g, supg, node_map, kmer_count);
 	kh_destroy(long_int, node_map);
 }
 
-void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(int, int))
+void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
 {
 	for (int k = g->ksize; k <= lastk; ++k){
 		log_info("Resolving using kmer of size %d", k);

@@ -47,11 +47,16 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map);
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map);
-void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(int, int));
+		khash_t(long_int) *node_map, int (*kmer_count)(char *));
+void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(char *));
 
 void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
-		int (*kmer_count)(int, int));
+		int (*kmer_count)(char *));
 
 void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer);
+
+int get_big_kmer_count(char *big_kmer, int (*kmer_count)(char *));
+
+void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
+		char *big_kmer, int count, khash_t(long_int) *node_map);
 #endif
