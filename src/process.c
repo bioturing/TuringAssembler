@@ -413,6 +413,17 @@ void print_barcode_graph_process(struct opt_proc_t *opt)
 //	count_edge_links_bc(opt);
 //}
 
+void resolve_multi_kmer_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/resolve_ite_kmer.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Resolve iterative kmers");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	resolve_multi_kmer(&g, 105, NULL);
+}
+
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];

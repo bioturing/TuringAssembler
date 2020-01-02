@@ -475,6 +475,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &dirty_process);
 	else if (!strcmp(argv[1], "resolve_complex_bulges"))
 		build_opt_process(argc, argv, &resolve_complex_bulges_process);
+	else if (!strcmp(argv[1], "resolve_multi_kmer"))
+		build_opt_process(argc, argv, &resolve_multi_kmer_process);
 //	else if (!strcmp(argv[1], "debug_cluster_molecules"))
 //		build_opt_process(argc, argv, &cluster_molecules_process);
 	else if (!strcmp(argv[1], "debug_get_barcode_graph"))
