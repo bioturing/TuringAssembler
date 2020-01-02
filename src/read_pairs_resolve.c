@@ -297,6 +297,9 @@ void get_long_contigs(struct opt_proc_t *opt)
 			log_info("Processed %d/%d edges (%d\%)", p, g->n_e,
 					p * 100 / g->n_e);
 		int e = edge_sorted[i];
+		int e_rc = g->edges[e].rc_id;
+		if (e > e_rc)
+			continue;
 		log_debug("Trying to extend from %d", e);
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
 		//if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
@@ -321,21 +324,25 @@ void get_long_contigs(struct opt_proc_t *opt)
 		free(path_fw);
 		free(path_rv);
 
-		char *seq;
-		join_read_pair_path(g, path, n_path, &seq);
+		if (n_path > 1){
+			char *seq;
+			join_read_pair_path(g, path, n_path, &seq);
 
-		char path_str[2000] = {};
-		for (int i = 0; i < n_path; ++i){
-			visited[path[i]] = visited[g->edges[path[i]].rc_id] = 1;
-			char tmp[1000];
-			sprintf(tmp, "%d ", path[i]);
-			strcat(path_str, tmp);
+			char path_str[2000] = {};
+			for (int i = 0; i < n_path; ++i){
+				visited[path[i]] = visited[g->edges[path[i]].rc_id] = 1;
+				char tmp[1000];
+				sprintf(tmp, "%d ", path[i]);
+				strcat(path_str, tmp);
+			}
+			log_debug("Path number %d start from %d: %s", n_e, e, path_str);
+			fprintf(f, ">SEQ_%d\n", n_e++);
+			fprintf(f, "%s\n", seq);
+			free(seq);
+		} else {
+			log_debug("Path has only one edge, ignore");
 		}
-		log_debug("Path number %d start from %d: %s", n_e, e, path_str);
 		free(path);
-		fprintf(f, ">SEQ_%d\n", n_e++);
-		fprintf(f, "%s\n", seq);
-		free(seq);
 	}
 	kh_destroy(set_long, check_link);
 	free(edge_sorted);
