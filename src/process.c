@@ -421,7 +421,7 @@ void resolve_multi_kmer_process(struct opt_proc_t *opt)
 	set_log_stage("Resolve iterative kmers");
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
-	resolve_multi_kmer(&g, 81, NULL);
+	resolve_multi_kmer(opt->out_dir, &g, 51, NULL);
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)

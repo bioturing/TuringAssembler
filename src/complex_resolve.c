@@ -597,7 +597,7 @@ void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 	kh_destroy(long_int, node_map);
 }
 
-void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
+void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
 {
 	for (int k = g->ksize; k <= lastk; ++k){
 		log_info("Resolving using kmer of size %d", k);
@@ -606,5 +606,6 @@ void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(char
 		asm_graph_destroy(g);
 		g = supg;
 	}
+	save_graph_info(out_dir, g, "kmer_resolve");
 }
 
