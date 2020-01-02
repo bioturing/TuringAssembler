@@ -411,8 +411,8 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 		if (g->edges[e].seq_len <= MIN_NOTICE_LEN)
 			continue;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (visited[e] == 0 || cov >= 0.2 * unit_cov) {
-			log_debug("Single edge %d to edge n_e %d", e, n_e);
+		if (visited[e] == 0 || cov >= 0.2 * unit_cov){
+			log_debug("Output left-over edge %d as %d", e, n_e);
 			char *seq;
 			decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
 			fprintf(f, ">SEQ_%d\n%s\n", n_e++, seq);
