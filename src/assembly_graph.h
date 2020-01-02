@@ -304,5 +304,4 @@ void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
-
 #endif  /* __ASSEMBLY_GRAPH_H__ */

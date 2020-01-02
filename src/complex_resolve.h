@@ -41,4 +41,17 @@ void supress_bulge(struct resolve_bulges_bundle_t *bundle);
 int resolve_bulges(struct asm_graph_t *g);
 int asm_resolve_complex_bulges_ite(struct asm_graph_t *g);
 int get_adj_node(struct asm_graph_t *g, int v, int id);
+
+
+void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map);
+
+void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map);
+void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(int, int));
+
+void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
+		int (*kmer_count)(int, int));
+
+void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer);
 #endif

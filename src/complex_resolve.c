@@ -9,6 +9,12 @@
 #include "utils.h"
 
 
+static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
+{
+	g->nodes[u].adj = realloc(g->nodes[u].adj, (g->nodes[u].deg + 1) * sizeof(gint_t));
+	g->nodes[u].adj[g->nodes[u].deg++] = e;
+}
+
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle)
 {
 	bundle->graph = g;
@@ -471,5 +477,90 @@ int get_adj_node(struct asm_graph_t *g, int v, int id)
 {
 	int e = g->nodes[v].adj[id];
 	return g->edges[e].target;
+}
+
+void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map)
+{
+	int pu = g->edges[e].source;
+	int pv = g->edges[e].target;
+	if (g->edges[e].seq_len > g->ksize + 1){
+		supg->nodes = realloc(supg->nodes, (supg->n_v + 2)
+				* sizeof(struct asm_node_t));
+		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t) * 2);
+		supg->edges = realloc(supg->edges, (supg->n_e + 1)
+				* sizeof(struct asm_edge_t));
+		int u = supg->n_v;
+		int v = supg->n_v + 1;
+		asm_add_node_adj(supg, u, supg->n_e);
+		asm_clone_seq(g->edges + e, supg->edges + supg->n_e);
+		supg->edges[supg->n_e].source = u;
+		supg->edges[supg->n_e].target = v;
+		kh_long_int_set(node_map, GET_CODE(pu, e), u);
+		kh_long_int_set(node_map, GET_CODE(e, pv), v);
+		supg->n_v += 2;
+		++supg->n_e;
+	} else {
+		supg->nodes = realloc(supg->nodes, (supg->n_v + 1)
+				* sizeof(struct asm_node_t));
+		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t));
+		int u = supg->n_v;
+		kh_long_int_set(node_map, GET_CODE(pu, e), u);
+		kh_long_int_set(node_map, GET_CODE(e, pv), u);
+		++supg->n_v;
+	}
+}
+
+void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
+{
+	char *seq1, *seq2;
+	decode_seq(&seq1, g->edges[e1].seq, g->edges[e1].seq_len);
+	decode_seq(&seq2, g->edges[e2].seq, g->edges[e2].seq_len);
+	*big_kmer = calloc(g->ksize + 3, sizeof(char));
+	int len1 = strlen(seq1);
+	strcpy(*big_kmer, seq1 + len1 - (g->ksize + 1));
+	(*big_kmer)[g->ksize + 1] = seq2[g->ksize];
+	free(seq1);
+	free(seq2);
+}
+
+void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map)
+{
+	for (int u = 0; u < g->n_v; ++u){
+		for (int i = 0; i < g->nodes[u].deg; ++i){
+			int e1 = g->nodes[u].adj[i];
+			int v = g->edges[e1].target;
+			for (int j = 0; j < g->nodes[v].deg; ++j){
+				int e2 = g->nodes[v].adj[j];
+				int w = g->edges[e2].target;
+				char *big_kmer;
+				get_big_kmer(e1, e2, g, &big_kmer);
+				printf("%s\n", big_kmer);
+				free(big_kmer);
+				exit(0);
+			}
+		}
+	}
+}
+
+void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
+		int (*kmer_count)(int, int))
+{
+	khash_t(long_int) *node_map = kh_init(long_int);
+	for (int e = 0; e < g->n_e; ++e)
+		create_super_nodes(g, e, supg, node_map);
+	create_super_edges(g, supg, node_map);
+	kh_destroy(long_int, node_map);
+}
+
+void resolve_multi_kmer(struct asm_graph_t *g, int lastk, int (*kmer_count)(int, int))
+{
+	for (int k = g->ksize; k <= lastk; ++k){
+		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
+		upsize_graph(g, supg, kmer_count);
+		asm_graph_destroy(g);
+		g = supg;
+	}
 }
 

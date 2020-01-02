@@ -15,8 +15,6 @@
 #include "simple_queue.h"
 #include "khash_operations.h"
 #define GET_CODE(a, b) ((((uint64_t) (a)) << 32) | (b))
-KHASH_MAP_INIT_INT64(long_int, int);
-KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
 
 KHASH_SET_INIT_INT64(set_long);
 KHASH_SET_OPERATIONS(set_long, uint64_t);

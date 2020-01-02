@@ -1,6 +1,7 @@
 #ifndef __KHASH_OPERATIONS__
 #define __KHASH_OPERATIONS__
 #include <assert.h>
+#include <stdint.h>
 #include "khash.h"
 
 #define KHASH_MAP_OPERATIONS(name, key_type, val_type)\
@@ -62,6 +63,9 @@ KHASH_SET_OPERATIONS(set_int, int);
 
 KHASH_MAP_INIT_INT(int_int, int);
 KHASH_MAP_OPERATIONS(int_int, int, int);
+
+KHASH_MAP_INIT_INT64(long_int, int);
+KHASH_MAP_OPERATIONS(long_int, uint64_t, int);
 
 void put_in_set(khash_t(set_int) *h, int k);
 void erase_from_set(khash_t(set_int) *h, int k);
