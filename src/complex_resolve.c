@@ -603,8 +603,12 @@ void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*k
 		log_info("Resolving using kmer of size %d", k);
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
 		upsize_graph(g, supg, kmer_count);
+
+		struct asm_graph_t g1;
+		asm_condense(supg, &g1);
+		asm_graph_destroy(supg);
 		asm_graph_destroy(g);
-		g = supg;
+		*g = g1;
 	}
 	save_graph_info(out_dir, g, "kmer_resolve");
 }
