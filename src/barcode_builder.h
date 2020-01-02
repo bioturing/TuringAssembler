@@ -30,7 +30,12 @@ void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_coun
 
 void region_sample_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
                  struct region_sample_bundle_t *bundle);
+void *region_sample_buffer_iterator(void *data);
 
+void get_region_barcodes(struct opt_proc_t *opt, struct read_path_t *rpath,
+		struct barcode_hash_t *h);
+
+void get_region_reads_sample(struct opt_proc_t *opt, struct read_path_t *rpath);
 struct rp_count_bundle_t{
 	struct asm_graph_t *g;
 	struct dqueue_t *q;

@@ -55,4 +55,8 @@ int fill_path_local(struct opt_local_t *opt, struct asm_graph_t *g0, struct asm_
 			gint_t e1, gint_t e2, struct result_local_t *sret);
 void test_same_barcode(struct read_path_t *ref, khash_t(bcpos) *dict,
 					   uint64_t *shared, int n_shared);
+
+void get_reads_by_barcodes(struct read_path_t *reads, struct read_path_t *rpath,
+		khash_t(bcpos) *dict, struct barcode_hash_t *bc, const char *prefix);
+void destroy_read_path(struct read_path_t *reads);
 #endif

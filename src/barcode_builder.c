@@ -15,6 +15,7 @@
 #include "basic_resolve.h"
 #include "scaffolding/global_params.h"
 #include "barcode_builder.h"
+#include "barcode_resolve2.h"
 
 #define MAX_MULTIPLE_MAP_ALLOW 6
 
@@ -235,7 +236,8 @@ void count_readpair_path(int n_threads, struct read_path_t *rpath,
 
 void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
                              const char *fasta_path, khash_t(contig_count) *count_cand,
-                             khash_t(contig_count) *count_err) {
+                             khash_t(contig_count) *count_err)
+{
 	bwa_idx_build(fasta_path, fasta_path, BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(fasta_path, BWA_IDX_ALL);
 	mem_opt_t *bwa_opt = asm_memopt_init();
@@ -284,7 +286,8 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 	free(bwa_opt);
 }
 
-void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count){
+void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count)
+{
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 
@@ -383,7 +386,9 @@ void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_coun
 	free(g);
 }
 
-void get_region_sample(struct opt_proc_t *opt, struct read_path_t *rpath) {
+void get_region_barcodes(struct opt_proc_t *opt, struct read_path_t *rpath,
+		struct barcode_hash_t *h)
+{
 	bwa_idx_build(opt->in_fasta, opt->in_fasta, BWTALGO_AUTO, 500000000);
 	bwaidx_t *bwa_idx = bwa_idx_load(opt->in_fasta, BWA_IDX_ALL);
 	mem_opt_t *bwa_opt = asm_memopt_init();
@@ -396,8 +401,10 @@ void get_region_sample(struct opt_proc_t *opt, struct read_path_t *rpath) {
 	producer_bundles = init_fastq_pair(opt->n_threads, 1,
 	                                   &(rpath->R1_path), &(rpath->R2_path));
 
-	struct bccount_bundle_t *worker_bundles;
+	struct region_sample_bundle_t *worker_bundles;
 	worker_bundles = malloc(opt->n_threads * sizeof(struct region_sample_bundle_t));
+
+	barcode_hash_init(h, 4);
 
 	pthread_mutex_t lock;
 	pthread_mutex_init(&lock, NULL);
@@ -406,6 +413,7 @@ void get_region_sample(struct opt_proc_t *opt, struct read_path_t *rpath) {
 		worker_bundles[i].bwa_idx = bwa_idx;
 		worker_bundles[i].bwa_opt = bwa_opt;
 		worker_bundles[i].lock = &lock;
+		worker_bundles[i].h = h;
 	}
 
 	pthread_t *producer_threads, *worker_threads;
@@ -420,7 +428,7 @@ void get_region_sample(struct opt_proc_t *opt, struct read_path_t *rpath) {
 		               producer_bundles + i);
 
 	for (i = 0; i < opt->n_threads; ++i)
-		pthread_create(worker_threads + i, &attr, barcode_buffer_iterator,
+		pthread_create(worker_threads + i, &attr, region_sample_buffer_iterator,
 		               worker_bundles + i);
 
 	for (i = 0; i < opt->n_files; ++i)
@@ -1369,3 +1377,22 @@ struct read_path_t parse_read_path_from_opt(struct opt_proc_t *opt)
 	res.idx_path = opt->files_I[0];
 	return res;
 }
+
+void get_region_reads_sample(struct opt_proc_t *opt, struct read_path_t *rpath)
+{
+	struct barcode_hash_t h;
+	get_region_barcodes(opt, rpath, &h);
+
+
+	struct read_path_t read_sorted_path = parse_read_path_from_opt(opt);
+	khash_t(bcpos) *dict = kh_init(bcpos);
+	construct_read_index(&read_sorted_path, dict);
+
+	char path[1024];
+	sprintf(path, "%s/sub_region", opt->out_dir);
+	struct read_path_t local_read_path;
+	get_reads_by_barcodes(&read_sorted_path, &local_read_path, dict, &h, path);
+	destroy_read_path(&local_read_path);
+}
+
+

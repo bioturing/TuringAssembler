@@ -410,6 +410,20 @@ void print_barcode_graph_process(struct opt_proc_t *opt)
 //	count_edge_links_bc(opt);
 //}
 
+void region_subsample_process(struct opt_proc_t *opt)
+{
+	char path[1024];
+	sprintf(path, "%s/region_subsample.log", opt->out_dir);
+	init_logger(opt->log_level, path);
+	set_log_stage("Subsampling by region");
+
+	struct read_path_t rpath;
+	rpath.R1_path = opt->files_1[0];
+	rpath.R2_path = opt->files_2[0];
+	rpath.idx_path = opt->files_I[0];
+	get_region_reads_sample(opt, &rpath);
+}
+
 void resolve_complex_bulges_process(struct opt_proc_t *opt)
 {
 	char path[1024];

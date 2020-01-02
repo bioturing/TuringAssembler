@@ -1636,6 +1636,25 @@ int get_reads_local_graph(struct read_path_t *reads, struct read_path_t *rpath,
 	return res;
 }
 
+void get_reads_by_barcodes(struct read_path_t *reads, struct read_path_t *rpath,
+		khash_t(bcpos) *dict, struct barcode_hash_t *bc, const char *prefix)
+{
+	char path[MAX_PATH];
+	sprintf(path, "%s/R1.sub.fq", prefix);
+	rpath->R1_path = strdup(path);
+	sprintf(path, "%s/R2.sub.fq", prefix);
+	rpath->R2_path = strdup(path);
+	rpath->idx_path = NULL;
+	khash_t(gint) *h = barcode_hash_2_khash(bc);
+
+	uint64_t *h_arr;
+	int n;
+	khash_2_arr(h, &h_arr, &n);
+	filter_read(reads, dict, rpath, h_arr, n);
+	free(h_arr);
+	kh_destroy(gint, h);
+}
+
 /**
  * @brief: gets reads to build the estimated coverage for each edge in the local graph
  * @param reads: path to the original read files
