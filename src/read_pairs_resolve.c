@@ -355,7 +355,7 @@ void get_long_contigs(struct opt_proc_t *opt)
 		if (e > e_rc || g->edges[e].seq_len < MIN_NOTICE_LEN)
 			continue;
 		float cov = __get_edge_cov(g->edges + e, g->ksize);
-		if (visited[e] == 0 || cov >= 0.2 * unit_cov){
+		if (visited[e] == 0){
 			log_debug("Output left-over edge %d as %d", e, n_e);
 			char *seq;
 			decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
