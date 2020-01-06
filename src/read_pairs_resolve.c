@@ -16,7 +16,6 @@ void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
 void get_read_pairs_count(struct asm_graph_t *g, char *path,
 			  struct read_pair_cand_t *rp_cand)
 {
-	log_warn("%s", path);
 	FILE *f = fopen(path, "r");
 	int v, u_rc, count;
 	khash_t(long_int) *rp_count = kh_init(long_int);

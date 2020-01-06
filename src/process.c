@@ -396,7 +396,6 @@ void read_pairs_count_process(struct opt_proc_t *opt)
 	fclose(f);
 	opt->in_fasta = calloc(1024, 1);
 	COPY_ARR(path, opt->in_fasta, strlen(path)+1);
-	log_warn("%s\n%s\n------", path, opt->in_fasta);
 }
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
