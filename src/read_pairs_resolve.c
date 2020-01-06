@@ -388,7 +388,8 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 
 		if (n_path > 1){
 			char *seq;
-			join_read_pair_path(g, path, n_path, &seq);
+			concate_path_seq_fill_shortest_path(g, path, n_path,
+					&seq, 50);
 
 			char path_str[2000] = {};
 			for (int i = 0; i < n_path; ++i){
