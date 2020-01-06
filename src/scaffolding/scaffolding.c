@@ -76,7 +76,7 @@ pthread_attr_t init_thread_attr()
 
 struct list_position {
     int n_pos;
-    int *i_contig, *i_bin;
+    int *i_contig;
     pthread_mutex_t lock_entry;
 };
 
@@ -225,8 +225,6 @@ void *process_build_big_table(void *data)
 				if ((v & (v - 1)) == 0) {
 					pos->i_contig = realloc(pos->i_contig, (v * 2 + 1) *
 					                                       sizeof(int));
-					pos->i_bin = realloc(pos->i_bin, (v * 2 + 1) *
-					                                 sizeof(int));
 				}
 				pos->i_contig[v] = new_i_contig;
 				pthread_mutex_unlock(&pos->lock_entry);
@@ -344,7 +342,6 @@ void deep_kh_destroy(khash_t(btable_sig) *big_table)
 			continue;
 		}
 		struct list_position *pos = kh_value(big_table, it);
-		free(pos->i_bin);
 		free(pos->i_contig);
 		free(pos);
 	}

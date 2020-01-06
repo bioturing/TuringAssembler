@@ -5,6 +5,7 @@
 #include "kmer_build.h"
 #include "process.h"
 #include "basic_resolve.h"
+#include "utils.h"
 
 void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
 {
@@ -15,6 +16,7 @@ void read_pair_cand_destroy(struct read_pair_cand_t *rp_cand)
 void get_read_pairs_count(struct asm_graph_t *g, char *path,
 			  struct read_pair_cand_t *rp_cand)
 {
+	log_warn("%s", path);
 	FILE *f = fopen(path, "r");
 	int v, u_rc, count;
 	khash_t(long_int) *rp_count = kh_init(long_int);
@@ -82,8 +84,6 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 					v, last);
 			continue;
 		}
-		float cov = __get_edge_cov(g->edges + v, g->ksize);
-		if (cov >= 0.5 * unit_cov && g->edges[v].seq_len >= 100) {
 			if (rp_cand[last].score[i] > second_score) {
 				second_score = rp_cand[last].score[i];
 				if (second_score > best_score) {
@@ -94,13 +94,17 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 				}
 			}
 //			kh_set_int_insert(cand, rp_cand[last].cand[i]);
+	}
+	if (best_score > (second_score + 10) * 1.3) {
+		float cov = __get_edge_cov(g->edges + best, g->ksize);
+		if (cov >= 0.5 * unit_cov && g->edges[best].seq_len >= 100) {
+			return best;
 		} else {
-			log_debug("%d does not sastisfy threshold, cov: %.3f, len: %.3f, unit cov: %.3f",
-					cov, g->edges[v].seq_len, unit_cov);
+			log_debug(
+				"edge %d does not sastisfy threshold, cov: %.3f, len: %d, unit cov: %.3f",
+				best, cov, g->edges[best].seq_len, unit_cov);
 		}
 	}
-	if (best_score > (second_score + 10) * 1.3)
-		return best;
 	else {
 		log_debug("best %d second %d", best_score, second_score);
 		return -1;
@@ -170,6 +174,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 			  struct read_pair_cand_t *rp_cand, int **path, int *n_path)
 {
 	//__VERBOSE("s = %d\n", s);
+	log_debug("rpextend from %d", s);
 	*path = calloc(1, sizeof(int));
 	*n_path = 1;
 	(*path)[0] = s;
@@ -285,8 +290,10 @@ void print_left_over(struct opt_proc_t *opt, struct asm_graph_t *g)
 	save_graph_info(opt->out_dir, g0, "left_over");
 }
 
-void get_long_contigs(struct opt_proc_t *opt)
+void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 {
+	char *log_file = str_concate(opt->out_dir, "/get_contigs_readpairs.log");
+	init_logger(opt->log_level, log_file);
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	struct read_pair_cand_t *rp_cand = calloc(g->n_e, sizeof(struct read_pair_cand_t));
@@ -301,9 +308,8 @@ void get_long_contigs(struct opt_proc_t *opt)
 	log_info("global cov: %lf", unit_cov);
 	int *visited = calloc(g->n_e, sizeof(int));
 	int n_e = 0;
-	char out_path[1024];
-	sprintf(out_path, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
-	FILE *f = fopen(out_path, "w");
+	sprintf(opt->in_fasta, "%s/graph_k_%d_extend.fasta", opt->out_dir, g->ksize);
+	FILE *f = fopen(opt->in_fasta, "w");
 	for (int i = g->n_e - 1; i >= 0; --i) {
 		int e = edge_sorted[i];
 		log_debug("Trying to extend from %d", e);
@@ -374,10 +380,8 @@ void get_long_contigs(struct opt_proc_t *opt)
 			free(seq);
 		}
 	}
-	print_left_over(opt, g);
+//	print_left_over(opt, g);
 	fclose(f);
 	asm_graph_destroy(g);
 	free(g);
 }
-
-

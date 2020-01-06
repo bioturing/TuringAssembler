@@ -35,5 +35,5 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 
 int get_share_bc(struct asm_graph_t *g, khash_t(long_int) *share_bc, int u, int v);
 
-void get_long_contigs(struct opt_proc_t *opt);
+void get_long_contigs_by_readpairs(struct opt_proc_t *opt);
 #endif
