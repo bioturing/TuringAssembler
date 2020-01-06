@@ -217,9 +217,9 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	while (1){
 		int v = get_next_cand(g, unit_cov, rp_cand, share_bc, check_link,
 				*path, *n_path);
-		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
-			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
-			return;
+		//if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
+		//	|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov)
+		//	return;
 		if (v == -1)
 			return;
 		kh_set_long_insert(check_link, GET_CODE(last, v));
