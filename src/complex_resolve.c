@@ -581,6 +581,44 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 	}
 }
 
+void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map)
+{
+	for (int u = 0; u < g->n_v; ++u){
+		for (int i = 0; i < g->nodes[u].deg; ++i){
+			int e = g->nodes[u].adj[i];
+			int u_rc = g->nodes[u].rc_id;
+			int e_rc = g->edges[e].rc_id;
+
+			int supu = kh_long_int_get(node_map, GET_CODE(u, e));
+			int supu_rc = kh_long_int_get(node_map,
+					GET_CODE(e_rc, u_rc));
+			supg->nodes[supu].rc_id = supu_rc;
+		}
+	}
+
+	for (int u = 0; u < supg->n_v; ++u){
+		for (int i = 0; i < supg->nodes[u].deg; ++i){
+			int e = supg->nodes[u].adj[i];
+			int v = supg->edges[e].target;
+			int v_rc = supg->nodes[v].rc_id;
+			int u_rc = supg->nodes[u].rc_id;
+
+			int e_rc = -1;
+			for (int j = 0; j < supg->nodes[v_rc].deg; ++j){
+				e_rc = supg->nodes[v_rc].adj[j];
+				int tmp = supg->edges[e_rc].target;
+				if (tmp == u_rc)
+					break;
+			}
+			if (e_rc == -1)
+				log_error("Something went wrong, e_rc not found at node %d, edge %d",
+						u, e);
+			supg->edges[e].rc_id = e_rc;
+		}
+	}
+}
+
 void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 		int (*kmer_count)(char *))
 {
@@ -594,7 +632,14 @@ void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 	}
 	log_info("Creating super edges");
 	create_super_edges(g, supg, node_map, kmer_count);
+	log_info("Assigning reverse complement id for nodes and edges");
+	assign_reverse_complement(g, supg, node_map);
 	kh_destroy(long_int, node_map);
+
+	struct asm_graph_t g1;
+	asm_condense(supg, &g1);
+	asm_graph_destroy(supg);
+	*supg = g1;
 }
 
 void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
@@ -603,12 +648,6 @@ void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*k
 		log_info("Resolving using kmer of size %d", k);
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
 		upsize_graph(g, supg, kmer_count);
-
-		struct asm_graph_t g1;
-		asm_condense(supg, &g1);
-		asm_graph_destroy(supg);
-		asm_graph_destroy(g);
-		*g = g1;
 	}
 	save_graph_info(out_dir, g, "kmer_resolve");
 }

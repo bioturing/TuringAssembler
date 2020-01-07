@@ -59,4 +59,7 @@ int get_big_kmer_count(char *big_kmer, int (*kmer_count)(char *));
 
 void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 		char *big_kmer, int count, khash_t(long_int) *node_map);
+
+void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
+		khash_t(long_int) *node_map);
 #endif
