@@ -480,7 +480,7 @@ int get_adj_node(struct asm_graph_t *g, int v, int id)
 }
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map)
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw)
 {
 	int pu = g->edges[e].source;
 	int pv = g->edges[e].target;
@@ -496,8 +496,10 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		asm_clone_seq(supg->edges + supg->n_e, g->edges + e);
 		supg->edges[supg->n_e].source = u;
 		supg->edges[supg->n_e].target = v;
-		kh_long_int_set(node_map, GET_CODE(pu, e), u);
-		kh_long_int_set(node_map, GET_CODE(e, pv), v);
+		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
+		kh_long_int_set(node_map_bw, GET_CODE(e, pv), v);
+		log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
+		log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
 		supg->n_v += 2;
 		++supg->n_e;
 	} else {
@@ -505,8 +507,10 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 				* sizeof(struct asm_node_t));
 		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t));
 		int u = supg->n_v;
-		kh_long_int_set(node_map, GET_CODE(pu, e), u);
-		kh_long_int_set(node_map, GET_CODE(e, pv), u);
+		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
+		kh_long_int_set(node_map_bw, GET_CODE(e, pv), u);
+		log_debug("(pu, e, pv) = (%d, %d, %d) -> (u) = (%d)", pu, e, pv,
+				u);
 		++supg->n_v;
 	}
 }
@@ -531,10 +535,11 @@ int get_big_kmer_count(char *big_kmer, int (*kmer_count)(char *))
 }
 
 void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
-		char *big_kmer, int count, khash_t(long_int) *node_map)
+		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw)
 {
-	int u = kh_long_int_get(node_map, GET_CODE(e1, mid));
-	int v = kh_long_int_get(node_map, GET_CODE(mid, e2));
+	int u = kh_long_int_get(node_map_bw, GET_CODE(e1, mid));
+	int v = kh_long_int_get(node_map_fw, GET_CODE(mid, e2));
 	uint32_t *bin_seq;
 	encode_seq(&bin_seq, big_kmer);
 	struct asm_edge_t *e = calloc(1, sizeof(struct asm_edge_t));
@@ -556,12 +561,13 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 }
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map, int (*kmer_count)(char *))
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
+		int (*kmer_count)(char *))
 {
 	for (int u = 0; u < g->n_v; ++u){
-		if (100 * (u + 1) / g->n_v > 100 * u / g->n_v)
-			log_debug("Processed %d/%d vertices (%d\%)", u + 1,
-					g->n_v, 100 * (u + 1) / g->n_v);
+		//if (100 * (u + 1) / g->n_v > 100 * u / g->n_v)
+		//	log_debug("Processed %d/%d vertices (%d\%)", u + 1,
+		//			g->n_v, 100 * (u + 1) / g->n_v);
 		for (int i = 0; i < g->nodes[u].deg; ++i){
 			int e1 = g->nodes[u].adj[i];
 			int v = g->edges[e1].target;
@@ -573,7 +579,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				int count = get_big_kmer_count(big_kmer, kmer_count);
 				if (count >= 2){
 					add_super_edge(v, e1, e2, supg, big_kmer,
-							count, node_map);
+							count, node_map_fw,
+							node_map_bw);
 				}
 				free(big_kmer);
 			}
@@ -582,7 +589,7 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 }
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map)
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw)
 {
 	for (int u = 0; u < g->n_v; ++u){
 		for (int i = 0; i < g->nodes[u].deg; ++i){
@@ -590,10 +597,24 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 			int u_rc = g->nodes[u].rc_id;
 			int e_rc = g->edges[e].rc_id;
 
-			int supu = kh_long_int_get(node_map, GET_CODE(u, e));
-			int supu_rc = kh_long_int_get(node_map,
+			int supu = kh_long_int_get(node_map_fw, GET_CODE(u, e));
+			int supu_rc = kh_long_int_get(node_map_bw,
 					GET_CODE(e_rc, u_rc));
 			supg->nodes[supu].rc_id = supu_rc;
+			//supg->nodes[supu_rc].rc_id = supu;
+		}
+	}
+
+	for (int v = 0; v < g->n_v; ++v){
+		int v_rc = g->nodes[v].rc_id;
+		for (int i = 0; i < g->nodes[v_rc].deg; ++i){
+			int e_rc = g->nodes[v_rc].adj[i];
+			int e = g->edges[e_rc].rc_id;
+
+			int supv = kh_long_int_get(node_map_bw, GET_CODE(e, v));
+			int supv_rc = kh_long_int_get(node_map_fw,
+					GET_CODE(v_rc, e_rc));
+			supg->nodes[supv].rc_id = supv_rc;
 		}
 	}
 
@@ -622,24 +643,28 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 		int (*kmer_count)(char *))
 {
-	khash_t(long_int) *node_map = kh_init(long_int);
+	khash_t(long_int) *node_map_fw = kh_init(long_int);
+	khash_t(long_int) *node_map_bw = kh_init(long_int);
 	log_info("Creating super nodes");
 	for (int e = 0; e < g->n_e; ++e){
-		if (100 * (e + 1) / g->n_e > 100 * e / g->n_e)
-			log_info("Processed %d/%d edges (%d\%)", e + 1,
-					g->n_e, 100 * (e + 1) / g->n_e);
-		create_super_nodes(g, e, supg, node_map);
+		//if (100 * (e + 1) / g->n_e > 100 * e / g->n_e)
+		//	log_info("Processed %d/%d edges (%d\%)", e + 1,
+		//			g->n_e, 100 * (e + 1) / g->n_e);
+		create_super_nodes(g, e, supg, node_map_fw, node_map_bw);
 	}
 	log_info("Creating super edges");
-	create_super_edges(g, supg, node_map, kmer_count);
+	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_count);
 	log_info("Assigning reverse complement id for nodes and edges");
-	assign_reverse_complement(g, supg, node_map);
-	kh_destroy(long_int, node_map);
+	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
+	kh_destroy(long_int, node_map_fw);
+	kh_destroy(long_int, node_map_bw);
 
+	test_asm_graph(supg);
 	struct asm_graph_t g1;
 	asm_condense(supg, &g1);
 	asm_graph_destroy(supg);
 	*supg = g1;
+	supg->ksize = g->ksize + 1;
 }
 
 void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
@@ -648,6 +673,9 @@ void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*k
 		log_info("Resolving using kmer of size %d", k);
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
 		upsize_graph(g, supg, kmer_count);
+
+		asm_graph_destroy(g);
+		g = supg;
 	}
 	save_graph_info(out_dir, g, "kmer_resolve");
 }
