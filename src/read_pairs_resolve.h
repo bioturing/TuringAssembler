@@ -11,7 +11,9 @@
 #include "helper.h"
 #define MIN_READ_PAIR_MAPPED_HARD 50
 #define MIN_READ_PAIR_MAPPED_SOFT 20
+#define MAX_READ_PAIR_DISTANCE 555
 #define REPEAT_COV_RATIO 1.3
+#define MAX_LEN_RESOLVE_READPAIR 5000
 
 struct read_pair_cand_t{
 	int n;
@@ -27,13 +29,10 @@ void get_read_pairs_count(struct asm_graph_t *g, char *path,
 int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
 		khash_t(long_int) *share_bc, int cand);
 
-void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
-		struct read_pair_cand_t *rp_cand, int **path, int *n_path);
-
 int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t *rp_cand,
 		int *path, int n_path);
 
 int get_share_bc(struct asm_graph_t *g, khash_t(long_int) *share_bc, int u, int v);
 
-void get_long_contigs(struct opt_proc_t *opt);
+void get_long_contigs_by_readpairs(struct opt_proc_t *opt);
 #endif

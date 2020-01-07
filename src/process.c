@@ -370,7 +370,8 @@ void debug_process(struct opt_proc_t *opt)
 	sprintf(path, "%s/debug.log", opt->out_dir);
 	init_logger(opt->log_level, path);
 	set_log_stage("Debug process");
-	get_long_contigs(opt);
+	get_long_contigs_by_readpairs(opt);
+	log_info("get long contig by readpair done");
 }
 
 void read_pairs_count_process(struct opt_proc_t *opt)
@@ -394,6 +395,8 @@ void read_pairs_count_process(struct opt_proc_t *opt)
 		fprintf(f, "%d %d %d\n", v, u, kh_val(rp_count, it));
 	}
 	fclose(f);
+	opt->in_fasta = calloc(1024, 1);
+	COPY_ARR(path, opt->in_fasta, strlen(path)+1);
 }
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
@@ -612,17 +615,10 @@ void assembly3_process(struct opt_proc_t *opt)
 	sprintf(lv1_path, "%s/graph_k_%d_level_1.bin", opt->out_dir, opt->k0);
 	opt->in_file = lv1_path;
 	resolve_local_process(opt);
-
-	/**
-	 * Molecule clustering
-	 */
 	char lv2_path[1024];
 	sprintf(lv2_path, "%s/graph_k_%d_level_2.bin", opt->out_dir, opt->k0);
-	struct asm_graph_t g_lv2;
-	load_asm_graph(&g_lv2, lv2_path);
-	set_log_stage("Get long contig");
-	get_list_contig(opt, &g_lv2);
-	asm_graph_destroy(&g_lv2);
+	opt->in_file = lv2_path;
+
 	/**
 	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
 	 */
@@ -646,32 +642,31 @@ void assembly3_process(struct opt_proc_t *opt)
 	}
 
 	/**
+	 * Get readpair count
+	 */
+	read_pairs_count_process(opt);
+
+	/**
+	 * resolve by readpairs
+	 */
+	set_log_stage("Get long contig by readpairs");
+	get_long_contigs_by_readpairs(opt);
+
+	/**
 	 * Build barcodes
 	 */
-	char lv3_path[1024];
-	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
-	struct asm_graph_t g_lv3;
-	load_asm_graph(&g_lv3, lv3_path);
-
+//	char lv3_path[1024];
+//	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
 	set_log_stage("BWAIndex");
-	sprintf(fasta_path, "%s/barcode_build_dir", opt->out_dir); /* Store temporary contigs for indexing two heads */
-	mkdir(fasta_path, 0755);
-	sprintf(fasta_path, "%s/barcode_build_dir/contigs_tmp.fasta", opt->out_dir);
-	write_fasta_seq(&g_lv3, fasta_path);
-	set_log_stage("MapReads");
-	construct_aux_info(opt, &g_lv3, &read_sorted_path, fasta_path,
-			ASM_BUILD_BARCODE);
-	save_graph_info(opt->out_dir, &g_lv3, "added_barcode");
-	asm_graph_destroy(&g_lv3);
+	build_barcode_process_fasta(opt);
 
 	/**
 	* Scaffolding
 	*/
-	char lv3_added_path[1024];
-	sprintf(lv3_added_path, "%s/graph_k_%d_added_barcode.bin", opt->out_dir,
-			opt->k0);
+	sprintf(opt->in_file, "%s/graph_k_%d_added_barcode.bin", opt->out_dir,
+		opt->k0);
 	struct asm_graph_t g_lv3_added;
-	load_asm_graph(&g_lv3_added, lv3_added_path);
+	load_asm_graph(&g_lv3_added, opt->in_file);
 	set_log_stage("Scaffolding");
 	char out_name[MAX_PATH];
 	sprintf(out_name, "%s/scaffolds.fasta", opt->out_dir);
@@ -692,7 +687,6 @@ void assembly3_process(struct opt_proc_t *opt)
 	char local_fasta[1024];
 	sprintf(in_fasta, "%s/local_assembly_scaffold_path.txt", opt->out_dir);
 	sprintf(local_fasta, "%s/scaffold.full.fasta", opt->out_dir);
-	opt->in_file = lv3_added_path;
 	opt->in_fasta = in_fasta;
 	opt->lc = local_fasta;
 	char local_path[1024];
