@@ -1341,6 +1341,8 @@ void get_shared_rp_statistic(struct opt_proc_t *opt)
 			g_dump->edges[n_e].n_holes = 0;
 			asm_clone_seq_reverse(g_dump->edges + n_e + 1,
 					g_dump->edges + n_e);
+			g_dump->edges[n_e].rc_id = n_e + 1;
+			g_dump->edges[n_e + 1].rc_id = n_e;
 
 			e_id = realloc(e_id, (n_e + 2) * sizeof(int));
 			dis_len = realloc(dis_len, (n_e + 2) * sizeof(int));
@@ -1363,10 +1365,6 @@ void get_shared_rp_statistic(struct opt_proc_t *opt)
 	};
 
 
-	save_graph_info(opt->out_dir, g_dump, "dump");
-	char dump_graph[1024];
-	sprintf(dump_graph, "%s/graph_k_%d_dump.bin", opt->out_dir, opt->k0);
-	opt->in_file = dump_graph;
 	char fasta_path[1024];
 	sprintf(fasta_path, "%s/estimate_shared_rp", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
@@ -1374,7 +1372,7 @@ void get_shared_rp_statistic(struct opt_proc_t *opt)
 	write_fasta_seq(g_dump, fasta_path);
 	set_log_stage("MapReads");
 	khash_t(long_int) *rp_count = kh_init(long_int);
-	get_all_read_pairs_count(opt, rp_count);
+	get_all_read_pairs_count(opt, g_dump, rp_count);
 
 	FILE *f = fopen(opt->lc, "w");
 	for (int i = 2; i < n_e; i += 2){

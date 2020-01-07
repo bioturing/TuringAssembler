@@ -284,10 +284,8 @@ void count_readpair_err_path(int n_threads, struct read_path_t *rpath,
 	free(bwa_opt);
 }
 
-void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count){
-	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
-	load_asm_graph(g, opt->in_file);
-
+void get_all_read_pairs_count(struct opt_proc_t *opt, struct asm_graph_t *g,
+		khash_t(long_int) *rp_count){
 	struct read_path_t *read_sorted_path = calloc(1, sizeof(struct read_path_t));
 	read_sorted_path->R1_path = opt->files_1[0];
 	read_sorted_path->R2_path = opt->files_2[0];

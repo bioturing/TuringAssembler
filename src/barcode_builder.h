@@ -18,7 +18,8 @@ struct read_path_t parse_read_path_from_opt(struct opt_proc_t *opt);
 
 void *rp_count_buffer_iterator(void *data);
 
-void get_all_read_pairs_count(struct opt_proc_t *opt, khash_t(long_int) *rp_count);
+void get_all_read_pairs_count(struct opt_proc_t *opt, struct asm_graph_t *g,
+		khash_t(long_int) *rp_count);
 
 struct rp_count_bundle_t{
 	struct asm_graph_t *g;

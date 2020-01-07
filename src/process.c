@@ -380,7 +380,10 @@ void read_pairs_count_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, path);
 	set_log_stage("Debug process");
 	khash_t(long_int) *rp_count = kh_init(long_int);
-	get_all_read_pairs_count(opt, rp_count);
+
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	get_all_read_pairs_count(opt, &g, rp_count);
 	sprintf(path, "%s/rp_counts.txt", opt->out_dir);
 	FILE *f = fopen(path, "w");
 	for (khiter_t it = kh_begin(rp_count); it != kh_end(rp_count); ++it){
@@ -396,6 +399,7 @@ void read_pairs_count_process(struct opt_proc_t *opt)
 	fclose(f);
 	opt->in_fasta = calloc(1024, 1);
 	COPY_ARR(path, opt->in_fasta, strlen(path)+1);
+	asm_graph_destroy(&g);
 }
 void print_barcode_graph_process(struct opt_proc_t *opt)
 {
