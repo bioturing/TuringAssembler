@@ -6,6 +6,7 @@
 #define PATH_NOT_FOUND -1
 #define MAX_VISITED_EDGE 20000
 #define MIN_RELIABLE_COV_LEN 500
+#define MAX_DEPTH 1000
 
 /**
  * @brief: initializes ginfo, a structure for storing stuffs when finding paths
@@ -249,7 +250,7 @@ void get_all_paths_kmer_check(struct asm_graph_t *lg, struct edge_map_info_t *em
 	mark_edge_trash(&ginfo, emap1->lc_e);
 	mark_edge_trash(&ginfo, lg->edges[emap1->lc_e].rc_id);
 	mark_edge_trash(&ginfo, lg->edges[emap2->lc_e].rc_id);
-	int path[1024];
+	int path[MAX_DEPTH + 1];
 	int n_visited = 0;
 	find_all_paths_kmer_check(lg, &ginfo, emap1->lc_e, 0, path, pinfo,
 			&n_visited, ksize, h);
@@ -285,7 +286,8 @@ void find_all_paths_kmer_check(struct asm_graph_t *lg, struct graph_info_t *ginf
 		int u, int depth, int *cur_path, struct path_info_t *pinfo,
 		int *n_visited, int ksize, khash_t(kmer_int) *h)
 {
-	if (pinfo->n_paths == MAX_PATH_COUNT || *n_visited >= MAX_VISITED_EDGE)
+	if (pinfo->n_paths == MAX_PATH_COUNT || *n_visited >= MAX_VISITED_EDGE
+		|| depth > MAX_DEPTH)
 		return;
 	++(*n_visited);
 	cur_path[depth] = u;
