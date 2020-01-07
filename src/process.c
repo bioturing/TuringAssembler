@@ -659,8 +659,6 @@ void assembly3_process(struct opt_proc_t *opt)
 //	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
 	set_log_stage("BWAIndex");
 	build_barcode_process_fasta(opt);
-	struct asm_graph_t g_lv3;
-	load_asm_graph(&g_lv3, opt->in_file);
 
 	/**
 	* Scaffolding
