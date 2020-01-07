@@ -169,8 +169,8 @@ int check_good_cand(struct asm_graph_t *g, int *path, int n_path,
 	return sum_share < get_share_bc(g, share_bc, last_e, cand);
 }
 
-void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
-			  struct read_pair_cand_t *rp_cand, int **path, int *n_path)
+int extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
+			  struct read_pair_cand_t *rp_cand, int **path, int *n_path, int last_len)
 {
 	//__VERBOSE("s = %d\n", s);
 	log_debug("rpextend from %d", s);
@@ -182,16 +182,19 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	g->edges[s].count -= count;
 	g->edges[g->edges[s].rc_id].count -= count;
 
+	int total_len = last_len;
 	while (1) {
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
+		if (g->edges[v].seq_len > MAX_LEN_RESOLVE_READPAIR && total_len > MAX_LEN_RESOLVE_READPAIR)
+			return total_len;
 		if (v == -1)
-			return;
+			return total_len;
 		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
 			|| __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov){
 			log_debug("Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
 					v, __get_edge_cov(g->edges + v, g->ksize),
 					__get_edge_cov(g->edges + s, g->ksize), unit_cov);
-			return;
+			return total_len;
 		}
 		log_debug("Next cand of %d: %d", (*path)[(*n_path) - 1], v);
 		int v_rc = g->edges[v].rc_id;
@@ -201,6 +204,7 @@ void extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 		g->edges[v_rc].count = 0;
 		*path = realloc(*path, ((*n_path) + 1) * sizeof(int));
 		(*path)[(*n_path)++] = v;
+		total_len += g->edges[v].seq_len;
 	}
 }
 
@@ -257,7 +261,7 @@ void concate_path_seq_fill_shortest_path(struct asm_graph_t *g, int *path, int n
 	khash_t(long_spath) *stored = kh_init(long_spath);
 	for (int i = 1; i < n_path; i++) {
 		struct shortest_path_info_t *shortest_path = get_shortest_path(g, path[i - 1], path[i], stored);
-		if (shortest_path != NULL)  {
+		if (shortest_path != NULL && shortest_path->sum_seq < MAX_READ_PAIR_DISTANCE)  {
 			new_path = realloc(new_path, (n_new_path + shortest_path->n_e - 2) * sizeof(int));
 			for (int j = 1; j < shortest_path->n_e - 1; j++) {
 				new_path[n_new_path + j - 1] = shortest_path->path[j];
@@ -322,9 +326,9 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 		}
 		int *path_fw, *path_rv;
 		int n_path_fw, n_path_rv;
-		extend_by_read_pairs(g, e, unit_cov, rp_cand, &path_fw, &n_path_fw);
+		int last_len = extend_by_read_pairs(g, e, unit_cov, rp_cand, &path_fw, &n_path_fw, g->edges[e].seq_len);
 		extend_by_read_pairs(g, g->edges[e].rc_id, unit_cov, rp_cand,
-				     &path_rv, &n_path_rv);
+				     &path_rv, &n_path_rv, last_len);
 		int *path = calloc(n_path_fw + n_path_rv - 1, sizeof(int));
 		int n_path = 0;
 		for (int i = n_path_rv - 1; i >= 0; --i)

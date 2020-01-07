@@ -371,6 +371,7 @@ void debug_process(struct opt_proc_t *opt)
 	init_logger(opt->log_level, path);
 	set_log_stage("Debug process");
 	get_long_contigs_by_readpairs(opt);
+	log_info("get long contig by readpair done");
 }
 
 void read_pairs_count_process(struct opt_proc_t *opt)
