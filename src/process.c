@@ -620,17 +620,6 @@ void assembly3_process(struct opt_proc_t *opt)
 	opt->in_file = lv2_path;
 
 	/**
-	 * Get readpair count
-	 */
-	read_pairs_count_process(opt);
-
-	/**
-	 * resolve by readpairs
-	 */
-	set_log_stage("Get long contig by readpairs");
-	get_long_contigs_by_readpairs(opt);
-
-	/**
 	 * Rearrange reads in fastq files. Reads from the same barcodes are grouped together
 	 */
 	char fasta_path[MAX_PATH];
@@ -651,6 +640,17 @@ void assembly3_process(struct opt_proc_t *opt)
 		opt->files_2[0] = read_sorted_path.R2_path;
 		opt->files_I[0] = read_sorted_path.idx_path;
 	}
+
+	/**
+	 * Get readpair count
+	 */
+	read_pairs_count_process(opt);
+
+	/**
+	 * resolve by readpairs
+	 */
+	set_log_stage("Get long contig by readpairs");
+	get_long_contigs_by_readpairs(opt);
 
 	/**
 	 * Build barcodes
