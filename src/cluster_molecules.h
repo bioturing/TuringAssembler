@@ -2,7 +2,7 @@
 #define __CLUSTER_MOLECULES__
 #include "assembly_graph.h"
 #define MIN_EDGE_LEN 500
-#define MAX_RADIUS 4000
+#define MAX_RADIUS 500
 #define MAX_PATH_LEN 30
 #define MIN_BC_READ_COUNT 10
 #define MAX_BC_READ_COUNT 88
