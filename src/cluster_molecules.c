@@ -1374,7 +1374,9 @@ void get_shared_rp_statistic(struct opt_proc_t *opt)
 	khash_t(long_int) *rp_count = kh_init(long_int);
 	get_all_read_pairs_count(opt, g_dump, rp_count);
 
-	FILE *f = fopen(opt->lc, "w");
+	char rp_count_path[1024];
+	sprintf(rp_count_path, "%s/shared_rp_estimated.txt", opt->out_dir);
+	FILE *f = fopen(rp_count_path, "w");
 	for (int i = 2; i < n_e; i += 2){
 		if (e_id[i] != e_id[i - 1])
 			continue;
