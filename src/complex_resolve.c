@@ -669,7 +669,7 @@ void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
 
 void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
 {
-	for (int k = g->ksize; k <= lastk; ++k){
+	for (int k = g->ksize + 1; k <= lastk; ++k){
 		log_info("Resolving using kmer of size %d", k);
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
 		upsize_graph(g, supg, kmer_count);
