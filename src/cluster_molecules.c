@@ -1380,8 +1380,8 @@ void get_shared_rp_statistic(struct opt_proc_t *opt)
 	for (int i = 2; i < n_e; i += 2){
 		if (e_id[i] != e_id[i - 1])
 			continue;
-		int rp_shared = kh_long_int_try_get(rp_count, GET_CODE(i, i - 1),
-							0);
+		int rp_shared = kh_long_int_try_get(rp_count, GET_CODE(i - 2, i + 1), 0)
+			+ kh_long_int_try_get(rp_count, GET_CODE(i + 1, i - 2), 0);
 		fprintf(f, "%d %d %d %d\n", e_id[i], pos[i], dis_len[i - 1],
 				rp_shared);
 	}
