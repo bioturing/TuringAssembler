@@ -331,8 +331,6 @@ void print_left_over(struct opt_proc_t *opt, struct asm_graph_t *g)
 
 void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 {
-	char *log_file = str_concate(opt->out_dir, "/get_contigs_readpairs.log");
-	init_logger(opt->log_level, log_file);
 	struct asm_graph_t *g = calloc(1, sizeof(struct asm_graph_t));
 	load_asm_graph(g, opt->in_file);
 	struct read_pair_cand_t *rp_cand = calloc(g->n_e, sizeof(struct read_pair_cand_t));
