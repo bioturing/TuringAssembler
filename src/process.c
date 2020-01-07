@@ -834,12 +834,12 @@ void build_coverage_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
-void estimate_shared_barcode_process(struct opt_proc_t *opt)
+void estimate_shared_rp_process(struct opt_proc_t *opt)
 {
 	char log_file[1024];
-	sprintf(log_file, "%s/estimate_shared_barcode.log", opt->out_dir);
+	sprintf(log_file, "%s/estimate_shared_rp.log", opt->out_dir);
 	init_logger(opt->log_level, log_file);
-	set_log_stage("Estimate shared barcode");
-	get_shared_barcode_statistic(opt);
+	set_log_stage("Estimate shared read-pairs");
+	get_shared_rp_statistic(opt);
 }
 

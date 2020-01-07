@@ -1301,7 +1301,7 @@ void long_spath_destroy(khash_t(long_spath) *stored)
 	kh_destroy(long_spath, stored);
 }
 
-void get_shared_barcode_statistic(struct opt_proc_t *opt)
+void get_shared_rp_statistic(struct opt_proc_t *opt)
 {
 	srand(time(NULL));
 	if (opt->lib_type != LIB_TYPE_SORTED)
@@ -1354,19 +1354,6 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 		}
 		free(seq);
 	}
-	/*int n_e_20k = n_e;
-	for (int e = 0; e < g->n_e; ++e){
-		int e_rc = g->edges[e].rc_id;
-		if (e > e_rc)
-			continue;
-		if (g->edges[e].seq_len >= 20000)
-			continue;
-		g_dump->edges = realloc(g_dump->edges, (n_e + 2) * sizeof(struct asm_edge_t));
-		asm_clone_seq(g_dump->edges + n_e, g->edges + e);
-		asm_clone_seq_reverse(g_dump->edges + n_e + 1,
-				g->edges + e);
-		n_e += 2;
-	}*/
 	g_dump->n_e = n_e;
 
 	struct read_path_t read_sorted_path = {
@@ -1374,28 +1361,29 @@ void get_shared_barcode_statistic(struct opt_proc_t *opt)
 		.R2_path = opt->files_2[0],
 		.idx_path = opt->files_I[0]
 	};
+
+
+	save_graph_info(opt->out_dir, g_dump, "dump");
+	char dump_graph[1024];
+	sprintf(dump_graph, "%s/graph_k_%d_dump.bin", opt->out_dir, opt->k0);
+	opt->in_file = dump_graph;
 	char fasta_path[1024];
-	sprintf(fasta_path, "%s/estimate_shared_barcode", opt->out_dir); /* Store temporary contigs for indexing two heads */
+	sprintf(fasta_path, "%s/estimate_shared_rp", opt->out_dir); /* Store temporary contigs for indexing two heads */
 	mkdir(fasta_path, 0755);
-	sprintf(fasta_path, "%s/estimate_shared_barcode/contigs_tmp.fasta", opt->out_dir);
+	sprintf(fasta_path, "%s/estimate_shared_rp/contigs_tmp.fasta", opt->out_dir);
 	write_fasta_seq(g_dump, fasta_path);
 	set_log_stage("MapReads");
-	construct_aux_info(opt, g_dump, &read_sorted_path, fasta_path,
-			ASM_BUILD_BARCODE);
+	khash_t(long_int) *rp_count = kh_init(long_int);
+	get_all_read_pairs_count(opt, rp_count);
+
 	FILE *f = fopen(opt->lc, "w");
-	//for (int i = 2; i < n_e_20k; i += 2){
 	for (int i = 2; i < n_e; i += 2){
 		if (e_id[i] != e_id[i - 1])
 			continue;
-		khash_t(gint) *h1 = barcode_hash_2_khash(g_dump->edges[i].barcodes + 2);
-		khash_t(gint) *h2 = barcode_hash_2_khash(g_dump->edges[i - 1].barcodes + 2);
-		log_debug("number of barcodes %d %d", kh_size(h1), kh_size(h2));
-		khash_t(gint) *h_shared = get_shared_bc(h1, h2);
+		int rp_shared = kh_long_int_try_get(rp_count, GET_CODE(i, i - 1),
+							0);
 		fprintf(f, "%d %d %d %d\n", e_id[i], pos[i], dis_len[i - 1],
-				kh_size(h_shared));
-		kh_destroy(gint, h1);
-		kh_destroy(gint, h2);
-		kh_destroy(gint, h_shared);
+				rp_shared);
 	}
 	free(e_id);
 	free(pos);
