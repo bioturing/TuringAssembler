@@ -531,7 +531,10 @@ void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 
 int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table)
 {
-	kmint_t p = kmhash_get(kmer_table, big_kmer);
+	uint32_t *key;
+	encode_seq(&key, big_kmer);
+	kmint_t p = kmhash_get(kmer_table, (uint8_t *) key);
+	free(key);
 	if (p == KMHASH_END(kmer_table))
 		return 0;
 	return 1;
@@ -579,13 +582,22 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				int w = g->edges[e2].target;
 				char *big_kmer;
 				get_big_kmer(e1, e2, g, &big_kmer);
-				int count = get_big_kmer_count(big_kmer, kmer_table);
+				char *big_kmer_rc = calloc(strlen(big_kmer) + 1,
+						sizeof(char));
+				strcpy(big_kmer_rc, big_kmer);
+				flip_reverse(big_kmer_rc);
+
+				int count = 0;
+				if (get_big_kmer_count(big_kmer, kmer_table)
+					|| get_big_kmer_count(big_kmer_rc, kmer_table))
+					count = 100;
 				if (count >= 1){
 					add_super_edge(v, e1, e2, supg, big_kmer,
 							count, node_map_fw,
 							node_map_bw);
 				}
 				free(big_kmer);
+				free(big_kmer_rc);
 			}
 		}
 	}
