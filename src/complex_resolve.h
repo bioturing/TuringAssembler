@@ -3,6 +3,7 @@
 #include "assembly_graph.h"
 #include "simple_queue.h"
 #include "khash_operations.h"
+#include "kmer_build.h"
 
 struct vertex_height_t{
 	int vertex;
@@ -48,15 +49,15 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
-		int (*kmer_count)(char *));
-void resolve_multi_kmer(char *out_dir, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *));
+		struct kmhash_t *kmer_table);
+void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *));
 
-void upsize_graph(struct asm_graph_t *g, struct asm_graph_t *supg,
-		int (*kmer_count)(char *));
+void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
+		struct asm_graph_t *supg, int (*kmer_count)(char *));
 
 void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer);
 
-int get_big_kmer_count(char *big_kmer, int (*kmer_count)(char *));
+int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table);
 
 void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 		char *big_kmer, int count, khash_t(long_int) *node_map_fw,

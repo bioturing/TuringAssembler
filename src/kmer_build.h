@@ -27,4 +27,6 @@ void build_local_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, char *work_dir,
 		char *R1_path, char *R2_path);
 
+struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
+		char **files_2, int n_threads, int mmem, char *work_dir);
 #endif /* __KMER_BUILD_H__ */

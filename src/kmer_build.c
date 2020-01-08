@@ -1043,3 +1043,48 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	destroy_kmc_info(&kmc_inf);
 }
 
+struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
+		char **files_2, int n_threads, int mmem, char *work_dir)
+{
+	log_debug("|---- Build graph from scratch");
+	// n_files < 0 mean we have one contig file at end of files_2
+	char **tmp_files;
+	char *count_kmer_dir = alloca(strlen(work_dir) + 50);
+	if (have_contig_file(n_files)) {
+		tmp_files = alloca((abs(n_files) * 2 +1) * sizeof(char *));
+		memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
+		memcpy(tmp_files + abs(n_files), files_2, (abs(n_files)+1) * sizeof(char *));
+		KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
+								abs(n_files)* 2 + 1, tmp_files);
+		sprintf(count_kmer_dir, "%s/count_kmer", work_dir);
+		mkdir(count_kmer_dir, 0777);
+		printf("count kmer dir is %s %s\n", count_kmer_dir, files_2[abs(n_files)+1]);
+		KMC_build_kmer_database(ksize + 1, count_kmer_dir, n_threads, mmem, abs(n_files)*2, &files_2[abs(n_files)+1]);
+	} else {
+		tmp_files = alloca(abs(n_files) * 2 * sizeof(char *));
+		memcpy(tmp_files, files_1, abs(n_files) * sizeof(char *));
+		memcpy(tmp_files + abs(n_files), files_2, abs(n_files) * sizeof(char *));
+		KMC_build_kmer_database(ksize + 1, work_dir, n_threads, mmem,
+								abs(n_files) * 2, tmp_files);
+	}
+
+	log_debug("|---- Retrieving kmer from KMC database");
+	struct kmhash_t *kmer_table = calloc(1, sizeof(struct kmhash_t));
+	struct kmc_info_t kmc_inf;
+
+	char *kmc_pre = alloca(strlen(work_dir) + 50);
+	char *kmc_suf = alloca(strlen(work_dir) + 50);
+	sprintf(kmc_pre, "%s/KMC_%d_count.kmc_pre", work_dir, ksize + 1);
+	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
+	KMC_read_prefix(kmc_pre, &kmc_inf);
+
+	kmhash_init(kmer_table, SIZE_16MB, (ksize + 3) >> 2, KM_AUX_ADJ, n_threads);
+	struct kmbuild_bundle_t kmbuild_bundle;
+	kmbuild_bundle_init(&kmbuild_bundle, kmer_table, ksize);
+	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
+							(void *)(&kmbuild_bundle), split_kmer_from_kedge_multi);
+	kmbuild_bundle_destroy(&kmbuild_bundle);
+	/* FIXME: additional kmer here */
+	log_info("Number of kmer: %lu", kmer_table->n_item);
+	return kmer_table;
+}
