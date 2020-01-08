@@ -34,6 +34,7 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index);
 void destroy_mini_hash(struct mini_hash_t *h_table);
 void destroy_worker_bundles(struct readsort_bundle1_t *bundles, int n);
 uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data);
+uint64_t *mini_put_value(struct mini_hash_t **h_table, uint64_t data, int value);
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key);
 uint64_t get_barcode_biot(char *s, struct read_t *r);
 uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data);

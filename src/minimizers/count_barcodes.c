@@ -214,7 +214,7 @@ inline void try_expanding(struct mini_hash_t **h_table)
 }
 
 /**
- * Increase the the count of one barcode by 1
+ * Return slot of data
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
  */
@@ -225,7 +225,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
 	if (is_empty) { // slot is empty -> fill in
-		atomic_add_and_fetch64(&(h_table->count), 1);
+		atomic_add_and_fetch64(&(h_table->count), 0);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
 		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
@@ -242,7 +242,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
-			atomic_add_and_fetch64(&(h_table->count), 1);
+			atomic_add_and_fetch64(&(h_table->count), 0);
 		slot = i;
 	}
 	return h_table->h + slot;
@@ -297,7 +297,7 @@ uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 }
 
 /**
- * @brief Increase the count of data to 1
+ * @brief Return slot of the data
  * @param data byte array of data
  * @param len length in byte of data
  */
