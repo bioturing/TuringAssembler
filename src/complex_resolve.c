@@ -683,6 +683,7 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	struct asm_graph_t g1;
 	asm_condense(supg, &g1);
 	asm_graph_destroy(supg);
+	kmhash_destroy(kmer_table);
 	*supg = g1;
 	supg->ksize = super_k;
 }
@@ -695,7 +696,7 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 		upsize_graph(opt, k, g, supg);
 
 		asm_graph_destroy(g);
-		g = supg;
+		*g = *supg;
 	}
 	save_graph_info(opt->out_dir, g, "kmer_resolve");
 }
