@@ -644,7 +644,7 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 }
 
 void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
-		struct asm_graph_t *supg, int (*kmer_count)(char *))
+		struct asm_graph_t *supg)
 {
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
@@ -674,12 +674,12 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	supg->ksize = g->ksize + 1;
 }
 
-void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk, int (*kmer_count)(char *))
+void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk)
 {
 	for (int k = g->ksize + 1; k <= lastk; ++k){
 		log_info("Resolving using kmer of size %d", k);
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
-		upsize_graph(opt, k, g, supg, kmer_count);
+		upsize_graph(opt, k, g, supg);
 
 		asm_graph_destroy(g);
 		g = supg;
