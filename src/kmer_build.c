@@ -75,6 +75,20 @@ static inline int check_kmer(uint8_t *kmer, int len, int l)
 	return ((kmer[l - 1] & (~(((uint8_t)1 << (k << 1)) - 1))) == 0);
 }
 
+void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
+		void *data)
+{
+	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
+	struct kmhash_t *h = bundle->h;
+	int ksize = bundle->ksize;
+	log_error("%d", ksize);
+	int word_size = (ksize + 3) >> 2;
+	uint8_t *kedge_rc = alloca(word_size);
+	km_get_rc(kedge_rc, kedge, ksize, word_size);
+	kmhash_put_multi(h, kedge, h->locks + thread_no);
+	kmhash_put_multi(h, kedge_rc, h->locks + thread_no);
+}
+
 void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)
 {
 	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
@@ -1082,7 +1096,8 @@ struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 	struct kmbuild_bundle_t kmbuild_bundle;
 	kmbuild_bundle_init(&kmbuild_bundle, kmer_table, ksize);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
-							(void *)(&kmbuild_bundle), split_kmer_from_kedge_multi);
+				(void *)(&kmbuild_bundle),
+				kmer_count_from_reads_multi);
 	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */
 	log_info("Number of kmer: %lu", kmer_table->n_item);

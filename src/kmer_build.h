@@ -29,4 +29,6 @@ void build_local_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 		char **files_2, int n_threads, int mmem, char *work_dir);
+void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
+		void *data);
 #endif /* __KMER_BUILD_H__ */

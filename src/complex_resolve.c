@@ -531,8 +531,10 @@ void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 
 int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table)
 {
-	uint32_t *key;
-	encode_seq(&key, big_kmer);
+	int len = strlen(big_kmer);
+	uint8_t *key = calloc((len + 3) >> 2, sizeof(uint8_t));
+	for (int i = 0; i < len; ++i)
+		key[i >> 2] |= nt4_table[big_kmer[i]] << ((i & 3) << 1);
 	kmint_t p = kmhash_get(kmer_table, (uint8_t *) key);
 	free(key);
 	if (p == KMHASH_END(kmer_table))
@@ -667,11 +669,12 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		//			g->n_e, 100 * (e + 1) / g->n_e);
 		create_super_nodes(g, e, supg, node_map_fw, node_map_bw);
 	}
-	log_info("Creating super edges");
+	log_info("Creating kmer table");
 	struct kmhash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
 			opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
 			opt->out_dir);
 
+	log_info("Creating super edges");
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
 	kmhash_destroy(kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");
