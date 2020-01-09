@@ -601,7 +601,6 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				//	count = 100;
 				if (a || b)
 					count = 100;
-				log_debug("fw %s", big_kmer);
 				if (count >= 1){
 					add_super_edge(v, e1, e2, supg, big_kmer,
 							count, node_map_fw,
@@ -707,8 +706,7 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 
 		asm_graph_destroy(g);
 		g = supg;
-		if (k % 2)
-			save_graph_info(opt->out_dir, g, "kmer_resolve");
+		save_graph_info(opt->out_dir, g, "kmer_resolve");
 	}
 }
 
