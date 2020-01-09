@@ -45,7 +45,8 @@ int get_adj_node(struct asm_graph_t *g, int v, int id);
 
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw);
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
+		struct kmhash_t *kmer_table);
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,

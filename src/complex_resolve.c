@@ -481,28 +481,52 @@ int get_adj_node(struct asm_graph_t *g, int v, int id)
 }
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw)
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
+		struct kmhash_t *kmer_table)
 {
 	int pu = g->edges[e].source;
 	int pv = g->edges[e].target;
+	int ok = 1;
+	if (g->edges[e].seq_len > g->ksize + 1 && g->edges[e].seq_len <= 100){
+		char *seq;
+		char *kmer = calloc(g->ksize + 3, sizeof(char));
+		char *kmer_rc = calloc(g->ksize + 3, sizeof(char));
+		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		for (int i = 0; i + g->ksize + 2 <= g->edges[e].seq_len; ++i){
+			strncpy(kmer, seq + i, g->ksize + 2);
+			strcpy(kmer_rc, kmer);
+			flip_reverse(kmer_rc);
+			if (!get_big_kmer_count(kmer, kmer_table) &&
+				!get_big_kmer_count(kmer_rc, kmer_table)){
+				ok = 0;
+				break;
+			}
+		}
+		free(seq);
+		free(kmer);
+		free(kmer_rc);
+	}
 	if (g->edges[e].seq_len > g->ksize + 1){
 		supg->nodes = realloc(supg->nodes, (supg->n_v + 2)
 				* sizeof(struct asm_node_t));
 		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t) * 2);
-		supg->edges = realloc(supg->edges, (supg->n_e + 1)
-				* sizeof(struct asm_edge_t));
 		int u = supg->n_v;
 		int v = supg->n_v + 1;
-		asm_add_node_adj(supg, u, supg->n_e);
-		asm_clone_seq(supg->edges + supg->n_e, g->edges + e);
-		supg->edges[supg->n_e].source = u;
-		supg->edges[supg->n_e].target = v;
 		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
 		kh_long_int_set(node_map_bw, GET_CODE(e, pv), v);
-		log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
-		log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
 		supg->n_v += 2;
-		++supg->n_e;
+
+		if (ok){
+			supg->edges = realloc(supg->edges, (supg->n_e + 1)
+					* sizeof(struct asm_edge_t));
+			asm_add_node_adj(supg, u, supg->n_e);
+			asm_clone_seq(supg->edges + supg->n_e, g->edges + e);
+			supg->edges[supg->n_e].source = u;
+			supg->edges[supg->n_e].target = v;
+			//log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
+			//log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
+			++supg->n_e;
+		}
 	} else {
 		supg->nodes = realloc(supg->nodes, (supg->n_v + 1)
 				* sizeof(struct asm_node_t));
@@ -669,17 +693,18 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 {
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
+	log_info("Creating kmer table");
+	struct kmhash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
+			opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
+			opt->out_dir);
+
 	log_info("Creating super nodes");
 	for (int e = 0; e < g->n_e; ++e){
 		//if (100 * (e + 1) / g->n_e > 100 * e / g->n_e)
 		//	log_info("Processed %d/%d edges (%d\%)", e + 1,
 		//			g->n_e, 100 * (e + 1) / g->n_e);
-		create_super_nodes(g, e, supg, node_map_fw, node_map_bw);
+		create_super_nodes(g, e, supg, node_map_fw, node_map_bw, kmer_table);
 	}
-	log_info("Creating kmer table");
-	struct kmhash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
-			opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
-			opt->out_dir);
 
 	log_info("Creating super edges");
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
