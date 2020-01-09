@@ -81,10 +81,19 @@ void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
 	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
 	struct kmhash_t *h = bundle->h;
 	int ksize = bundle->ksize;
-	log_error("%d", ksize);
 	int word_size = (ksize + 3) >> 2;
 	uint8_t *kedge_rc = alloca(word_size);
 	km_get_rc(kedge_rc, kedge, ksize, word_size);
+	//char *seq = calloc(ksize + 1, sizeof(char));
+	//char *seq_rc = calloc(ksize + 1, sizeof(char));
+	//for (int i = 0; i < ksize; ++i)
+	//	seq[ksize - i - 1] = int_to_base((kedge[i >> 2] >> ((i & 3) << 1)) & 3);
+	//for (int i = 0; i < ksize; ++i)
+	//	seq_rc[ksize - i - 1] = int_to_base((kedge_rc[i >> 2] >> ((i & 3) << 1)) & 3);
+	//log_info("%s", seq);
+	//log_info("%s", seq_rc);
+	//exit(0);
+	//free(seq);
 	kmhash_put_multi(h, kedge, h->locks + thread_no);
 	kmhash_put_multi(h, kedge_rc, h->locks + thread_no);
 }

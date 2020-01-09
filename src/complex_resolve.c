@@ -534,8 +534,8 @@ int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table)
 	int len = strlen(big_kmer);
 	uint8_t *key = calloc((len + 3) >> 2, sizeof(uint8_t));
 	for (int i = 0; i < len; ++i)
-		key[i >> 2] |= nt4_table[big_kmer[i]] << ((i & 3) << 1);
-	kmint_t p = kmhash_get(kmer_table, (uint8_t *) key);
+		key[i >> 2] |= nt4_table[big_kmer[len - i - 1]] << ((i & 3) << 1);
+	kmint_t p = kmhash_get(kmer_table, key);
 	free(key);
 	if (p == KMHASH_END(kmer_table))
 		return 0;
@@ -584,22 +584,30 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				int w = g->edges[e2].target;
 				char *big_kmer;
 				get_big_kmer(e1, e2, g, &big_kmer);
-				char *big_kmer_rc = calloc(strlen(big_kmer) + 1,
-						sizeof(char));
+
+				char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
 				strcpy(big_kmer_rc, big_kmer);
 				flip_reverse(big_kmer_rc);
 
 				int count = 0;
-				if (get_big_kmer_count(big_kmer, kmer_table)
-					|| get_big_kmer_count(big_kmer_rc, kmer_table))
+				int a = get_big_kmer_count(big_kmer, kmer_table);
+				int b = get_big_kmer_count(big_kmer_rc, kmer_table);
+				//if (a != b)
+				//	log_error("Reverse complement counts are not consistent: %s, %s, %d, %d",
+				//			big_kmer, big_kmer_rc,
+				//			a, b);
+				//if (get_big_kmer_count(big_kmer, kmer_table)
+				//	|| get_big_kmer_count(big_kmer_rc, kmer_table))
+				//	count = 100;
+				if (a || b)
 					count = 100;
+				log_debug("fw %s", big_kmer);
 				if (count >= 1){
 					add_super_edge(v, e1, e2, supg, big_kmer,
 							count, node_map_fw,
 							node_map_bw);
 				}
 				free(big_kmer);
-				free(big_kmer_rc);
 			}
 		}
 	}
@@ -699,7 +707,8 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 
 		asm_graph_destroy(g);
 		g = supg;
+		if (k % 2)
+			save_graph_info(opt->out_dir, g, "kmer_resolve");
 	}
-	save_graph_info(opt->out_dir, g, "kmer_resolve");
 }
 
