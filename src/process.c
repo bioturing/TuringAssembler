@@ -792,6 +792,13 @@ void build_barcode_process(struct opt_proc_t *opt)
 	asm_graph_destroy(&g);
 }
 
+void chiermic_edges_stat_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	chiermic_edges_stat(&g);
+}
+
 void build_barcode_process_fasta(struct opt_proc_t *opt)
 {
 	struct asm_graph_t g;

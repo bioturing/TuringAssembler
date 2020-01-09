@@ -1739,3 +1739,12 @@ int asm_resolve_simple_bulges_ite(struct asm_graph_t *g)
 	return res;
 }
 
+void chiermic_edges_stat(struct asm_graph_t *g)
+{
+	for (int i = 0; i < g->n_v; ++i) {
+		gint_t rc = g->nodes[i].rc_id;
+		if (g->nodes[i].deg <= 2 && g->nodes[rc].deg <= 2) {
+			log_debug("One incoming edge: %d", g->edges[g->nodes[rc].adj[0]].rc_id);
+		}
+	}
+}

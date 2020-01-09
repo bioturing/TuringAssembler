@@ -46,6 +46,7 @@ void print_barcode_graph_process(struct opt_proc_t *opt);
 void cluster_molecules_process(struct opt_proc_t *opt);
 void debug_process(struct opt_proc_t *opt);
 void build_coverage_process(struct opt_proc_t *opt);
+void chiermic_edges_stat_process(struct opt_proc_t *opt);
 void read_pairs_count_process(struct opt_proc_t *opt);
 void build_barcode_coverage_info(struct opt_proc_t *opt);
 void resolve_212_cov_process(struct opt_proc_t *opt);
