@@ -201,7 +201,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 inline void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
-	if (table->count == table->max_cnt) {
+	if (table->count >= table->max_cnt) {
 		if (table->prime_index < N_PRIMES_NUMBER - 1) {
 			log_info("Doubling hash table...");
 			mini_expand(h_table);
@@ -225,7 +225,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
 	if (is_empty) { // slot is empty -> fill in
-		atomic_add_and_fetch64(&(h_table->count), 0);
+		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
 		//linear probing
 		for (i = slot + 1; i < h_table->size && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
@@ -242,7 +242,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
-			atomic_add_and_fetch64(&(h_table->count), 0);
+			atomic_add_and_fetch64(&(h_table->count), 1);
 		slot = i;
 	}
 	return h_table->h + slot;
@@ -305,8 +305,8 @@ uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
 	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
-	if (table->count > table->max_cnt) {
-//	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
+//	if (table->count > table->max_cnt) {
+	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
 		pthread_mutex_lock(&h_table_mut);
 		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
