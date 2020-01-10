@@ -81,11 +81,15 @@ void count_kmer_minihash_multi(int thread_no, uint8_t *kedge, uint32_t count, vo
 	struct km_minihash_bundle_t *bundle = (struct km_minihash_bundle_t *) data;
 	struct mini_hash_t *h = bundle->h;
 	int ksize = bundle->ksize;
-	int n_word = ksize  +15 /
-	char *res;
-	decode_seq(&res, kedge, ksize);
-	log_warn("%s", res);
-	uint64_t hash = MurmurHash3_x64_64(kedge, ksize);
+	char *res = calloc(ksize+1, 1);
+	for (int i = 0; i < ksize; i++) {
+		res[ksize-i-1] = nt4_char[(kedge[i>>2] >> ((i & 3)<<1)) & 3];
+	}
+	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
+	for (int i = 0; i < ksize; i++) {
+		km_shift_append(seq, ksize, (ksize+3)>>2, res[i]);
+	}
+	uint64_t hash = MurmurHash3_x64_64(seq, (ksize + 3) >> 2);
 	uint64_t *slot = mini_put(&h, hash);
 	atomic_add_and_fetch64(slot , count);
 }

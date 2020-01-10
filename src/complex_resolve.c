@@ -9,6 +9,7 @@
 #include "process.h"
 #include "utils.h"
 #include "kmhash.h"
+#include "kmer.h"
 
 
 static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
@@ -492,6 +493,7 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t) * 2);
 		supg->edges = realloc(supg->edges, (supg->n_e + 1)
 				* sizeof(struct asm_edge_t));
+		memset(&supg->edges[supg->n_e], 0, sizeof(struct asm_edge_t));
 		int u = supg->n_v;
 		int v = supg->n_v + 1;
 		asm_add_node_adj(supg, u, supg->n_e);
@@ -502,6 +504,7 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		kh_long_int_set(node_map_bw, GET_CODE(e, pv), v);
 		log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
 		log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
+		log_debug("old_edge %d -> new_edge %d", e, supg->n_e);
 		supg->n_v += 2;
 		++supg->n_e;
 	} else {
@@ -526,27 +529,24 @@ void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 	int len1 = strlen(seq1);
 	strcpy(*big_kmer, seq1 + len1 - (g->ksize + 1));
 	(*big_kmer)[g->ksize + 1] = seq2[g->ksize];
-	log_warn("last1  %s", seq1+len1 -g->ksize);
 	seq2[g->ksize] = 0;
-	log_warn("start2 %s", seq2);
-	log_warn("big   %s", *big_kmer);
 	free(seq1);
 	free(seq2);
 }
 
 int get_big_kmer_count(char *big_kmer, struct mini_hash_t *kmer_table)
 {
-	uint32_t *key;
-	int len = strlen(big_kmer);
-	encode_seq(&key, big_kmer);
-	uint64_t key_new = MurmurHash3_x64_64(key, len);
+	int ksize = strlen(big_kmer);
+	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
+	for (int i = 0; i < ksize; i++) {
+		km_shift_append(seq, ksize, (ksize+3)>>2, big_kmer[i]);
+	}
+	uint64_t key_new = MurmurHash3_x64_64(seq, (ksize +3 ) >> 2);
 	uint64_t *slot = mini_get(kmer_table, key_new);
 	int res = 0;
 	if (slot != (uint64_t *)EMPTY_SLOT)
 		res = *slot;
-	log_info("*slot %d len %d key %d", res, len, *key);
-	log_info("%s\n", big_kmer);
-	free(key);
+	free(seq);
 	return res;
 }
 
@@ -598,9 +598,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				flip_reverse(big_kmer_rc);
 
 				int count = 0;
-				if (get_big_kmer_count(big_kmer, kmer_table)
-					|| get_big_kmer_count(big_kmer_rc, kmer_table))
-					count = 100;
+				count = get_big_kmer_count(big_kmer, kmer_table) +
+					get_big_kmer_count(big_kmer_rc, kmer_table);
 				if (count >= 1){
 					add_super_edge(v, e1, e2, supg, big_kmer,
 							count, node_map_fw,
@@ -685,16 +684,17 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");
 	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
+	log_info("Assigning done");
 	kh_destroy(long_int, node_map_fw);
 	kh_destroy(long_int, node_map_bw);
 
 	test_asm_graph(supg);
-	struct asm_graph_t g1;
-	asm_condense(supg, &g1);
-	asm_graph_destroy(supg);
+//	struct asm_graph_t g1 = *supg;
+//	asm_condense(supg, &g1);
+//	asm_graph_destroy(supg);
+//	*supg = g1;
 	//todo huu destroy kmer_table
 //	kmhash_destroy(kmer_table);
-	*supg = g1;
 	supg->ksize = super_k;
 }
 
@@ -705,9 +705,14 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
 		upsize_graph(opt, k, g, supg);
 
-		asm_graph_destroy(g);
+		log_info("Resolving done kmer of size %d", k);
+//		asm_graph_destroy(g);
 		*g = *supg;
 	}
 	save_graph_info(opt->out_dir, g, "kmer_resolve");
+	struct asm_graph_t g1 = *g;
+	asm_condense(g, &g1);
+	save_graph_info(opt->out_dir, &g1, "after_condense");
+	*g = g1;
 }
 

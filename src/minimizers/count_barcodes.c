@@ -305,7 +305,8 @@ uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
 	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
-	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
+	if (table->count > table->max_cnt) {
+//	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
 		pthread_mutex_lock(&h_table_mut);
 		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
