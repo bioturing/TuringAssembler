@@ -84,22 +84,26 @@ void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
 	int word_size = (ksize + 3) >> 2;
 	uint8_t *kedge_rc = alloca(word_size);
 	km_get_rc(kedge_rc, kedge, ksize, word_size);
-	//char *seq = calloc(ksize + 1, sizeof(char));
-	//char *seq_rc = calloc(ksize + 1, sizeof(char));
-	//for (int i = 0; i < ksize; ++i)
-	//	seq[ksize - i - 1] = int_to_base((kedge[i >> 2] >> ((i & 3) << 1)) & 3);
-	//for (int i = 0; i < ksize; ++i)
-	//	seq_rc[ksize - i - 1] = int_to_base((kedge_rc[i >> 2] >> ((i & 3) << 1)) & 3);
-	//if (ksize == 20){
+	//uint64_t k = MurmurHash3_x64_64(kedge, word_size);
+	//if (k == (uint64_t) -5214783808680829881ll){
+	//__VERBOSE("%d\n", ksize);
+	//if (ksize == 38){
+	//	char *seq = calloc(ksize + 1, sizeof(char));
+	//	char *seq_rc = calloc(ksize + 1, sizeof(char));
+	//	for (int i = 0; i < ksize; ++i)
+	//		seq[ksize - i - 1] = int_to_base((kedge[i >> 2] >> ((i & 3) << 1)) & 3);
+	//	for (int i = 0; i < ksize; ++i)
+	//		seq_rc[ksize - i - 1] = int_to_base((kedge_rc[i >> 2] >> ((i & 3) << 1)) & 3);
 	//	log_info("seq %s", seq);
 	//	log_info("src %s", seq_rc);
+	//	//if (strcmp(seq, "GTATTTTTTATAATTTTTTT") == 0)
+	//	//	log_info("seq %s seq_rc %s", seq, seq_rc);
+	//	//if (strcmp(seq_rc, "GTATTTTTTATAATTTTTTT") == 0)
+	//	//	log_info("seq %s seq_rc %s", seq, seq_rc);
+	//	free(seq);
+	//	free(seq_rc);
+
 	//}
-	//if (strcmp(seq, "GTATTTTTTATAATTTTTTT") == 0)
-	//	log_info("seq %s seq_rc %s", seq, seq_rc);
-	//if (strcmp(seq_rc, "GTATTTTTTATAATTTTTTT") == 0)
-	//	log_info("seq %s seq_rc %s", seq, seq_rc);
-	//free(seq);
-	//free(seq_rc);
 	kmhash_put_multi(h, kedge, h->locks + thread_no);
 	kmhash_put_multi(h, kedge_rc, h->locks + thread_no);
 }
@@ -1109,7 +1113,7 @@ struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 
 	kmhash_init(kmer_table, SIZE_16MB, (ksize + 3) >> 2, KM_AUX_ADJ, n_threads);
 	struct kmbuild_bundle_t kmbuild_bundle;
-	kmbuild_bundle_init(&kmbuild_bundle, kmer_table, ksize);
+	kmbuild_bundle_init(&kmbuild_bundle, kmer_table, ksize + 1);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 				(void *)(&kmbuild_bundle),
 				kmer_count_from_reads_multi);

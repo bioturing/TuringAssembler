@@ -576,10 +576,10 @@ int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table)
 	//uint64_t k = MurmurHash3_x64_64(key, word_size);
 	kmint_t p = kmhash_get(kmer_table, key);
 	free(key);
-	//if (strcmp(big_kmer, "TTTTGTTTATTGTTAATTTG") == 0 && p != KMHASH_END(kmer_table))
-	//	log_error("%s %ld", big_kmer, k);
-	//if (strcmp(big_kmer, "CAAATTAACAATAAACAAAA") == 0 && p != KMHASH_END(kmer_table))
-	//	log_error("%s %ld", big_kmer, k);
+	//if (strcmp(big_kmer, "TTTAATTATCATAGTATTTGTTTGAAAAAAAAAAAAAT") == 0 && p != KMHASH_END(kmer_table))
+	//	log_warn("%s %ld", big_kmer, k);
+	//if (strcmp(big_kmer, "ATTTTTTTTTTTTTCAAACAAATACTATGATAATTAAA") == 0 && p != KMHASH_END(kmer_table))
+	//	log_warn("%s %ld", big_kmer, k);
 	if (p == KMHASH_END(kmer_table))
 		return 0;
 	return 1;
