@@ -482,30 +482,42 @@ int get_adj_node(struct asm_graph_t *g, int v, int id)
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
-		struct kmhash_t *kmer_table)
+		struct kmhash_t *kmer_table, int *is_rc_dup)
 {
+	int e_rc = g->edges[e].rc_id;
+	if (is_rc_dup[e] && e > e_rc)
+		return;
 	int pu = g->edges[e].source;
 	int pv = g->edges[e].target;
 	int ok = 1;
-	if (g->edges[e].seq_len > g->ksize + 1 && g->edges[e].seq_len <= 100){
-		char *seq;
-		char *kmer = calloc(g->ksize + 3, sizeof(char));
-		char *kmer_rc = calloc(g->ksize + 3, sizeof(char));
-		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
-		for (int i = 0; i + g->ksize + 2 <= g->edges[e].seq_len; ++i){
-			strncpy(kmer, seq + i, g->ksize + 2);
-			strcpy(kmer_rc, kmer);
-			flip_reverse(kmer_rc);
-			if (!get_big_kmer_count(kmer, kmer_table) &&
-				!get_big_kmer_count(kmer_rc, kmer_table)){
-				ok = 0;
-				break;
-			}
-		}
-		free(seq);
-		free(kmer);
-		free(kmer_rc);
-	}
+	//if (g->edges[e].seq_len > g->ksize + 1 && g->edges[e].seq_len <= g->ksize + 10){
+	//	int unmatch = 0;
+	//	char *seq;
+	//	char *kmer = calloc(g->ksize + 3, sizeof(char));
+	//	char *kmer_rc = calloc(g->ksize + 3, sizeof(char));
+	//	decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+	//	for (int i = 0; i + g->ksize + 2 <= g->edges[e].seq_len; ++i){
+	//		strncpy(kmer, seq + i, g->ksize + 2);
+	//		strcpy(kmer_rc, kmer);
+	//		flip_reverse(kmer_rc);
+	//		if (!get_big_kmer_count(kmer, kmer_table) &&
+	//			!get_big_kmer_count(kmer_rc, kmer_table)){
+	//			++unmatch;
+	//			int total_kmer = g->edges[e].seq_len - (g->ksize + 2) + 1;
+	//			//if (1.0 * unmatch / total_kmer > 0.05){
+	//			if (unmatch){
+	//				ok = 0;
+	//				log_info("Delete edge %d len %d match %d",
+	//						e, g->edges[e].seq_len,
+	//						total_kmer - unmatch);
+	//				break;
+	//			}
+	//		}
+	//	}
+	//	free(seq);
+	//	free(kmer);
+	//	free(kmer_rc);
+	//}
 	if (g->edges[e].seq_len > g->ksize + 1){
 		supg->nodes = realloc(supg->nodes, (supg->n_v + 2)
 				* sizeof(struct asm_node_t));
@@ -519,6 +531,7 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		if (ok){
 			supg->edges = realloc(supg->edges, (supg->n_e + 1)
 					* sizeof(struct asm_edge_t));
+			memset(supg->edges + supg->n_e, 0, sizeof(struct asm_edge_t));
 			asm_add_node_adj(supg, u, supg->n_e);
 			asm_clone_seq(supg->edges + supg->n_e, g->edges + e);
 			supg->edges[supg->n_e].source = u;
@@ -534,8 +547,8 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		int u = supg->n_v;
 		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
 		kh_long_int_set(node_map_bw, GET_CODE(e, pv), u);
-		log_debug("(pu, e, pv) = (%d, %d, %d) -> (u) = (%d)", pu, e, pv,
-				u);
+		//log_debug("(pu, e, pv) = (%d, %d, %d) -> (u) = (%d)", pu, e, pv,
+		//		u);
 		++supg->n_v;
 	}
 }
@@ -557,10 +570,16 @@ int get_big_kmer_count(char *big_kmer, struct kmhash_t *kmer_table)
 {
 	int len = strlen(big_kmer);
 	uint8_t *key = calloc((len + 3) >> 2, sizeof(uint8_t));
+	//int word_size = (len + 3) >> 2;
 	for (int i = 0; i < len; ++i)
 		key[i >> 2] |= nt4_table[big_kmer[len - i - 1]] << ((i & 3) << 1);
+	//uint64_t k = MurmurHash3_x64_64(key, word_size);
 	kmint_t p = kmhash_get(kmer_table, key);
 	free(key);
+	//if (strcmp(big_kmer, "TTTTGTTTATTGTTAATTTG") == 0 && p != KMHASH_END(kmer_table))
+	//	log_error("%s %ld", big_kmer, k);
+	//if (strcmp(big_kmer, "CAAATTAACAATAAACAAAA") == 0 && p != KMHASH_END(kmer_table))
+	//	log_error("%s %ld", big_kmer, k);
 	if (p == KMHASH_END(kmer_table))
 		return 0;
 	return 1;
@@ -594,57 +613,62 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
-		struct kmhash_t *kmer_table)
+		struct kmhash_t *kmer_table, int *is_rc_dup)
 {
-	for (int u = 0; u < g->n_v; ++u){
-		//if (100 * (u + 1) / g->n_v > 100 * u / g->n_v)
-		//	log_debug("Processed %d/%d vertices (%d\%)", u + 1,
-		//			g->n_v, 100 * (u + 1) / g->n_v);
+	for (int e1 = 0; e1 < g->n_e; ++e1){
+		if (is_rc_dup[e1] && e1 > g->edges[e1].rc_id)
+			continue;
+		int u = g->edges[e1].target;
 		for (int i = 0; i < g->nodes[u].deg; ++i){
-			int e1 = g->nodes[u].adj[i];
-			int v = g->edges[e1].target;
-			for (int j = 0; j < g->nodes[v].deg; ++j){
-				int e2 = g->nodes[v].adj[j];
-				int w = g->edges[e2].target;
-				char *big_kmer;
-				get_big_kmer(e1, e2, g, &big_kmer);
+			int e2 = g->nodes[u].adj[i];
+			if (is_rc_dup[e2] && e2 > g->edges[e2].rc_id)
+				continue;
+			char *big_kmer;
+			get_big_kmer(e1, e2, g, &big_kmer);
 
-				char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
-				strcpy(big_kmer_rc, big_kmer);
-				flip_reverse(big_kmer_rc);
+			char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
+			strcpy(big_kmer_rc, big_kmer);
+			flip_reverse(big_kmer_rc);
 
-				int count = 0;
-				int a = get_big_kmer_count(big_kmer, kmer_table);
-				int b = get_big_kmer_count(big_kmer_rc, kmer_table);
-				//if (a != b)
-				//	log_error("Reverse complement counts are not consistent: %s, %s, %d, %d",
-				//			big_kmer, big_kmer_rc,
-				//			a, b);
-				//if (get_big_kmer_count(big_kmer, kmer_table)
-				//	|| get_big_kmer_count(big_kmer_rc, kmer_table))
-				//	count = 100;
-				if (a || b)
-					count = 100;
-				if (count >= 1){
-					add_super_edge(v, e1, e2, supg, big_kmer,
-							count, node_map_fw,
-							node_map_bw);
-				}
-				free(big_kmer);
+			int count = 0;
+			int a = get_big_kmer_count(big_kmer, kmer_table);
+			int b = get_big_kmer_count(big_kmer_rc, kmer_table);
+			//if (a != b)
+			//	log_error("Reverse complement counts are not consistent: %s, %s, %d, %d",
+			//			big_kmer, big_kmer_rc,
+			//			a, b);
+			//if (get_big_kmer_count(big_kmer, kmer_table)
+			//	|| get_big_kmer_count(big_kmer_rc, kmer_table))
+			//	count = 100;
+			if (a || b)
+				count = 100;
+			if (count >= 1){
+				add_super_edge(u, e1, e2, supg, big_kmer,
+						count, node_map_fw,
+						node_map_bw);
 			}
+			free(big_kmer);
 		}
 	}
 }
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw)
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
+		int *is_rc_dup)
 {
 	for (int u = 0; u < g->n_v; ++u){
 		for (int i = 0; i < g->nodes[u].deg; ++i){
 			int e = g->nodes[u].adj[i];
 			int u_rc = g->nodes[u].rc_id;
 			int e_rc = g->edges[e].rc_id;
+			if (is_rc_dup[e]){
+				if (e > e_rc)
+					continue;
+				else
+					e_rc = e;
+			}
 
+			//__VERBOSE("%d %d %d %d\n", u, e, e_rc, is_rc_dup[e]);
 			int supu = kh_long_int_get(node_map_fw, GET_CODE(u, e));
 			int supu_rc = kh_long_int_get(node_map_bw,
 					GET_CODE(e_rc, u_rc));
@@ -658,6 +682,12 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 		for (int i = 0; i < g->nodes[v_rc].deg; ++i){
 			int e_rc = g->nodes[v_rc].adj[i];
 			int e = g->edges[e_rc].rc_id;
+			if (is_rc_dup[e]){
+				if (e > e_rc)
+					continue;
+				else
+					e_rc = e;
+			}
 
 			int supv = kh_long_int_get(node_map_bw, GET_CODE(e, v));
 			int supv_rc = kh_long_int_get(node_map_fw,
@@ -688,9 +718,44 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 	}
 }
 
+void get_duplicate_rc_edges(struct asm_graph_t *g, int **is_rc_dup)
+{
+	*is_rc_dup = calloc(g->n_e, sizeof(int));
+	for (int e = 0; e < g->n_e; ++e){
+		int e_rc = g->edges[e].rc_id;
+		int sr = g->edges[e].source;
+		int tg = g->edges[e].target;
+		int rc_sr = g->edges[e_rc].source;
+		int rc_tg = g->edges[e_rc].target;
+		if (sr == rc_sr && tg == rc_tg &&
+			strcmp((char *) g->edges[e].seq, (char *) g->edges[e_rc].seq) == 0){
+			char *seq;
+			decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+			//log_info("Reverse complements are duplicate at %d and %d, seq = %s",
+			//		e, e_rc, seq);
+			free(seq);
+			(*is_rc_dup)[e] = 1;
+			(*is_rc_dup)[e_rc] = 1;
+		}
+	}
+}
+
 void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		struct asm_graph_t *supg)
 {
+	//__VERBOSE("\n\n\n");
+	//for (int u = 0; u < g->n_v; ++u){
+	//	for (int i = 0; i < g->nodes[u].deg; ++i){
+	//		int e = g->nodes[u].adj[i];
+	//		int v = g->edges[e].target;
+	//		if (v == 123091)
+	//			__VERBOSE("in %d %d %d\n", u, e, v);
+	//		if (u == 123091)
+	//			__VERBOSE("out %d %d %d\n", u, e, v);
+	//	}
+	//}
+	int *is_rc_dup;
+	get_duplicate_rc_edges(g, &is_rc_dup);
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
 	log_info("Creating kmer table");
@@ -703,23 +768,30 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		//if (100 * (e + 1) / g->n_e > 100 * e / g->n_e)
 		//	log_info("Processed %d/%d edges (%d\%)", e + 1,
 		//			g->n_e, 100 * (e + 1) / g->n_e);
-		create_super_nodes(g, e, supg, node_map_fw, node_map_bw, kmer_table);
+		create_super_nodes(g, e, supg, node_map_fw, node_map_bw,
+				kmer_table, is_rc_dup);
 	}
 
 	log_info("Creating super edges");
-	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
+	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table,
+			is_rc_dup);
+
 	kmhash_destroy(kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");
-	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
+	assign_reverse_complement(g, supg, node_map_fw, node_map_bw, is_rc_dup);
+	free(is_rc_dup);
+
 	kh_destroy(long_int, node_map_fw);
 	kh_destroy(long_int, node_map_bw);
 
 	test_asm_graph(supg);
-	struct asm_graph_t g1;
-	asm_condense(supg, &g1);
-	asm_graph_destroy(supg);
-	*supg = g1;
 	supg->ksize = super_k;
+	if (super_k % 2){
+		struct asm_graph_t g1;
+		asm_condense(supg, &g1);
+		asm_graph_destroy(supg);
+		*supg = g1;
+	}
 }
 
 void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk)

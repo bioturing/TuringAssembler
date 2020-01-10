@@ -46,11 +46,12 @@ int get_adj_node(struct asm_graph_t *g, int v, int id);
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
-		struct kmhash_t *kmer_table);
+		struct kmhash_t *kmer_table, int *is_rc_dup);
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
-		struct kmhash_t *kmer_table);
+		struct kmhash_t *kmer_table, int *is_rc_dup);
+
 void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk);
 
 void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer);
@@ -62,5 +63,8 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_bw);
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw);
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
+		int *is_rc_dup);
+
+void get_duplicate_rc_edges(struct asm_graph_t *g, int **is_rc_dup);
 #endif

@@ -90,10 +90,16 @@ void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
 	//	seq[ksize - i - 1] = int_to_base((kedge[i >> 2] >> ((i & 3) << 1)) & 3);
 	//for (int i = 0; i < ksize; ++i)
 	//	seq_rc[ksize - i - 1] = int_to_base((kedge_rc[i >> 2] >> ((i & 3) << 1)) & 3);
-	//log_info("%s", seq);
-	//log_info("%s", seq_rc);
-	//exit(0);
+	//if (ksize == 20){
+	//	log_info("seq %s", seq);
+	//	log_info("src %s", seq_rc);
+	//}
+	//if (strcmp(seq, "GTATTTTTTATAATTTTTTT") == 0)
+	//	log_info("seq %s seq_rc %s", seq, seq_rc);
+	//if (strcmp(seq_rc, "GTATTTTTTATAATTTTTTT") == 0)
+	//	log_info("seq %s seq_rc %s", seq, seq_rc);
 	//free(seq);
+	//free(seq_rc);
 	kmhash_put_multi(h, kedge, h->locks + thread_no);
 	kmhash_put_multi(h, kedge_rc, h->locks + thread_no);
 }

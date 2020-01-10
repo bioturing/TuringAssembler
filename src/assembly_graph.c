@@ -1061,6 +1061,15 @@ void test_asm_graph(struct asm_graph_t *g)
 				}
 			}
 		}
+		///* Test 6: Node deg must be <= 4 */
+		//if (g->nodes[u].deg > 4){
+		//	for (int i = 0; i < g->nodes[u].deg; ++i){
+		//		int e = g->nodes[u].adj[i];
+		//		int v = g->edges[e].target;
+		//		__VERBOSE("%d %d\n", e, v);
+		//	}
+		//	log_error("Node %d has deg %d", u, g->nodes[u].deg);
+		//}
 	}
 	for (e = 0; e < g->n_e; ++e) {
 		if (g->edges[e].source == -1) /* edge was removed */
