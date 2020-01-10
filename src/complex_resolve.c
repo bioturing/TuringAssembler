@@ -615,6 +615,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
 		struct kmhash_t *kmer_table, int *is_rc_dup)
 {
+	//int *total = calloc(g->n_v, sizeof(int));
+	//int *accept = calloc(g->n_v, sizeof(int));
 	for (int e1 = 0; e1 < g->n_e; ++e1){
 		if (is_rc_dup[e1] && e1 > g->edges[e1].rc_id)
 			continue;
@@ -642,14 +644,43 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			//	count = 100;
 			if (a || b)
 				count = 100;
+			//++total[u];
+
 			if (count >= 1){
 				add_super_edge(u, e1, e2, supg, big_kmer,
 						count, node_map_fw,
 						node_map_bw);
+				//++accept[u];
 			}
 			free(big_kmer);
 		}
 	}
+
+	//for (int u = 0; u < g->nodes[u].deg; ++u){
+	//	if (total[u] > 0 && accept[u] == 0){
+	//		printf("weird u %d\n", u);
+	//		int u_rc = g->nodes[u].rc_id;
+	//		printf("in: ");
+	//		for (int i = 0; i < g->nodes[u_rc].deg; ++i)
+	//			printf("%d ", g->edges[g->nodes[u_rc].adj[i]].rc_id);
+	//		printf("\n");
+	//		printf("out: ");
+	//		for (int i = 0; i < g->nodes[u].deg; ++i)
+	//			printf("%d ", g->nodes[u].adj[i]);
+	//		printf("\n");
+
+	//		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+	//			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+	//			for (int j = 0; j < g->nodes[u].deg; ++j){
+	//				int e2 = g->nodes[u].adj[j];
+	//				char *big_kmer;
+	//				get_big_kmer(e1, e2, g, &big_kmer);
+	//				printf("%s\n", big_kmer);
+	//				free(big_kmer);
+	//			}
+	//		}
+	//	}
+	//}
 }
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
@@ -784,7 +815,6 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	kh_destroy(long_int, node_map_fw);
 	kh_destroy(long_int, node_map_bw);
 
-	test_asm_graph(supg);
 	supg->ksize = super_k;
 	if (super_k % 2){
 		log_info("Condesing graph");
@@ -793,10 +823,11 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		asm_graph_destroy(supg);
 		*supg = g1;
 
-		log_info("Resolving graph");
-		struct asm_graph_t g2;
-		resolve_graph_operation(supg, &g2);
+		//log_info("Resolving graph");
+		//struct asm_graph_t g2;
+		//resolve_graph_operation(supg, &g2);
 	}
+	test_asm_graph(supg);
 }
 
 void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk)
