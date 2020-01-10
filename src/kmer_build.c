@@ -1088,8 +1088,9 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	}
 
 	log_debug("|---- Retrieving kmer from KMC database");
-	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct kmhash_t));
+	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
 	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
+	assert(kmer_table->key[0] == -1);
 	struct kmc_info_t kmc_inf;
 
 	char *kmc_pre = alloca(strlen(work_dir) + 50);
@@ -1101,8 +1102,10 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	struct km_minihash_bundle_t kmbuild_bundle;
 	kmbuild_bundle.h = kmer_table;
 	kmbuild_bundle.ksize = ksize + 1;
+	assert(kmer_table->key[0] == -1);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 							(void *)(&kmbuild_bundle), count_kmer_minihash_multi);
+	assert(kmer_table->key[0] == -1);
 	//todo huu destroy kmbuild_bundle
 //	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */

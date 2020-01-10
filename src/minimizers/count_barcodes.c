@@ -75,6 +75,9 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 	table->h = calloc(h_size, sizeof(uint64_t));
 	table->key = calloc(h_size, sizeof(uint64_t));
 	memset(table->key, 255, sizeof(uint64_t) * h_size);
+	for (int i = 0; i < h_size; i++) {
+		assert(table->key[i] == -1);
+	}
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
 	table->count = 0;
@@ -224,6 +227,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
+	int go_around = 0;
 	if (is_empty) { // slot is empty -> fill in
 		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
@@ -234,11 +238,21 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 				break;
 		}
 		if (i == h_table->size) {
+			go_around = 1;
 			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
 				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
 				if (is_empty)
 					break;
 			}
+		}
+		log_info("%lld", h_table->key[0]);
+		if (i == slot) {
+			for (int i = 0; i < h_table->size; i+= 1000) {
+				log_info("%lld", h_table->key[i]);
+			}
+			log_info("size %d count %d maxcount %d key0 %lld EMPTY %lld goaround %d",
+				h_table->size, h_table->count, h_table->max_cnt, h_table->key[0], EMPTY_SLOT, go_around);
+			log_error("i == slot == %d", i);
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
