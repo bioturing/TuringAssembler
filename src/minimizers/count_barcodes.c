@@ -183,7 +183,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 	assert(h_table->h != NULL);
 	for (i = 0; i < h_table->size; ++i) {
 		if (!((i + 1) % log_size)) {
-			log_info("Copied %d elements", log_size);
+			log_debug("Copied %d elements", log_size);
 			log_size <<= 1;
 		}
 		if (__mini_empty(h_table, i))
@@ -196,7 +196,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 	}
 //	destroy_mini_hash(h_table);
 	*new_table_ptr = new_table;
-	log_info("new size %d", new_table->prime_index);
+	log_debug("new size %d", new_table->prime_index);
 }
 
 /**
@@ -321,7 +321,7 @@ uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 //	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
 		int old_size = (*h_table)->size;
 		try_expanding(h_table);
-		log_info("miniput %d", (*h_table)->prime_index);
+		log_debug("miniput %d", (*h_table)->prime_index);
 		if (old_size == (*h_table)->size) {
 			log_error("old size %d new size %d", old_size, (*h_table)->size);
 		}
