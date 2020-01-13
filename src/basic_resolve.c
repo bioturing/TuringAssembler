@@ -653,6 +653,7 @@ gint_t remove_tips(struct asm_graph_t *g)
 	double cov_fw, cov_rv, cov, max_cov;
 	uint32_t len_fw, len_rv, extend_left, extend_right;
 	cnt_removed = 0;
+	double genome_cov = get_genome_coverage_h(g);
 	for (u = 0; u < g->n_v; ++u) {
 		u_rc = g->nodes[u].rc_id;
 		cov_fw = cov_rv = 0;
@@ -675,6 +676,7 @@ gint_t remove_tips(struct asm_graph_t *g)
 			extend_right |= (g->nodes[v].deg != 0 || g->edges[e].seq_len >= MIN_TIPS_LEG);
 		}
 		max_cov = __max(cov_fw, cov_rv);
+		max_cov = __min(5 * genome_cov, max_cov);
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
 			v = g->edges[e].target;
