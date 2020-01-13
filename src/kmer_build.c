@@ -1106,7 +1106,8 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	kmbuild_bundle.h = &kmer_table;
 	kmbuild_bundle.ksize = ksize + 1;
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
-							(void *)(&kmbuild_bundle), count_kmer_minihash_multi);
+					(void *)(&kmbuild_bundle),
+					count_kmer_minihash_multi);
 	//todo huu destroy kmbuild_bundle
 //	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */
