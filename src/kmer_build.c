@@ -87,11 +87,13 @@ void count_kmer_minihash_multi(int thread_no, uint8_t *kedge, uint32_t count, vo
 	}
 	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
 	for (int i = 0; i < ksize; i++) {
-		km_shift_append(seq, ksize, (ksize+3)>>2, res[i]);
+		km_shift_append(seq, ksize, (ksize+3)>>2, nt4_table[res[i]]);
 	}
 	uint64_t hash = MurmurHash3_x64_64(seq, (ksize + 3) >> 2);
 	uint64_t *slot = mini_put(h, hash);
 	atomic_add_and_fetch64(slot , count);
+	free(seq);
+	free(res);
 }
 
 void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)

@@ -566,7 +566,7 @@ int get_big_kmer_count(char *big_kmer, struct mini_hash_t *kmer_table)
 	int ksize = strlen(big_kmer);
 	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
 	for (int i = 0; i < ksize; i++) {
-		km_shift_append(seq, ksize, (ksize+3)>>2, big_kmer[i]);
+		km_shift_append(seq, ksize, (ksize+3)>>2, nt4_table[big_kmer[i]]);
 	}
 	uint64_t key_new = MurmurHash3_x64_64(seq, (ksize +3 ) >> 2);
 	uint64_t *slot = mini_get(kmer_table, key_new);
@@ -640,32 +640,6 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			free(big_kmer_rc);
 		}
 	}
-
-	//for (int u = 0; u < g->nodes[u].deg; ++u){
-	//	if (total[u] > 0 && accept[u] == 0){
-	//		printf("weird u %d\n", u);
-	//		int u_rc = g->nodes[u].rc_id;
-	//		printf("in: ");
-	//		for (int i = 0; i < g->nodes[u_rc].deg; ++i)
-	//			printf("%d ", g->edges[g->nodes[u_rc].adj[i]].rc_id);
-	//		printf("\n");
-	//		printf("out: ");
-	//		for (int i = 0; i < g->nodes[u].deg; ++i)
-	//			printf("%d ", g->nodes[u].adj[i]);
-	//		printf("\n");
-
-	//		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
-	//			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
-	//			for (int j = 0; j < g->nodes[u].deg; ++j){
-	//				int e2 = g->nodes[u].adj[j];
-	//				char *big_kmer;
-	//				get_big_kmer(e1, e2, g, &big_kmer);
-	//				printf("%s\n", big_kmer);
-	//				free(big_kmer);
-	//			}
-	//		}
-	//	}
-	//}
 }
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
@@ -832,9 +806,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		asm_graph_destroy(supg);
 		*supg = g1;
 
-		log_info("Resolving graph");
-		struct asm_graph_t g2;
-		resolve_graph_operation(supg, &g2);
+		//log_info("Resolving graph");
+		//struct asm_graph_t g2;
+		//resolve_graph_operation(supg, &g2);
 	}
 	test_asm_graph(supg);
 }
