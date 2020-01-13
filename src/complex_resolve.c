@@ -771,6 +771,10 @@ void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 			c_n++;
 		}
 	}
+
+	for (int e = 0; e < g->n_e; ++e)
+		c_e += g->nodes[g->edges[e].target].deg;
+
 	*count_edge = c_e;
 	*count_node = c_n;
 }
