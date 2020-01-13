@@ -14,6 +14,11 @@ struct kmbuild_bundle_t {
 	uint8_t *k2_rc;
 };
 
+struct km_minihash_bundle_t {
+    int ksize;
+    struct mini_hash_t **h;
+};
+
 void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 				char **files_1, char **files_2, char *work_dir,
 						struct asm_graph_t *g);
@@ -27,7 +32,7 @@ void build_local_graph_cov(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, int e1, int e2, char *work_dir,
 		char *R1_path, char *R2_path);
 
-struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
+struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 		char **files_2, int n_threads, int mmem, char *work_dir);
 void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
 		void *data);

@@ -75,6 +75,9 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 	table->h = calloc(h_size, sizeof(uint64_t));
 	table->key = calloc(h_size, sizeof(uint64_t));
 	memset(table->key, 255, sizeof(uint64_t) * h_size);
+	for (int i = 0; i < h_size; i++) {
+		assert(table->key[i] == -1);
+	}
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
 	table->count = 0;
@@ -191,8 +194,9 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 		slot = mini_put_by_key(new_table, data, key);
 		*slot = val;
 	}
-	destroy_mini_hash(h_table);
+//	destroy_mini_hash(h_table);
 	*new_table_ptr = new_table;
+	log_info("new size %d", new_table->prime_index);
 }
 
 /**
@@ -201,20 +205,23 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 inline void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
-	if (table->count == table->max_cnt) {
+	log_info("try expanding %d %d", table->count, table->max_cnt);
+	if (table->count >= table->max_cnt) {
 		if (table->prime_index < N_PRIMES_NUMBER - 1) {
-			log_info("Doubling hash table...");
+			log_info("Doubling hash table... %d", table->prime_index);
 			mini_expand(h_table);
+			log_info("expand size %d", (*h_table)->prime_index);
 		} else {
 			if ((double)table->count > FATAL_LOAD_FACTOR * (table->size)) {
 				log_warn("Hash table size reached limit!");
 			}
 		}
 	}
+	log_info("Expanding done");
 }
 
 /**
- * Increase the the count of one barcode by 1
+ * Return slot of data
  * @param data  barcode encoded as an uint64_t number
  * @param key   hash(data)
  */
@@ -224,6 +231,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
 	uint64_t is_empty = atomic_bool_CAS64(h_table->key + slot, EMPTY_SLOT, data);
+	int go_around = 0;
 	if (is_empty) { // slot is empty -> fill in
 		atomic_add_and_fetch64(&(h_table->count), 1);
 	} else if (!atomic_bool_CAS64(h_table->key + slot, data, data)) { // slot is reserved
@@ -234,11 +242,15 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 				break;
 		}
 		if (i == h_table->size) {
+			go_around = 1;
 			for (i = 0; i < slot && !atomic_bool_CAS64(h_table->key + i, data, data); ++i) {
 				is_empty = atomic_bool_CAS64(h_table->key + i, EMPTY_SLOT, data);
 				if (is_empty)
 					break;
 			}
+		}
+		if (i == slot) {
+			log_error("i == slot == %d", i);
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
 		if (is_empty) //room at probe is empty -> fill in
@@ -297,19 +309,24 @@ uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
 }
 
 /**
- * @brief Increase the count of data to 1
+ * @brief Return slot of the data
  * @param data byte array of data
  * @param len length in byte of data
  */
 uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
-	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
-	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
-		pthread_mutex_lock(&h_table_mut);
+	pthread_mutex_lock(&h_table_mut);
+	if ((*h_table)->count >= (*h_table)->max_cnt) {
+//	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
+		int old_size = (*h_table)->size;
 		try_expanding(h_table);
-		pthread_mutex_unlock(&h_table_mut);
+		log_info("miniput %d", (*h_table)->prime_index);
+		if (old_size == (*h_table)->size) {
+			log_error("old size %d new size %d", old_size, (*h_table)->size);
+		}
 	}
+	pthread_mutex_unlock(&h_table_mut);
 	return mini_put_by_key(*h_table, data, key);
 }
 

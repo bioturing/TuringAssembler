@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <minimizers/count_barcodes.h>
 
 #include "assembly_graph.h"
 #include "atomic.h"
@@ -75,37 +76,22 @@ static inline int check_kmer(uint8_t *kmer, int len, int l)
 	return ((kmer[l - 1] & (~(((uint8_t)1 << (k << 1)) - 1))) == 0);
 }
 
-void kmer_count_from_reads_multi(int thread_no, uint8_t *kedge, uint32_t count,
-		void *data)
+void count_kmer_minihash_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)
 {
-	struct kmbuild_bundle_t *bundle = (struct kmbuild_bundle_t *)data;
-	struct kmhash_t *h = bundle->h;
+	struct km_minihash_bundle_t *bundle = (struct km_minihash_bundle_t *) data;
+	struct mini_hash_t *h = bundle->h;
 	int ksize = bundle->ksize;
-	int word_size = (ksize + 3) >> 2;
-	uint8_t *kedge_rc = alloca(word_size);
-	km_get_rc(kedge_rc, kedge, ksize, word_size);
-	//uint64_t k = MurmurHash3_x64_64(kedge, word_size);
-	//if (k == (uint64_t) -5214783808680829881ll){
-	//__VERBOSE("%d\n", ksize);
-	//if (ksize == 38){
-	//	char *seq = calloc(ksize + 1, sizeof(char));
-	//	char *seq_rc = calloc(ksize + 1, sizeof(char));
-	//	for (int i = 0; i < ksize; ++i)
-	//		seq[ksize - i - 1] = int_to_base((kedge[i >> 2] >> ((i & 3) << 1)) & 3);
-	//	for (int i = 0; i < ksize; ++i)
-	//		seq_rc[ksize - i - 1] = int_to_base((kedge_rc[i >> 2] >> ((i & 3) << 1)) & 3);
-	//	log_info("seq %s", seq);
-	//	log_info("src %s", seq_rc);
-	//	//if (strcmp(seq, "GTATTTTTTATAATTTTTTT") == 0)
-	//	//	log_info("seq %s seq_rc %s", seq, seq_rc);
-	//	//if (strcmp(seq_rc, "GTATTTTTTATAATTTTTTT") == 0)
-	//	//	log_info("seq %s seq_rc %s", seq, seq_rc);
-	//	free(seq);
-	//	free(seq_rc);
-
-	//}
-	kmhash_put_multi(h, kedge, h->locks + thread_no);
-	kmhash_put_multi(h, kedge_rc, h->locks + thread_no);
+	char *res = calloc(ksize+1, 1);
+	for (int i = 0; i < ksize; i++) {
+		res[ksize-i-1] = nt4_char[(kedge[i>>2] >> ((i & 3)<<1)) & 3];
+	}
+	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
+	for (int i = 0; i < ksize; i++) {
+		km_shift_append(seq, ksize, (ksize+3)>>2, res[i]);
+	}
+	uint64_t hash = MurmurHash3_x64_64(seq, (ksize + 3) >> 2);
+	uint64_t *slot = mini_put(h, hash);
+	atomic_add_and_fetch64(slot , count);
 }
 
 void split_kmer_from_kedge_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)
@@ -1076,7 +1062,7 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 	destroy_kmc_info(&kmc_inf);
 }
 
-struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
+struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 		char **files_2, int n_threads, int mmem, char *work_dir)
 {
 	log_debug("|---- Build graph from scratch");
@@ -1102,7 +1088,10 @@ struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 	}
 
 	log_debug("|---- Retrieving kmer from KMC database");
-	struct kmhash_t *kmer_table = calloc(1, sizeof(struct kmhash_t));
+	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
+	init_mini_hash(&kmer_table, 2);
+//	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
+	assert(kmer_table->key[0] == -1);
 	struct kmc_info_t kmc_inf;
 
 	char *kmc_pre = alloca(strlen(work_dir) + 50);
@@ -1111,14 +1100,13 @@ struct kmhash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 	sprintf(kmc_suf, "%s/KMC_%d_count.kmc_suf", work_dir, ksize + 1);
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 
-	kmhash_init(kmer_table, SIZE_16MB, (ksize + 3) >> 2, KM_AUX_ADJ, n_threads);
-	struct kmbuild_bundle_t kmbuild_bundle;
-	kmbuild_bundle_init(&kmbuild_bundle, kmer_table, ksize + 1);
+	struct km_minihash_bundle_t kmbuild_bundle;
+	kmbuild_bundle.h = &kmer_table;
+	kmbuild_bundle.ksize = ksize + 1;
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
-				(void *)(&kmbuild_bundle),
-				kmer_count_from_reads_multi);
-	kmbuild_bundle_destroy(&kmbuild_bundle);
+							(void *)(&kmbuild_bundle), count_kmer_minihash_multi);
+	//todo huu destroy kmbuild_bundle
+//	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */
-	log_info("Number of kmer: %lu", kmer_table->n_item);
 	return kmer_table;
 }
