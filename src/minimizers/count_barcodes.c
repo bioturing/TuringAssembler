@@ -205,19 +205,19 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 inline void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
-	log_info("try expanding %d %d", table->count, table->max_cnt);
+	log_debug("try expanding %d %d", table->count, table->max_cnt);
 	if (table->count >= table->max_cnt) {
 		if (table->prime_index < N_PRIMES_NUMBER - 1) {
-			log_info("Doubling hash table... %d", table->prime_index);
+			log_debug("Doubling hash table... %d", table->prime_index);
 			mini_expand(h_table);
-			log_info("expand size %d", (*h_table)->prime_index);
+			log_debug("expand size %d", (*h_table)->prime_index);
 		} else {
 			if ((double)table->count > FATAL_LOAD_FACTOR * (table->size)) {
 				log_warn("Hash table size reached limit!");
 			}
 		}
 	}
-	log_info("Expanding done");
+	log_debug("Expanding done");
 }
 
 /**

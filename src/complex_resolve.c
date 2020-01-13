@@ -609,6 +609,11 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 {
 	//int *total = calloc(g->n_v, sizeof(int));
 	//int *accept = calloc(g->n_v, sizeof(int));
+	int deg_sum = 0;
+	for (int i = 0; i < g->n_e; ++i)
+		deg_sum += g->nodes[g->edges[i].target].deg;
+	log_info("Number of iterations: %d", deg_sum);
+
 	for (int e1 = 0; e1 < g->n_e; ++e1){
 		if (is_rc_dup[e1] && e1 > g->edges[e1].rc_id)
 			continue;
