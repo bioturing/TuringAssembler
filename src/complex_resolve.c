@@ -758,16 +758,19 @@ void get_duplicate_rc_edges(struct asm_graph_t *g, int **is_rc_dup)
 		int tg = g->edges[e].target;
 		int rc_sr = g->edges[e_rc].source;
 		int rc_tg = g->edges[e_rc].target;
-		if (sr == rc_sr && tg == rc_tg &&
-			strcmp((char *) g->edges[e].seq, (char *) g->edges[e_rc].seq) == 0){
-			char *seq;
-			decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		char *seq;
+		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		char *seq_rc;
+		decode_seq(&seq_rc, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
+
+		if (sr == rc_sr && tg == rc_tg && strcmp(seq, seq_rc) == 0){
 			//log_info("Reverse complements are duplicate at %d and %d, seq = %s",
 			//		e, e_rc, seq);
-			free(seq);
 			(*is_rc_dup)[e] = 1;
 			(*is_rc_dup)[e_rc] = 1;
 		}
+		free(seq);
+		free(seq_rc);
 	}
 }
 
