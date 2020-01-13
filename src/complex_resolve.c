@@ -828,9 +828,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		asm_graph_destroy(supg);
 		*supg = g1;
 
-		//log_info("Resolving graph");
-		//struct asm_graph_t g2;
-		//resolve_graph_operation(supg, &g2);
+		log_info("Resolving graph");
+		struct asm_graph_t g2;
+		resolve_graph_operation(supg, &g2);
 	}
 	test_asm_graph(supg);
 }
