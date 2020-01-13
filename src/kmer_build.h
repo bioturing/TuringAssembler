@@ -16,7 +16,7 @@ struct kmbuild_bundle_t {
 
 struct km_minihash_bundle_t {
     int ksize;
-    struct mini_hash_t *h;
+    struct mini_hash_t **h;
 };
 
 void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,

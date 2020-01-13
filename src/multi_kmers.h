@@ -15,4 +15,8 @@ void save_graph_info(const char *out_dir, struct asm_graph_t *g, const char *suf
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g);
 void init_logger(int level, const char * file_path);
 void set_log_stage(char *stage);
+gint_t remove_tips(struct asm_graph_t *g);
+void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);
+void asm_graph_destroy(struct asm_graph_t *g);
+gint_t resolve_simple_bubble(struct asm_graph_t *g);
 #endif //SKIPPING_MULTI_KMERS_H

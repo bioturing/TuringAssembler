@@ -483,17 +483,12 @@ int get_adj_node(struct asm_graph_t *g, int v, int id)
 }
 
 void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
-		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw)
+		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw
+		)
 {
 	int pu = g->edges[e].source;
 	int pv = g->edges[e].target;
 	if (g->edges[e].seq_len > g->ksize + 1){
-		supg->nodes = realloc(supg->nodes, (supg->n_v + 2)
-				* sizeof(struct asm_node_t));
-		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t) * 2);
-		supg->edges = realloc(supg->edges, (supg->n_e + 1)
-				* sizeof(struct asm_edge_t));
-		memset(&supg->edges[supg->n_e], 0, sizeof(struct asm_edge_t));
 		int u = supg->n_v;
 		int v = supg->n_v + 1;
 		asm_add_node_adj(supg, u, supg->n_e);
@@ -502,20 +497,17 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		supg->edges[supg->n_e].target = v;
 		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
 		kh_long_int_set(node_map_bw, GET_CODE(e, pv), v);
-		log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
-		log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
-		log_debug("old_edge %d -> new_edge %d", e, supg->n_e);
+//		log_debug("(pu, e) = (%d, %d) -> (u) = (%d)", pu, e, u);
+//		log_debug("(e, pv) = (%d, %d) -> (v) = (%d)", e, pv, v);
+//		log_debug("old_edge %d -> new_edge %d", e, supg->n_e);
 		supg->n_v += 2;
 		++supg->n_e;
 	} else {
-		supg->nodes = realloc(supg->nodes, (supg->n_v + 1)
-				* sizeof(struct asm_node_t));
-		memset(supg->nodes + supg->n_v, 0, sizeof(struct asm_node_t));
 		int u = supg->n_v;
 		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
 		kh_long_int_set(node_map_bw, GET_CODE(e, pv), u);
-		log_debug("(pu, e, pv) = (%d, %d, %d) -> (u) = (%d)", pu, e, pv,
-				u);
+//		log_debug("(pu, e, pv) = (%d, %d, %d) -> (u) = (%d)", pu, e, pv,
+//				u);
 		++supg->n_v;
 	}
 }
@@ -664,12 +656,35 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 	}
 }
 
+void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
+{
+	int c_e = 0, c_n = 0;
+	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		if (g->edges[i_e].seq_len > g->ksize + 1){
+			c_n += 2;
+			c_e+=1;
+
+		} else {
+			c_n++;
+		}
+	}
+	*count_edge = c_e;
+	*count_node = c_n;
+}
+
 void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		struct asm_graph_t *supg)
 {
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
+	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
+								 opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
+								 opt->out_dir);
 	log_info("Creating super nodes");
+	int estimate_node = 0, estimate_edge = 0;
+	estimate_something(g, &estimate_edge, &estimate_node);
+	supg->nodes = calloc(estimate_node, sizeof(struct asm_node_t));
+	supg->edges = calloc(estimate_edge, sizeof(struct asm_edge_t));
 	for (int e = 0; e < g->n_e; ++e){
 		//if (100 * (e + 1) / g->n_e > 100 * e / g->n_e)
 		//	log_info("Processed %d/%d edges (%d\%)", e + 1,
@@ -677,9 +692,6 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		create_super_nodes(g, e, supg, node_map_fw, node_map_bw);
 	}
 	log_info("Creating super edges");
-	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
-			opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
-			opt->out_dir);
 
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");

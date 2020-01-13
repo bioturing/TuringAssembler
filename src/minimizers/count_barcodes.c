@@ -194,8 +194,9 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 		slot = mini_put_by_key(new_table, data, key);
 		*slot = val;
 	}
-	destroy_mini_hash(h_table);
+//	destroy_mini_hash(h_table);
 	*new_table_ptr = new_table;
+	log_info("new size %d", new_table->prime_index);
 }
 
 /**
@@ -204,16 +205,19 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 inline void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
+	log_info("try expanding %d %d", table->count, table->max_cnt);
 	if (table->count >= table->max_cnt) {
 		if (table->prime_index < N_PRIMES_NUMBER - 1) {
-			log_info("Doubling hash table...");
+			log_info("Doubling hash table... %d", table->prime_index);
 			mini_expand(h_table);
+			log_info("expand size %d", (*h_table)->prime_index);
 		} else {
 			if ((double)table->count > FATAL_LOAD_FACTOR * (table->size)) {
 				log_warn("Hash table size reached limit!");
 			}
 		}
 	}
+	log_info("Expanding done");
 }
 
 /**
@@ -245,13 +249,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 					break;
 			}
 		}
-		log_info("%lld", h_table->key[0]);
 		if (i == slot) {
-			for (int i = 0; i < h_table->size; i+= 1000) {
-				log_info("%lld", h_table->key[i]);
-			}
-			log_info("size %d count %d maxcount %d key0 %lld EMPTY %lld goaround %d",
-				h_table->size, h_table->count, h_table->max_cnt, h_table->key[0], EMPTY_SLOT, go_around);
 			log_error("i == slot == %d", i);
 		}
 		assert(!atomic_bool_CAS64(&i, slot, slot));
@@ -317,14 +315,18 @@ uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
  */
 uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
-	struct mini_hash_t *table = *h_table;
 	uint64_t key = twang_mix64(data);
-//	if (table->count > table->max_cnt) {
-	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
-		pthread_mutex_lock(&h_table_mut);
+	pthread_mutex_lock(&h_table_mut);
+	if ((*h_table)->count >= (*h_table)->max_cnt) {
+//	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
+		int old_size = (*h_table)->size;
 		try_expanding(h_table);
-		pthread_mutex_unlock(&h_table_mut);
+		log_info("miniput %d", (*h_table)->prime_index);
+		if (old_size == (*h_table)->size) {
+			log_error("old size %d new size %d", old_size, (*h_table)->size);
+		}
 	}
+	pthread_mutex_unlock(&h_table_mut);
 	return mini_put_by_key(*h_table, data, key);
 }
 

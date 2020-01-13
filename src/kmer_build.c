@@ -90,7 +90,7 @@ void count_kmer_minihash_multi(int thread_no, uint8_t *kedge, uint32_t count, vo
 		km_shift_append(seq, ksize, (ksize+3)>>2, res[i]);
 	}
 	uint64_t hash = MurmurHash3_x64_64(seq, (ksize + 3) >> 2);
-	uint64_t *slot = mini_put(&h, hash);
+	uint64_t *slot = mini_put(h, hash);
 	atomic_add_and_fetch64(slot , count);
 }
 
@@ -1089,7 +1089,8 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 
 	log_debug("|---- Retrieving kmer from KMC database");
 	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
-	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
+	init_mini_hash(&kmer_table, 2);
+//	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
 	assert(kmer_table->key[0] == -1);
 	struct kmc_info_t kmc_inf;
 
@@ -1100,12 +1101,10 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	KMC_read_prefix(kmc_pre, &kmc_inf);
 
 	struct km_minihash_bundle_t kmbuild_bundle;
-	kmbuild_bundle.h = kmer_table;
+	kmbuild_bundle.h = &kmer_table;
 	kmbuild_bundle.ksize = ksize + 1;
-	assert(kmer_table->key[0] == -1);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 							(void *)(&kmbuild_bundle), count_kmer_minihash_multi);
-	assert(kmer_table->key[0] == -1);
 	//todo huu destroy kmbuild_bundle
 //	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */
