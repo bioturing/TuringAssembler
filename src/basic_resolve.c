@@ -677,14 +677,12 @@ gint_t remove_tips(struct asm_graph_t *g)
 		max_cov = __max(cov_fw, cov_rv);
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
-			if (g->edges[e].seq_len > TIPS_LEN_THRES)
-				continue;
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize);
 			if (g->nodes[v].deg == 0 && cov < max_cov &&
-				((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right && cov < TIPS_HARD_THRESHOLD) ||
-				 (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES) ||
-				 (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
+				((g->edges[e].seq_len < TIPS_LEN_THRES && extend_left && extend_right && cov < TIPS_HARD_THRESHOLD)
+				|| (cov < TIPS_COV_THRES && cov < max_cov * TIPS_RATIO_THRES))){
+				//|| (len_fw >= MIN_TIPS_LEG && len_rv >= MIN_TIPS_LEG && cov < max_cov * TIPS_RATIO_THRES))) {
 				e_rc = g->edges[e].rc_id;
 				asm_remove_edge(g, e);
 				asm_remove_edge(g, e_rc);

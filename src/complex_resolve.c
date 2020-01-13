@@ -791,7 +791,7 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table,
 			is_rc_dup);
 
-	// TODO: Destroy minihash
+	destroy_mini_hash(kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");
 	assign_reverse_complement(g, supg, node_map_fw, node_map_bw, is_rc_dup);
 	free(is_rc_dup);
