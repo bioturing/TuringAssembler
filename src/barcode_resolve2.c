@@ -166,7 +166,7 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 	gint_t cnt = 0, i, e;
 	for (i = 0; i < n_leg; ++i) {
 		e = legs[i];
-		cov = __get_edge_cov(g->edges + e, g->ksize);
+		cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		ratio = cov / uni_cov;
 		if (ratio > 0.75 && ratio < 1.25) {
 			sum_cov += cov;
@@ -556,7 +556,7 @@ int check_2_2_high_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov
 	struct cov_range_t rcov[4], ecov;
 	double fcov[4], ratio[4];
 	for (i = 0; i < 4; ++i) {
-		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize_count) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
 
@@ -649,7 +649,7 @@ int check_2_2_med_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	struct cov_range_t rcov[4], ecov;
 	double fcov[4], ratio[4];
 	for (i = 0; i < 4; ++i) {
-		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize_count) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
 	if (check_barcode_superior(g, legs[0], legs[2], legs[3]) == 1 ||
@@ -749,7 +749,7 @@ int check_2_2_low_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	struct cov_range_t rcov[4], ecov;
 	double fcov[4], ratio[4];
 	for (i = 0; i < 4; ++i) {
-		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize_count) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
 	if (check_barcode_positive(g, legs[0], legs[2]) == 1 ||
@@ -854,7 +854,7 @@ int check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	double uni_cov_local, fcov1, fcov2, e_cov;
 	struct cov_range_t rcov1, rcov2, e_rcov;
 	uni_cov_local = callibrate_uni_cov(g, legs, n_leg, uni_cov);
-	e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
+	e_cov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov_local;
 	uint64_t add_count, sub_count;
 	sub_count = 0;
 	ret = 0;
@@ -862,12 +862,12 @@ int check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 		resolve = 0;
 		for (i = 0; i < n_leg1; ++i) {
 			e1 = legs1[i];
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			e2 = bc_find_pair(g, e1, legs2, n_leg2);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -899,11 +899,11 @@ int check_n_m_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	if (g->nodes[u_rc].deg == 1 && g->nodes[v].deg == 1) {
 		e1 = g->nodes[u_rc].adj[0];
 		e2 = g->nodes[v].adj[0];
-		fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
-		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+		fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
+		fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
-		e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
+		e_cov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov_local;
 		e_rcov = convert_cov_range(e_cov);
 		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
 			g->edges[e2].seq_len >= MIN_CONTIG_READPAIR) {
@@ -976,12 +976,12 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 		resolve = 0;
 		for (i = 0; i < n_leg1; ++i) {
 			e1 = legs1[i];
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			e2 = bc_find_pair(g, e1, legs2, n_leg2);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -1003,8 +1003,8 @@ gint_t check_n_m_node(struct asm_graph_t *g, gint_t u, double uni_cov)
 	if (g->nodes[u_rc].deg == 1 && g->nodes[u].deg == 1) {
 		e1 = g->nodes[u].adj[0];
 		e2 = g->nodes[u_rc].adj[0];
-		fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
-		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+		fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
+		fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
 		if (g->edges[e1].seq_len >= MIN_CONTIG_READPAIR &&
@@ -1047,7 +1047,7 @@ gint_t join_1_1_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 		if (!kh_exist(set_e, k))
 			continue;
 		e = kh_key(set_e, k);
-		fcov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
+		fcov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov;
 		rcov = convert_cov_range(fcov);
 		gap_len += rcov.lo * (g->edges[e].seq_len - g->ksize);
 	}
@@ -1075,12 +1075,12 @@ gint_t join_n_m_small_jungle(struct asm_graph_t *g, khash_t(gint) *set_e,
 			if (!kh_exist(set_leg, k))
 				continue;
 			e1 = kh_key(set_leg, k);
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			e2 = bc_find_pair_check_path(g, set_e, e1, set_leg);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -1173,8 +1173,8 @@ static inline int check_long_loop(struct asm_graph_t *g, gint_t e, double uni_co
 		return 0;
 	}
 	double fcov_e, fcov_e_return;
-	fcov_e = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
-	fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize) / uni_cov;
+	fcov_e = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov;
+	fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize_count) / uni_cov;
 	struct cov_range_t rcov_e, rcov_e_return;
 	rcov_e = convert_cov_range(fcov_e);
 	rcov_e_return = convert_cov_range(fcov_e_return);
@@ -2510,8 +2510,8 @@ int join_1_1_jungle_la(struct asm_graph_t *g, khash_t(gint) *set_e,
 	struct read_path_t local_read;
 	get_local_reads(opt->read_path, &local_read, opt->dict, g, e1, e2, work_dir);
 
-	double uni_cov = (__get_edge_cov(g->edges + e1, g->ksize) +
-				__get_edge_cov(g->edges + e2, g->ksize)) / 2;
+	double uni_cov = (__get_edge_cov(g->edges + e1, g->ksize_count) +
+				__get_edge_cov(g->edges + e2, g->ksize_count)) / 2;
 	khash_t(cap_set) *cap = kh_init(cap_set);
 	max_list_e = 0;
 	for (k = kh_begin(set_e); k != kh_end(set_e); ++k) {

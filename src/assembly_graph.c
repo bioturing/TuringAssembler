@@ -118,7 +118,7 @@ double get_genome_coverage(struct asm_graph_t *g)
 			continue;
 		if (g->edges[e].seq_len > max_len) {
 			max_len = g->edges[e].seq_len;
-			ret_cov = __get_edge_cov(g->edges + e, g->ksize);
+			ret_cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		}
 	}
 	return ret_cov;
@@ -136,7 +136,7 @@ double get_genome_coverage_h(struct asm_graph_t *g)
 		if (g->edges[e].source == -1)
 			continue;
 		int len = get_edge_len(&g->edges[e]);
-		float cov = __get_edge_cov(g->edges + e, g->ksize);
+		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		if (len < 1000)
 			continue;
 		sum_len += g->edges[e].seq_len;
@@ -176,7 +176,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	if (cov == 1)
 // 		return;
 // 	double fcov;
-// 	fcov = __get_edge_cov(g->edges + e, g->ksize);
+// 	fcov = __get_edge_cov(g->edges + e, g->ksize_count);
 // 	// log_info("Edge %ld[len=%u][cov~%.3lf] before duplicate x%d, ", e,
 // 	// 			get_edge_len(g->edges + e), fcov, cov);
 
@@ -187,7 +187,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 		asm_append_seq2(g, e, g->n_e);
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
-// 	fcov = __get_edge_cov(g->edges + e, g->ksize);
+// 	fcov = __get_edge_cov(g->edges + e, g->ksize_count);
 // 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e), fcov);
 // }
@@ -195,8 +195,8 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // void asm_duplicate_edge_seq2(struct asm_graph_t *g, gint_t e1, gint_t e2, int cov)
 // {
 // 	double fcov1, fcov2;
-// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
-// 	fcov2 = __get_edge_cov(g->edges + e2, g->ksize);
+// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count);
+// 	fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count);
 // 	// log_info("Edge e1=%ld[len=%u][cov~%.3lf], e2=%ld[len=%u][cov~%.3lf] before double duplicate x%d, ",
 // 	// 	e1, get_edge_len(g->edges + e1), fcov1,
 // 	// 	e2, get_edge_len(g->edges + e2), fcov2, cov);
@@ -211,7 +211,7 @@ gint_t dump_edge_seq_h(char **seq, uint32_t *m_seq, struct asm_edge_t *e)
 // 	g->edges[e1].count += g->edges[e2].count;
 // 	asm_clean_edge_seq(g->edges + g->n_e);
 
-// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize);
+// 	fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count);
 // 	// log_info("[len=%u][cov~%.3lf] after duplicate",
 // 	// 		get_edge_len(g->edges + e1), fcov1);
 // }
@@ -813,7 +813,7 @@ void write_fasta(struct asm_graph_t *g, const char *path)
 		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 		        (long long)e, (long long)e_rc, (long long)len,
-		        __get_edge_cov(g->edges + e, g->ksize));
+		        __get_edge_cov(g->edges + e, g->ksize_count));
 		gint_t k = 0;
 		while (k < len) {
 			gint_t l = __min(80, len - k);
@@ -838,12 +838,12 @@ void write_stupid_fasta(struct asm_graph_t *g, const char *path)
 	gint_t e, e_rc;
 	for (e = 0; e < g->n_e; ++e) {
 		gint_t len = dump_edge_seq_h(&seq, &seq_len, g->edges + e);
-		double cov = __get_edge_cov(&g->edges[e], g->ksize);
+		double cov = __get_edge_cov(&g->edges[e], g->ksize_count);
 		assert(cov > 0);
 		assert(g->edges[e].count > 0);
 		fprintf(fp, ">SEQ_%lld_%lld_length_%lld_cov_%.3lf\n",
 			(long long)e, (long long)e_rc, (long long)len,
-			__get_edge_cov(g->edges + e, g->ksize));
+			__get_edge_cov(g->edges + e, g->ksize_count));
 		gint_t k = 0;
 		while (k < len) {
 			gint_t l = __min(80, len - k);
@@ -879,7 +879,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
-		float cov = __get_edge_cov(g->edges + e, g->ksize);
+		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld_cov_%.3f\t%s\tKC:i:%llu\n", (long long)e,
 			(long long)e_rc, cov, seq, (long long unsigned)fake_count);
@@ -917,8 +917,8 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 				next_pe_rc = next_e_rc;
 				next_ce = '+';
 			}
-			float cov1 = __get_edge_cov(g->edges + pe, g->ksize);
-			float cov2 = __get_edge_cov(g->edges + next_pe, g->ksize);
+			float cov1 = __get_edge_cov(g->edges + pe, g->ksize_count);
+			float cov2 = __get_edge_cov(g->edges + next_pe, g->ksize_count);
 			fprintf(fp, "L\t%lld_%lld_cov_%.3f\t%c\t%lld_%lld_cov_%.3f\t%c\t%dM\n",
 				(long long)pe, (long long)pe_rc, cov1, ce,
 				(long long)next_pe, cov2, (long long)next_pe_rc,
@@ -1172,7 +1172,7 @@ void test_asm_graph(struct asm_graph_t *g)
 
 	// for (e = 0; e < g->n_e; ++e) {
 	// 	uint32_t len = get_edge_len(g->edges + e);
-	// 	double cov = __get_edge_cov(g->edges + e, g->ksize);
+	// 	double cov = __get_edge_cov(g->edges + e, g->ksize_count);
 	// 	if (len > 5000 && cov < 100.0)
 	// 		log_info("WARNING: Edge %ld has length %u with cov ~ %.6lf",
 	// 			e, len, cov);
@@ -1189,6 +1189,7 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 	/* save the graph topology and sequence information */
 	gint_t u, e;
 	xfwrite(&g->ksize, sizeof(int), 1, fp);
+	xfwrite(&g->ksize_count, sizeof(int), 1, fp);
 	xfwrite(&g->n_v, sizeof(gint_t), 1, fp);
 	xfwrite(&g->n_e, sizeof(gint_t), 1, fp);
 	log_info("Writing asm_node_t, number of nodes: %d", g->n_v);
@@ -1270,6 +1271,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	/* load the graph topology and sequence information */
 	gint_t u, e;
 	xfread(&g->ksize, sizeof(int), 1, fp);
+	xfread(&g->ksize_count, sizeof(int), 1, fp);
 	xfread(&g->n_v, sizeof(gint_t), 1, fp);
 	xfread(&g->n_e, sizeof(gint_t), 1, fp);
 	g->nodes = calloc(g->n_v, sizeof(struct asm_node_t));

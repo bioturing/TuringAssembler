@@ -84,6 +84,7 @@ struct asm_edge_t {
 
 struct asm_graph_t {
 	int ksize;			/* ksize of nodes */
+	int ksize_count; 		/* ksize for calculate cov */
 	int bin_size;			/* deprecated */
 	uint32_t aux_flag;		/* aux flag, marker for storing BARCODE of READPAIR */
 	gint_t n_v, n_e;		/* number of nodes, number of edges */
@@ -192,7 +193,7 @@ struct cov_range_t {
 				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
 static inline struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
-	double fcov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov;
+	double fcov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov;
 	int icov = (int)fcov;
 	if (fcov + EPS < icov + 0.25)
 		return (struct cov_range_t){icov, icov};

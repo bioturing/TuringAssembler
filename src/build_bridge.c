@@ -778,11 +778,11 @@ void coverage_filter(struct opt_proc_t *opt, struct asm_graph_t *g,
 	log_info("Filter by coverage");
 	log_debug("Before filter: %d edges", lg->n_e);
 
-	float avg_cov = (__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize)
-			+ __get_edge_cov(lg->edges + emap2->lc_e, lg->ksize)) / 2;
+	float avg_cov = (__get_edge_cov(lg->edges + emap1->lc_e, lg->ksize_count)
+			+ __get_edge_cov(lg->edges + emap2->lc_e, lg->ksize_count)) / 2;
 	int *bad = (int *) calloc(lg->n_e, sizeof(int));
 	for (int i = 0; i < lg->n_e; ++i){
-		float ratio = __get_edge_cov(lg->edges + i, lg->ksize) / avg_cov;
+		float ratio = __get_edge_cov(lg->edges + i, lg->ksize_count) / avg_cov;
 		if (lg->edges[i].seq_len >= COV_FILTER_STRICT_LEN){
 			if (ratio < COV_FILTER_STRICT_THRESH)
 				bad[i] = 1;
@@ -982,8 +982,8 @@ void *build_bridge_iterator(void *data)
 		char *seq;
 		int seq_len;
 		int local_asm_res = BRIDGE_LOCAL_NOT_FOUND;
-		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
-			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+		if (__get_edge_cov(g->edges + e1, g->ksize_count) > MIN_PROCESS_COV
+			|| __get_edge_cov(g->edges + e2, g->ksize_count) > MIN_PROCESS_COV){
 			log_local_info("Graph is too complex, filling Ns", e1, e2);
 			join_bridge_dump(g->edges[e1], g->edges[e2], &seq);
 		} else {
@@ -1049,8 +1049,8 @@ void get_all_local_graphs(struct opt_proc_t *opt, struct asm_graph_t *g,
 		/*
 		 * Build the local assembly graph for two edges: e1.rev and e2
 		 */
-		if (__get_edge_cov(g->edges + e1, g->ksize) > MIN_PROCESS_COV
-			|| __get_edge_cov(g->edges + e2, g->ksize) > MIN_PROCESS_COV){
+		if (__get_edge_cov(g->edges + e1, g->ksize_count) > MIN_PROCESS_COV
+			|| __get_edge_cov(g->edges + e2, g->ksize_count) > MIN_PROCESS_COV){
 			log_debug("Too complex region, continue");
 			continue;
 		}

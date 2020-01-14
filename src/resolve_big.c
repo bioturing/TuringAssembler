@@ -515,10 +515,10 @@ int resolve_212_by_cov_1step(struct asm_graph_t *g)
 		struct asm_edge_t *e = &g->edges[i_e];
 		if (!is_pairwise_different_node(g, 6, a0->source, a0->target, a1->source, o0->source, o0->target, o1->target))
 			continue;
-		float cov_a0 = __get_edge_cov(a0,g->ksize);
-		float cov_a1 = __get_edge_cov(a1,g->ksize);
-		float cov_o0 = __get_edge_cov(o0,g->ksize);
-		float cov_o1 = __get_edge_cov(o1,g->ksize);
+		float cov_a0 = __get_edge_cov(a0,g->ksize_count);
+		float cov_a1 = __get_edge_cov(a1,g->ksize_count);
+		float cov_o0 = __get_edge_cov(o0,g->ksize_count);
+		float cov_o1 = __get_edge_cov(o1,g->ksize_count);
 		if (!(cov_a0 > 1.7 * cov_a1 || cov_a1 > 1.7 * cov_a0)) {
 			continue;
 		}
