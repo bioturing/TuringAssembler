@@ -59,8 +59,6 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw);
 
-void get_duplicate_rc_edges(struct asm_graph_t *g);
-
 int get_big_kmer_count(char *big_kmer, struct mini_hash_t *kmer_table);
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
