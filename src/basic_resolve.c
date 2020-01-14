@@ -12,6 +12,7 @@
 #include "graph_search.h"
 #include "kmer_hash.h"
 #include "process.h"
+#include "basic_resolve.h"
 #define KSIZE_CHECK (g->ksize + 6)
 #define LEN_VAR				20
 #define MAX_JOIN_LEN			2000
@@ -1743,7 +1744,6 @@ int asm_resolve_simple_bulges_ite(struct asm_graph_t *g)
 
 void remove_duplicate_edge(struct asm_graph_t *g)
 {
-	log_info("Start remove duplicate edge %d", g->n_e);
 	for (int i = 0; i < g->n_e; i++) {
 		if (g->edges[i].source == -1)
 			continue;
@@ -1755,11 +1755,13 @@ void remove_duplicate_edge(struct asm_graph_t *g)
 				if (g->edges[i].target != g->edges[i_rc].target) {
 					log_error("i not irc %d %d", i, i_rc);
 				}
+				if (__binseq_get(g->edges[i].seq, g->ksize) !=
+					__binseq_get(g->edges[i_rc].seq, g->ksize))
+					continue;
 				g->edges[i].rc_id = i;
 				asm_remove_edge(g, i_rc);
 				g->edges[i_rc].rc_id = -1;
 			}
 		}
 	}
-	log_info("remove duplecate edge done");
 }
