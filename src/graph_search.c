@@ -40,13 +40,13 @@ void graph_info_init_max_vst(struct graph_info_t *ginfo)
 	float init_cov = (cov1 + cov2) / 2;
 	for (int i = 0; i < ginfo->g->n_e; ++i){
 		if (ginfo->g->edges[i].seq_len >= MIN_RELIABLE_COV_LEN){
-			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
+			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize_count);
 			//ginfo->edge_max_vst[i] = (int) (cov / init_cov + 0.5);
 			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
 			//ginfo->edge_max_vst[i] = min(2, ginfo->edge_max_vst[i]);
 			//ginfo->edge_max_vst[i] = 1;
 		} else {
-			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize);
+			float cov = __get_edge_cov(ginfo->g->edges + i, ginfo->g->ksize_count);
 			//ginfo->edge_max_vst[i] = (int) (cov / init_cov + 0.5);
 			ginfo->edge_max_vst[i] = max(1, (int) (cov / init_cov + 0.5));
 			//ginfo->edge_max_vst[i] = 1e9;

@@ -18,6 +18,7 @@
 #include "barcode_builder.h"
 #include "fastq_producer.h"
 #include "map_contig.h"
+#include "basic_resolve.h"
 
 #define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
 
@@ -804,6 +805,9 @@ void build_graph_from_scratch(int ksize, int n_threads, int mmem, int n_files,
 	}
 	kmhash_destroy(&kmer_index_table);
 	destroy_kmc_info(&kmc_inf);
+	remove_duplicate_edge(g);
+	g->ksize_count = ksize;
+	log_warn("ksize_count %d", g->ksize_count);
 }
 
 void build_graph_from_scratch_without_count(int ksize, int n_threads, int mmem, int n_files,
@@ -935,8 +939,8 @@ void assign_count_garbage(uint32_t ksize, struct kmhash_t *h, struct asm_graph_t
 				gint_t new_e, new_e_rc;
 				double old_cov, new_cov;
 				new_e = KMHASH_IDX(h, k);
-				old_cov = __get_edge_cov(g0->edges + e, g0->ksize);
-				new_cov = __get_edge_cov(g->edges + new_e, g->ksize);
+				old_cov = __get_edge_cov(g0->edges + e, g0->ksize_count);
+				new_cov = __get_edge_cov(g->edges + new_e, g->ksize_count);
 				if (new_cov < old_cov) {
 					new_e_rc = g->edges[new_e].rc_id;
 					g->edges[new_e].count = g->edges[new_e_rc].count = (uint64_t)old_cov * (g->edges[new_e].seq_len - ksize + 1);
@@ -1091,7 +1095,7 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 
 	log_debug("|---- Retrieving kmer from KMC database");
 	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
-	init_mini_hash(&kmer_table, 2);
+	init_mini_hash(&kmer_table, 20);
 //	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
 	assert(kmer_table->key[0] == -1);
 	struct kmc_info_t kmc_inf;

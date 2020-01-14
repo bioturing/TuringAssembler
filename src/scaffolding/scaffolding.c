@@ -143,8 +143,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		}
 		new_candidate_edge->src = i_edge;
 		new_candidate_edge->des = i_contig;
-		float e1_cov = __get_edge_cov(&g->edges[i_edge], g->ksize);
-		float e2_cov = __get_edge_cov(&g->edges[i_contig], g->ksize);
+		float e1_cov = __get_edge_cov(&g->edges[i_edge], g->ksize_count);
+		float e2_cov = __get_edge_cov(&g->edges[i_contig], g->ksize_count);
 		int value = count[i_contig];
 		if (too_different(e1_cov, e2_cov))
 			value = 0;
@@ -325,7 +325,7 @@ void remove_lov_high_cov(struct asm_graph_t *g)
 	float cvr = global_genome_coverage;
 	int64_t total_len = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
-		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize) / cvr;
+		float edge_cov = __get_edge_cov(&g->edges[i_e], g->ksize_count) / cvr;
 		if (edge_cov < MIN_EDGE_COV_SCAFFOLD) {
 			total_len += g->edges[i_e].seq_len;
 			g->edges[i_e].seq_len = 0;
@@ -594,7 +594,7 @@ void init_mark(struct asm_graph_t *g, struct opt_proc_t *opt, int *mark)
 	if (!opt->metagenomics) {
 		for (int i = 0; i < g->n_e; i++) {
 			float edge_cov =
-				MAX(__get_edge_cov(&g->edges[i], g->ksize) / global_genome_coverage, 1);
+				MAX(__get_edge_cov(&g->edges[i], g->ksize_count) / global_genome_coverage, 1);
 			mark[i] = MIN(lround(edge_cov), 3);
 		}
 	} else {
@@ -650,7 +650,7 @@ void print_contig_info(struct asm_graph_t *g)
 	float cvr = global_genome_coverage;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		struct asm_edge_t *edge = &g->edges[i_e];
-		float edge_cov = __get_edge_cov(edge, g->ksize) / cvr;
+		float edge_cov = __get_edge_cov(edge, g->ksize_count) / cvr;
 		log_debug("edge %d len:%d cov: %f count_bc %d",
 		          i_e, get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
 	}

@@ -663,8 +663,8 @@ void get_list_contig(struct opt_proc_t *opt, struct asm_graph_t *g)
 			if (u == v || u == g->edges[u].rc_id) {
 				continue;
 			}
-			double cov_u = __get_edge_cov(&g->edges[u], g->ksize);
-			double cov_v = __get_edge_cov(&g->edges[v], g->ksize);
+			double cov_u = __get_edge_cov(&g->edges[u], g->ksize_count);
+			double cov_v = __get_edge_cov(&g->edges[v], g->ksize_count);
 			//todo @huu in metagenomics case, consider relative between u and v
 			if (global_cov * 1.5 < cov_u || global_cov * 1.5 < cov_v) {
 				continue;

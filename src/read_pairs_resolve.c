@@ -95,7 +95,7 @@ int get_next_cand(struct asm_graph_t *g, float unit_cov, struct read_pair_cand_t
 //			kh_set_int_insert(cand, rp_cand[last].cand[i]);
 	}
 	if (best_score > (second_score + 10) * 1.3) {
-		float cov = __get_edge_cov(g->edges + best, g->ksize);
+		float cov = __get_edge_cov(g->edges + best, g->ksize_count);
 		if (cov >= 0.5 * unit_cov && g->edges[best].seq_len >= 100) {
 			return best;
 		} else {
@@ -189,12 +189,12 @@ int extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 			return total_len;
 		if (v == -1)
 			return total_len;
-		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
-		    || __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov) {
+		if (__get_edge_cov(&g->edges[v], g->ksize_count) > REPEAT_COV_RATIO * unit_cov
+		    || __get_edge_cov(&g->edges[s], g->ksize_count) > REPEAT_COV_RATIO * unit_cov) {
 			log_debug(
 				"Next cand %d is repeat, v cov: %.3f, s cov: %.3f, unit cov: %.3f",
-				v, __get_edge_cov(g->edges + v, g->ksize),
-				__get_edge_cov(g->edges + s, g->ksize), unit_cov);
+				v, __get_edge_cov(g->edges + v, g->ksize_count),
+				__get_edge_cov(g->edges + s, g->ksize_count), unit_cov);
 			return total_len;
 		}
 		log_debug("Next cand of %d: %d", (*path)[(*n_path) - 1], v);
@@ -318,7 +318,7 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 	for (int i = g->n_e - 1; i >= 0; --i) {
 		int e = edge_sorted[i];
 		log_debug("Trying to extend from %d", e);
-		float cov = __get_edge_cov(g->edges + e, g->ksize);
+		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		//if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov)
 		//	continue;
 		if (cov < 0.5 * unit_cov || g->edges[e].seq_len < 100 || cov > 1.3 * unit_cov) {
@@ -377,7 +377,7 @@ void get_long_contigs_by_readpairs(struct opt_proc_t *opt)
 			continue;
 		if (g->edges[e].seq_len <= MIN_NOTICE_LEN)
 			continue;
-		float cov = __get_edge_cov(g->edges + e, g->ksize);
+		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		if (visited[e] == 0 || cov >= 0.2 * unit_cov) {
 			log_debug("Single edge %d to edge n_e %d", e, n_e);
 			char *seq;

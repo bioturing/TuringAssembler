@@ -490,6 +490,8 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 	if (is_rc_dup[e] && e > e_rc)
 		return;
 	int pu = g->edges[e].source;
+	if (pu == -1)
+		return;
 	int pv = g->edges[e].target;
 	int ok = 1;
 	//if (g->edges[e].seq_len > g->ksize + 1 && g->edges[e].seq_len <= g->ksize + 10){
@@ -703,14 +705,16 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 
 			int e_rc = -1;
 			for (int j = 0; j < supg->nodes[v_rc].deg; ++j){
-				e_rc = supg->nodes[v_rc].adj[j];
-				int tmp = supg->edges[e_rc].target;
-				if (tmp == u_rc)
+				int e2 = supg->nodes[v_rc].adj[j];
+				int tmp = supg->edges[e2].target;
+				if (tmp == u_rc) {
+					e_rc = e2;
 					break;
+				}
 			}
 			if (e_rc == -1)
-				log_error("Something went wrong, e_rc not found at node %d, edge %d",
-						u, e);
+				log_error("Something went wrong, e_rc not found at node %d, edge %d, u_rc %d v_rc %d",
+						u, e, u_rc, v_rc);
 			supg->edges[e].rc_id = e_rc;
 		}
 	}
@@ -745,6 +749,8 @@ void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 {
 	int c_e = 0, c_n = 0;
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
+		if (g->edges[i_e].source == -1 )
+			continue;
 		if (g->edges[i_e].seq_len > g->ksize + 1){
 			c_n += 2;
 			c_e+=1;
@@ -808,6 +814,15 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		//resolve_graph_operation(supg, &g2);
 	}
 	test_asm_graph(supg);
+//	struct asm_graph_t g1 = *supg;
+//	asm_condense(supg, &g1);
+//	asm_graph_destroy(supg);
+//	*supg = g1;
+	//todo huu destroy kmer_table
+//	kmhash_destroy(kmer_table);
+	supg->ksize = super_k;
+	supg->ksize_count = g->ksize_count;
+	destroy_mini_hash(kmer_table);
 }
 
 void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk)

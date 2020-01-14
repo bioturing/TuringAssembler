@@ -365,7 +365,7 @@ double callibrate_uni_cov(struct asm_graph_t *g, gint_t *legs, gint_t n_leg,
 	gint_t cnt = 0, i, e;
 	for (i = 0; i < n_leg; ++i) {
 		e = legs[i];
-		cov = __get_edge_cov(g->edges + e, g->ksize);
+		cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		ratio = cov / uni_cov;
 		if (ratio > 0.75 && ratio < 1.25) {
 			sum_cov += cov;
@@ -402,7 +402,7 @@ gint_t check_2_2_small_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	double *fcov = alloca(4 * sizeof(double));
 	struct cov_range_t *rcov = alloca(4 * sizeof(struct cov_range_t));
 	for (i = 0; i < 4; ++i) {
-		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov;
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize_count) / uni_cov;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
 	for (i = 0; i < 2; ++i) {
@@ -477,7 +477,7 @@ gint_t check_2_2_strict_bridge(struct asm_graph_t *g, gint_t e, double uni_cov)
 	double *fcov = alloca(4 * sizeof(double));
 	struct cov_range_t *rcov = alloca(4 * sizeof(struct cov_range_t));
 	for (i = 0; i < 4; ++i) {
-		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize) / uni_cov_local;
+		fcov[i] = __get_edge_cov(g->edges + legs[i], g->ksize_count) / uni_cov_local;
 		rcov[i] = convert_cov_range(fcov[i]);
 	}
 	for (i = 0; i < 2; ++i) {
@@ -552,13 +552,13 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 	sum_fcov = 0;
 	for (i = 0; i < g->nodes[u_rc].deg; ++i) {
 		e1 = g->nodes[u_rc].adj[i];
-		sum_fcov += __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+		sum_fcov += __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 	}
 	for (i = 0; i < g->nodes[v].deg; ++i) {
 		e1 = g->nodes[v].adj[i];
-		sum_fcov += __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+		sum_fcov += __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 	}
-	e_cov = __get_edge_cov(g->edges + e, g->ksize) / uni_cov_local;
+	e_cov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov_local;
 	e_uni_cov = e_cov / sum_fcov;
 
 	gint_t resolve, ret = 0;
@@ -566,7 +566,7 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 		resolve = 0;
 		for (i = 0; i < g->nodes[u_rc].deg; ++i) {
 			e1 = g->nodes[u_rc].adj[i];
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
@@ -575,7 +575,7 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 			e2 = bc_find_pair_strict(g, e1, g->nodes[v].adj, g->nodes[v].deg);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -597,8 +597,8 @@ gint_t check_n_m_bridge_strict(struct asm_graph_t *g, gint_t e, double uni_cov)
 	if (g->nodes[u_rc].deg == 1 && g->nodes[v].deg == 1) {
 		e1 = g->nodes[u_rc].adj[0];
 		e2 = g->nodes[v].adj[0];
-		fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
-		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+		fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
+		fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
 		double ratio = get_barcode_ratio(g, e1, e2);
@@ -666,14 +666,14 @@ gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t u, double uni_cov)
 		resolve = 0;
 		for (i = 0; i < g->nodes[u_rc].deg; ++i) {
 			e1 = g->nodes[u_rc].adj[i];
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov;
 			rcov1 = convert_cov_range(fcov1);
 			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
 			e2 = bc_find_pair_strict(g, e1, g->nodes[u].adj, g->nodes[u].deg);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -691,8 +691,8 @@ gint_t check_n_m_node_strict(struct asm_graph_t *g, gint_t u, double uni_cov)
 	if (g->nodes[u_rc].deg == 1 && g->nodes[u].deg == 1) {
 		e1 = g->nodes[u].adj[0];
 		e2 = g->nodes[u_rc].adj[0];
-		fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov;
-		fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov;
+		fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov;
+		fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov;
 		rcov1 = convert_cov_range(fcov1);
 		rcov2 = convert_cov_range(fcov2);
 		double ratio = get_barcode_ratio(g, e1, e2);
@@ -778,14 +778,14 @@ gint_t check_simple_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 		uint32_t gap_size;
 		for (i = 0; i < n_leg; ++i) {
 			e1 = legs[i];
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
 			e2 = bc_find_pair_check_path_strict(g, set_e, e1, legs, n_leg);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;
@@ -839,14 +839,14 @@ gint_t check_complex_jungle_strict(struct asm_graph_t *g, khash_t(gint) *set_e,
 			e1 = legs[i];
 			if (kh_get(gint, set_leg, e1) == kh_end(set_leg))
 				continue;
-			fcov1 = __get_edge_cov(g->edges + e1, g->ksize) / uni_cov_local;
+			fcov1 = __get_edge_cov(g->edges + e1, g->ksize_count) / uni_cov_local;
 			rcov1 = convert_cov_range(fcov1);
 			if (rcov1.hi < 1 || rcov1.lo > 1)
 				continue;
 			e2 = bc_find_pair_check_path_strict(g, set_e, e1, legs, n_leg);
 			if (e2 < 0)
 				continue;
-			fcov2 = __get_edge_cov(g->edges + e2, g->ksize) / uni_cov_local;
+			fcov2 = __get_edge_cov(g->edges + e2, g->ksize_count) / uni_cov_local;
 			rcov2 = convert_cov_range(fcov2);
 			if (!__check_coverage(fcov1, fcov2, rcov1, rcov2))
 				continue;

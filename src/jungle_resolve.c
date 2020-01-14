@@ -269,7 +269,7 @@ int resolve_jungle(struct asm_graph_t *g, khash_t(khInt) *h,
 		if (g->edges[e].source == -1)
 			continue;
 		gint_t len = get_edge_len(g->edges + e);
-		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
+		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize_count) / gcov + 0.499999);
 		gap_size += cov * (len - g->ksize);
 		gint_t e_rc = g->edges[e].rc_id;
 		/* Remove edges , e.i isolate the nodes */
@@ -348,7 +348,7 @@ int resolve_jungle4(struct asm_graph_t *g, khash_t(khInt) *h,
 		if (g->edges[e].source == -1)
 			continue;
 		gint_t len = get_edge_len(g->edges + e);
-		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
+		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize_count) / gcov + 0.499999);
 		gap_size += cov * (len - g->ksize);
 		gint_t e_rc = g->edges[e].rc_id;
 		asm_remove_edge(g, e);
@@ -400,11 +400,11 @@ static void resolve_baby_flow(struct asm_graph_t *g, gint_t e, float gcov)
 {
 	gint_t src = g->edges[e].source;
 	gint_t ei_rc = g->nodes[g->nodes[src].rc_id].adj[0];
-	int cov_i = (int)(__get_edge_cov(g->edges + ei_rc, g->ksize) / gcov + 0.499999);
+	int cov_i = (int)(__get_edge_cov(g->edges + ei_rc, g->ksize_count) / gcov + 0.499999);
 	int j, i = find_adj_idx(g->nodes[src].adj, g->nodes[src].deg, e);
 	assert(i >= 0);
 	for (j = 0; j < g->nodes[src].deg; ++j){
-		int cov_o = (int)(__get_edge_cov(g->edges + g->nodes[src].adj[j], g->ksize) / gcov + 0.499999);
+		int cov_o = (int)(__get_edge_cov(g->edges + g->nodes[src].adj[j], g->ksize_count) / gcov + 0.499999);
 		if (cov_o == 1 && cov_i == 1){
 			log_info(KCYN "Remove the baby %d" RESET, e);
 			asm_remove_edge(g, e);
@@ -426,7 +426,7 @@ int jungle_resolve_flow(struct asm_graph_t *g, khash_t(khInt) *h,
 		if (g->edges[e].source == -1) //FIXME: I think we don't need this in this case
 			continue;
 		gint_t len = get_edge_len(g->edges + e);
-		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize) / gcov + 0.499999);
+		int cov = (int)(__get_edge_cov(g->edges + e, g->ksize_count) / gcov + 0.499999);
 		if (!cov){
 			log_info(KCYN "Found the baby %d" RESET, e);
 			resolve_baby_flow(g, e, gcov);

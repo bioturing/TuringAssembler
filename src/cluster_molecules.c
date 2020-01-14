@@ -226,7 +226,7 @@ void print_barcode_graph(struct opt_proc_t *opt)
 
 	for (int i = 0; i < n_e; ++i) {
 		int v = edges[i];
-		float cov = __get_edge_cov(g->edges + v, g->ksize);
+		float cov = __get_edge_cov(g->edges + v, g->ksize_count);
 		float ratio = cov / unit_cov;
 		if (ratio >= 0.8 && ratio <= 1.2)
 			fprintf(f, "%d [style=\"filled\",fillcolor=green]\n",
@@ -595,7 +595,7 @@ int check_ignore_path(struct asm_graph_t *g, double global_avg_cov,
 	double sum_cov = 0, sum_len = 0;
 	for (int i = 0; i < n_contig_path; i++) {
 		int i_e = contig_path[i];
-		double cov = __get_edge_cov(&g->edges[i_e], g->ksize);
+		double cov = __get_edge_cov(&g->edges[i_e], g->ksize_count);
 		assert(cov >= 0);
 		if (cov < MIN_COVERAGE_TO_BE_IGNORE * global_avg_cov){
 			log_debug("Ignore path cov: %.3f", cov);
@@ -651,7 +651,7 @@ void concate_edges_fill_N(struct asm_graph_t *g, int *path, int n,
 			++n_holes;
 		}
 		int b_len = g->edges[b].seq_len;
-		double tmp_cov = __get_edge_cov(&g->edges[b], g->ksize);
+		double tmp_cov = __get_edge_cov(&g->edges[b], g->ksize_count);
 		log_debug("cov %d %d %lf", b, g->edges[b].count, tmp_cov);
 		total_count += g->edges[b].count;
 
@@ -670,7 +670,7 @@ void concate_edges_fill_N(struct asm_graph_t *g, int *path, int n,
 	e->seq = seq_encode;
 	e->seq_len = total_len;
 	e->count = total_count;
-	log_debug("total_count %d %lf", total_count, __get_edge_cov(e, g->ksize));
+	log_debug("total_count %d %lf", total_count, __get_edge_cov(e, g->ksize_count));
 	e->n_holes = n_holes;
 	e->l_holes = l_holes;
 	e->p_holes = p_holes;
@@ -746,8 +746,8 @@ void create_barcode_molecules(struct opt_proc_t *opt, int *edges, int n_e,
 		int e = i;
 		int e_rc = g->edges[e].rc_id;
 		int been_touch = visited[e] + visited[e_rc];
-		if (__get_edge_cov(&g->edges[i], g->ksize) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov && been_touch != 0) {
-			log_debug("Ignore edge %d, coverage %.2f, ration threshold %.2f, coverage threshold %.2f", i, __get_edge_cov(&g->edges[i], g->ksize), MIN_COVERAGE_TO_BE_IGNORE, global_cov);
+		if (__get_edge_cov(&g->edges[i], g->ksize_count) <= MIN_COVERAGE_TO_BE_IGNORE * global_cov && been_touch != 0) {
+			log_debug("Ignore edge %d, coverage %.2f, ration threshold %.2f, coverage threshold %.2f", i, __get_edge_cov(&g->edges[i], g->ksize_count), MIN_COVERAGE_TO_BE_IGNORE, global_cov);
 			continue;
 		}
 		assert(g->edges[i].count > 0);
@@ -808,7 +808,7 @@ void barcode_list_destroy(struct barcode_list_t *blist)
 int is_repeat(struct asm_graph_t *g, int e)
 {
 	float unit_cov = get_genome_coverage(g);
-	float cov = __get_edge_cov(g->edges + e, g->ksize);
+	float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 	float ratio = cov / unit_cov;
 	if (ratio > 1.2)
 		return 1;
@@ -878,7 +878,7 @@ void print_graph_component(struct simple_graph_t *sg, char *bc, FILE *f)
 				for (int i = 0; i < snode->deg; ++i)
 					fprintf(f, "\t%d -> %d\n", s, snode->adj[i]);
 				float unit_cov = get_genome_coverage(sg->g);
-				float cov = __get_edge_cov(g->edges + s, g->ksize);
+				float cov = __get_edge_cov(g->edges + s, g->ksize_count);
 				float ratio = cov / unit_cov;
 				if (ratio >= 0.8 && ratio <= 1.2)
 					fprintf(f, "\t%d [style=\"filled\",fillcolor=green]\n",
@@ -1117,7 +1117,7 @@ void get_all_longest_paths(int *edges, int n_e, struct asm_graph_t *g,
 			continue;
 		if (snode->rv_deg != 0)
 			continue;
-		if (__get_edge_cov(&g->edges[source], g->ksize) <= 0.5 * unit_cov)
+		if (__get_edge_cov(&g->edges[source], g->ksize_count) <= 0.5 * unit_cov)
 			continue;
 
 		int *path = calloc(1, sizeof(int));
