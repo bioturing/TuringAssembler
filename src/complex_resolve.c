@@ -697,37 +697,6 @@ void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 	}
 }
 
-void get_duplicate_rc_edges(struct asm_graph_t *g)
-{
-	for (int e = 0; e < g->n_e; ++e){
-		if (g->edges[e].source == -1)
-			continue;
-		int e_rc = g->edges[e].rc_id;
-		int sr = g->edges[e].source;
-		int tg = g->edges[e].target;
-		int rc_sr = g->edges[e_rc].source;
-		int rc_tg = g->edges[e_rc].target;
-		char *seq;
-		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
-		char *seq_rc;
-		decode_seq(&seq_rc, g->edges[e_rc].seq, g->edges[e_rc].seq_len);
-
-		if (e != e_rc){
-			if (sr == rc_sr && tg == rc_tg && strcmp(seq, seq_rc) == 0){
-				log_error("Reverse complements are duplicate at %d and %d, seq = %s",
-						e, e_rc, seq);
-			}
-		} else {
-			if (sr == rc_sr && tg == rc_tg && strcmp(seq, seq_rc) != 0){
-				log_error("Reverse complements are NOT duplicate at %d and %d, seq = %s",
-						e, e_rc, seq);
-			}
-		}
-		free(seq);
-		free(seq_rc);
-	}
-}
-
 void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 {
 	int c_e = 0, c_n = 0;
@@ -756,7 +725,6 @@ void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		struct asm_graph_t *supg)
 {
-	get_duplicate_rc_edges(g);
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
 	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
