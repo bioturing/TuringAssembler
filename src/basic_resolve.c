@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include <scaffolding/global_params.h>
+#include "scaffolding/global_params.h"
 
 #include "assembly_graph.h"
 #include "io_utils.h"

@@ -756,17 +756,6 @@ void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		struct asm_graph_t *supg)
 {
-	//__VERBOSE("\n\n\n");
-	//for (int u = 0; u < g->n_v; ++u){
-	//	for (int i = 0; i < g->nodes[u].deg; ++i){
-	//		int e = g->nodes[u].adj[i];
-	//		int v = g->edges[e].target;
-	//		if (v == 123091)
-	//			__VERBOSE("in %d %d %d\n", u, e, v);
-	//		if (u == 123091)
-	//			__VERBOSE("out %d %d %d\n", u, e, v);
-	//	}
-	//}
 	int *is_rc_dup;
 	get_duplicate_rc_edges(g, &is_rc_dup);
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
@@ -806,9 +795,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		asm_graph_destroy(supg);
 		*supg = g1;
 
-		//log_info("Resolving graph");
-		//struct asm_graph_t g2;
-		//resolve_graph_operation(supg, &g2);
+		log_info("Resolving graph");
+		struct asm_graph_t g2;
+		resolve_graph_operation(supg, &g2);
 	}
 	test_asm_graph(supg);
 }
