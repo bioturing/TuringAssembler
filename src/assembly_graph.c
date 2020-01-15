@@ -879,6 +879,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
+//		log_warn("ksize %d ksize count %d", g->ksize, g->ksize_count);
 		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld_cov_%.3f\t%s\tKC:i:%llu\n", (long long)e,
