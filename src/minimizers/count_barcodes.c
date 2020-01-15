@@ -202,7 +202,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 /**
  * @brief Try expanding the hash table by doubling in size
  */
-inline void try_expanding(struct mini_hash_t **h_table)
+void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
 	log_debug("try expanding %d %d", table->count, table->max_cnt);

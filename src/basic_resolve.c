@@ -251,6 +251,9 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+	log_info("asm_condense");
+	test_asm_graph(g0);
+	save_graph_info(".", g0, "be4condense");
 	gint_t *node_id;
 	gint_t n_v, n_e, m_e;
 	node_id = malloc(g0->n_v * sizeof(gint_t));
@@ -351,7 +354,9 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			e_rc = g0->edges[e].rc_id;
 			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
 						g0->nodes[v_rc].deg, e_rc);
-			assert(j >= 0);
+			if (j < 0) {
+				log_error("%d", e);
+			}
 			g0->nodes[v_rc].adj[j] = -1;
 			y_rc = node_id[v_rc];
 			edges[q].source = y_rc;
@@ -762,7 +767,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		n_edges = 0;
 		e1 = e2 = -1;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-			if (g->nodes[u_rc].adj[j] != e) {
+			if (g->nodes[u_rc].adj[j] != e_rc) {
 				e1 = g->nodes[u_rc].adj[j];
 				sum_cov += __get_edge_cov(g->edges + e1, g->ksize_count);
 				++n_edges;
@@ -782,31 +787,35 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 			asm_remove_edge(g, e_rc);
 			return -1;
 		}
-		if (g->nodes[u_rc].deg > 2 || g->nodes[u].deg > 2)
+		if (g->nodes[u_rc].deg != 2 || g->nodes[u].deg != 2)
 			return 0;
 		/* split the node */
-		v = asm_create_node(g);
-		v_rc = g->nodes[v].rc_id;
-		/* set source-target of edge e */
-		g->edges[e].target = v;
-		asm_remove_node_adj(g, u_rc, e_rc);
-		g->edges[e_rc].source = v_rc;
-		asm_add_node_adj(g, v_rc, e_rc);
-		/* move edge from node u to node v */
-		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
-		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
-		g->nodes[v].deg = g->nodes[u].deg;
-		asm_remove_node_adj(g, v, e);
-		/* node u has only edge e left */
-		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
-		g->nodes[u].adj[0] = e;
-		g->nodes[u].deg = 1;
-		gint_t j;
-		for (j = 0; j < g->nodes[v].deg; ++j) {
-			gint_t e_t = g->nodes[v].adj[j];
-			g->edges[e_t].source = v;
-			g->edges[g->edges[e_t].rc_id].target = v_rc;
-		}
+//		v = asm_create_node(g);
+//		v_rc = g->nodes[v].rc_id;
+//		/* set source-target of edge e */
+//		g->edges[e].target = v;
+//		asm_remove_node_adj(g, u_rc, e_rc);
+//		g->edges[e_rc].source = v_rc;
+//		asm_add_node_adj(g, v_rc, e_rc);
+//		/* move edge from node u to node v */
+//		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
+//		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
+//		g->nodes[v].deg = g->nodes[u].deg;
+//		asm_remove_node_adj(g, v, e);
+//		/* node u has only edge e left */
+//		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
+//		g->nodes[u].adj[0] = e;
+//		g->nodes[u].deg = 1;
+//		gint_t j;
+//		for (j = 0; j < g->nodes[v].deg; ++j) {
+//			gint_t e_t = g->nodes[v].adj[j];
+//			g->edges[e_t].source = v;
+//			g->edges[g->edges[e_t].rc_id].target = v_rc;
+//		}
+		gint_t i_e1 = g->edges[g->nodes[u_rc].adj[0]].rc_id;
+		gint_t i_e2 = g->nodes[u].adj[0];
+		asm_join_edge(g, i_e1, g->edges[i_e1].rc_id, e, g->edges[e].rc_id);
+		asm_join_edge(g, i_e1, g->edges[i_e1].rc_id, i_e2, g->edges[i_e2].rc_id);
 		return 1;
 	} else if (u == v_rc) { /* self loop reverse */
 		sum_cov = 0;
@@ -1095,9 +1104,17 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			cnt_loop = cnt_collapse = 0;
 
 			cnt_loop = unroll_simple_loop(g0);
+			asm_condense(g0, g);
+			test_asm_graph(g0);
 			cnt_collapse = resolve_simple_bubble(g0);
+			asm_condense(g0, g);
+			test_asm_graph(g0);
 			cnt_collapse += resolve_align_bubble(g0);
+			asm_condense(g0, g);
+			test_asm_graph(g0);
 			cnt_loop += resolve_loop(g0);
+			asm_condense(g0, g);
+			test_asm_graph(g0);
 			asm_lazy_condense(g0);
 		} while (cnt_loop + cnt_collapse);
 

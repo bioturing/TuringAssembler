@@ -746,6 +746,9 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 			}
 
 			u = g->edges[e_rc].target;
+			if (u < 0 || u >= g->n_v) {
+				log_error("%d", u);
+			}
 			if (g->nodes[u].deg == 0)
 				cur_size += g->ksize;
 			for (c = 0; c < g->nodes[u].deg; ++c) {
@@ -985,8 +988,13 @@ void deb_dump_seq(struct asm_graph_t *g, gint_t e)
 	printf("%s\n", seq);
 }
 
+int fff(uint32_t *seq, int k) {
+	return (((seq)[(k) >> 4] >> (((k) & 15) << 1)) & (uint32_t)3);
+}
+
 void test_asm_graph(struct asm_graph_t *g)
 {
+	log_info("g->ne %d", g->n_e);
 	gint_t le_idx = get_longest_edge(g);
 	if (le_idx != -1) {
 		log_info("Longest edge %ld_%ld, length %u",
@@ -1008,6 +1016,10 @@ void test_asm_graph(struct asm_graph_t *g)
 		/* Test 1: consistency of node's adj and edge's source */
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
+			if (e < 0 || e >= g->n_e) {
+				log_error("e %d", e);
+			}
+			assert(e >= 0 && e < g->n_e);
 			if (g->edges[e].source != u) {
 				log_debug("node = %ld; edge = [%ld](%ld->%ld)",
 					u, e,
@@ -1047,8 +1059,13 @@ void test_asm_graph(struct asm_graph_t *g)
 		if (g->nodes[u].deg > 0 && g->nodes[u_rc].deg > 0) {
 			e1 = g->nodes[u].adj[0];
 			e2 = g->edges[g->nodes[u_rc].adj[0]].rc_id;
+			assert(e1 >= 0 && e2 >= 0 && e1 < g->n_e && e2 < g->n_e);
 			for (k = 0; k < g->ksize; ++k) {
 				j = g->edges[e2].seq_len - g->ksize + k;
+				assert(j >= 0);
+				if (g->n_e == 102314 && u == 59790 && k == 0) {
+					log_info("wtf");
+				}
 				if (__binseq_get(g->edges[e2].seq, j) !=
 					__binseq_get(g->edges[e1].seq, k)) {
 					log_debug("(%ld, %ld) -> (%ld, %ld)",
