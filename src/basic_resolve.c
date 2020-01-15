@@ -768,7 +768,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		e1 = e2 = -1;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
 			if (g->nodes[u_rc].adj[j] != e_rc) {
-				e1 = g->nodes[u_rc].adj[j];
+				e1 = g->edges[g->nodes[u_rc].adj[j]].rc_id;
 				sum_cov += __get_edge_cov(g->edges + e1, g->ksize_count);
 				++n_edges;
 			}
@@ -812,10 +812,10 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 //			g->edges[e_t].source = v;
 //			g->edges[g->edges[e_t].rc_id].target = v_rc;
 //		}
-		gint_t i_e1 = g->edges[g->nodes[u_rc].adj[0]].rc_id;
-		gint_t i_e2 = g->nodes[u].adj[0];
-		asm_join_edge(g, i_e1, g->edges[i_e1].rc_id, e, g->edges[e].rc_id);
-		asm_join_edge(g, i_e1, g->edges[i_e1].rc_id, i_e2, g->edges[i_e2].rc_id);
+//
+		asm_join_edge(g, e1, g->edges[e1].rc_id, e, g->edges[e].rc_id);
+		asm_join_edge(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id);
+		g->nodes[u].deg = g->nodes[u_rc].deg = 0;
 		return 1;
 	} else if (u == v_rc) { /* self loop reverse */
 		sum_cov = 0;
