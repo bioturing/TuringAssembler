@@ -74,6 +74,7 @@ int64_t dfs(struct asm_graph_t *g, int x, int *mark, int *hd)
 		int x = hd[l++];
 		res += g->edges[x].seq_len-g->ksize;
 		int target = g->edges[x].target;
+		assert(target >=0 && target < g->n_v);
 		int src_rc = g->nodes[target].rc_id;
 		for (int i = 0; i < g->nodes[src_rc].deg; i++) {
 			int next = g->nodes[src_rc].adj[i];
