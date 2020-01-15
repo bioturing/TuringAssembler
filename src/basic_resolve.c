@@ -818,72 +818,72 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		g->nodes[u].deg = g->nodes[u_rc].deg = 0;
 		return 1;
 	}
-//	else if (u == v_rc) { /* self loop reverse */
-//		sum_cov = 0;
-//		n_edges = 0;
-//		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-//			e1 = g->nodes[u_rc].adj[j];
-//			sum_cov += __get_edge_cov(g->edges + e1, g->ksize_count);
-//			++n_edges;
-//		}
-//		for (j = 0; j < g->nodes[u].deg; ++j) {
-//			if (g->nodes[u].adj[j] != e && g->nodes[u].adj[j] != e_rc) {
-//				e2 = g->nodes[u].adj[j];
-//				sum_cov += __get_edge_cov(g->edges + e2, g->ksize_count);
-//				++n_edges;
-//			}
-//		}
-//		if (cov < sum_cov / n_edges * 0.5) {
-//			asm_remove_edge(g, e);
-//			asm_remove_edge(g, e_rc);
-//			return -1;
-//		}
-//	} else {
-//		if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
-//			g->nodes[u_rc].deg > 2 || g->nodes[v].deg > 2)
-//			return 0;
-//		e1 = e2 = e_return = e_return_rc = -1;
-//		for (j = 0; j < g->nodes[v].deg; ++j) {
-//			if (g->edges[g->nodes[v].adj[j]].target == u) {
-//				e_return = g->nodes[v].adj[j];
-//			} else {
-//				e2 = g->nodes[v].adj[j];
-//			}
-//		}
-//		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-//			if (g->edges[g->nodes[u_rc].adj[j]].target == v_rc)
-//				e_return_rc = g->nodes[u_rc].adj[j];
-//			else
-//				e1 = g->nodes[u_rc].adj[j];
-//		}
-//		if (e_return == -1 || e_return_rc == -1)
-//			return 0;
-//		if (g->edges[e_return].seq_len >= MIN_UNROLL_LOOP)
-//			return 0;
-//		if (e1 == -1 && e2 == -1)
-//			return 0;
-//		double fcov_e, fcov_e_return, mean_cov;
-//		struct cov_range_t rcov_e, rcov_e_return;
-//		if (e1 == -1)
-//			mean_cov = __get_edge_cov(g->edges + e2, g->ksize_count);
-//		else if (e2 == -1)
-//			mean_cov = __get_edge_cov(g->edges + e1, g->ksize_count);
-//		else
-//			mean_cov = (__get_edge_cov(g->edges + e1, g->ksize_count) +
-//				__get_edge_cov(g->edges + e2, g->ksize_count)) / 2;
-//		fcov_e = __get_edge_cov(g->edges + e, g->ksize_count) / mean_cov;
-//		fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize_count) / mean_cov;
-//		rcov_e = convert_cov_range(fcov_e);
-//		rcov_e_return = convert_cov_range(fcov_e_return);
-//		rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
-//		if (rep <= 0)
-//			rep = 1;
-//		asm_unroll_loop_forward(g, e, e_return, rep);
-//		asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
-//		asm_remove_edge(g, e_return);
-//		asm_remove_edge(g, e_return_rc);
-//		return 3;
-//	}
+	else if (u == v_rc) { /* self loop reverse */
+		sum_cov = 0;
+		n_edges = 0;
+		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+			e1 = g->nodes[u_rc].adj[j];
+			sum_cov += __get_edge_cov(g->edges + e1, g->ksize_count);
+			++n_edges;
+		}
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			if (g->nodes[u].adj[j] != e && g->nodes[u].adj[j] != e_rc) {
+				e2 = g->nodes[u].adj[j];
+				sum_cov += __get_edge_cov(g->edges + e2, g->ksize_count);
+				++n_edges;
+			}
+		}
+		if (cov < sum_cov / n_edges * 0.5) {
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, e_rc);
+			return -1;
+		}
+	} else {
+		if (g->nodes[u].deg != 1 || g->nodes[v_rc].deg != 1 ||
+			g->nodes[u_rc].deg > 2 || g->nodes[v].deg > 2)
+			return 0;
+		e1 = e2 = e_return = e_return_rc = -1;
+		for (j = 0; j < g->nodes[v].deg; ++j) {
+			if (g->edges[g->nodes[v].adj[j]].target == u) {
+				e_return = g->nodes[v].adj[j];
+			} else {
+				e2 = g->nodes[v].adj[j];
+			}
+		}
+		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+			if (g->edges[g->nodes[u_rc].adj[j]].target == v_rc)
+				e_return_rc = g->nodes[u_rc].adj[j];
+			else
+				e1 = g->nodes[u_rc].adj[j];
+		}
+		if (e_return == -1 || e_return_rc == -1)
+			return 0;
+		if (g->edges[e_return].seq_len >= MIN_UNROLL_LOOP)
+			return 0;
+		if (e1 == -1 && e2 == -1)
+			return 0;
+		double fcov_e, fcov_e_return, mean_cov;
+		struct cov_range_t rcov_e, rcov_e_return;
+		if (e1 == -1)
+			mean_cov = __get_edge_cov(g->edges + e2, g->ksize_count);
+		else if (e2 == -1)
+			mean_cov = __get_edge_cov(g->edges + e1, g->ksize_count);
+		else
+			mean_cov = (__get_edge_cov(g->edges + e1, g->ksize_count) +
+				__get_edge_cov(g->edges + e2, g->ksize_count)) / 2;
+		fcov_e = __get_edge_cov(g->edges + e, g->ksize_count) / mean_cov;
+		fcov_e_return = __get_edge_cov(g->edges + e_return, g->ksize_count) / mean_cov;
+		rcov_e = convert_cov_range(fcov_e);
+		rcov_e_return = convert_cov_range(fcov_e_return);
+		rep = __min(rcov_e.lo - 1, rcov_e_return.lo);
+		if (rep <= 0)
+			rep = 1;
+		asm_unroll_loop_forward(g, e, e_return, rep);
+		asm_unroll_loop_forward(g, e_rc, e_return_rc, rep);
+		asm_remove_edge(g, e_return);
+		asm_remove_edge(g, e_return_rc);
+		return 3;
+	}
 	return 0;
 }
 
