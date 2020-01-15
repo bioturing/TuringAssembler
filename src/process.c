@@ -101,16 +101,18 @@ void count_cc(struct asm_graph_t *g)
 	int *res = calloc(MAX, sizeof(int)), big_res = 0;
 	int *hd = calloc(100000000, 4), total_cc = 0, total_10k_cc = 0;
 	for (int i = 0; i < g->n_e; i++) if (mark[i] == 0){
-			int len = dfs(g, i, mark, hd);
-			if (len > MAX*10000) {
-				log_info("This component is big: %d", len);
-			} else {
-				res[len/10000]++;
-			}
-			if (len > 10000)
-				total_10k_cc++;
-			total_cc++;
+		if (g->edges[i].source == -1)
+			continue;
+		int len = dfs(g, i, mark, hd);
+		if (len > MAX*10000) {
+			log_info("This component is big: %d", len);
+		} else {
+			res[len/10000]++;
 		}
+		if (len > 10000)
+			total_10k_cc++;
+		total_cc++;
+	}
 	for (int i = 0 ;  i < MAX; i++) {
 		log_info("Number of CC of len %d is %d", i, res[i]);
 	}

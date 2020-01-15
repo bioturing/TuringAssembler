@@ -1047,6 +1047,13 @@ void test_asm_graph(struct asm_graph_t *g)
 			if (e < 0 || e >= g->n_e) {
 				log_error("node = %ld; edge = %ld", u, e);
 			}
+			int source = g->edges[e].source;
+			int target = g->edges[e].target;
+			if (source < 0 || source >= g->n_v)
+				log_error("ssscv");
+			if (target < 0 || target >= g->n_v)
+				log_error("ssscv");
+
 		}
 		/* Test 4: Node reverse complement id within [0, g->n_v) */
 		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
