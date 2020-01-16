@@ -746,6 +746,7 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 
 	log_info("Creating super edges");
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
+	destroy_mini_hash(kmer_table);
 
 	log_info("Assigning reverse complement id for nodes and edges");
 	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
@@ -765,12 +766,6 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 		//resolve_graph_operation(supg, &g2);
 	}
 	test_asm_graph(supg);
-//	struct asm_graph_t g1 = *supg;
-//	asm_condense(supg, &g1);
-//	asm_graph_destroy(supg);
-//	*supg = g1;
-	//todo huu destroy kmer_table
-//	kmhash_destroy(kmer_table);
 	supg->ksize_count = g->ksize_count;
 }
 
