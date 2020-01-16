@@ -135,6 +135,20 @@ void build_0_1(struct opt_proc_t *opt, struct asm_graph_t *g0, struct asm_graph_
 	log_info("Build graph level 1 time: %.3f", sec_from_prev_time());
 }
 
+void build_0_1_small(struct opt_proc_t *opt, struct asm_graph_t *g0, struct asm_graph_t *g)
+{
+	char *log_file = str_concate(opt->out_dir, "/build_0_1.log");
+	init_logger(opt->log_level, log_file);
+	init_clock();
+	log_info("Resolve graph using small operation");
+	log_info("Input graph kmer size: %d", g0->ksize);
+	set_time_now();
+	resolve_graph_small_operation(g0, g);
+	// remove_tips(g0, g);
+	test_asm_graph(g);
+	log_info("Build graph level 1 time: %.3f", sec_from_prev_time());
+}
+
 void build_1_2b(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
 	log_info("Resolving graph using barcode (local assembly included)");
@@ -722,6 +736,17 @@ void build_0_process(struct opt_proc_t *opt)
 	build_0_KMC(opt, opt->k0, &g);
 	save_graph_info(opt->out_dir, &g, "level_0");
 	asm_graph_destroy(&g);
+}
+
+void build_0_1_small_process(struct opt_proc_t *opt)
+{
+	struct asm_graph_t g1, g2;
+	load_asm_graph(&g1, opt->in_file);
+	build_0_1_small(opt, &g1, &g2);
+	save_graph_info(opt->out_dir, &g2, "level_1");
+	count_cc(&g2);
+	// asm_graph_destroy(&g1);
+	// asm_graph_destroy(&g2);
 }
 
 void build_0_1_process(struct opt_proc_t *opt)
