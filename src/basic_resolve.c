@@ -329,6 +329,7 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			edges[p].rc_id = q;
 			edges[q].rc_id = p;
 			asm_clone_seq(edges + p, g0->edges + e);
+			uint64_t sum_count = 0, n_kmer = 0;
 			do {
 				v = g0->edges[e].target;
 				if (node_id[v] == -1) { /* middle node */
@@ -342,11 +343,13 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 					assert(e != -1);
 					asm_append_seq(edges + p,
 						g0->edges + e, g0->ksize);
-					edges[p].count += g0->edges[e].count;
+					sum_count += g0->edges[e].count;
+					n_kmer += g0->edges[e].seq_len - g0->ksize_count;
 				} else {
 					break;
 				}
 			} while (1);
+			edges[p].count = (sum_count/n_kmer) * (edges[p].seq_len - g0->ksize_count);
 			edges[p].source = x;
 			edges[p].target = node_id[v];
 			asm_clone_seq_reverse(edges + q, edges + p);
