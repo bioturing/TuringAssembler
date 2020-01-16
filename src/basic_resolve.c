@@ -759,8 +759,8 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		n_edges = 0;
 		e1 = e2 = -1;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-			if (g->nodes[u_rc].adj[j] != e) {
-				e1 = g->nodes[u_rc].adj[j];
+			if (g->nodes[u_rc].adj[j] != e_rc) {
+				e1 = g->edges[g->nodes[u_rc].adj[j]].rc_id;
 				sum_cov += __get_edge_cov(g->edges + e1, g->ksize);
 				++n_edges;
 			}
