@@ -629,7 +629,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				get_big_kmer_count(big_kmer_rc, kmer_table);
 			if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
 				|| count >= 1){
-				add_super_edge(u, e1, e2, supg, big_kmer, count,
+				add_super_edge(u, e1, e2, supg, big_kmer,
+						count * (g->ksize + 2 - g->ksize_count),
 						node_map_fw, node_map_bw);
 				++accept[u];
 			}
