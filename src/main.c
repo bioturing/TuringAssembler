@@ -443,6 +443,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &build_barcode_process_fastg);
 	else if (!strcmp(argv[1], "build_0_1"))
 		build_opt_process(argc, argv, &build_0_1_process);
+	else if (!strcmp(argv[1], "build_0_1_small"))
+		build_opt_process(argc, argv, &build_0_1_small_process);
 	else if (!strcmp(argv[1], "build_1_2"))
 		build_opt_process(argc, argv, &build_1_2_process);
 	else if (!strcmp(argv[1], "build_2_3"))
