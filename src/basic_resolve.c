@@ -349,7 +349,8 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 					break;
 				}
 			} while (1);
-			edges[p].count = (sum_count/n_kmer) * (edges[p].seq_len - g0->ksize_count);
+			if (n_kmer != 0)
+				edges[p].count = (sum_count/n_kmer) * (edges[p].seq_len - g0->ksize_count);
 			edges[p].source = x;
 			edges[p].target = node_id[v];
 			asm_clone_seq_reverse(edges + q, edges + p);
