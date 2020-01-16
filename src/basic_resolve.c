@@ -251,6 +251,9 @@ void asm_condense_barcode(struct asm_graph_t *g0, struct asm_graph_t *g)
 
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+//	log_info("asm_condense");
+//	test_asm_graph(g0);
+//	save_graph_info(".", g0, "be4condense");
 	gint_t *node_id;
 	gint_t n_v, n_e, m_e;
 	node_id = malloc(g0->n_v * sizeof(gint_t));
@@ -351,7 +354,9 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 			e_rc = g0->edges[e].rc_id;
 			gint_t j = find_adj_idx(g0->nodes[v_rc].adj,
 						g0->nodes[v_rc].deg, e_rc);
-			assert(j >= 0);
+			if (j < 0) {
+				log_error("%d", e);
+			}
 			g0->nodes[v_rc].adj[j] = -1;
 			y_rc = node_id[v_rc];
 			edges[q].source = y_rc;
@@ -762,8 +767,8 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		n_edges = 0;
 		e1 = e2 = -1;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
-			if (g->nodes[u_rc].adj[j] != e) {
-				e1 = g->nodes[u_rc].adj[j];
+			if (g->nodes[u_rc].adj[j] != e_rc) {
+				e1 = g->edges[g->nodes[u_rc].adj[j]].rc_id;
 				sum_cov += __get_edge_cov(g->edges + e1, g->ksize_count);
 				++n_edges;
 			}
@@ -782,33 +787,38 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 			asm_remove_edge(g, e_rc);
 			return -1;
 		}
-		if (g->nodes[u_rc].deg > 2 || g->nodes[u].deg > 2)
+		if (g->nodes[u_rc].deg != 2 || g->nodes[u].deg != 2)
 			return 0;
 		/* split the node */
-		v = asm_create_node(g);
-		v_rc = g->nodes[v].rc_id;
-		/* set source-target of edge e */
-		g->edges[e].target = v;
-		asm_remove_node_adj(g, u_rc, e_rc);
-		g->edges[e_rc].source = v_rc;
-		asm_add_node_adj(g, v_rc, e_rc);
-		/* move edge from node u to node v */
-		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
-		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
-		g->nodes[v].deg = g->nodes[u].deg;
-		asm_remove_node_adj(g, v, e);
-		/* node u has only edge e left */
-		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
-		g->nodes[u].adj[0] = e;
-		g->nodes[u].deg = 1;
-		gint_t j;
-		for (j = 0; j < g->nodes[v].deg; ++j) {
-			gint_t e_t = g->nodes[v].adj[j];
-			g->edges[e_t].source = v;
-			g->edges[g->edges[e_t].rc_id].target = v_rc;
-		}
+//		v = asm_create_node(g);
+//		v_rc = g->nodes[v].rc_id;
+//		/* set source-target of edge e */
+//		g->edges[e].target = v;
+//		asm_remove_node_adj(g, u_rc, e_rc);
+//		g->edges[e_rc].source = v_rc;
+//		asm_add_node_adj(g, v_rc, e_rc);
+//		/* move edge from node u to node v */
+//		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
+//		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
+//		g->nodes[v].deg = g->nodes[u].deg;
+//		asm_remove_node_adj(g, v, e);
+//		/* node u has only edge e left */
+//		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
+//		g->nodes[u].adj[0] = e;
+//		g->nodes[u].deg = 1;
+//		gint_t j;
+//		for (j = 0; j < g->nodes[v].deg; ++j) {
+//			gint_t e_t = g->nodes[v].adj[j];
+//			g->edges[e_t].source = v;
+//			g->edges[g->edges[e_t].rc_id].target = v_rc;
+//		}
+//
+		asm_join_edge(g, e1, g->edges[e1].rc_id, e, g->edges[e].rc_id);
+		asm_join_edge(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id);
+		g->nodes[u].deg = g->nodes[u_rc].deg = 0;
 		return 1;
-	} else if (u == v_rc) { /* self loop reverse */
+	}
+	else if (u == v_rc) { /* self loop reverse */
 		sum_cov = 0;
 		n_edges = 0;
 		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
@@ -992,6 +1002,9 @@ static gint_t check_simple_bubble(struct asm_graph_t *g, gint_t se)
 	n = 0;
 	for (j = 0; j < g->nodes[u].deg; ++j) {
 		e = g->nodes[u].adj[j];
+		if (e < 0 || e >= g->n_e) {
+			log_error("wtf");
+		}
 		if (g->edges[e].target == v && g->edges[e].seq_len < MIN_NOTICE_LEN)
 			branch[n++] = e;
 	}
@@ -1070,6 +1083,7 @@ void resolve_local_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 
 void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+	test_asm_graph(g0);
 	gint_t cnt_tips = 0 , cnt_tips_complex = 0, cnt_chimeric = 0, cnt_loop = 0, cnt_collapse = 0;
 	int iter = 0;
 	do {
@@ -1098,14 +1112,16 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			cnt_collapse = resolve_simple_bubble(g0);
 			cnt_collapse += resolve_align_bubble(g0);
 			cnt_loop += resolve_loop(g0);
-			asm_lazy_condense(g0);
+			asm_condense(g0, g);
+			asm_graph_destroy(g0);
+			*g0 = *g;
 		} while (cnt_loop + cnt_collapse);
 
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
-
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
+	test_asm_graph(g0);
 }
 
 int check_loop(struct asm_graph_t *g, int i_e2)

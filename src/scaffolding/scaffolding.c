@@ -763,12 +763,12 @@ void load_list_barcode(int *n_barcodes, char ***barcodes, int **freq)
 	*freq = arr_fre;
 }
 
-inline int get_nu(const uint32_t *seq, int pos)
+int get_nu(const uint32_t *seq, int pos)
 {
 	return (seq[pos >> 4] >> ((pos & 15) << 1)) & 3;
 }
 
-inline void set_nu(uint32_t *seq, int pos, int val)
+void set_nu(uint32_t *seq, int pos, int val)
 {
 	seq[pos >> 4] |= val << ((pos & 15) << 1);
 }

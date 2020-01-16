@@ -191,6 +191,7 @@ struct cov_range_t {
  * */
 #define __get_edge_cov(e, ksize) ((e)->count * 1.0 /			\
 				((e)->seq_len - ((e)->n_holes + 1) * (ksize)))
+
 static inline struct cov_range_t get_edge_cov_range(struct asm_graph_t *g, gint_t e, double uni_cov)
 {
 	double fcov = __get_edge_cov(g->edges + e, g->ksize_count) / uni_cov;

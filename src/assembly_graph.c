@@ -746,6 +746,9 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 			}
 
 			u = g->edges[e_rc].target;
+			if (u < 0 || u >= g->n_v) {
+				log_error("%d", u);
+			}
 			if (g->nodes[u].deg == 0)
 				cur_size += g->ksize;
 			for (c = 0; c < g->nodes[u].deg; ++c) {
@@ -879,6 +882,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
 		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
+//		log_warn("ksize %d ksize count %d", g->ksize, g->ksize_count);
 		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		/* print fake count for correct coverage display on Bandage */
 		fprintf(fp, "S\t%lld_%lld_cov_%.3f\t%s\tKC:i:%llu\n", (long long)e,
@@ -984,8 +988,13 @@ void deb_dump_seq(struct asm_graph_t *g, gint_t e)
 	printf("%s\n", seq);
 }
 
+int fff(uint32_t *seq, int k) {
+	return (((seq)[(k) >> 4] >> (((k) & 15) << 1)) & (uint32_t)3);
+}
+
 void test_asm_graph(struct asm_graph_t *g)
 {
+	log_info("g->ne %d", g->n_e);
 	gint_t le_idx = get_longest_edge(g);
 	if (le_idx != -1) {
 		log_info("Longest edge %ld_%ld, length %u",
@@ -1007,6 +1016,10 @@ void test_asm_graph(struct asm_graph_t *g)
 		/* Test 1: consistency of node's adj and edge's source */
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
+			if (e < 0 || e >= g->n_e) {
+				log_error("e %d", e);
+			}
+			assert(e >= 0 && e < g->n_e);
 			if (g->edges[e].source != u) {
 				log_debug("node = %ld; edge = [%ld](%ld->%ld)",
 					u, e,
@@ -1034,6 +1047,13 @@ void test_asm_graph(struct asm_graph_t *g)
 			if (e < 0 || e >= g->n_e) {
 				log_error("node = %ld; edge = %ld", u, e);
 			}
+			int source = g->edges[e].source;
+			int target = g->edges[e].target;
+			if (source < 0 || source >= g->n_v)
+				log_error("ssscv");
+			if (target < 0 || target >= g->n_v)
+				log_error("ssscv");
+
 		}
 		/* Test 4: Node reverse complement id within [0, g->n_v) */
 		if (g->nodes[u].rc_id < 0 || g->nodes[u].rc_id >= g->n_v) {
@@ -1046,8 +1066,13 @@ void test_asm_graph(struct asm_graph_t *g)
 		if (g->nodes[u].deg > 0 && g->nodes[u_rc].deg > 0) {
 			e1 = g->nodes[u].adj[0];
 			e2 = g->edges[g->nodes[u_rc].adj[0]].rc_id;
+			assert(e1 >= 0 && e2 >= 0 && e1 < g->n_e && e2 < g->n_e);
 			for (k = 0; k < g->ksize; ++k) {
 				j = g->edges[e2].seq_len - g->ksize + k;
+				assert(j >= 0);
+				if (g->n_e == 102314 && u == 59790 && k == 0) {
+					log_info("wtf");
+				}
 				if (__binseq_get(g->edges[e2].seq, j) !=
 					__binseq_get(g->edges[e1].seq, k)) {
 					log_debug("(%ld, %ld) -> (%ld, %ld)",

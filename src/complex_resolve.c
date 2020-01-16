@@ -629,7 +629,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				get_big_kmer_count(big_kmer_rc, kmer_table);
 			if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
 				|| count >= 1){
-				add_super_edge(u, e1, e2, supg, big_kmer, count,
+				add_super_edge(u, e1, e2, supg, big_kmer,
+						count * (g->ksize + 2 - g->ksize_count),
 						node_map_fw, node_map_bw);
 				++accept[u];
 			}
@@ -746,7 +747,6 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	log_info("Creating super edges");
 	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
 
-	destroy_mini_hash(kmer_table);
 	log_info("Assigning reverse complement id for nodes and edges");
 	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
 

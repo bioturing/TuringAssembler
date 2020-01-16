@@ -74,6 +74,7 @@ int64_t dfs(struct asm_graph_t *g, int x, int *mark, int *hd)
 		int x = hd[l++];
 		res += g->edges[x].seq_len-g->ksize;
 		int target = g->edges[x].target;
+		assert(target >=0 && target < g->n_v);
 		int src_rc = g->nodes[target].rc_id;
 		for (int i = 0; i < g->nodes[src_rc].deg; i++) {
 			int next = g->nodes[src_rc].adj[i];
@@ -100,16 +101,18 @@ void count_cc(struct asm_graph_t *g)
 	int *res = calloc(MAX, sizeof(int)), big_res = 0;
 	int *hd = calloc(100000000, 4), total_cc = 0, total_10k_cc = 0;
 	for (int i = 0; i < g->n_e; i++) if (mark[i] == 0){
-			int len = dfs(g, i, mark, hd);
-			if (len > MAX*10000) {
-				log_info("This component is big: %d", len);
-			} else {
-				res[len/10000]++;
-			}
-			if (len > 10000)
-				total_10k_cc++;
-			total_cc++;
+		if (g->edges[i].source == -1)
+			continue;
+		int len = dfs(g, i, mark, hd);
+		if (len > MAX*10000) {
+			log_info("This component is big: %d", len);
+		} else {
+			res[len/10000]++;
 		}
+		if (len > 10000)
+			total_10k_cc++;
+		total_cc++;
+	}
 	for (int i = 0 ;  i < MAX; i++) {
 		log_info("Number of CC of len %d is %d", i, res[i]);
 	}
@@ -198,8 +201,10 @@ void write_neo4j_create(struct asm_graph_t *g)
 void dirty_process(struct opt_proc_t *opt)
 {
 	struct asm_graph_t *g = create_and_load_graph(opt);
+	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
+	asm_condense(g, g0);
 //	count_cc(g);
-	dirty(g, opt);
+//	dirty(g, opt);
 //	write_neo4j_create(g);
 }
 
