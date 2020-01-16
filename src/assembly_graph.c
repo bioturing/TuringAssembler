@@ -771,9 +771,9 @@ static void asm_edge_cc(struct asm_graph_t *g, gint_t *id_edge, gint_t **ret_siz
 	free(q);
 }
 
-static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize)
+static inline uint64_t get_bandage_count(struct asm_edge_t *e, int ksize_count)
 {
-	float cov = __get_edge_cov(e, ksize);
+	float cov = __get_edge_cov(e, ksize_count);
 	uint32_t i, len = e->seq_len;
 	for (i = 0; i < e->n_holes; ++i)
 		len += e->l_holes[i];
@@ -881,7 +881,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 		if (cc_size[cc_id] < MIN_COMPONENT)
 			continue;
 		dump_edge_seq_h(&seq, &seq_len, g->edges + e);
-		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize);
+		uint64_t fake_count = get_bandage_count(g->edges + e, g->ksize_count);
 //		log_warn("ksize %d ksize count %d", g->ksize, g->ksize_count);
 		float cov = __get_edge_cov(g->edges + e, g->ksize_count);
 		/* print fake count for correct coverage display on Bandage */

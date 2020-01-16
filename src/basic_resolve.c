@@ -815,6 +815,7 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 //
 		asm_join_edge(g, e1, g->edges[e1].rc_id, e, g->edges[e].rc_id);
 		asm_join_edge(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id);
+
 		g->nodes[u].deg = g->nodes[u_rc].deg = 0;
 		return 1;
 	}

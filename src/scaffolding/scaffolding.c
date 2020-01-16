@@ -899,6 +899,7 @@ void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
+	log_info("%d %d %d", g->ksize, g->ksize_count, g->edges[48478].count);
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
