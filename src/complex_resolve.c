@@ -777,7 +777,7 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 		upsize_graph(opt, k, g, supg);
 
 		log_info("Resolving done kmer of size %d", k);
-//		asm_graph_destroy(g);
+		asm_graph_destroy(g);
 		*g = *supg;
 		save_graph_info(opt->out_dir, g, "kmer_resolve");
 	}
