@@ -615,8 +615,8 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		int u = g->edges[e1].target;
 		int u_rc = g->nodes[u].rc_id;
 		if (g->nodes[u].deg > 1) {
-			log_info("-------");
-			log_info("From %d degout %d degin %d", e1, g->nodes[u].deg, g->nodes[u_rc].deg);
+			log_debug("-------");
+			log_debug("From %d degout %d degin %d", e1, g->nodes[u].deg, g->nodes[u_rc].deg);
 		}
 		int count_connect = 0;
 		for (int i = 0; i < g->nodes[u].deg; ++i){
@@ -633,9 +633,9 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			int count = count1 + count2;
 			if (g->nodes[u].deg > 1) {
 				if (count1 + count2 > 5000) {
-					log_info("this kmer exist>5000: %s", big_kmer);
+					log_debug("this kmer exist>5000: %s", big_kmer);
 				}
-				log_info("    To %d: %d %d", e2, count1, count2);
+				log_debug("    To %d: %d %d", e2, count1, count2);
 			}
 			if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
 				|| count >= 3){
