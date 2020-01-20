@@ -607,17 +607,20 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
 		struct mini_hash_t *kmer_table)
 {
-	int *total = calloc(g->n_v, sizeof(int));
-	int *accept = calloc(g->n_v, sizeof(int));
+	int count_resolve = 0;
 
 	for (int e1 = 0; e1 < g->n_e; ++e1){
 		if (g->edges[e1].source == -1)
 			continue;
 		int u = g->edges[e1].target;
 		int u_rc = g->nodes[u].rc_id;
+		if (g->nodes[u].deg > 1) {
+			log_info("-------");
+			log_info("From %d degout %d degin %d", e1, g->nodes[u].deg, g->nodes[u_rc].deg);
+		}
+		int count_connect = 0;
 		for (int i = 0; i < g->nodes[u].deg; ++i){
 			int e2 = g->nodes[u].adj[i];
-			++total[u];
 
 			char *big_kmer;
 			get_big_kmer(e1, e2, g, &big_kmer);
@@ -625,23 +628,51 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
 			strcpy(big_kmer_rc, big_kmer);
 			flip_reverse(big_kmer_rc);
-			int count = get_big_kmer_count(big_kmer, kmer_table) +
-				get_big_kmer_count(big_kmer_rc, kmer_table);
+			int count1 = get_big_kmer_count(big_kmer, kmer_table) ;
+			int count2 = get_big_kmer_count(big_kmer_rc, kmer_table);
+			int count = count1 + count2;
+			if (g->nodes[u].deg > 1) {
+				if (count1 + count2 > 5000) {
+					log_info("this kmer exist>5000: %s", big_kmer);
+				}
+				log_info("    To %d: %d %d", e2, count1, count2);
+			}
 			if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
 				|| count >= 3){
 				add_super_edge(u, e1, e2, supg, big_kmer,
 						count * (g->ksize + 2 - g->ksize_count),
 						node_map_fw, node_map_bw);
-				++accept[u];
-			}
+				count_connect++;
+			} else
+				count_resolve++;
 
 			free(big_kmer);
 			free(big_kmer_rc);
 		}
-	}
+		if (count_connect == 0) {
+			for (int i = 0; i < g->nodes[u].deg; ++i){
+				int e2 = g->nodes[u].adj[i];
 
-	free(total);
-	free(accept);
+				char *big_kmer;
+				get_big_kmer(e1, e2, g, &big_kmer);
+
+				char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
+				strcpy(big_kmer_rc, big_kmer);
+				flip_reverse(big_kmer_rc);
+				int count1 = get_big_kmer_count(big_kmer, kmer_table) ;
+				int count2 = get_big_kmer_count(big_kmer_rc, kmer_table);
+				int count = count1 + count2;
+				add_super_edge(u, e1, e2, supg, big_kmer,
+					       count * (g->ksize + 2 - g->ksize_count),
+					       node_map_fw, node_map_bw);
+
+				free(big_kmer);
+				free(big_kmer_rc);
+			}
+
+		}
+	}
+	log_info("Total resolve using big kmer: %d edges", count_resolve);
 }
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
