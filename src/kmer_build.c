@@ -1071,7 +1071,7 @@ void build_local_assembly_graph(int ksize, int n_threads, int mmem, int n_files,
 struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files_1,
 		char **files_2, int n_threads, int mmem, char *work_dir)
 {
-	log_debug("|---- Build graph from scratch");
+	log_info("|---- get kmer count from kmc");
 	// n_files < 0 mean we have one contig file at end of files_2
 	char **tmp_files;
 	char *count_kmer_dir = alloca(strlen(work_dir) + 50);
@@ -1093,7 +1093,7 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 								abs(n_files) * 2, tmp_files);
 	}
 
-	log_debug("|---- Retrieving kmer from KMC database");
+	log_info("|---- Retrieving kmer from KMC database");
 	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
 	init_mini_hash(&kmer_table, 20);
 //	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
