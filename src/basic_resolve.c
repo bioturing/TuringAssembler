@@ -585,6 +585,67 @@ void find_topo(struct asm_graph_t *g, gint_t *d, gint_t *deg, uint32_t max_len)
 	free(q);
 }
 
+gint_t remove_tips_topo_harsh(struct asm_graph_t *g)
+{
+	/*             o
+	 *             ^      o
+	 *       o<--+ |      ^
+	 *            \|     /         TIP
+	 *        o<---o--->o--->o
+	 *             ^
+	 *            /
+	 * o-------->o-------->o------>o------>o
+	 */
+	gint_t *d, *degs;
+	d = malloc(g->n_v * sizeof(gint_t));
+	degs = malloc(g->n_v * sizeof(gint_t));
+	find_topo(g, d, degs, 1000);
+
+	gint_t u, u_rc, v, e, e_rc, j, cnt_removed;
+	double cov, cov_fw, cov_rv, max_cov;
+	uint32_t len_fw, len_rv, extend_left, extend_right;
+	cnt_removed = 0;
+	for (u = 0; u < g->n_v; ++u) {
+		u_rc = g->nodes[u].rc_id;
+		cov_fw = cov_rv = 0;
+		len_fw = len_rv = 0;
+		extend_left = extend_right = 0;
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			cov_fw = __max(cov_fw, cov);
+			len_fw = __max(len_fw, g->edges[e].seq_len);
+			v = g->edges[e].target;
+			extend_left |= (degs[v] != 0 || d[v] == -1 || d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
+		}
+		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+			e = g->nodes[u_rc].adj[j];
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			cov_rv = __max(cov_rv, cov);
+			len_rv = __max(len_rv, g->edges[e].seq_len);
+			v = g->edges[e].target;
+			extend_right |= (degs[v] != 0 || d[v] == -1 || d[v] + g->edges[e].seq_len - g->ksize >= MIN_TIPS_LEG);
+		}
+		max_cov = __max(cov_fw, cov_rv);
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			v = g->edges[e].target;
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			if (degs[v] == 0 && d[v] != -1 && g->edges[e].seq_len < 150){
+				e_rc = g->edges[e].rc_id;
+				asm_remove_edge(g, e);
+				asm_remove_edge(g, e_rc);
+				++cnt_removed;
+				--j;
+			}
+		}
+	}
+	free(d);
+	free(degs);
+	log_debug("Number of tips remove using graph topology: %ld", cnt_removed);
+	return cnt_removed;
+}
+
 gint_t remove_tips_topo(struct asm_graph_t *g)
 {
 	/*             o
@@ -646,6 +707,60 @@ gint_t remove_tips_topo(struct asm_graph_t *g)
 	free(d);
 	free(degs);
 	log_debug("Number of tips remove using graph topology: %ld", cnt_removed);
+	return cnt_removed;
+}
+
+gint_t remove_tips_harsh(struct asm_graph_t *g)
+{
+	/*
+	 *                      o
+	 *                      ^
+	 *                     /
+	 *              cov~1 /
+	 *                   /
+	 *       cov~10     /   cov~10
+	 * o-------------->o------------->o---------->o
+	 */
+	gint_t u, u_rc, j, e, e_rc, v, cnt_removed;
+	double cov_fw, cov_rv, cov, max_cov;
+	uint32_t len_fw, len_rv, extend_left, extend_right;
+	cnt_removed = 0;
+	for (u = 0; u < g->n_v; ++u) {
+		u_rc = g->nodes[u].rc_id;
+		cov_fw = cov_rv = 0;
+		len_fw = len_rv = 0;
+		extend_left = extend_right = 0;
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			cov_fw = __max(cov_fw, cov);
+			len_fw = __max(len_fw, g->edges[e].seq_len);
+			v = g->edges[e].target;
+			extend_left |= (g->nodes[v].deg != 0 || g->edges[e].seq_len >= MIN_TIPS_LEG);
+		}
+		for (j = 0; j < g->nodes[u_rc].deg; ++j) {
+			e = g->nodes[u_rc].adj[j];
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			cov_rv = __max(cov_rv, cov);
+			len_rv = __max(len_rv, g->edges[e].seq_len);
+			v = g->edges[e].target;
+			extend_right |= (g->nodes[v].deg != 0 || g->edges[e].seq_len >= MIN_TIPS_LEG);
+		}
+		max_cov = __max(cov_fw, cov_rv);
+		for (j = 0; j < g->nodes[u].deg; ++j) {
+			e = g->nodes[u].adj[j];
+			v = g->edges[e].target;
+			cov = __get_edge_cov(g->edges + e, g->ksize_count);
+			if (g->nodes[v].deg == 0 && g->edges[e].seq_len < 150){
+				int e_rc = g->edges[e].rc_id;
+				asm_remove_edge(g, e);
+				asm_remove_edge(g, e_rc);
+				++cnt_removed;
+				--j;
+			}
+		}
+	}
+	log_debug("Number of trivial tips removed: %ld", cnt_removed);
 	return cnt_removed;
 }
 
