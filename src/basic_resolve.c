@@ -1030,6 +1030,34 @@ gint_t unroll_simple_loop(struct asm_graph_t *g)
 	return cnt_self + cnt_self_rv + cnt_double + cnt_false;
 }
 
+static gint_t bubble_keep_deepest(struct asm_graph_t *g, gint_t *b, gint_t n)
+{
+	gint_t e_kept, e, e_rc, i;
+	uint32_t max_count = 0;
+	uint64_t sum_cnt = 0;
+	e_kept = -1;
+	for (i = 0; i < n; ++i) {
+		e = b[i];
+		if (g->edges[e].count > max_count){
+			max_count = g->edges[e].count;
+			e_kept = e;
+		}
+		sum_cnt += g->edges[e].count;
+	}
+	for (i = 0; i < n; ++i) {
+		e = b[i];
+		if (e != e_kept) {
+			e_rc = g->edges[e].rc_id;
+			asm_remove_edge(g, e);
+			asm_remove_edge(g, e_rc);
+		}
+	}
+	g->edges[e_kept].count = sum_cnt;
+	e_rc = g->edges[e_kept].rc_id;
+	g->edges[e_rc].count = sum_cnt;
+	return n - 1;
+}
+
 static gint_t bubble_keep_longest(struct asm_graph_t *g, gint_t *b, gint_t n)
 {
 	gint_t e_kept, e, e_rc, i;
@@ -1109,6 +1137,47 @@ static gint_t check_align_bubble(struct asm_graph_t *g, gint_t se)
 	return n;
 }
 
+int check_approx_length(int l1, int l2)
+{
+	return l1 >= 0.8 * l2 && l2 >= 0.8 * l1;
+}
+
+static gint_t check_simple_bubble_harsh(struct asm_graph_t *g, gint_t se)
+{
+	gint_t u, v, e, ret, n, j;
+	gint_t *branch;
+	u = g->edges[se].source;
+	v = g->edges[se].target;
+	if (u == g->nodes[v].rc_id) /* self loop reverse */
+		return 0;
+	branch = alloca(g->nodes[u].deg * sizeof(gint_t));
+	n = 0;
+	for (j = 0; j < g->nodes[u].deg; ++j) {
+		e = g->nodes[u].adj[j];
+		if (g->edges[e].target == v && g->edges[e].seq_len < MIN_NOTICE_LEN)
+			branch[n++] = e;
+	}
+	if (n < 2)
+		return 0;
+
+	int e_keep = branch[0];
+	for (int i = 0; i < n; ++i){
+		int e = branch[i];
+		if (g->edges[e_keep].count < g->edges[e].count)
+			e_keep = e;
+	}
+
+	for (int i = 0; i < n; ++i){
+		int e = branch[i];
+		if (e == e_keep)
+			continue;
+		if (check_approx_length(g->edges[e].seq_len, g->edges[e_keep].seq_len) == 0)
+			return 0;
+	}
+	bubble_keep_deepest(g, branch, n);
+	return n;
+}
+
 static gint_t check_simple_bubble(struct asm_graph_t *g, gint_t se)
 {
 	gint_t u, v, e, ret, n, j;
@@ -1131,6 +1200,19 @@ static gint_t check_simple_bubble(struct asm_graph_t *g, gint_t se)
 		return 0;
 	bubble_keep_longest(g, branch, n);
 	return n;
+}
+
+gint_t resolve_simple_bubble_harsh(struct asm_graph_t *g)
+{
+	gint_t e, cnt_collapsed;
+	cnt_collapsed = 0;
+	for (e = 0; e < g->n_e; ++e) {
+		if (g->edges[e].source == -1)
+			continue;
+		cnt_collapsed += check_simple_bubble_harsh(g, e);
+	}
+	log_debug("Number of collapsed bubble: %ld", cnt_collapsed);
+	return cnt_collapsed;
 }
 
 gint_t resolve_simple_bubble(struct asm_graph_t *g)
@@ -1209,12 +1291,12 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		log_debug("Iteration [%d]", ++iter);
 		cnt_tips = cnt_tips_complex = cnt_chimeric = 0;
 
-		cnt_tips = remove_tips(g0);
+		cnt_tips = remove_tips_harsh(g0);
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
-		cnt_tips_complex = remove_tips_topo(g0);
+		cnt_tips_complex = remove_tips_topo_harsh(g0);
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
@@ -1222,6 +1304,7 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		do {
 			cnt_loop = cnt_collapse = 0;
 
+			cnt_collapse = resolve_simple_bubble_harsh(g0);
 			cnt_loop = unroll_simple_loop(g0);
 			cnt_loop += resolve_loop(g0);
 			asm_condense(g0, g);

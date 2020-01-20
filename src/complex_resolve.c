@@ -796,6 +796,6 @@ int is_reverse_complement(struct asm_graph_t *g, int e1, int e2)
 	int base = __binseq_get(g->edges[e1].seq, g->ksize);
 	int base_rc = __binseq_get(g->edges[e2].seq,
 					g->edges[e2].seq_len - g->ksize - 1);
-	return base ^ base_rc == 3;
+	return (base ^ base_rc) == 3;
 }
 
