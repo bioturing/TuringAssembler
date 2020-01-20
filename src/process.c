@@ -219,7 +219,6 @@ void dirty_process(struct opt_proc_t *opt)
 //	asm_condense(g, g0);
 //	count_cc(g);
 	dirty(g, opt);
-	save_graph_info(opt->out_dir, g, "wtf");
 //	write_neo4j_create(g);
 }
 

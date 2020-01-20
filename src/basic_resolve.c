@@ -751,7 +751,7 @@ gint_t remove_tips_harsh(struct asm_graph_t *g)
 			e = g->nodes[u].adj[j];
 			v = g->edges[e].target;
 			cov = __get_edge_cov(g->edges + e, g->ksize_count);
-			if (g->nodes[v].deg == 0 && g->edges[e].seq_len < 150){
+			if (g->nodes[v].deg == 0 && g->edges[e].seq_len < 500){
 				int e_rc = g->edges[e].rc_id;
 				asm_remove_edge(g, e);
 				asm_remove_edge(g, e_rc);

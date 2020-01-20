@@ -12,6 +12,7 @@
 #include <resolve_big.h>
 #include <process.h>
 #include <resolve.h>
+#include <basic_resolve.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -892,6 +893,7 @@ void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt)
 		t = resolve_212_by_cov_1step(g);
 		struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 		asm_condense(g, g0);
+		asm_graph_destroy(g);
 		g = g0;
 	} while (t);
 	save_graph_info(opt->out_dir, g, "resolve_212cov");
@@ -899,7 +901,14 @@ void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-	log_info("%d %d %d", g->ksize, g->ksize_count, g->edges[48478].count);
+	while (remove_tips_harsh(g)) {
+		struct asm_graph_t g0;
+		asm_condense(g, &g0);
+		asm_graph_destroy(g);
+		*g = g0;
+	}
+
+	save_graph_info(opt->out_dir, g, "remove_harsh");
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
