@@ -1319,8 +1319,9 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 	test_asm_graph(g0);
 }
 
-void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
+int resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 {
+	int total_resolved = 0;
 	test_asm_graph(g0);
 	gint_t cnt_tips = 0 , cnt_tips_complex = 0, cnt_chimeric = 0, cnt_loop = 0, cnt_collapse = 0;
 	int iter = 0;
@@ -1353,13 +1354,16 @@ void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 			asm_condense(g0, g);
 			asm_graph_destroy(g0);
 			*g0 = *g;
+			total_resolved += cnt_loop + cnt_collapse;
 		} while (cnt_loop + cnt_collapse);
 
 		asm_condense(g0, g);
 		asm_graph_destroy(g0);
 		*g0 = *g;
+		total_resolved += cnt_tips + cnt_tips_complex + cnt_chimeric;
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
 	test_asm_graph(g0);
+	return total_resolved;
 }
 
 int check_loop(struct asm_graph_t *g, int i_e2)
