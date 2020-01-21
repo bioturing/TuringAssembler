@@ -634,6 +634,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 			nodes[krev_idx].deg = deg_rv;
 		}
 	}
+	log_warn("ne after %d", n_e);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
