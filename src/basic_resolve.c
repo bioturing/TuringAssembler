@@ -869,7 +869,7 @@ gint_t remove_chimeric(struct asm_graph_t *g)
 
 int check_simple_loop(struct asm_graph_t *g, gint_t e)
 {
-	if (g->edges[e].seq_len >= MIN_NOTICE_LEN)
+	if (g->edges[e].seq_len >= MIN_UNROLL_LOOP)
 		return 0;
 	gint_t e_rc, u, v, u_rc, v_rc, e1, e2, e_rc1, e_rc2, e_return, e_return_rc, j;
 	int rep, rep_e, rep_e_return, n_edges;
@@ -1362,7 +1362,7 @@ int resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g)
 		*g0 = *g;
 		total_resolved += cnt_tips + cnt_tips_complex + cnt_chimeric;
 	} while (cnt_tips + cnt_tips_complex + cnt_chimeric);
-	test_asm_graph(g0);
+	test_asm_graph(g);
 	return total_resolved;
 }
 

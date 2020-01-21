@@ -685,7 +685,7 @@ void asm_clean_edge(struct asm_graph_t *g, gint_t e)
 		barcode_hash_clean(g->edges[e].barcodes + 1);
 		barcode_hash_clean(g->edges[e].barcodes + 2);
 		free(g->edges[e].barcodes);
-		barcode_hash_clean(&(g->edges[e].barcodes_scaf));
+		barcode_hash_clean(g->edges[e].barcodes_scaf);
 	}
 }
 
@@ -1013,6 +1013,8 @@ void test_asm_graph(struct asm_graph_t *g)
 
 	gint_t u, e, j, k;
 	for (u = 0; u < g->n_v; ++u) {
+		/* Test 0: huu test */
+		assert(g->nodes[u].rc_id >= 0 && g->nodes[u].rc_id < g->n_v);
 		/* Test 1: consistency of node's adj and edge's source */
 		for (j = 0; j < g->nodes[u].deg; ++j) {
 			e = g->nodes[u].adj[j];
@@ -1266,17 +1268,12 @@ void save_asm_graph(struct asm_graph_t *g, const char *path)
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 
-			h = &g->edges[e].barcodes_scaf;
+			h = g->edges[e].barcodes_scaf;
 			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
 			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
 			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
 			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 
-			h = &g->edges[e].barcodes_cov;
-			xfwrite(&h->size, sizeof(uint32_t), 1, fp);
-			xfwrite(&h->n_item, sizeof(uint32_t), 1, fp);
-			xfwrite(h->keys, sizeof(uint64_t), h->size, fp);
-			xfwrite(h->cnts, sizeof(uint32_t), h->size, fp);
 	}
 	}
 	fclose(fp);
@@ -1368,16 +1365,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 			h->cnts = malloc(h->size * sizeof(uint32_t));
 			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
 
-			h = &g->edges[e].barcodes_scaf;
-			xfread(&h->size, sizeof(uint32_t), 1, fp);
-			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
-			h->keys = malloc(h->size * sizeof(uint64_t));
-			xfread(h->keys, sizeof(uint64_t), h->size, fp);
-			h->cnts = NULL;
-			h->cnts = malloc(h->size * sizeof(uint32_t));
-			xfread(h->cnts, sizeof(uint32_t), h->size, fp);
-
-			h = &g->edges[e].barcodes_cov;
+			h = g->edges[e].barcodes_scaf;
 			xfread(&h->size, sizeof(uint32_t), 1, fp);
 			xfread(&h->n_item, sizeof(uint32_t), 1, fp);
 			h->keys = malloc(h->size * sizeof(uint64_t));
@@ -1614,7 +1602,6 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		g1->edges[i].source = g0->edges[i].source;
 		g1->edges[i].target = g0->edges[i].target;
 		g1->edges[i].rc_id = g0->edges[i].rc_id;
-		pthread_mutex_init(&g1->edges[i].lock, NULL);
 		log_debug("seq len %d", g1->edges[i].seq_len);
 		log_debug("g0->edges[i].seq == NULL or not: %d", g0->edges[i].seq == NULL);
 		g1->edges[i].seq = (uint32_t *) calloc((g1->edges[i].seq_len + 3) / 4,
