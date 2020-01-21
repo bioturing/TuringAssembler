@@ -585,7 +585,9 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 	int v = kh_long_int_get(node_map_fw, GET_CODE(mid, e2));
 	uint32_t *bin_seq;
 	encode_seq(&bin_seq, big_kmer);
-	struct asm_edge_t *e = calloc(1, sizeof(struct asm_edge_t));
+	supg->edges = realloc(supg->edges, (supg->n_e + 1)
+			* sizeof(struct asm_edge_t));
+	struct asm_edge_t *e = supg->edges + supg->n_e;
 	e->count = count;
 	e->seq = bin_seq;
 	e->seq_len = strlen(big_kmer);
@@ -596,9 +598,6 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 	e->target = v;
 	e->rc_id = 0;
 	e->barcodes = NULL;
-	supg->edges = realloc(supg->edges, (supg->n_e + 1)
-			* sizeof(struct asm_edge_t));
-	supg->edges[supg->n_e] = *e;
 	asm_add_node_adj(supg, u, supg->n_e);
 	++supg->n_e;
 }
