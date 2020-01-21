@@ -607,18 +607,13 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
 		struct mini_hash_t *kmer_table)
 {
+	int *accept = calloc(g->n_v, sizeof(int));
 	int count_resolve = 0;
-
 	for (int e1 = 0; e1 < g->n_e; ++e1){
 		if (g->edges[e1].source == -1)
 			continue;
 		int u = g->edges[e1].target;
 		int u_rc = g->nodes[u].rc_id;
-		if (g->nodes[u].deg > 1) {
-			log_debug("-------");
-			log_debug("From %d degout %d degin %d", e1, g->nodes[u].deg, g->nodes[u_rc].deg);
-		}
-		int count_connect = 0;
 		for (int i = 0; i < g->nodes[u].deg; ++i){
 			int e2 = g->nodes[u].adj[i];
 
@@ -642,36 +637,31 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				add_super_edge(u, e1, e2, supg, big_kmer,
 						count * (g->ksize + 2 - g->ksize_count),
 						node_map_fw, node_map_bw);
-				count_connect++;
-			} else
-				count_resolve++;
+				++accept[u];
+			} else {
+				++count_resolve;
+			}
 
 			free(big_kmer);
 			free(big_kmer_rc);
 		}
-		if (count_connect == 0) {
-			for (int i = 0; i < g->nodes[u].deg; ++i){
-				int e2 = g->nodes[u].adj[i];
-
+	}
+	for (int u = 0; u < g->n_v; ++u){
+		if (accept[u] > 0)
+			continue;
+		int u_rc = g->nodes[u].rc_id;
+		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[u].deg; ++j){
+				int e2 = g->nodes[u].adj[j];
 				char *big_kmer;
 				get_big_kmer(e1, e2, g, &big_kmer);
-
-				char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
-				strcpy(big_kmer_rc, big_kmer);
-				flip_reverse(big_kmer_rc);
-				int count1 = get_big_kmer_count(big_kmer, kmer_table) ;
-				int count2 = get_big_kmer_count(big_kmer_rc, kmer_table);
-				int count = count1 + count2;
-				add_super_edge(u, e1, e2, supg, big_kmer,
-					       count * (g->ksize + 2 - g->ksize_count),
-					       node_map_fw, node_map_bw);
-
-				free(big_kmer);
-				free(big_kmer_rc);
+				add_super_edge(u, e1, e2, supg, big_kmer, 0,
+						node_map_fw, node_map_bw);
 			}
-
 		}
 	}
+	free(accept);
 	log_info("Total resolve using big kmer: %d edges", count_resolve);
 }
 
