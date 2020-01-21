@@ -1657,8 +1657,6 @@ int get_reads_build_cov(struct read_path_t *reads, struct read_path_t *rpath,
 	rpath->R2_path = strdup(path);
 	rpath->idx_path = NULL;
 	struct barcode_hash_t *bc1, *bc2;
-	bc1 = &(g->edges[e1].barcodes_cov);
-	bc2 = &(g->edges[e2].barcodes_cov);
 
 	struct barcode_hash_t *bc_head;
 	struct barcode_hash_t *bc_tail;

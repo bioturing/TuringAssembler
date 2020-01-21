@@ -172,13 +172,11 @@ void init_barcode_graph(struct asm_graph_t *g){
 	g->aux_flag |= ASM_HAVE_BARCODE;
 	gint_t e;
 	for (e = 0; e < g->n_e; ++e) {
-		pthread_mutex_init(&(g->edges[e].lock), NULL);
 		g->edges[e].barcodes = calloc(3, sizeof(struct barcode_hash_t));
 		barcode_hash_init(g->edges[e].barcodes, 4);
 		barcode_hash_init(g->edges[e].barcodes + 1, 4);
 		barcode_hash_init(g->edges[e].barcodes + 2, 4);
-		barcode_hash_init(&g->edges[e].barcodes_scaf, 4);
-		barcode_hash_init(&g->edges[e].barcodes_cov, 4);
+		barcode_hash_init(g->edges[e].barcodes_scaf, 4);
 	}
 }
 
@@ -610,22 +608,16 @@ static inline struct fasta_ref_t parse_fasta_ref(const char *name) {
 }
 
 static inline void add_barcode_edge(struct asm_graph_t *g, gint_t e,
-                                    int lvl, uint64_t bc) {
-	pthread_mutex_lock(&g->edges[e].lock);
+                                    int lvl, uint64_t bc, pthread_mutex_t *lock) {
+	pthread_mutex_lock(lock);
 	barcode_hash_add(g->edges[e].barcodes + lvl, bc);
-	pthread_mutex_unlock(&g->edges[e].lock);
+	pthread_mutex_unlock(lock);
 }
 
-static inline void add_barcode_scaffold(struct asm_graph_t *g, gint_t e, uint64_t bc) {
-	pthread_mutex_lock(&g->edges[e].lock);
-	barcode_hash_add(&g->edges[e].barcodes_scaf, bc);
-	pthread_mutex_unlock(&g->edges[e].lock);
-}
-
-static inline void add_barcode_cov(struct asm_graph_t *g, gint_t e, uint64_t bc) {
-	pthread_mutex_lock(&g->edges[e].lock);
-	barcode_hash_add(&g->edges[e].barcodes_cov, bc);
-	pthread_mutex_unlock(&g->edges[e].lock);
+static inline void add_barcode_scaffold(struct asm_graph_t *g, gint_t e, uint64_t bc, pthread_mutex_t *lock) {
+	pthread_mutex_lock(lock);
+	barcode_hash_add(g->edges[e].barcodes_scaf, bc);
+	pthread_mutex_unlock(lock);
 }
 
 static inline void add_read_count_candidate(struct asm_graph_t *g, gint_t e1, gint_t e2) {
@@ -829,6 +821,9 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			}
 		}
 	}
+	pthread_mutex_t *lock = calloc(g->n_e, sizeof(pthread_mutex_t));
+	for (int i = 0; i < g->n_e; i++)
+		pthread_mutex_init(&lock[i], NULL);
 	if ((bundle->aux_build & ASM_BUILD_BARCODE) && bc != (uint64_t) -1) {
 		for (i = 0; i < n1; ++i) {
 			struct fasta_ref_t ref;
@@ -836,17 +831,15 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
 			if (p1[i].pos <= CONTIG_LEVEL_0) {
-				add_barcode_edge(g, ref.e1, 0, bc);
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 0, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 1, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			} else if (p1[i].pos <= CONTIG_LEVEL_1) {
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 1, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			} else if (p1[i].pos <= CONTIG_LEVEL_2) {
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			}
-			if (p1[i].pos > CONTIG_LEVEL_1 && p1[i].pos <= CONTIG_LEVEL_2)
-				add_barcode_cov(g, ref.e1, bc);
 		}
 		for (i = 0; i < n2; ++i) {
 			struct fasta_ref_t ref;
@@ -854,17 +847,15 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 			if (ref.type != FASTA_REF_SEQ)
 				continue;
 			if (p2[i].pos <= CONTIG_LEVEL_0) {
-				add_barcode_edge(g, ref.e1, 0, bc);
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 0, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 1, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			} else if (p2[i].pos <= CONTIG_LEVEL_1) {
-				add_barcode_edge(g, ref.e1, 1, bc);
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 1, bc, &lock[ref.e1]);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			} else if (p2[i].pos <= CONTIG_LEVEL_2) {
-				add_barcode_edge(g, ref.e1, 2, bc);
+				add_barcode_edge(g, ref.e1, 2, bc, &lock[ref.e1]);
 			}
-			if (p2[i].pos > CONTIG_LEVEL_1 && p2[i].pos <= CONTIG_LEVEL_2)
-				add_barcode_cov(g, ref.e1, bc);
 		}
 		// TODO verify if n1<2 is best
 		if (ar1.n <= 2) {
@@ -874,7 +865,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 				if (ref.type != FASTA_REF_SEQ)
 					continue;
 				if (p1[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
-					add_barcode_scaffold(g, ref.e1, bc);
+					add_barcode_scaffold(g, ref.e1, bc, &lock[ref.e1]);
 				}
 			}
 		}
@@ -885,7 +876,7 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 				if (ref.type != FASTA_REF_SEQ)
 					continue;
 				if (p2[i].pos < MIN(MIN_CONTIG_BARCODE, g->edges[ref.e1].seq_len / 2)) {
-					add_barcode_scaffold(g, ref.e1, bc);
+					add_barcode_scaffold(g, ref.e1, bc, &lock[ref.e1]);
 				}
 			}
 		}
@@ -911,6 +902,9 @@ void read_mapper(struct read_t *r1, struct read_t *r2, uint64_t bc,
 		}
 	}
 free_stage_1:
+	for (int i = 0; i < g->n_e; i++)
+		pthread_mutex_destroy(&lock[i]);
+	free(lock);
 	free(ar1.a);
 	free(ar2.a);
 	free(r1_seq);

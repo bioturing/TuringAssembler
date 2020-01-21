@@ -121,7 +121,7 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 
 	khash_t(btable_sig) *big_table = params->big_table;
 
-	struct barcode_hash_t *buck = &rev_e->barcodes_scaf;
+	struct barcode_hash_t *buck = rev_e->barcodes_scaf;
 	for (int j = 0; (uint32_t) j < buck->size; j++) {
 		if (buck->keys[j] != (uint64_t) (-1)) {
 			uint64_t barcode = buck->keys[j];
@@ -151,8 +151,8 @@ void find_local_nearby_contig(int i_edge, struct params_build_candidate_edges *p
 		if (too_different(e1_cov, e2_cov))
 			value = 0;
 		if (value != 0) {
-			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf.n_item;
-			int cnt1 = g->edges[i_contig].barcodes_scaf.n_item;
+			int cnt0 = g->edges[get_rc_id(g, i_edge)].barcodes_scaf->n_item;
+			int cnt1 = g->edges[i_contig].barcodes_scaf->n_item;
 			new_candidate_edge->score.bc_score = get_bc_score(value, cnt0, cnt1, params->avg_bin_hash, i_edge, i_contig);
 			(*list_local_edges)[*n_local_edges] = *new_candidate_edge;
 			++*n_local_edges;
@@ -202,7 +202,7 @@ void *process_build_big_table(void *data)
 		struct asm_edge_t *e = &g->edges[i_contig];
 		if (!is_long_contig(e))
 			continue;
-		struct barcode_hash_t *buck = &e->barcodes_scaf;
+		struct barcode_hash_t *buck = e->barcodes_scaf;
 		for (int l = 0; (uint32_t) l < buck->size; l++) {
 			if (buck->keys[l] != (uint64_t) (-1)) {
 				uint64_t barcode = buck->keys[l];
@@ -654,7 +654,7 @@ void print_contig_info(struct asm_graph_t *g)
 		struct asm_edge_t *edge = &g->edges[i_e];
 		float edge_cov = __get_edge_cov(edge, g->ksize_count) / cvr;
 		log_debug("edge %d len:%d cov: %f count_bc %d",
-		          i_e, get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf.n_item);
+		          i_e, get_edge_len(&g->edges[i_e]), edge_cov, g->edges[i_e].barcodes_scaf->n_item);
 	}
 }
 
@@ -907,7 +907,6 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 		resolved = remove_tips_harsh(g);
 		struct asm_graph_t g0;
 		resolved += resolve_graph_operation(g, &g0);
-		asm_graph_destroy(g);
 		*g = g0;
 		asm_condense(g, &g0);
 		asm_graph_destroy(g);
