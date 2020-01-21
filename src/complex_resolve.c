@@ -625,12 +625,12 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			int count1 = get_big_kmer_count(big_kmer, kmer_table) ;
 			int count2 = get_big_kmer_count(big_kmer_rc, kmer_table);
 			int count = count1 + count2;
-			if (g->nodes[u].deg > 1) {
-				if (count1 + count2 > 5000) {
-					log_debug("this kmer exist>5000: %s", big_kmer);
-				}
-				log_debug("    To %d: %d %d", e2, count1, count2);
-			}
+			//if (g->nodes[u].deg > 1) {
+			//	if (count1 + count2 > 5000) {
+			//		log_debug("this kmer exist>5000: %s", big_kmer);
+			//	}
+			//	log_debug("    To %d: %d %d", e2, count1, count2);
+			//}
 			if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
 				|| count >= 3){
 				add_super_edge(u, e1, e2, supg, big_kmer,
