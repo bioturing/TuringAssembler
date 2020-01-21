@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <minimizers/count_barcodes.h>
+#include "minimizers/count_barcodes.h"
 
 #include "assembly_graph.h"
 #include "atomic.h"
@@ -80,7 +80,7 @@ static inline int check_kmer(uint8_t *kmer, int len, int l)
 void count_kmer_minihash_multi(int thread_no, uint8_t *kedge, uint32_t count, void *data)
 {
 	struct km_minihash_bundle_t *bundle = (struct km_minihash_bundle_t *) data;
-	struct mini_hash_t *h = bundle->h;
+	struct mini_hash_t **h = bundle->h;
 	int ksize = bundle->ksize;
 	char *res = calloc(ksize+1, 1);
 	for (int i = 0; i < ksize; i++) {
@@ -691,10 +691,10 @@ void kmbuild_bundle_destroy(struct kmbuild_bundle_t *b)
 	b->k1 = b->k2 = b->k1_rc = b->k2_rc = NULL;
 }
 
-void km_count_bundle_destroy(struct km_count_bundle_t *b)
-{
-	//todo 0 destroy
-}
+//void km_count_bundle_destroy(struct km_count_bundle_t *b)
+//{
+//	//todo 0 destroy
+//}
 
 int have_contig_file(int n_files) {
     return n_files < 0;
@@ -1112,6 +1112,7 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 					(void *)(&kmbuild_bundle),
 					count_kmer_minihash_multi);
+	destroy_kmc_info(&kmc_inf);
 	//todo huu destroy kmbuild_bundle
 //	kmbuild_bundle_destroy(&kmbuild_bundle);
 	/* FIXME: additional kmer here */
