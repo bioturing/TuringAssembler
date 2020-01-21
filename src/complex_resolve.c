@@ -528,9 +528,6 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 		supg->n_v += 2;
 
 		if (ok){
-			supg->edges = realloc(supg->edges, (supg->n_e + 1)
-					* sizeof(struct asm_edge_t));
-			memset(supg->edges + supg->n_e, 0, sizeof(struct asm_edge_t));
 			asm_add_node_adj(supg, u, supg->n_e);
 			asm_clone_seq(supg->edges + supg->n_e, g->edges + e);
 			supg->edges[supg->n_e].source = u;
@@ -585,8 +582,6 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 	int v = kh_long_int_get(node_map_fw, GET_CODE(mid, e2));
 	uint32_t *bin_seq;
 	encode_seq(&bin_seq, big_kmer);
-	supg->edges = realloc(supg->edges, (supg->n_e + 1)
-			* sizeof(struct asm_edge_t));
 	struct asm_edge_t *e = supg->edges + supg->n_e;
 	e->count = count;
 	e->seq = bin_seq;
@@ -657,6 +652,7 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 				get_big_kmer(e1, e2, g, &big_kmer);
 				add_super_edge(u, e1, e2, supg, big_kmer, 0,
 						node_map_fw, node_map_bw);
+				free(big_kmer);
 			}
 		}
 	}
