@@ -659,8 +659,9 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 		for (k = 0; k < nodes[v_rc].deg; ++k) {
 			e_rc = nodes[v_rc].adj[k];
 			if (edges[e_rc].target == nodes[edges[e].source].rc_id
-				&& is_seq_rc(edges[e].seq, edges[e].seq_len,
-					edges[e_rc].seq, edges[e_rc].seq_len)) {
+				&& is_reverse_complement(g, e, e_rc)){
+				//&& is_seq_rc(edges[e].seq, edges[e].seq_len,
+				//	edges[e_rc].seq, edges[e_rc].seq_len)) {
 				edges[e].rc_id = e_rc;
 				edges[e_rc].rc_id = e;
 				break;
