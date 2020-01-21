@@ -10,7 +10,7 @@ struct alter_path_info_t{
 };
 
 KHASH_MAP_INIT_INT64(int64_alterp, struct alter_path_info_t *);
-void resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g);
+int resolve_graph_operation(struct asm_graph_t *g0, struct asm_graph_t *g);
 void resolve_local_graph_operation(struct asm_graph_t *g0,
 		struct asm_graph_t *g);
 void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g);

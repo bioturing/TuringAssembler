@@ -13,6 +13,7 @@
 #include <process.h>
 #include <resolve.h>
 #include <basic_resolve.h>
+#include <complex_resolve.h>
 #include "math.h"
 #include "attribute.h"
 #include "utils.h"
@@ -901,14 +902,21 @@ void resolve_212_by_cov(struct asm_graph_t *g, struct opt_proc_t *opt)
 
 void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 {
-	while (remove_tips_harsh(g)) {
+	int resolved;
+	do {
+		resolved = remove_tips_harsh(g);
 		struct asm_graph_t g0;
+		resolved += resolve_graph_operation(g, &g0);
+		asm_graph_destroy(g);
+		*g = g0;
 		asm_condense(g, &g0);
 		asm_graph_destroy(g);
 		*g = g0;
-	}
+		resolved += asm_resolve_simple_bulges_ite(g);
+		resolved += asm_resolve_complex_bulges_ite(g);
+	} while (resolved);
 
-	save_graph_info(opt->out_dir, g, "remove_harsh");
+	save_graph_info(opt->out_dir, g, "final");
 }
 
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
