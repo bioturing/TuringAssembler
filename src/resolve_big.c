@@ -250,7 +250,6 @@ void count_kmer_from_read_file(struct read_path_t *read_file, khash_t(big_kmer_c
 	km_count_bundle_init(&km_count_bundle, kmer_count_table, ksize);
 	KMC_retrieve_kmer_multi(kmc_suf, n_threads, &kmc_inf,
 							(void *) (&km_count_bundle), count_to_big_table);
-	km_count_bundle_destroy(&km_count_bundle);
 }
 
 void filter_read_build_kmer(struct read_path_t *ori_read, khash_t(bcpos) *dict,
