@@ -1296,10 +1296,10 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 		asm_graph_destroy(g0);
 		*g0 = *g;
 
-		cnt_tips_complex = remove_tips_topo_harsh(g0);
-		asm_condense(g0, g);
-		asm_graph_destroy(g0);
-		*g0 = *g;
+		//cnt_tips_complex = remove_tips_topo_harsh(g0);
+		//asm_condense(g0, g);
+		//asm_graph_destroy(g0);
+		//*g0 = *g;
 
 		do {
 			cnt_loop = cnt_collapse = 0;
