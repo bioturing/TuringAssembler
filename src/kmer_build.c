@@ -563,6 +563,15 @@ static void *build_graph_worker(void *data)
 	return NULL;
 }
 
+void print_usage_mem()
+{
+	FILE *f = fopen("/proc/self/status", "r");
+	char s[1024];
+	while (fgets(s, 1024, f) != 0)
+		printf("%s", s);
+	fclose(f);
+}
+
 void build_asm_graph_from_kmhash(int n_threads, int ksize,
 				struct kmhash_t *h, struct asm_graph_t *g)
 {
@@ -588,6 +597,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	}
 
 	log_warn("stage 2");
+	print_usage_mem();
 	log_warn("nv %d ne %d", n_v *2, n_e);
 	struct asm_node_t *nodes = calloc(n_v * 2, sizeof(struct asm_node_t));
 	struct asm_edge_t *edges = calloc(n_e, sizeof(struct asm_edge_t));
@@ -603,6 +613,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	bundle = calloc(n_threads, sizeof(struct kmgraph_bundle_t));
 
 	log_warn("stage 3");
+	print_usage_mem();
 	kmint_t cap = h->size / n_threads + 1;
 	n_e = 0;
 	int k;
@@ -643,6 +654,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	log_warn("stage 4");
+	print_usage_mem();
 
 	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
 	for (k = 0; k < n_threads; ++k)
@@ -653,6 +665,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	free(bundle);
 
 	log_warn("stage 5");
+	print_usage_mem();
 	/* link reverse complement edges */
 	gint_t e, e_rc, v, v_rc;
 	for (e = 0; e < n_e; ++e) {
