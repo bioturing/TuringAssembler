@@ -567,8 +567,11 @@ void print_usage_mem()
 {
 	FILE *f = fopen("/proc/self/status", "r");
 	char s[1024];
-	while (fgets(s, 1024, f) != 0)
-		printf("%s", s);
+	while (fgets(s, 1024, f) != 0){
+		if (strstr(s, "VmSize") != NULL)
+			break;
+	}
+	log_info("Real mem: %s", s);
 	fclose(f);
 }
 
@@ -615,6 +618,8 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	log_warn("stage 3");
 	print_usage_mem();
 	kmint_t cap = h->size / n_threads + 1;
+	gint_t *arr = malloc(n_e * sizeof(gint_t));
+	int p = 0;
 	n_e = 0;
 	int k;
 	int sum_deg = 0;
@@ -640,21 +645,23 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 			krev_idx = KMHASH_IDX(h, i) * 2 + 1;
 			nodes[knum_idx].rc_id = krev_idx;
 			nodes[krev_idx].rc_id = knum_idx;
-			nodes[knum_idx].adj = malloc(deg_fw * sizeof(gint_t));
-			nodes[krev_idx].adj = malloc(deg_rv * sizeof(gint_t));
+			nodes[knum_idx].adj = arr + p;
+			p += deg_fw;
+			nodes[krev_idx].adj = arr + p;
+			p += deg_rv;
 			sum_deg += deg_fw + deg_rv;
 			nodes[knum_idx].deg = deg_fw;
 			nodes[krev_idx].deg = deg_rv;
 		}
 	}
+	log_warn("stage 4");
+	print_usage_mem();
 	log_warn("sum deg %d size %d", sum_deg, sizeof(gint_t));
 	log_warn("ne after %d", n_e);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	log_warn("stage 4");
-	print_usage_mem();
 
 	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
 	for (k = 0; k < n_threads; ++k)
