@@ -606,6 +606,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	kmint_t cap = h->size / n_threads + 1;
 	n_e = 0;
 	int k;
+	int sum_deg = 0;
 	for (k = 0; k < n_threads; ++k) {
 		bundle[k].h = h;
 		bundle[k].g = g;
@@ -630,10 +631,12 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 			nodes[krev_idx].rc_id = knum_idx;
 			nodes[knum_idx].adj = malloc(deg_fw * sizeof(gint_t));
 			nodes[krev_idx].adj = malloc(deg_rv * sizeof(gint_t));
+			sum_deg += deg_fw + deg_rv;
 			nodes[knum_idx].deg = deg_fw;
 			nodes[krev_idx].deg = deg_rv;
 		}
 	}
+	log_warn("sum deg %d size %d", sum_deg, sizeof(gint_t));
 	log_warn("ne after %d", n_e);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
