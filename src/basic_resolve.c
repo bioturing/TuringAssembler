@@ -908,33 +908,34 @@ int check_simple_loop(struct asm_graph_t *g, gint_t e)
 		if (g->nodes[u_rc].deg != 2 || g->nodes[u].deg != 2)
 			return 0;
 		/* split the node */
-//		v = asm_create_node(g);
-//		v_rc = g->nodes[v].rc_id;
-//		/* set source-target of edge e */
-//		g->edges[e].target = v;
-//		asm_remove_node_adj(g, u_rc, e_rc);
-//		g->edges[e_rc].source = v_rc;
-//		asm_add_node_adj(g, v_rc, e_rc);
-//		/* move edge from node u to node v */
-//		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
-//		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
-//		g->nodes[v].deg = g->nodes[u].deg;
-//		asm_remove_node_adj(g, v, e);
-//		/* node u has only edge e left */
-//		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
-//		g->nodes[u].adj[0] = e;
-//		g->nodes[u].deg = 1;
-//		gint_t j;
-//		for (j = 0; j < g->nodes[v].deg; ++j) {
-//			gint_t e_t = g->nodes[v].adj[j];
-//			g->edges[e_t].source = v;
-//			g->edges[g->edges[e_t].rc_id].target = v_rc;
-//		}
-//
-		asm_join_edge(g, e1, g->edges[e1].rc_id, e, g->edges[e].rc_id);
-		asm_join_edge(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id);
+		v = asm_create_node(g);
+		v_rc = g->nodes[v].rc_id;
+		/* set source-target of edge e */
+		g->edges[e].target = v;
+		asm_remove_node_adj(g, u_rc, e_rc);
+		g->edges[e_rc].source = v_rc;
+		asm_add_node_adj(g, v_rc, e_rc);
+		/* move edge from node u to node v */
+		g->nodes[v].adj = malloc(g->nodes[u].deg * sizeof(gint_t));
+		memcpy(g->nodes[v].adj, g->nodes[u].adj, g->nodes[u].deg * sizeof(gint_t));
+		g->nodes[v].deg = g->nodes[u].deg;
+		asm_remove_node_adj(g, v, e);
+		/* node u has only edge e left */
+		g->nodes[u].adj = realloc(g->nodes[u].adj, sizeof(gint_t));
+		g->nodes[u].adj[0] = e;
+		g->nodes[u].deg = 1;
+		gint_t j;
+		for (j = 0; j < g->nodes[v].deg; ++j) {
+			gint_t e_t = g->nodes[v].adj[j];
+			g->edges[e_t].source = v;
+			g->edges[g->edges[e_t].rc_id].target = v_rc;
+		}
 
-		//g->nodes[u].deg = g->nodes[u_rc].deg = 0;
+		g->nodes[u].deg = g->nodes[u_rc].deg = 0;
+
+		//asm_join_edge(g, e1, g->edges[e1].rc_id, e, g->edges[e].rc_id);
+		//asm_join_edge(g, e1, g->edges[e1].rc_id, e2, g->edges[e2].rc_id);
+
 		return 1;
 	}
 	else if (u == v_rc) { /* self loop reverse */
