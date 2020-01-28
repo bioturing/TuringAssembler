@@ -336,8 +336,8 @@ void asm_condense(struct asm_graph_t *g0, struct asm_graph_t *g)
 					if (g0->nodes[v].deg != 1) {
 						fprintf(stderr, "Node %ld, deg = %ld\n",
 							v, g0->nodes[v].deg);
-						log_debug("Middle node degree is not equal to 1");
-						assert(0 && "Middle node degree is not equal to 1");
+						log_error("Middle node %d degree is not equal to 1, deg fw %d, deg rv %d, is dead end %d",
+								v, g->nodes[v].deg, g->nodes[g->nodes[v].rc_id].deg, is_dead_end(g, v));
 					}
 					e = g0->nodes[v].adj[0];
 					assert(e != -1);
@@ -1308,6 +1308,7 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 			cnt_collapse = resolve_simple_bubble_harsh(g0);
 			cnt_loop = unroll_simple_loop(g0);
 			cnt_loop += resolve_loop(g0);
+			save_graph_info(".", g0, "debug_condense");
 			asm_condense(g0, g);
 			asm_graph_destroy(g0);
 			*g0 = *g;
