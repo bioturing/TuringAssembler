@@ -1333,6 +1333,7 @@ void load_asm_graph(struct asm_graph_t *g, const char *path)
 	}
 
 	/* load the barcode information */
+	log_debug("Reading barcode");
 	if (g->aux_flag & ASM_HAVE_BARCODE) {
 		for (e = 0; e < g->n_e; ++e) {
 			if (g->edges[e].source == -1)
