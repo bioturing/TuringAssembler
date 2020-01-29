@@ -667,10 +667,8 @@ void asm_join_edge3(struct asm_graph_t *g, gint_t e1, gint_t e_rc1,
 static inline void asm_clean_edge_seq(struct asm_edge_t *e)
 {
 	free(e->seq);
-	if (e->n_holes != 0){
-		free(e->l_holes);
-		free(e->p_holes);
-	}
+	free(e->l_holes);
+	free(e->p_holes);
 	e->seq = NULL;
 	e->l_holes = NULL;
 	e->p_holes = NULL;
