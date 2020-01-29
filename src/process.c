@@ -745,8 +745,8 @@ void build_0_1_small_process(struct opt_proc_t *opt)
 	load_asm_graph(&g1, opt->in_file);
 	build_0_1_small(opt, &g1, &g2);
 	save_graph_info(opt->out_dir, &g2, "level_1");
-	count_cc(&g2);
-	// asm_graph_destroy(&g1);
+	// count_cc(&g2);
+	 asm_graph_destroy(&g1);
 	// asm_graph_destroy(&g2);
 }
 
