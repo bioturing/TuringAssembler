@@ -218,7 +218,8 @@ void dirty_process(struct opt_proc_t *opt)
 //	struct asm_graph_t *g0 = calloc(1, sizeof(struct asm_graph_t));
 //	asm_condense(g, g0);
 //	count_cc(g);
-	dirty(g, opt);
+//	dirty(g, opt);
+        dirty2(g);
 //	write_neo4j_create(g);
 }
 

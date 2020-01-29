@@ -18,7 +18,9 @@
 #include "barcode_builder.h"
 #include "fastq_producer.h"
 #include "map_contig.h"
+#include "complex_resolve.h"
 #include "basic_resolve.h"
+#include "process.h"
 
 #define __bin_degree4(e) (((e) & 1) + (((e) >> 1) & 1) + (((e) >> 2) & 1) + (((e) >> 3) & 1))
 
@@ -563,6 +565,73 @@ static void *build_graph_worker(void *data)
 	return NULL;
 }
 
+void print_usage_mem()
+{
+	FILE *f = fopen("/proc/self/status", "r");
+	char s[1024];
+	while (fgets(s, 1024, f) != 0){
+		if (strstr(s, "VmSize") != NULL)
+			break;
+	}
+	log_info("Real mem: %s", s);
+	fclose(f);
+}
+
+void set_rc_id(struct asm_graph_t *g)
+{
+	log_info("first");
+	gint_t *a = calloc(g->n_v * 4, sizeof(gint_t));
+	int *first_c = calloc(g->n_e, sizeof(int));
+	int *last_c = calloc(g->n_e, sizeof(int));
+	struct asm_node_t *nodes = g->nodes;
+	struct asm_edge_t *edges = g->edges;
+	int n_e = g->n_e;
+	int n_v = g->n_v;
+	//todo @huu init a arr
+	for (gint_t i = 0; i < g->n_e; i++){
+		first_c[i] = __binseq_get(edges[i].seq, g->ksize);
+		last_c[i] = __binseq_get(edges[i].seq, edges[i].seq_len - g->ksize - 1);
+	}
+	for (gint_t i = 0; i < g->n_e; i++){
+		struct asm_edge_t *e = &g->edges[i];
+		gint_t source = e->source;
+//		log_info("%d %d %d %d", source, first_c[i], edges[i].seq[0], edges[i].seq[1]);
+		assert(a[source*4 + first_c[i]] == 0);
+		a[source*4 + first_c[i]] = i;
+	}
+	for (gint_t i_e = 0; i_e < g->n_e; i_e++) {
+		edges[i_e].rc_id = -1;
+		gint_t v = edges[i_e].target;
+		gint_t v_rc = nodes[v].rc_id;
+		edges[i_e].rc_id = a[v_rc * 4 + (last_c[i_e]^3)];
+	}
+//	log_info("done my algo");
+//	gint_t e, e_rc, v, v_rc, k;
+//	for (e = 0; e < n_e; ++e) {
+//		v = edges[e].target;
+//		v_rc = nodes[v].rc_id;
+//		for (k = 0; k < nodes[v_rc].deg; ++k) {
+//			e_rc = nodes[v_rc].adj[k];
+//			if (edges[e_rc].target == nodes[edges[e].source].rc_id
+//				&& is_reverse_complement(g, e, e_rc)){
+//				//&& is_seq_rc(edges[e].seq, edges[e].seq_len,
+//				//	edges[e_rc].seq, edges[e_rc].seq_len)) {
+//				//	
+////				log_info("%d %d", edges[e].rc_id, e_rc);
+//				assert(edges[e].rc_id == e_rc);
+//
+////				assert(edges[e_rc].rc_id == e);
+//				break;
+//			}
+//		}
+//		assert(edges[e].rc_id != -1);
+//	}
+//	log_info("done check");
+	free(a);
+	free(last_c);
+	free(first_c);
+}
+
 void build_asm_graph_from_kmhash(int n_threads, int ksize,
 				struct kmhash_t *h, struct asm_graph_t *g)
 {
@@ -588,6 +657,7 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	}
 
 	log_warn("stage 2");
+	print_usage_mem();
 	log_warn("nv %d ne %d", n_v *2, n_e);
 	struct asm_node_t *nodes = calloc(n_v * 2, sizeof(struct asm_node_t));
 	struct asm_edge_t *edges = calloc(n_e, sizeof(struct asm_edge_t));
@@ -603,9 +673,14 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	bundle = calloc(n_threads, sizeof(struct kmgraph_bundle_t));
 
 	log_warn("stage 3");
+	print_usage_mem();
 	kmint_t cap = h->size / n_threads + 1;
+	//gint_t *arr = malloc(n_e * sizeof(gint_t));
+	//int p = 0;
 	n_e = 0;
 	int k;
+	int sum_deg = 0;
+	int n_malloc = 0;
 	for (k = 0; k < n_threads; ++k) {
 		bundle[k].h = h;
 		bundle[k].g = g;
@@ -628,18 +703,26 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 			krev_idx = KMHASH_IDX(h, i) * 2 + 1;
 			nodes[knum_idx].rc_id = krev_idx;
 			nodes[krev_idx].rc_id = knum_idx;
+			//nodes[knum_idx].adj = arr + p;
+			//p += deg_fw;
+			//nodes[krev_idx].adj = arr + p;
+			//p += deg_rv;
 			nodes[knum_idx].adj = malloc(deg_fw * sizeof(gint_t));
 			nodes[krev_idx].adj = malloc(deg_rv * sizeof(gint_t));
+			n_malloc += 2;
+			sum_deg += deg_fw + deg_rv;
 			nodes[knum_idx].deg = deg_fw;
 			nodes[krev_idx].deg = deg_rv;
 		}
 	}
+	log_warn("stage 4");
+	print_usage_mem();
+	log_warn("sum deg %d size %d n_malloc %d", sum_deg, sizeof(gint_t), n_malloc);
 	log_warn("ne after %d", n_e);
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	log_warn("stage 4");
 
 	pthread_t *threads = calloc(n_threads, sizeof(pthread_t));
 	for (k = 0; k < n_threads; ++k)
@@ -650,26 +733,9 @@ void build_asm_graph_from_kmhash(int n_threads, int ksize,
 	free(bundle);
 
 	log_warn("stage 5");
+	set_rc_id(g);
+	print_usage_mem();
 	/* link reverse complement edges */
-	gint_t e, e_rc, v, v_rc;
-	for (e = 0; e < n_e; ++e) {
-		edges[e].rc_id = -1;
-		v = edges[e].target;
-		v_rc = nodes[v].rc_id;
-		for (k = 0; k < nodes[v_rc].deg; ++k) {
-			e_rc = nodes[v_rc].adj[k];
-			if (edges[e_rc].target == nodes[edges[e].source].rc_id
-				&& is_reverse_complement(g, e, e_rc)){
-				//&& is_seq_rc(edges[e].seq, edges[e].seq_len,
-				//	edges[e_rc].seq, edges[e_rc].seq_len)) {
-				edges[e].rc_id = e_rc;
-				edges[e_rc].rc_id = e;
-				break;
-			}
-		}
-		assert(edges[e].rc_id != -1);
-	}
-
 	log_warn("stage 6");
 	gint_t u, u_rc;
 	for (u = 0; u < g->n_v; ++u) {
