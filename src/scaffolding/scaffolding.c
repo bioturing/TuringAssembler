@@ -918,6 +918,13 @@ void dirty(struct asm_graph_t *g, struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, g, "final");
 }
 
+void dirty2(struct asm_graph_t *g)
+{
+	log_warn("before this dirty set rcid");
+	set_rc_id(g);
+	log_warn("i am done in a slowly way");
+}
+
 void test_sort_read(struct read_path_t *read_sorted_path, struct asm_graph_t *g)
 {
 	khash_t(bcpos) *dict = kh_init(bcpos);
