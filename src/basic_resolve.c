@@ -1308,8 +1308,6 @@ void resolve_graph_small_operation(struct asm_graph_t *g0, struct asm_graph_t *g
 			cnt_collapse = resolve_simple_bubble_harsh(g0);
 			cnt_loop = unroll_simple_loop(g0);
 			cnt_loop += resolve_loop(g0);
-			if (iter == 1)
-				save_graph_info(".", g0, "debug_condense");
 			asm_condense(g0, g);
 			asm_graph_destroy(g0);
 			*g0 = *g;
