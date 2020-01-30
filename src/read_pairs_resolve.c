@@ -184,10 +184,10 @@ int extend_by_read_pairs(struct asm_graph_t *g, int s, float unit_cov,
 	int total_len = last_len;
 	while (1) {
 		int v = get_next_cand(g, unit_cov, rp_cand, *path, *n_path);
+		if (v == -1)
+			return total_len;
 		if (g->edges[v].seq_len > MAX_LEN_RESOLVE_READPAIR &&
 		    total_len > MAX_LEN_RESOLVE_READPAIR)
-			return total_len;
-		if (v == -1)
 			return total_len;
 		if (__get_edge_cov(&g->edges[v], g->ksize) > REPEAT_COV_RATIO * unit_cov
 		    || __get_edge_cov(&g->edges[s], g->ksize) > REPEAT_COV_RATIO * unit_cov) {
