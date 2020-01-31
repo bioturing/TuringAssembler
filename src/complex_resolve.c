@@ -848,10 +848,10 @@ void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(lon
 {
 	struct kmer_eid_bundle_t *worker_bundle = calloc(opt->n_threads,
 			sizeof(struct kmer_eid_bundle_t));
-	khash_t(long_int) **each_kmer_pos = calloc(opt->n_threads,
+	khash_t(long_int) **each_kmer_eid = calloc(opt->n_threads,
 			sizeof(khash_t(long_int) *));
 	for (int i = 0; i < opt->n_threads; ++i)
-		each_kmer_pos[i] = kh_init(long_int);
+		each_kmer_eid[i] = kh_init(long_int);
 
 	int e_id = 0;
 
@@ -860,7 +860,7 @@ void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(lon
 
 	for (int i = 0; i < opt->n_threads; ++i){
 		worker_bundle[i].g = g;
-		worker_bundle[i].kmer_pos = each_kmer_pos[i];
+		worker_bundle[i].kmer_pos = each_kmer_eid[i];
 		worker_bundle[i].e_id = &e_id;
 		worker_bundle[i].e_id_lock = &e_id_lock;
 	}
@@ -878,26 +878,25 @@ void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(lon
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(threads[i], NULL);
 
-	khash_t(long_int) *kmer_pos = kh_init(long_int);
 	for (int i = 0; i < opt->n_threads; ++i){
-		for (khiter_t it = kh_begin(each_kmer_pos[i]);
-			it != kh_end(each_kmer_pos[i]); ++it){
-			if (!kh_exist(each_kmer_pos[i], it))
+		for (khiter_t it = kh_begin(each_kmer_eid[i]);
+			it != kh_end(each_kmer_eid[i]); ++it){
+			if (!kh_exist(each_kmer_eid[i], it))
 				continue;
-			uint64_t key = kh_key(each_kmer_pos[i], it);
-			int val = kh_val(each_kmer_pos[i], it);
-			kh_long_int_set(kmer_pos, key, val);
+			uint64_t key = kh_key(each_kmer_eid[i], it);
+			int val = kh_val(each_kmer_eid[i], it);
+			kh_long_int_set(kmer_eid, key, val);
 		}
-		kh_destroy(long_int, each_kmer_pos[i]);
+		kh_destroy(long_int, each_kmer_eid[i]);
 	}
 
-	for (khiter_t it = kh_begin(kmer_pos); it != kh_end(kmer_pos); ++it){
-		if (!kh_exist(kmer_pos, it))
+	for (khiter_t it = kh_begin(kmer_eid); it != kh_end(kmer_eid); ++it){
+		if (!kh_exist(kmer_eid, it))
 			continue;
-		log_debug("Kmer %ld appears in edge %d", kh_key(kmer_pos, it),
-				kh_val(kmer_pos, it));
+		log_debug("Kmer %ld appears in edge %d", kh_key(kmer_eid, it),
+				kh_val(kmer_eid, it));
 	}
-	free(each_kmer_pos);
+	free(each_kmer_eid);
 	free(worker_bundle);
 
 }
