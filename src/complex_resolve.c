@@ -817,3 +817,87 @@ int is_reverse_complement(struct asm_graph_t *g, int e1, int e2)
 	return (base ^ base_rc) == 3;
 }
 
+void *assign_kmer_pos_eid(void *data)
+{
+	struct kmer_eid_bundle_t *bundle = (struct kmer_eid_bundle_t *) data;
+
+	struct asm_graph_t *g = bundle->g;
+	char *kmer = calloc(g->ksize + 1, sizeof(char));
+	do{
+		pthread_mutex_lock(bundle->e_id_lock);
+		int e = *(bundle->e_id);
+		++(*bundle->e_id);
+		pthread_mutex_unlock(bundle->e_id_lock);
+		if (e >= g->n_e)
+			break;
+		char *seq;
+		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
+		for (int i = 0; i + g->ksize <= g->edges[e].seq_len; ++i){
+			strncpy(kmer, seq + i, g->ksize);
+			uint64_t hash = MurmurHash3_x64_64(kmer, g->ksize);
+			kh_long_int_set(bundle->kmer_pos, hash, e);
+			log_debug("Kmer %s hash code is %ld", kmer, hash);
+		}
+		free(seq);
+	} while(1);
+	free(kmer);
+	return NULL;
+}
+
+void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(long_int) *kmer_eid)
+{
+	struct kmer_eid_bundle_t *worker_bundle = calloc(opt->n_threads,
+			sizeof(struct kmer_eid_bundle_t));
+	khash_t(long_int) **each_kmer_pos = calloc(opt->n_threads,
+			sizeof(khash_t(long_int) *));
+	for (int i = 0; i < opt->n_threads; ++i)
+		each_kmer_pos[i] = kh_init(long_int);
+
+	int e_id = 0;
+
+	pthread_mutex_t e_id_lock;
+	pthread_mutex_init(&e_id_lock, NULL);
+
+	for (int i = 0; i < opt->n_threads; ++i){
+		worker_bundle[i].g = g;
+		worker_bundle[i].kmer_pos = each_kmer_pos[i];
+		worker_bundle[i].e_id = &e_id;
+		worker_bundle[i].e_id_lock = &e_id_lock;
+	}
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(threads + i, &attr, assign_kmer_pos_eid,
+				worker_bundle + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	khash_t(long_int) *kmer_pos = kh_init(long_int);
+	for (int i = 0; i < opt->n_threads; ++i){
+		for (khiter_t it = kh_begin(each_kmer_pos[i]);
+			it != kh_end(each_kmer_pos[i]); ++it){
+			if (!kh_exist(each_kmer_pos[i], it))
+				continue;
+			uint64_t key = kh_key(each_kmer_pos[i], it);
+			int val = kh_val(each_kmer_pos[i], it);
+			kh_long_int_set(kmer_pos, key, val);
+		}
+		kh_destroy(long_int, each_kmer_pos[i]);
+	}
+
+	for (khiter_t it = kh_begin(kmer_pos); it != kh_end(kmer_pos); ++it){
+		if (!kh_exist(kmer_pos, it))
+			continue;
+		log_debug("Kmer %ld appears in edge %d", kh_key(kmer_pos, it),
+				kh_val(kmer_pos, it));
+	}
+	free(each_kmer_pos);
+	free(worker_bundle);
+
+}
