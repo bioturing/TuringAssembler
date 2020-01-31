@@ -93,6 +93,7 @@ void destroy_mini_hash(struct mini_hash_t *h_table)
 	 **/
 	free(h_table->h);
 	free(h_table->key);
+	free(h_table);
 }
 
 uint64_t barcode_hash_mini(char *s)

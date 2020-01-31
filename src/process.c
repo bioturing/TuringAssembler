@@ -442,6 +442,7 @@ void resolve_multi_kmer_process(struct opt_proc_t *opt)
 	struct asm_graph_t g;
 	load_asm_graph(&g, opt->in_file);
 	resolve_multi_kmer(opt, &g, opt->k1);
+	asm_graph_destroy(&g);
 }
 
 void resolve_complex_bulges_process(struct opt_proc_t *opt)

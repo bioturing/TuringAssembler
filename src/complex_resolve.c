@@ -790,12 +790,13 @@ void resolve_multi_kmer(struct opt_proc_t *opt, struct asm_graph_t *g, int lastk
 {
 	for (int k = g->ksize + 1; k <= lastk; ++k){
 		log_info("Resolving using kmer of size %d", k);
-		struct asm_graph_t *supg = calloc(1, sizeof(struct asm_graph_t));
-		upsize_graph(opt, k, g, supg);
+		struct asm_graph_t supg;
+		memset(&supg, 0, sizeof(struct asm_graph_t));
+		upsize_graph(opt, k, g, &supg);
 
 		log_info("Resolving done kmer of size %d", k);
 		asm_graph_destroy(g);
-		*g = *supg;
+		*g = supg;
 		save_graph_info(opt->out_dir, g, "kmer_resolve");
 	}
 }
