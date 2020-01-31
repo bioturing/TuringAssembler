@@ -875,3 +875,15 @@ void build_coverage_process(struct opt_proc_t *opt)
 	save_graph_info(opt->out_dir, &g, "coverage_built");
 	asm_graph_destroy(&g);
 }
+
+void reduce_reads_process(struct opt_proc_t *opt)
+{
+	char *log_file = str_concate(opt->out_dir, "/reduce_reads.log");
+	init_logger(opt->log_level, log_file);
+	set_log_stage("Reduce reads");
+	struct asm_graph_t g;
+	load_asm_graph(&g, opt->in_file);
+	khash_t(long_int) *kmer_eid = kh_init(long_int);
+	get_kmer_edge_id(opt, &g, kmer_eid);
+}
+
