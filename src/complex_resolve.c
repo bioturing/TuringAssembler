@@ -836,7 +836,7 @@ void *assign_kmer_pos_eid(void *data)
 			strncpy(kmer, seq + i, g->ksize);
 			uint64_t hash = MurmurHash3_x64_64(kmer, g->ksize);
 			kh_long_int_set(bundle->kmer_pos, hash, e);
-			log_debug("Kmer %s hash code is %ld", kmer, hash);
+			//log_debug("Kmer %s hash code is %ld", kmer, hash);
 		}
 		free(seq);
 	} while(1);
@@ -890,12 +890,12 @@ void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(lon
 		kh_destroy(long_int, each_kmer_eid[i]);
 	}
 
-	for (khiter_t it = kh_begin(kmer_eid); it != kh_end(kmer_eid); ++it){
-		if (!kh_exist(kmer_eid, it))
-			continue;
-		log_debug("Kmer %ld appears in edge %d", kh_key(kmer_eid, it),
-				kh_val(kmer_eid, it));
-	}
+	//for (khiter_t it = kh_begin(kmer_eid); it != kh_end(kmer_eid); ++it){
+	//	if (!kh_exist(kmer_eid, it))
+	//		continue;
+	//	log_debug("Kmer %ld appears in edge %d", kh_key(kmer_eid, it),
+	//			kh_val(kmer_eid, it));
+	//}
 	free(each_kmer_eid);
 	free(worker_bundle);
 
