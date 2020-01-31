@@ -54,4 +54,5 @@ void resolve_multi_kmer_process(struct opt_proc_t *opt);
 void build_0_1_small(struct opt_proc_t *opt, struct asm_graph_t *g0,
 		struct asm_graph_t *g);
 void build_0_1_small_process(struct opt_proc_t *opt);
+void reduce_reads_process(struct opt_proc_t *opt);
 #endif /* __PROCESS_H__ */
