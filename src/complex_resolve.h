@@ -22,6 +22,13 @@ struct resolve_bulges_bundle_t{
 	khash_t(int_int) *L;
 };
 
+struct kmer_eid_bundle_t{
+	struct asm_graph_t *g;
+	int *e_id;
+	pthread_mutex_t *e_id_lock;
+	khash_t(long_int) *kmer_pos;
+};
+
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
@@ -65,4 +72,9 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			struct mini_hash_t *kmer_table);
 
 int is_reverse_complement(struct asm_graph_t *g, int e1, int e2);
+
+void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g,
+		khash_t(long_int) *kmer_eid);
+
+void *assign_kmer_pos_eid(void *data);
 #endif
