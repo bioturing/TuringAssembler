@@ -599,16 +599,16 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 
 void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
 		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
-		khash_t(long_int) *node_map_bw, pthread_mutex_t *lock)
+		khash_t(long_int) *node_map_bw, struct super_edges_bundle_t *bundle)
 {
 	int u = kh_long_int_get(node_map_bw, GET_CODE(e1, mid));
 	int v = kh_long_int_get(node_map_fw, GET_CODE(mid, e2));
 	uint32_t *bin_seq;
 	encode_seq(&bin_seq, big_kmer);
-	pthread_mutex_lock(lock);
+	pthread_mutex_lock(bundle->edge_id_lock);
 	int edge_id = supg->n_e;
 	++(supg->n_e);
-	pthread_mutex_unlock(lock);
+	pthread_mutex_unlock(bundle->edge_id_lock);
 
 	struct asm_edge_t *e = supg->edges + edge_id;
 	e->count = count;
@@ -621,7 +621,12 @@ void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
 	e->target = v;
 	e->rc_id = 0;
 	e->barcodes = NULL;
+	//pthread_mutex_lock(bundle->supg_node_locks + u);
+	//asm_add_node_adj(supg, u, edge_id);
+	//pthread_mutex_unlock(bundle->supg_node_locks + u);
+	pthread_mutex_lock(bundle->supg_node_locks);
 	asm_add_node_adj(supg, u, edge_id);
+	pthread_mutex_unlock(bundle->supg_node_locks);
 }
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
@@ -945,6 +950,11 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 	pthread_mutex_t edge_id_lock;
 	pthread_mutex_init(&edge_id_lock, NULL);
 
+	pthread_mutex_t *supg_node_locks = calloc(supg->n_v,
+						sizeof(pthread_mutex_t));
+	for (int i = 0; i < supg->n_v; ++i)
+		pthread_mutex_init(supg_node_locks + i, NULL);
+
 	for (int i = 0; i < opt->n_threads; ++i){
 		worker_bundle[i].g = g;
 		worker_bundle[i].supg = supg;
@@ -954,6 +964,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 		worker_bundle[i].node_map_bw = node_map_bw;
 		worker_bundle[i].kmer_table = kmer_table;
 		worker_bundle[i].edge_id_lock = &edge_id_lock;
+		worker_bundle[i].supg_node_locks = supg_node_locks;
 	}
 
 	pthread_attr_t attr;
@@ -969,6 +980,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(threads[i], NULL);
 
+	free(supg_node_locks);
 	free(worker_bundle);
 }
 
@@ -1008,7 +1020,7 @@ void *create_super_edges_ite(void *data)
 					add_super_edge_multi(u, e1, e2, supg, big_kmer,
 							count * (g->ksize + 2 - g->ksize_count),
 							node_map_fw, node_map_bw,
-							bundle->edge_id_lock);
+							bundle);
 					accept = 1;
 				}
 				free(big_kmer);
@@ -1029,7 +1041,7 @@ void *create_super_edges_ite(void *data)
 
 				add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
 						node_map_fw, node_map_bw,
-						bundle->edge_id_lock);
+						bundle);
 				free(big_kmer);
 			}
 		}
