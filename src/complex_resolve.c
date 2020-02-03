@@ -994,8 +994,8 @@ void *create_super_edges_ite(void *data)
 	struct mini_hash_t *kmer_table = bundle->kmer_table;
 	do{
 		pthread_mutex_lock(bundle->node_id_lock);
-		int u = *(bundle->node_id);
-		++(bundle->node_id);
+		int u = *bundle->node_id;
+		++(*bundle->node_id);
 		pthread_mutex_unlock(bundle->node_id_lock);
 		if (u >= g->n_v)
 			break;
