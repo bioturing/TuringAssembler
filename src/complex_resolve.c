@@ -799,6 +799,11 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 			kmer_table);
 	destroy_mini_hash(kmer_table);
 
+	supg->nodes = realloc(supg->nodes, supg->n_v * sizeof(struct asm_node_t));
+	supg->edges = realloc(supg->edges, supg->n_e * sizeof(struct asm_edge_t));
+	log_info("node %d estimated node %d, edge %d estimated edge %d",
+			supg->n_v, estimate_node, supg->n_e, estimate_edge);
+
 	log_info("Assigning reverse complement id for nodes and edges");
 	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
 
@@ -980,6 +985,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(threads[i], NULL);
 
+	free(threads);
 	free(supg_node_locks);
 	free(worker_bundle);
 }
