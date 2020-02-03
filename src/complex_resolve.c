@@ -520,7 +520,7 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 	//	free(kmer);
 	//	free(kmer_rc);
 	//}
-	if (g->edges[e].seq_len > g->ksize + 1){
+	if ((int) g->edges[e].seq_len > g->ksize + 1){
 		int u = supg->n_v;
 		int v = supg->n_v + 1;
 		kh_long_int_set(node_map_fw, GET_CODE(pu, e), u);
@@ -561,7 +561,7 @@ void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 int get_big_kmer_count(char *big_kmer, struct mini_hash_t *kmer_table)
 {
 	int ksize = strlen(big_kmer);
-	uint8_t *seq = calloc(ksize + 3 >> 2, 1);
+	uint8_t *seq = calloc((ksize + 3) >> 2, 1);
 	for (int i = 0; i < ksize; i++) {
 		km_shift_append(seq, ksize, (ksize+3)>>2, nt4_table[big_kmer[i]]);
 	}
@@ -595,6 +595,33 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 	e->barcodes = NULL;
 	asm_add_node_adj(supg, u, supg->n_e);
 	++supg->n_e;
+}
+
+void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
+		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw, pthread_mutex_t *lock)
+{
+	int u = kh_long_int_get(node_map_bw, GET_CODE(e1, mid));
+	int v = kh_long_int_get(node_map_fw, GET_CODE(mid, e2));
+	uint32_t *bin_seq;
+	encode_seq(&bin_seq, big_kmer);
+	pthread_mutex_lock(lock);
+	int edge_id = supg->n_e;
+	++(supg->n_e);
+	pthread_mutex_unlock(lock);
+
+	struct asm_edge_t *e = supg->edges + edge_id;
+	e->count = count;
+	e->seq = bin_seq;
+	e->seq_len = strlen(big_kmer);
+	e->n_holes = 0;
+	e->p_holes = NULL;
+	e->l_holes = NULL;
+	e->source = u;
+	e->target = v;
+	e->rc_id = 0;
+	e->barcodes = NULL;
+	asm_add_node_adj(supg, u, edge_id);
 }
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
@@ -721,7 +748,7 @@ void estimate_something(struct asm_graph_t *g, int *count_edge, int *count_node)
 	for (int i_e = 0; i_e < g->n_e; i_e++) {
 		if (g->edges[i_e].source == -1 )
 			continue;
-		if (g->edges[i_e].seq_len > g->ksize + 1){
+		if ((int) g->edges[i_e].seq_len > g->ksize + 1){
 			c_n += 2;
 			c_e+=1;
 
@@ -762,7 +789,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	}
 
 	log_info("Creating super edges");
-	create_super_edges(g, supg, node_map_fw, node_map_bw, kmer_table);
+
+	create_super_edges_multi(opt, g, supg, node_map_fw, node_map_bw,
+			kmer_table);
 	destroy_mini_hash(kmer_table);
 
 	log_info("Assigning reverse complement id for nodes and edges");
@@ -832,9 +861,10 @@ void *assign_kmer_pos_eid(void *data)
 			break;
 		char *seq;
 		decode_seq(&seq, g->edges[e].seq, g->edges[e].seq_len);
-		for (int i = 0; i + g->ksize <= g->edges[e].seq_len; ++i){
+		for (int i = 0; i + g->ksize <= (int) g->edges[e].seq_len; ++i){
 			strncpy(kmer, seq + i, g->ksize);
-			uint64_t hash = MurmurHash3_x64_64(kmer, g->ksize);
+			uint64_t hash = MurmurHash3_x64_64((uint8_t *) kmer,
+								g->ksize);
 			kh_long_int_set(bundle->kmer_pos, hash, e);
 			//log_debug("Kmer %s hash code is %ld", kmer, hash);
 		}
@@ -899,4 +929,110 @@ void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g, khash_t(lon
 	free(each_kmer_eid);
 	free(worker_bundle);
 
+}
+
+void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *supg, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw, struct mini_hash_t *kmer_table)
+{
+	struct super_edges_bundle_t *worker_bundle = calloc(opt->n_threads,
+			sizeof(struct super_edges_bundle_t));
+
+	int node_id = 0;
+	pthread_mutex_t node_id_lock;
+	pthread_mutex_init(&node_id_lock, NULL);
+
+	pthread_mutex_t edge_id_lock;
+	pthread_mutex_init(&edge_id_lock, NULL);
+
+	for (int i = 0; i < opt->n_threads; ++i){
+		worker_bundle[i].g = g;
+		worker_bundle[i].supg = supg;
+		worker_bundle[i].node_id = &node_id;
+		worker_bundle[i].node_id_lock = &node_id_lock;
+		worker_bundle[i].node_map_fw = node_map_fw;
+		worker_bundle[i].node_map_bw = node_map_bw;
+		worker_bundle[i].kmer_table = kmer_table;
+		worker_bundle[i].edge_id_lock = &edge_id_lock;
+	}
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(threads + i, &attr, create_super_edges_ite,
+				worker_bundle + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	free(worker_bundle);
+}
+
+void *create_super_edges_ite(void *data)
+{
+	struct super_edges_bundle_t *bundle = (struct super_edges_bundle_t *) data;
+	struct asm_graph_t *g = bundle->g;
+	struct asm_graph_t *supg = bundle->supg;
+	khash_t(long_int) *node_map_fw = bundle->node_map_fw;
+	khash_t(long_int) *node_map_bw = bundle->node_map_bw;
+	struct mini_hash_t *kmer_table = bundle->kmer_table;
+	do{
+		pthread_mutex_lock(bundle->node_id_lock);
+		int u = *(bundle->node_id);
+		++(bundle->node_id);
+		pthread_mutex_unlock(bundle->node_id_lock);
+		if (u >= g->n_v)
+			break;
+
+		int accept = 0;
+		int u_rc = g->nodes[u].rc_id;
+		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[u].deg; ++j){
+				int e2 = g->nodes[u].adj[j];
+				char *big_kmer;
+				get_big_kmer(e1, e2, g, &big_kmer);
+
+				char *big_kmer_rc = calloc(g->ksize + 3, sizeof(char));
+				strcpy(big_kmer_rc, big_kmer);
+				flip_reverse(big_kmer_rc);
+				int count1 = get_big_kmer_count(big_kmer, kmer_table) ;
+				int count2 = get_big_kmer_count(big_kmer_rc, kmer_table);
+				int count = count1 + count2;
+				if ((g->nodes[u].deg == 1 && g->nodes[u_rc].deg == 1)
+					|| count >= 3){
+					add_super_edge_multi(u, e1, e2, supg, big_kmer,
+							count * (g->ksize + 2 - g->ksize_count),
+							node_map_fw, node_map_bw,
+							bundle->edge_id_lock);
+					accept = 1;
+				}
+				free(big_kmer);
+				free(big_kmer_rc);
+			}
+		}
+
+		if (accept)
+			continue;
+
+
+		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[u].deg; ++j){
+				int e2 = g->nodes[u].adj[j];
+				char *big_kmer;
+				get_big_kmer(e1, e2, g, &big_kmer);
+
+				add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
+						node_map_fw, node_map_bw,
+						bundle->edge_id_lock);
+				free(big_kmer);
+			}
+		}
+	}while (1);
+	return NULL;
 }
