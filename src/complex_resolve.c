@@ -1034,23 +1034,23 @@ void *create_super_edges_ite(void *data)
 			}
 		}
 
-		if (accept)
-			continue;
+		//if (accept)
+		//	continue;
 
 
-		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
-			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
-			for (int j = 0; j < g->nodes[u].deg; ++j){
-				int e2 = g->nodes[u].adj[j];
-				char *big_kmer;
-				get_big_kmer(e1, e2, g, &big_kmer);
+		//for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+		//	int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+		//	for (int j = 0; j < g->nodes[u].deg; ++j){
+		//		int e2 = g->nodes[u].adj[j];
+		//		char *big_kmer;
+		//		get_big_kmer(e1, e2, g, &big_kmer);
 
-				add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
-						node_map_fw, node_map_bw,
-						bundle);
-				free(big_kmer);
-			}
-		}
+		//		add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
+		//				node_map_fw, node_map_bw,
+		//				bundle);
+		//		free(big_kmer);
+		//	}
+		//}
 	}while (1);
 	return NULL;
 }
