@@ -621,12 +621,12 @@ void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
 	e->target = v;
 	e->rc_id = 0;
 	e->barcodes = NULL;
-	//pthread_mutex_lock(bundle->supg_node_locks + u);
-	//asm_add_node_adj(supg, u, edge_id);
-	//pthread_mutex_unlock(bundle->supg_node_locks + u);
-	pthread_mutex_lock(bundle->supg_node_locks);
+	pthread_mutex_lock(bundle->supg_node_locks + u);
 	asm_add_node_adj(supg, u, edge_id);
-	pthread_mutex_unlock(bundle->supg_node_locks);
+	pthread_mutex_unlock(bundle->supg_node_locks + u);
+	//pthread_mutex_lock(bundle->supg_node_locks);
+	//asm_add_node_adj(supg, u, edge_id);
+	//pthread_mutex_unlock(bundle->supg_node_locks);
 }
 
 void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
