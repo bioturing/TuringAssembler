@@ -29,6 +29,17 @@ struct kmer_eid_bundle_t{
 	khash_t(long_int) *kmer_pos;
 };
 
+struct super_edges_bundle_t{
+	struct asm_graph_t *g;
+	struct asm_graph_t *supg;
+	int *node_id;
+	pthread_mutex_t *node_id_lock;
+	khash_t(long_int) *node_map_fw;
+	khash_t(long_int) *node_map_bw;
+	struct mini_hash_t *kmer_table;
+	pthread_mutex_t *edge_id_lock;
+};
+
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
@@ -63,6 +74,10 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
 		khash_t(long_int) *node_map_bw);
 
+void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
+		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw, pthread_mutex_t *lock);
+
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw);
 
@@ -71,10 +86,16 @@ void create_super_edges(struct asm_graph_t *g, struct asm_graph_t *supg,
 			khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw,
 			struct mini_hash_t *kmer_table);
 
+void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *supg, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw, struct mini_hash_t *kmer_table);
+
 int is_reverse_complement(struct asm_graph_t *g, int e1, int e2);
 
 void get_kmer_edge_id(struct opt_proc_t *opt, struct asm_graph_t *g,
 		khash_t(long_int) *kmer_eid);
 
 void *assign_kmer_pos_eid(void *data);
+
+void *create_super_edges_ite(void *data);
 #endif
