@@ -38,6 +38,7 @@ struct super_edges_bundle_t{
 	khash_t(long_int) *node_map_bw;
 	struct mini_hash_t *kmer_table;
 	pthread_mutex_t *edge_id_lock;
+	pthread_mutex_t *supg_node_locks;
 };
 
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
@@ -76,7 +77,7 @@ void add_super_edge(int mid, int e1, int e2, struct asm_graph_t *supg,
 
 void add_super_edge_multi(int mid, int e1, int e2, struct asm_graph_t *supg,
 		char *big_kmer, int count, khash_t(long_int) *node_map_fw,
-		khash_t(long_int) *node_map_bw, pthread_mutex_t *lock);
+		khash_t(long_int) *node_map_bw, struct super_edges_bundle_t *bundle);
 
 void assign_reverse_complement(struct asm_graph_t *g, struct asm_graph_t *supg,
 		khash_t(long_int) *node_map_fw, khash_t(long_int) *node_map_bw);
