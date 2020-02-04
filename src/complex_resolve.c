@@ -780,6 +780,7 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
 								 opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
 								 opt->out_dir);
+	get_mem();
 	log_info("Creating super nodes");
 	int estimate_node = 0, estimate_edge = 0;
 	estimate_something(g, &estimate_edge, &estimate_node);
@@ -793,6 +794,7 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 				kmer_table);
 	}
 
+	get_mem();
 	log_info("Creating super edges");
 
 	create_super_edges_multi(opt, g, supg, node_map_fw, node_map_bw,
@@ -807,8 +809,8 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	get_mem();
 	log_info("Compressing graph");
 	compress_graph(g);
-	get_mem();
 
+	get_mem();
 	log_info("Assigning reverse complement id for nodes and edges");
 
 	assign_reverse_complement_multi(opt, g, supg, node_map_fw, node_map_bw);
@@ -816,6 +818,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	kh_destroy(long_int, node_map_fw);
 	kh_destroy(long_int, node_map_bw);
 	supg->ksize = super_k;
+
+	get_mem();
+	log_info("Done everything");
 	if (super_k % 2){
 		log_info("Condesing graph");
 		struct asm_graph_t g1;
