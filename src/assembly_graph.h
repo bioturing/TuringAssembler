@@ -11,6 +11,7 @@
 #define ASM_HAVE_BARCODE		0x1
 #define ASM_HAVE_READPAIR		0x2
 #define ASM_HAVE_CANDIDATE		0x8
+#define ASM_IS_COMPRESSED		0x10
 
 #define ASM_BUILD_BARCODE		0x1
 #define ASM_BUILD_READPAIR		0x2
@@ -304,4 +305,6 @@ void asm_append_barcode_edge(struct asm_edge_t *dst, struct asm_edge_t *src);
 void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 		char *tmp_name);
 void asm_join_edge3_wrapper(struct asm_graph_t *g, gint_t e1, gint_t e2, gint_t e3, int count);
+
+void compress_graph(struct asm_graph_t *g);
 #endif  /* __ASSEMBLY_GRAPH_H__ */

@@ -1491,10 +1491,14 @@ void asm_graph_destroy(struct asm_graph_t *g)
 	}
 	free(g->edges);
 	g->edges = NULL;
-	for (u = 0; u < g->n_v; ++u) {
-		free(g->nodes[u].adj);
-		g->nodes[u].adj = NULL;
+	if (g->aux_flag & ASM_IS_COMPRESSED){
+		free(g->nodes[0].adj);
+	} else {
+		for (int u = 0; u < g->n_v; ++u)
+			free(g->nodes[u].adj);
 	}
+	for (u = 0; u < g->n_v; ++u)
+		g->nodes[u].adj = NULL;
 	free(g->nodes);
 	g->nodes = NULL;
 	g->n_e = g->n_v = 0;
@@ -1622,3 +1626,20 @@ void asm_clone_graph(struct asm_graph_t *g0, struct asm_graph_t *g1,
 	}
 	log_info("DONE cloning assembly edges");
 }
+
+void compress_graph(struct asm_graph_t *g)
+{
+	g->aux_flag |= ASM_IS_COMPRESSED;
+	int deg_sum = 0;
+	for (int i = 0; i < g->n_v; ++i)
+		deg_sum += g->nodes[i].deg;
+	gint_t *mem = malloc(deg_sum * sizeof(gint_t));
+	int p = 0;
+	for (int i = 0; i < g->n_v; ++i){
+		memcpy(mem + p, g->nodes[i].adj, g->nodes[i].deg * sizeof(gint_t));
+		free(g->nodes[i].adj);
+		g->nodes[i].adj = mem + p;
+		p += g->nodes[i].deg;
+	}
+}
+
