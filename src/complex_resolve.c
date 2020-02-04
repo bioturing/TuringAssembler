@@ -805,7 +805,8 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 			supg->n_v, estimate_node, supg->n_e, estimate_edge);
 
 	log_info("Assigning reverse complement id for nodes and edges");
-	assign_reverse_complement(g, supg, node_map_fw, node_map_bw);
+
+	assign_reverse_complement_multi(opt, g, supg, node_map_fw, node_map_bw);
 
 	kh_destroy(long_int, node_map_fw);
 	kh_destroy(long_int, node_map_bw);
@@ -1054,3 +1055,133 @@ void *create_super_edges_ite(void *data)
 	}while (1);
 	return NULL;
 }
+
+void assign_reverse_complement_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
+		struct asm_graph_t *supg, khash_t(long_int) *node_map_fw,
+		khash_t(long_int) *node_map_bw)
+{
+	struct assign_rc_bundle_t *worker_bundle = calloc(opt->n_threads,
+			sizeof(struct assign_rc_bundle_t));
+
+	int node_id = 0;
+	pthread_mutex_t node_id_lock;
+	pthread_mutex_init(&node_id_lock, NULL);
+
+	for (int i = 0; i < opt->n_threads; ++i){
+		worker_bundle[i].g = g;
+		worker_bundle[i].supg = supg;
+		worker_bundle[i].node_map_fw = node_map_fw;
+		worker_bundle[i].node_map_bw = node_map_bw;
+		worker_bundle[i].node_id = &node_id;
+		worker_bundle[i].node_id_lock = &node_id_lock;
+	}
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(threads + i, &attr, assign_node_rc_ite,
+				worker_bundle + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	node_id = 0;
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(threads + i, &attr, assign_edge_rc_ite,
+				worker_bundle + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(threads[i], NULL);
+
+	free(threads);
+	free(worker_bundle);
+}
+
+void *assign_node_rc_ite(void *data)
+{
+	struct assign_rc_bundle_t *bundle = (struct assign_rc_bundle_t *) data;
+	struct asm_graph_t *g = bundle->g;
+	struct asm_graph_t *supg = bundle->supg;
+	khash_t(long_int) *node_map_fw = bundle->node_map_fw;
+	khash_t(long_int) *node_map_bw = bundle->node_map_bw;
+	
+	do{
+		pthread_mutex_lock(bundle->node_id_lock);
+		int u = *bundle->node_id;
+		++(*bundle->node_id);
+		pthread_mutex_unlock(bundle->node_id_lock);
+
+		if (u >= g->n_v)
+			break;
+
+		for (int i = 0; i < g->nodes[u].deg; ++i){
+			int e = g->nodes[u].adj[i];
+			int u_rc = g->nodes[u].rc_id;
+			int e_rc = g->edges[e].rc_id;
+
+			int supu = kh_long_int_get(node_map_fw, GET_CODE(u, e));
+			int supu_rc = kh_long_int_get(node_map_bw,
+					GET_CODE(e_rc, u_rc));
+			supg->nodes[supu].rc_id = supu_rc;
+		}
+
+		int u_rc = g->nodes[u].rc_id;
+		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+			int e_rc = g->nodes[u_rc].adj[i];
+			int e = g->edges[e_rc].rc_id;
+
+			int supu = kh_long_int_get(node_map_bw, GET_CODE(e, u));
+			int supu_rc = kh_long_int_get(node_map_fw,
+					GET_CODE(u_rc, e_rc));
+			supg->nodes[supu].rc_id = supu_rc;
+		}
+	} while(1);
+	return NULL;
+}
+
+void *assign_edge_rc_ite(void *data)
+{
+	struct assign_rc_bundle_t *bundle = (struct assign_rc_bundle_t *) data;
+	struct asm_graph_t *supg = bundle->supg;
+	khash_t(long_int) *node_map_fw = bundle->node_map_fw;
+	khash_t(long_int) *node_map_bw = bundle->node_map_bw;
+	
+	do{
+		pthread_mutex_lock(bundle->node_id_lock);
+		int u = *bundle->node_id;
+		++(*bundle->node_id);
+		pthread_mutex_unlock(bundle->node_id_lock);
+
+		if (u >= supg->n_v)
+			break;
+
+		for (int i = 0; i < supg->nodes[u].deg; ++i){
+			int e1 = supg->nodes[u].adj[i];
+			int v = supg->edges[e1].target;
+			int v_rc = supg->nodes[v].rc_id;
+			int u_rc = supg->nodes[u].rc_id;
+
+			int e_rc = -1;
+			for (int j = 0; j < supg->nodes[v_rc].deg; ++j){
+				int e2 = supg->nodes[v_rc].adj[j];
+				if (u_rc != supg->edges[e2].target)
+					continue;
+				if (is_reverse_complement(supg, e1, e2)){
+					e_rc = e2;
+					break;
+				}
+			}
+			if (e_rc == -1)
+				log_error("Something went wrong, e_rc not found at node %d, edge %d, u_rc %d v_rc %d",
+						u, e1, u_rc, v_rc);
+			supg->edges[e1].rc_id = e_rc;
+		}
+	} while(1);
+	return NULL;
+}
+
