@@ -804,6 +804,9 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 	log_info("node %d estimated node %d, edge %d estimated edge %d",
 			supg->n_v, estimate_node, supg->n_e, estimate_edge);
 
+	log_info("Compressing graph");
+	compress_graph(g);
+
 	log_info("Assigning reverse complement id for nodes and edges");
 
 	assign_reverse_complement_multi(opt, g, supg, node_map_fw, node_map_bw);
