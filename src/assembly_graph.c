@@ -923,7 +923,7 @@ void write_gfa(struct asm_graph_t *g, const char *path)
 			float cov2 = __get_edge_cov(g->edges + next_pe, g->ksize_count);
 			fprintf(fp, "L\t%lld_%lld_cov_%.3f\t%c\t%lld_%lld_cov_%.3f\t%c\t%dM\n",
 				(long long)pe, (long long)pe_rc, cov1, ce,
-				(long long)next_pe, cov2, (long long)next_pe_rc,
+				(long long)next_pe, (long long)next_pe_rc, cov2,
 				next_ce, g->ksize);
 			//fprintf(fp, "L\t%lld_%d->%d_%lld_%d->%d\t%c\t%lld_%d->%d_%lld_%d->%d\t%c\t%dM\n",
 			//	(long long)pe, g->edges[pe].source, g->edges[pe].target,
