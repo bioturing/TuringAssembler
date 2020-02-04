@@ -1082,6 +1082,7 @@ void assign_reverse_complement_multi(struct opt_proc_t *opt, struct asm_graph_t 
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
 	pthread_t *threads = calloc(opt->n_threads, sizeof(pthread_t));
+	log_info("Assigning reverse complement for nodes");
 
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_create(threads + i, &attr, assign_node_rc_ite,
@@ -1090,6 +1091,7 @@ void assign_reverse_complement_multi(struct opt_proc_t *opt, struct asm_graph_t 
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(threads[i], NULL);
 
+	log_info("Assigning reverse complement for edges");
 	node_id = 0;
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_create(threads + i, &attr, assign_edge_rc_ite,
