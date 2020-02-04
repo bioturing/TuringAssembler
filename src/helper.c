@@ -139,3 +139,16 @@ int delete_file(char *file_path)
 	else
 		log_debug("Cannot delete %s", file_path);
 }
+
+void get_mem()
+{
+	char s[1024];
+	FILE *f = fopen("/proc/self/status", "r");
+	while (fgets(s, 1023, f) != 0){
+		if (strstr(s, "VmSize") == NULL)
+			continue;
+		log_info("%s", s);
+	}
+	fclose(f);
+}
+
