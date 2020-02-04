@@ -1169,7 +1169,7 @@ struct mini_hash_t *get_kmer_count_from_kmc(int ksize, int n_files, char **files
 	}
 
 	log_info("|---- Retrieving kmer from KMC database");
-	struct mini_hash_t *kmer_table = calloc(1, sizeof(struct mini_hash_t));
+	struct mini_hash_t *kmer_table;
 	init_mini_hash(&kmer_table, 20);
 //	init_mini_hash(&kmer_table, INIT_PRIME_INDEX);
 	assert(kmer_table->key[0] == -1);
