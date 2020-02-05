@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "kmhash.h"
 #include "kmer.h"
+#include "fastq_producer.h"
 
 
 static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
@@ -1185,5 +1186,159 @@ void *assign_edge_rc_ite(void *data)
 		}
 	} while(1);
 	return NULL;
+}
+
+void reduce_reads_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
+			struct read_path_t *rpath, const char *fasta_path,
+			uint32_t aux_build, khash_t(long_int) *kmer_eid)
+{
+	struct producer_bundle_t *producer_bundles;
+	producer_bundles = init_fastq_pair(opt->n_threads, 1,
+					&(rpath->R1_path), &(rpath->R2_path));
+
+	struct reduce_reads_bundle_t *worker_bundles = calloc(opt->n_threads,
+			sizeof(struct reduce_reads_bundle_t));
+
+	struct reduce_reads_buffer_t r1_buf, r2_buf;
+	char r1_dir[1024];
+	sprintf(r1_dir, "%s/R1.reduced.fq", opt->out_dir);
+	r1_buf.out_file = fopen(r1_dir, "r");
+	r1_buf.cap = SIZE_16MB;
+	r1_buf.buffer = malloc(r1_buf.cap * sizeof(char));
+	r1_buf.size = 0;
+	pthread_mutex_t lock_r1;
+	pthread_mutex_init(&lock_r1, NULL);
+	r1_buf.lock = &lock_r1;
+
+	char r2_dir[1024];
+	sprintf(r2_dir, "%s/R2.reduced.fq", opt->out_dir);
+	r2_buf.out_file = fopen(r2_dir, "r");
+	r2_buf.cap = SIZE_16MB;
+	r2_buf.buffer = malloc(r2_buf.cap * sizeof(char));
+	r2_buf.size = 0;
+	pthread_mutex_t lock_r2;
+	pthread_mutex_init(&lock_r2, NULL);
+	r2_buf.lock = &lock_r2;
+
+	pthread_mutex_t lock;
+	pthread_mutex_init(&lock, NULL);
+	for (int i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].g = g;
+		worker_bundles[i].lock = &lock;
+		worker_bundles[i].kmer_eid = kmer_eid;
+		worker_bundles[i].r1_buf = &r1_buf;
+		worker_bundles[i].r2_buf = &r2_buf;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	/* FIXME: not actually opt->n_files, noob */
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	opt->n_files = 1;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	for (int i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_producer,
+		               producer_bundles + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, reduce_reads_ite,
+				worker_bundles + i);
+
+	for (int i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, 1);
+	free(worker_bundles);
+
+	free(producer_threads);
+	free(worker_threads);
+}
+
+void *reduce_reads_ite(void *data)
+{
+	struct reduce_reads_bundle_t *bundle = (struct reduce_reads_bundle_t *) data;
+	struct asm_graph_t *g = bundle->g;
+	khash_t(long_int) *kmer_eid = bundle->kmer_eid;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_pair_buffer();
+
+	char *buf1, *buf2;
+	int pos1, pos2, rc1, rc2, input_format, mapper_algo;
+
+	int64_t n_reads;
+	int64_t *gcnt_reads;
+	uint64_t barcode;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf) {
+			break;
+		}
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read1, buf1, &pos1) :
+				get_read_from_fa(&read1, buf1, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+				get_read_from_fq(&read2, buf2, &pos2) :
+				get_read_from_fa(&read2, buf2, &pos2);
+
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
+				log_warn("buf1 %s", buf1);
+				log_warn("buf2 %s", buf2);
+				log_error("\nWrong format file when build barcode scaffold\n");
+			}
+
+
+			if (check_read_mapped_on_edge(&read1, g->ksize, kmer_eid)
+				== 0)
+				write_reduced_reads(&read1, bundle->r1_buf);
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+
+	free_pair_buffer(own_buf);
+	pthread_exit(NULL);
+}
+
+int check_read_mapped_on_edge(struct read_t *r, int ksize,
+				khash_t(long_int) *kmer_eid)
+{
+	uint64_t first_hash = MurmurHash3_x64_64(r->seq, ksize);
+	uint64_t last_hash = MurmurHash3_x64_64(r->seq + r->len - ksize,
+						ksize);
+	int first_eid = kh_long_int_try_get(kmer_eid, first_hash, -1);
+	if (first_eid == -1)
+		return 0;
+	int last_eid = kh_long_int_try_get(kmer_eid, last_hash, -1);
+	if (last_eid == -1)
+		return 0;
+	return first_eid == last_eid;
+}
+
+void write_reduced_reads(struct read_t *r, struct reduce_reads_buffer_t *r_buf)
+{
+	pthread_mutex_lock(r_buf->lock);
 }
 

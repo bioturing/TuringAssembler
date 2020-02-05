@@ -50,6 +50,23 @@ struct assign_rc_bundle_t{
 	pthread_mutex_t *node_id_lock;
 };
 
+struct reduce_reads_buffer_t{
+	FILE *out_file;
+	char *buffer;
+	int cap;
+	int size;
+	pthread_mutex_t *lock;
+};
+
+struct reduce_reads_bundle_t{
+	struct dqueue_t *q;
+	struct asm_graph_t *g;
+	pthread_mutex_t *lock;
+	khash_t(long_int) *kmer_eid;
+	struct reduce_reads_buffer_t *r1_buf;
+	struct reduce_reads_buffer_t *r2_buf;
+};
+
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
@@ -116,4 +133,14 @@ void *create_super_edges_ite(void *data);
 void *assign_node_rc_ite(void *data);
 void *assign_edge_rc_ite(void *data);
 
+void reduce_reads_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
+			struct read_path_t *rpath, const char *fasta_path,
+			uint32_t aux_build, khash_t(long_int) *kmer_eid);
+
+void *reduce_reads_ite(void *data);
+
+int check_read_mapped_on_edge(struct read_t *r, int ksize,
+				khash_t(long_int) *kmer_eid);
+
+void write_reduced_reads(struct read_t *r, struct reduce_reads_buffer_t *r_buf);
 #endif
