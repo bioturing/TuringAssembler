@@ -548,16 +548,24 @@ void create_super_nodes(struct asm_graph_t *g, int e, struct asm_graph_t *supg,
 
 void get_big_kmer(int e1, int e2, struct asm_graph_t *g, char **big_kmer)
 {
-	char *seq1, *seq2;
-	decode_seq(&seq1, g->edges[e1].seq, g->edges[e1].seq_len);
-	decode_seq(&seq2, g->edges[e2].seq, g->edges[e2].seq_len);
-	*big_kmer = calloc(g->ksize + 3, sizeof(char));
-	int len1 = strlen(seq1);
-	strcpy(*big_kmer, seq1 + len1 - (g->ksize + 1));
-	(*big_kmer)[g->ksize + 1] = seq2[g->ksize];
-	seq2[g->ksize] = 0;
-	free(seq1);
-	free(seq2);
+	//char *seq1, *seq2;
+	//decode_seq(&seq1, g->edges[e1].seq, g->edges[e1].seq_len);
+	//decode_seq(&seq2, g->edges[e2].seq, g->edges[e2].seq_len);
+	//*big_kmer = calloc(g->ksize + 3, sizeof(char));
+	*big_kmer = malloc((g->ksize + 3) * sizeof(char));
+
+	for (int i = 0; i < g->ksize + 1; ++i)
+		(*big_kmer)[i] = int_to_base(__binseq_get(g->edges[e1].seq,
+				g->edges[e1].seq_len - (g->ksize + 1) + i));
+	(*big_kmer)[g->ksize + 1] = int_to_base(__binseq_get(g->edges[e2].seq,
+						g->ksize));
+	//int len1 = strlen(seq1);
+	//strcpy(*big_kmer, seq1 + len1 - (g->ksize + 1));
+	//(*big_kmer)[g->ksize + 1] = seq2[g->ksize];
+	//seq2[g->ksize] = 0;
+	//free(seq1);
+	//free(seq2);
+	(*big_kmer)[g->ksize + 2] = '\0';
 }
 
 int get_big_kmer_count(char *big_kmer, struct mini_hash_t *kmer_table)
