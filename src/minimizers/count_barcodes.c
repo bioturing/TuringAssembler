@@ -34,7 +34,6 @@
 
 #include "count_barcodes.h"
 
-
 /*
  Credit for primes table: Aaron Krowne
  http://br.endernet.org/~akrowne/
@@ -81,6 +80,7 @@ void init_mini_hash(struct mini_hash_t **h_table, uint32_t p_index)
 	table->size = h_size;
 	table->max_cnt = (uint64_t) (table->size * MAX_LOAD_FACTOR);
 	table->count = 0;
+	table->sem = 0;
 	*h_table = table;
 }
 
@@ -206,7 +206,6 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 void try_expanding(struct mini_hash_t **h_table)
 {
 	struct mini_hash_t *table = *h_table;
-	log_debug("try expanding %d %d", table->count, table->max_cnt);
 	if (table->count >= table->max_cnt) {
 		if (table->prime_index < N_PRIMES_NUMBER - 1) {
 			log_debug("Doubling hash table... %d", table->prime_index);
@@ -228,6 +227,7 @@ void try_expanding(struct mini_hash_t **h_table)
  */
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
+	atomic_bool_CAS64(&h_table->sem, 0, 1);
 	uint64_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
@@ -258,6 +258,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 			atomic_add_and_fetch64(&(h_table->count), 1);
 		slot = i;
 	}
+	atomic_bool_CAS64(&h_table->sem, 1, 0);
 	return h_table->h + slot;
 }
 
@@ -316,18 +317,14 @@ uint64_t *mini_get(struct mini_hash_t *h_table, uint64_t data)
  */
 uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
-	uint64_t key = twang_mix64(data);
-	pthread_mutex_lock(&h_table_mut);
-	if ((*h_table)->count >= (*h_table)->max_cnt) {
-//	if (atomic_bool_CAS64(&table->count, table->max_cnt, table->max_cnt)){
-		int old_size = (*h_table)->size;
+	struct mini_hash_t *table = *h_table;
+	if (table->count > table->max_cnt) {
+		while (atomic_bool_CAS64(&table->sem, 1, 1)){}
+		pthread_mutex_lock(&h_table_mut);
 		try_expanding(h_table);
-		log_debug("miniput %d", (*h_table)->prime_index);
-		if (old_size == (*h_table)->size) {
-			log_error("old size %d new size %d", old_size, (*h_table)->size);
-		}
+		pthread_mutex_unlock(&h_table_mut);
 	}
-	pthread_mutex_unlock(&h_table_mut);
+	uint64_t key = twang_mix64(data);
 	return mini_put_by_key(*h_table, data, key);
 }
 
@@ -372,7 +369,7 @@ static inline void *biot_buffer_iterator_simple(void *data);
 struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 {
 	struct mini_hash_t *h_table;
-	init_mini_hash(&h_table, INIT_PRIME_INDEX);
+	init_mini_hash(&h_table, 20);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
@@ -415,7 +412,7 @@ struct mini_hash_t *count_bx_freq(struct opt_proc_t *opt)
 	free(worker_bundles);
 
 	free_fastq_pair(producer_bundles, opt->n_files);
-	mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
+	//mini_print(h_table, 18, opt->out_dir); // 18 is the barcode length from TELL-Seq technology
 	return h_table;
 }
 
@@ -458,20 +455,25 @@ static inline void *biot_buffer_iterator_simple(void *data)
 			if (rc1 == READ_FAIL || rc2 == READ_FAIL)
 				log_error("\nWrong format file\n");
 
-			/* read_name + \t + BX:Z: + barcode + \t + QB:Z: + barcode_quality + \n */
-			uint64_t barcode = get_barcode_biot(read1.info, &readbc);
-			if (barcode != (uint64_t) -1) {
-				// any main stuff goes here
-				uint64_t *slot = mini_put(bundle->h_table_ptr, barcode);
-				atomic_add_and_fetch64(slot, 1);
-			} else {
-				//read doesn't have barcode
-			}
+			count_kmer(read1.seq, 31, read1.len, bundle->h_table_ptr);
+			count_kmer(read2.seq, 31, read2.len, bundle->h_table_ptr);
 			if (rc1 == READ_END)
 				break;
 		}
 	}
 	return NULL;
+}
+
+void count_kmer(char *seq, int k, int l, struct mini_hash_t **h_table)
+{
+	int i;
+	uint64_t *slot;
+	for (i = 0; i + k < l; ++i) {
+		int64_t enc = seq2num(seq + i, k);
+		slot = mini_put(h_table, enc);
+		atomic_add_and_fetch64(slot, 1);
+	}
+
 }
 
 uint64_t get_min_code(struct asm_graph_t *g, int u, int v)

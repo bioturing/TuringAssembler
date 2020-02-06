@@ -18,6 +18,7 @@ struct mini_hash_t {
     uint64_t size;
     uint64_t count;
     uint64_t max_cnt;
+    int sem;
     int prime_index;
 };
 
