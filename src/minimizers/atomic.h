@@ -5,6 +5,7 @@
 
 #define atomic_add_and_fetch32(a, x)		__sync_add_and_fetch(a, x)
 #define atomic_add_and_fetch64(a, x)		__sync_add_and_fetch(a, x)
+#define atomic_sub_and_fetch64(a, x)		__sync_sub_and_fetch(a, x)
 
 #define atomic_val_CAS8(ptr, old_val, new_val)				       \
 			__sync_val_compare_and_swap(ptr, old_val, new_val)
