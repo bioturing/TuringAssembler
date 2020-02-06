@@ -50,6 +50,13 @@ struct assign_rc_bundle_t{
 	pthread_mutex_t *node_id_lock;
 };
 
+struct count_kmer_bundle_t{
+	struct dqueue_t *q;
+	int ksize;
+	pthread_mutex_t *lock;
+	struct mini_hash_t **h;
+};
+
 void init_resolve_bulges(struct asm_graph_t *g, struct resolve_bulges_bundle_t *bundle);
 void reset_source(struct resolve_bulges_bundle_t *bundle, int s);
 void bulges_bundle_destroy(struct resolve_bulges_bundle_t *bundle);
@@ -116,4 +123,8 @@ void *create_super_edges_ite(void *data);
 void *assign_node_rc_ite(void *data);
 void *assign_edge_rc_ite(void *data);
 
+struct mini_hash_t *count_kmer_simple(struct opt_proc_t *opt, int ksize,
+			char *R1_path, char *R2_path);
+void *count_kmer_ite(void *data);
+void add_count(struct read_t *r, int ksize, struct mini_hash_t **h);
 #endif

@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "kmhash.h"
 #include "kmer.h"
+#include "fastq_producer.h"
 
 
 static inline void asm_add_node_adj(struct asm_graph_t *g, gint_t u, gint_t e)
@@ -777,9 +778,8 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 {
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
-	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k, opt->n_files,
-								 opt->files_1, opt->files_2, opt->n_threads, opt->mmem,
-								 opt->out_dir);
+	struct mini_hash_t *kmer_table = count_kmer_simple(opt, super_k,
+						opt->files_1[0], opt->files_2[0]);
 	log_info("Creating super nodes");
 	int estimate_node = 0, estimate_edge = 0;
 	estimate_something(g, &estimate_edge, &estimate_node);
@@ -1185,5 +1185,125 @@ void *assign_edge_rc_ite(void *data)
 		}
 	} while(1);
 	return NULL;
+}
+
+struct mini_hash_t *count_kmer_simple(struct opt_proc_t *opt, int ksize,
+			char *R1_path, char *R2_path)
+{
+	struct producer_bundle_t *producer_bundles;
+	producer_bundles = init_fastq_pair(opt->n_threads, 1, &R1_path,
+						&R2_path);
+
+	struct count_kmer_bundle_t *worker_bundles = calloc(opt->n_threads,
+			sizeof(struct count_kmer_bundle_t));
+
+	struct mini_hash_t *h;
+	init_mini_hash(&h, 20);
+
+	pthread_mutex_t lock;
+	pthread_mutex_init(&lock, NULL);
+	for (int i = 0; i < opt->n_threads; ++i) {
+		worker_bundles[i].q = producer_bundles->q;
+		worker_bundles[i].ksize = ksize;
+		worker_bundles[i].lock = &lock;
+		worker_bundles[i].h = &h;
+	}
+
+	pthread_t *producer_threads, *worker_threads;
+	/* FIXME: not actually opt->n_files, noob */
+
+	opt->n_files = 1;
+	producer_threads = calloc(opt->n_files, sizeof(pthread_t));
+	worker_threads = calloc(opt->n_threads, sizeof(pthread_t));
+
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_attr_setstacksize(&attr, THREAD_STACK_SIZE);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	for (int i = 0; i < opt->n_files; ++i)
+		pthread_create(producer_threads + i, &attr, fastq_producer,
+		               producer_bundles + i);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_create(worker_threads + i, &attr, count_kmer_ite,
+		               worker_bundles + i);
+
+	for (int i = 0; i < opt->n_files; ++i)
+		pthread_join(producer_threads[i], NULL);
+
+	for (int i = 0; i < opt->n_threads; ++i)
+		pthread_join(worker_threads[i], NULL);
+
+	free_fastq_pair(producer_bundles, 1);
+	free(worker_bundles);
+
+	free(producer_threads);
+	free(worker_threads);
+	return h;
+}
+
+void *count_kmer_ite(void *data)
+{
+	struct count_kmer_bundle_t *bundle = (struct count_kmer_bundle_t *) data;
+	struct dqueue_t *q = bundle->q;
+	struct read_t read1, read2;
+	struct pair_buffer_t *own_buf, *ext_buf;
+	own_buf = init_pair_buffer();
+
+	char *buf1, *buf2;
+	int pos1, pos2, rc1, rc2, input_format, mapper_algo;
+
+	int64_t n_reads;
+	int64_t *gcnt_reads;
+	uint64_t barcode;
+
+	while (1) {
+		ext_buf = d_dequeue_in(q);
+		if (!ext_buf) {
+			break;
+		}
+		d_enqueue_out(q, own_buf);
+		own_buf = ext_buf;
+		pos1 = pos2 = 0;
+		buf1 = ext_buf->R1_buf;
+		buf2 = ext_buf->R2_buf;
+		input_format = ext_buf->input_format;
+
+		while (1) {
+			rc1 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read1, buf1, &pos1) :
+			      get_read_from_fa(&read1, buf1, &pos1);
+
+			rc2 = input_format == TYPE_FASTQ ?
+			      get_read_from_fq(&read2, buf2, &pos2) :
+			      get_read_from_fa(&read2, buf2, &pos2);
+
+
+			if (rc1 == READ_FAIL || rc2 == READ_FAIL) {
+				log_warn("buf1 %s", buf1);
+				log_warn("buf2 %s", buf2);
+				log_error("\nWrong format file when build barcode scaffold\n");
+			}
+
+			add_count(&read1, bundle->ksize, bundle->h);
+			add_count(&read2, bundle->ksize, bundle->h);
+			if (rc1 == READ_END)
+				break;
+		}
+	}
+
+	free_pair_buffer(own_buf);
+	pthread_exit(NULL);
+}
+
+void add_count(struct read_t *r, int ksize, struct mini_hash_t **h)
+{
+	char *kmer = calloc(ksize + 1, sizeof(char));
+	for (int i = 0; i + ksize <= r->len; ++i){
+		strncpy(kmer, r->seq + i, ksize);
+		uint64_t hash = MurmurHash3_x64_64(kmer, ksize);
+		mini_put(h, hash);
+	}
 }
 
