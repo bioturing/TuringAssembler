@@ -39,6 +39,7 @@ struct super_edges_bundle_t{
 	struct mini_hash_t *kmer_table;
 	pthread_mutex_t *edge_id_lock;
 	pthread_mutex_t *supg_node_locks;
+	int **count_resolve;
 };
 
 struct assign_rc_bundle_t{

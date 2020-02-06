@@ -4,6 +4,7 @@
 #include "log.h"
 #include "resolve.h"
 #include "verbose.h"
+#include "atomic.h"
 #include "helper.h"
 #include "dqueue.h"
 #include "process.h"
@@ -964,6 +965,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 	for (int i = 0; i < supg->n_v; ++i)
 		pthread_mutex_init(supg_node_locks + i, NULL);
 
+	int *count_resolve = calloc(30, sizeof(int));
 	for (int i = 0; i < opt->n_threads; ++i){
 		worker_bundle[i].g = g;
 		worker_bundle[i].supg = supg;
@@ -974,6 +976,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 		worker_bundle[i].kmer_table = kmer_table;
 		worker_bundle[i].edge_id_lock = &edge_id_lock;
 		worker_bundle[i].supg_node_locks = supg_node_locks;
+		worker_bundle[i].count_resolve = &count_resolve;
 	}
 
 	pthread_attr_t attr;
@@ -988,6 +991,12 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 
 	for (int i = 0; i < opt->n_threads; ++i)
 		pthread_join(threads[i], NULL);
+	log_info("count resolve at kmer%d is: %d", g->ksize, count_resolve[0]);
+	log_info("count node disconnect %d is: %d", g->ksize, count_resolve[1]);
+	log_info("count node keep many many %d is: %d", g->ksize, count_resolve[2]);
+	for (int i = 3; i < 30; i++) {
+		log_info("count deg in out %d: %d", i-3, count_resolve[i]);
+	}
 
 	free(threads);
 	free(supg_node_locks);
@@ -1031,11 +1040,20 @@ void *create_super_edges_ite(void *data)
 							count * (g->ksize + 2 - g->ksize_count),
 							node_map_fw, node_map_bw,
 							bundle);
-					accept = 1;
+					accept++;
+				} else {
+					atomic_add_and_fetch32(*bundle->count_resolve, 1);
 				}
 				free(big_kmer);
 				free(big_kmer_rc);
 			}
+		}
+		int t = g->nodes[u_rc].deg * 5 + g->nodes[u].deg;
+		atomic_add_and_fetch32(*bundle->count_resolve + t + 3, 1);
+		if (accept != 0) {
+			atomic_add_and_fetch32(*bundle->count_resolve + 1, 1);
+		} else if (accept > 1) {
+			atomic_add_and_fetch32(*bundle->count_resolve + 2, 1);
 		}
 
 		//if (accept)
