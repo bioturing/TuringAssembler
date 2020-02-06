@@ -227,7 +227,7 @@ void try_expanding(struct mini_hash_t **h_table)
  */
 uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t key)
 {
-	atomic_bool_CAS64(&h_table->sem, 0, 1);
+	atomic_add_and_fetch64(&h_table->sem, 1);
 	uint64_t i;
 	uint64_t mask = h_table->size;
 	uint64_t slot = key % mask;
@@ -258,7 +258,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 			atomic_add_and_fetch64(&(h_table->count), 1);
 		slot = i;
 	}
-	atomic_bool_CAS64(&h_table->sem, 1, 0);
+	atomic_add_and_fetch64(&h_table->sem, -1);
 	return h_table->h + slot;
 }
 
@@ -319,7 +319,7 @@ uint64_t *mini_put(struct mini_hash_t **h_table, uint64_t data)
 {
 	struct mini_hash_t *table = *h_table;
 	if (table->count > table->max_cnt) {
-		while (atomic_bool_CAS64(&table->sem, 1, 1)){}
+		while (!atomic_bool_CAS64(&table->sem, 0, 0)){}
 		pthread_mutex_lock(&h_table_mut);
 		try_expanding(h_table);
 		pthread_mutex_unlock(&h_table_mut);
