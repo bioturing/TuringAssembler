@@ -246,7 +246,7 @@ uint64_t *mini_put_by_key(struct mini_hash_t *h_table, uint64_t data, uint64_t k
 			atomic_add_and_fetch64(&(h_table->count), 1);
 		slot = i;
 	}
-	atomic_add_and_fetch64(&h_table->sem, -1);
+	atomic_sub_and_fetch64(&h_table->sem, 1);
 	return h_table->h + slot;
 }
 
