@@ -1299,10 +1299,8 @@ void *count_kmer_ite(void *data)
 
 void add_count(struct read_t *r, int ksize, struct mini_hash_t **h)
 {
-	char *kmer = calloc(ksize + 1, sizeof(char));
 	for (int i = 0; i + ksize <= r->len; ++i){
-		strncpy(kmer, r->seq + i, ksize);
-		uint64_t hash = MurmurHash3_x64_64(kmer, ksize);
+		uint64_t hash = MurmurHash3_x64_64(r->seq + i, ksize);
 		mini_put(h, hash);
 	}
 }

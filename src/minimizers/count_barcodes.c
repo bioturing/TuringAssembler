@@ -195,7 +195,7 @@ void mini_expand(struct mini_hash_t **new_table_ptr)
 		slot = mini_put_by_key(new_table, data, key);
 		*slot = val;
 	}
-//	destroy_mini_hash(h_table);
+	destroy_mini_hash(h_table);
 	*new_table_ptr = new_table;
 	log_debug("new size %d", new_table->prime_index);
 }
