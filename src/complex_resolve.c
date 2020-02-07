@@ -778,8 +778,11 @@ void upsize_graph(struct opt_proc_t *opt, int super_k, struct asm_graph_t *g,
 {
 	khash_t(long_int) *node_map_fw = kh_init(long_int);
 	khash_t(long_int) *node_map_bw = kh_init(long_int);
-	struct mini_hash_t *kmer_table = count_kmer_simple(opt, super_k,
-						opt->files_1[0], opt->files_2[0]);
+	struct mini_hash_t *kmer_table = get_kmer_count_from_kmc(super_k,
+					opt->n_files, opt->files_1, opt->files_2,
+					opt->n_threads, opt->mmem, opt->out_dir);
+	//struct mini_hash_t *kmer_table = count_kmer_simple(opt, super_k,
+	//					opt->files_1[0], opt->files_2[0]);
 	log_info("Creating super nodes");
 	int estimate_node = 0, estimate_edge = 0;
 	estimate_something(g, &estimate_edge, &estimate_node);
