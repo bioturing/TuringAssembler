@@ -985,6 +985,7 @@ void create_super_edges_multi(struct opt_proc_t *opt, struct asm_graph_t *g,
 		worker_bundle[i].edge_id_lock = &edge_id_lock;
 		worker_bundle[i].supg_node_locks = supg_node_locks;
 		worker_bundle[i].count_resolve = &count_resolve;
+		worker_bundle[i].opt = opt;
 	}
 
 	pthread_attr_t attr;
@@ -1064,23 +1065,25 @@ void *create_super_edges_ite(void *data)
 			atomic_add_and_fetch32(*bundle->count_resolve + 2, 1);
 		}
 
-		//if (accept)
-		//	continue;
+		if (accept)
+			continue;
 
+		if (g->ksize < bundle->opt->k1 / 2)
+			continue;
 
-		//for (int i = 0; i < g->nodes[u_rc].deg; ++i){
-		//	int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
-		//	for (int j = 0; j < g->nodes[u].deg; ++j){
-		//		int e2 = g->nodes[u].adj[j];
-		//		char *big_kmer;
-		//		get_big_kmer(e1, e2, g, &big_kmer);
+		for (int i = 0; i < g->nodes[u_rc].deg; ++i){
+			int e1 = g->edges[g->nodes[u_rc].adj[i]].rc_id;
+			for (int j = 0; j < g->nodes[u].deg; ++j){
+				int e2 = g->nodes[u].adj[j];
+				char *big_kmer;
+				get_big_kmer(e1, e2, g, &big_kmer);
 
-		//		add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
-		//				node_map_fw, node_map_bw,
-		//				bundle);
-		//		free(big_kmer);
-		//	}
-		//}
+				add_super_edge_multi(u, e1, e2, supg, big_kmer, 0,
+						node_map_fw, node_map_bw,
+						bundle);
+				free(big_kmer);
+			}
+		}
 	}while (1);
 	return NULL;
 }
