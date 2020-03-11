@@ -107,6 +107,8 @@ static inline int ust_add_record(struct read_t *r, struct read_t *rI,
 		len += 5;
 		memcpy(buf + len, rI->seq, rI->len);
 		len += rI->len;
+		memcpy(buf + len, "-1", 2); //10x format
+		len += 2;
 		buf[len++] = ' ';
 		memcpy(buf + len, "QB:Z:", 5);
 		len += 5;

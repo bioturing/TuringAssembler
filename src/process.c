@@ -268,6 +268,19 @@ void build_bridge_process(struct opt_proc_t *opt)
 	build_bridge(opt);
 }
 
+void sort_read_process(struct opt_proc_t *opt)
+{
+	struct read_path_t read_sorted_path;
+	if (opt->lib_type == LIB_TYPE_SORTED) {
+		read_sorted_path.R1_path = opt->files_1[0];
+		read_sorted_path.R2_path = opt->files_2[0];
+		read_sorted_path.idx_path = opt->files_I[0];
+	} else {
+		log_info("Reads are not sorted. Sort reads by barcode sequence...");
+		sort_read(opt, &read_sorted_path);
+	}
+}
+
 void split_molecules_wrapper(struct opt_proc_t *opt)
 {
 	char path[1024];

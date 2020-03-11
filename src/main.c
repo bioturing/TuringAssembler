@@ -497,6 +497,8 @@ int main(int argc, char *argv[])
 		build_opt_process(argc, argv, &resolve_212_cov_process);
 	else if (!strcmp(argv[1], "resolve_molecule"))
 		build_opt_process(argc, argv, &resolve_molecule_process);
+	else if (!strcmp(argv[1], "sort_reads"))
+		build_opt_process(argc, argv, &sort_read_process);
 	else
 		print_usage();
 	return 0;
