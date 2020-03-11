@@ -531,7 +531,7 @@ void *ust_buffer_iterator(void *data)
 					buf + buf_len + 16, input_format);
 			len2 = ust_add_record(&read2, &readI,
 				buf + buf_len + 16 + len1, input_format);
-			if (record_len != len1 + len2 + 16) {
+			if (record_len != len1 + len2 + 16 + 4) { //add -1 two times so ++4
 				fprintf(stderr, "record_len = %d; sum_len = %d\n",
 					record_len, len1 + len2 + 16);
 				assert(0);
