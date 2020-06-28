@@ -1143,8 +1143,15 @@ void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *sca
 				g->edges[paths[i][0]].seq_len);
 		fprintf(f, "%s", seq);
 		for (int j = 1; j < path_lens[i]; ++j){
-			fprintf(f, "%s", bridges[p] +
-					g->edges[paths[i][j - 1]].seq_len);
+			int len = strlen(bridges[p]);
+			int p_n = g->edges[paths[i][j - 1]].seq_len;
+			if (bridges[p][p_n] == 'N') {
+				while (p_n < len && bridges[p][p_n] == 'N')
+					++p_n;
+				for (int k = 0; k < 100; ++k)
+					fprintf(f, "N");
+			}
+			fprintf(f, "%s", bridges[p] + p_n);
 			++p;
 		}
 		free(seq);
