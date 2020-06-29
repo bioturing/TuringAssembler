@@ -684,6 +684,20 @@ void join_bridge_no_path(struct asm_graph_t *g, struct asm_graph_t *lg,
 			emap1->gpos, emap1->lpos, SYNC_MAX_GLOBAL, &first);
 	sync_global_local_edge(g->edges[emap2->gl_e], lg->edges[emap2->lc_e],
 			emap2->gpos, emap2->lpos, SYNC_MAX_LOCAL, &second);
+	if (strlen(first) < g->edges[emap1->gl_e].seq_len) {
+		FILE *f = fopen("./N.log", "w");
+		fprintf(f, "global edge = %d\n", emap1->gl_e);
+		char *tmp;
+		decode_seq(&tmp, g->edges[emap1->gl_e].seq,
+				g->edges[emap1->gl_e].seq_len);
+		fprintf(f, "%s\n", tmp);
+		decode_seq(&tmp, lg->edges[emap1->lc_e].seq,
+				lg->edges[emap1->lc_e].seq_len);
+		fprintf(f, "%s\n", tmp);
+		fprintf(f, "%s\n", first);
+		fclose(f);
+		exit(0);
+	}
 	char *dump_N;
 	get_dump_N(&dump_N);
 	join_seq(res_seq, first);
