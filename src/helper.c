@@ -61,13 +61,6 @@ void swap(void *a, void *b, int size)
 	free(c);
 }
 
-void get_dump_N(char **N)
-{
-	*N = (char *) calloc(101, sizeof(char));
-	for (int i = 0; i < 100; ++i)
-		(*N)[i] = 'N';
-}
-
 int min(int a, int b)
 {
 	return a < b ? a : b;

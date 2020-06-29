@@ -13,7 +13,6 @@ void encode_seq(uint32_t **dest, char *source);
 void decode_seq(char **dest, uint32_t *source, int len);
 char flip(char base);
 void swap(void *a, void *b, int size);
-void get_dump_N(char **N);
 int recursive_delete_files(char *dir);
 int check_file_exist(char *path);
 int delete_file(char *file_path);
