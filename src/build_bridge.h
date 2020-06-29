@@ -18,6 +18,7 @@
 #define BRIDGE_MULTIPLE_PATH 2
 #define BRIDGE_PATH_NOT_FOUND 3
 #define N_BRIDGE_TYPE 4
+#define DUMP_N_LEN 100
 #include <stdlib.h>
 #include "assembly_graph.h"
 #include "verbose.h"
@@ -130,4 +131,5 @@ void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *sca
 void condense_check_degenerate(struct opt_proc_t *opt, struct asm_graph_t *g,
 		struct asm_graph_t *lg, struct edge_map_info_t *emap1,
 		struct edge_map_info_t *emap2);
+void get_dump_N(char **N);
 #endif

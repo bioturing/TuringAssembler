@@ -1130,6 +1130,13 @@ void get_local_assembly_query(struct scaffold_record_t *scaffolds,
 	query->process_pos = 0;
 }
 
+void get_dump_N(char **N)
+{
+	*N = (char *) calloc(DUMP_N_LEN + 1, sizeof(char));
+	for (int i = 0; i < DUMP_N_LEN; ++i)
+		(*N)[i] = 'N';
+}
+
 void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *scaffolds,
 		char **bridges)
 {
@@ -1148,7 +1155,7 @@ void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *sca
 			if (bridges[p][p_n] == 'N') {
 				while (p_n < len && bridges[p][p_n] == 'N')
 					++p_n;
-				for (int k = 0; k < 100; ++k)
+				for (int k = 0; k < DUMP_N_LEN; ++k)
 					fprintf(f, "N");
 			}
 			fprintf(f, "%s", bridges[p] + p_n);
