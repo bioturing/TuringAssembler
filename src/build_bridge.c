@@ -598,7 +598,7 @@ void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 			lg.edges[local_edge].seq_len);
 
 	if (lpos2.start < lpos1.end){
-		int diff = lpos2.start - lpos1.end;
+		int diff = lpos1.end - lpos2.start;
 		lpos2.start = lpos1.end;
 		gpos2.start += diff;
 	}
@@ -610,7 +610,7 @@ void join_trivial_bridge(struct asm_edge_t e1, struct asm_edge_t e2,
 	len += gpos1.end;
 	strncpy(*res_seq + len, local_seq + lpos1.end, lpos2.start - lpos1.end);
 	len += lpos2.start - lpos1.end;
-	strncpy(*res_seq + len, edge_seq2, e2.seq_len - gpos2.start);
+	strcpy(*res_seq + len, edge_seq2 + gpos2.start);
 	len += e2.seq_len - gpos2.start;
 	free(edge_seq1);
 	free(edge_seq2);
