@@ -1145,23 +1145,26 @@ void print_bridges(FILE *f, struct asm_graph_t *g, struct scaffold_record_t *sca
 	int *path_lens = scaffolds->path_lens;
 	for (int i = 0; i < scaffolds->n_paths; ++i){
 		fprintf(f, ">contig_%d\n", i);
-		char *seq;
-		decode_seq(&seq, g->edges[paths[i][0]].seq,
-				g->edges[paths[i][0]].seq_len);
-		fprintf(f, "%s", seq);
+		int last_replace_p = 0;
 		for (int j = 1; j < path_lens[i]; ++j){
-			int len = strlen(bridges[p]);
-			int p_n = g->edges[paths[i][j - 1]].seq_len;
-			if (bridges[p][p_n] == 'N') {
-				while (p_n < len && bridges[p][p_n] == 'N')
-					++p_n;
-				for (int k = 0; k < DUMP_N_LEN; ++k)
-					fprintf(f, "N");
+			int p_org = g->edges[paths[i][j]].seq_len;
+			int p_bridge = strlen(bridges[p]);
+			char *seq;
+			decode_seq(&seq, g->edges[paths[i][j]].seq,
+					g->edges[paths[i][j]].seq_len);
+			while (p_org > 0 && p_bridge > 0
+				&& seq[p_org - 1] == bridges[p][p_bridge - 1]) {
+				--p_org;
+				--p_bridge;
 			}
-			fprintf(f, "%s", bridges[p] + p_n);
+			free(seq);
+
+			if (j + 1 < path_lens[i])
+				bridges[p][p_bridge] = '\0';
+			fprintf(f, "%s", bridges[p] + last_replace_p);
+			last_replace_p = p_org;
 			++p;
 		}
-		free(seq);
 		fprintf(f, "\n");
 	}
 }
