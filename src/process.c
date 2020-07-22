@@ -644,22 +644,23 @@ void assembly3_process(struct opt_proc_t *opt)
 	/**
 	 * Get readpair count
 	 */
-	read_pairs_count_process(opt);
+	//read_pairs_count_process(opt);
 
 	/**
 	 * resolve by readpairs
 	 */
-	set_log_stage("Get long contig by readpairs");
-	get_long_contigs_by_readpairs(opt);
+	//set_log_stage("Get long contig by readpairs");
+	//get_long_contigs_by_readpairs(opt);
 
 	/**
 	 * Build barcodes
 	 */
 //	char lv3_path[1024];
 //	sprintf(lv3_path, "%s/graph_k_%d_level_3.bin", opt->out_dir, opt->k0);
-	set_log_stage("BWAIndex");
-	build_barcode_process_fasta(opt);
+	//set_log_stage("BWAIndex");
+	//build_barcode_process_fasta(opt);
 
+	build_barcode_info(opt);
 	/**
 	* Scaffolding
 	*/
